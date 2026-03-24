@@ -2,11 +2,11 @@
 
 ## Document Purpose
 
-This document defines the high-level game design and separates the full game design from the current vertical slice implementation scope.
+This document defines the high-level game design, shared terminology, and the boundary between the full game design and the current vertical slice.
 
-- Full battle details live in [battle_rules.md](./battle_rules.md).
-- Full draft details live in [draft_rules.md](./draft_rules.md).
-- Full meta progression details live in [meta_rules.md](./meta_rules.md).
+- Detailed battle rules live in [battle_rules.md](./battle_rules.md).
+- Draft rules live in [draft_rules.md](./draft_rules.md).
+- Meta progression rules live in [meta_rules.md](./meta_rules.md).
 
 ## Game Snapshot
 
@@ -29,7 +29,7 @@ The full game design loop is:
 
 ### Current Vertical Slice Implementation Scope
 
-The current vertical slice implementation scope is intentionally narrower:
+The current vertical slice is intentionally narrower:
 
 1. Use fixed decks instead of draft
 2. Complete exactly one battle
@@ -55,9 +55,12 @@ The current vertical slice does not implement:
 ### Protected Leader
 
 - Each player has a Master Unit.
-- A battle ends when a Master Unit's HP reaches 0.
-
-> TBD: Master Unit base HP, attack value, board placement, attackability rules, and unique abilities are not fixed yet.
+- A battle ends when a Master Unit's HP reaches 0 or below.
+- The Master Unit is a 1x1 unit placed on the player's own field.
+- The Master Unit starts at `(2,1)`.
+- The Master Unit is a movable melee attacker.
+- The Master Unit has `333 HP` and `3 ATK`.
+- The Master Unit follows the same targeting and melee counterattack rules as other melee units.
 
 ### Card Types
 
@@ -73,13 +76,17 @@ The current vertical slice does not implement:
 ### Field Model
 
 - Each player has 2 rows and 5 columns.
-- For each player, the row farther from that player is the front row.
-- For each player, the row nearer to that player is the back row.
+- Coordinates use `(column, row)` notation.
+- Column values run from `0` to `4`, left to right.
+- Row `0` is the front row.
+- Row `1` is the back row.
 - One tile can hold at most one occupant.
+- Units and buildings occupy field tiles.
+- Persistent spells do not occupy field tiles.
 
 Some cards may occupy more than one tile.
 
-> TBD: Multi-tile footprint shape, orientation, and movement rules are not fixed yet.
+> TBD: Multi-tile footprint shape, orientation, and placement rules are not fixed yet.
 
 ## Glossary
 
@@ -87,27 +94,31 @@ Some cards may occupy more than one tile.
 | --- | --- |
 | Battle | One match between the player and an AI opponent |
 | Run | A multi-battle progression sequence that ends at 33 wins or 3 losses |
-| Master Unit | The protected leader unit whose HP reaching 0 causes defeat |
-| Front Row | The row farther from the owning player |
-| Back Row | The row nearer to the owning player |
-| Melee | Attack type that follows front-row blocking rules |
-| Ranged | Attack type that can target enemy tiles regardless of front-row blockers |
-| Gold (battle resource) | In-battle resource gained by battle rules and card effects |
-| Resource Gold (meta currency) | Out-of-battle currency used for shop, upgrades, and tickets |
+| Master Unit | The protected leader unit whose HP reaching 0 or below causes defeat |
+| Front Row | Row `0`, the row farther from the owning player |
+| Back Row | Row `1`, the row nearer to the owning player |
+| Melee | Attack type that follows front-row blocking rules and only counterattacks against other melee attackers |
+| Ranged | Attack type that can target enemy occupied tiles regardless of front-row blockers and never counterattacks |
+| Gold | In-battle resource used to play cards and gained by battle rules and card effects |
+| Resource Gold | Out-of-battle currency used for shop, upgrades, and tickets |
 | Occupied Tile | A tile currently taken by a unit or building |
 | Occupancy Size | The number of tiles a card requires when summoned |
+| Disabled | A temporary science-civilization state that prevents attack, movement, counterattack, effect use, and effect text while making the unit take double damage |
+| Persistent Spell | A spell whose effect remains in a separate persistent zone after the card itself is cast and sent to the discard pile |
 
 ## Core Systems Overview
 
 ### Battle System
 
 - Random first player / second player
-- Opening hand and mulligan
-- Turn structure with draw/resource calculation, gain, main phase, and turn end
+- Opening hands of `3` for first player and `4` for second player
+- One mulligan per player, using Hearthstone-style partial replacement
+- Starting resources of `0 mana`, `0 qi`, `0 power`, and `3 gold`
+- Turn structure with draw/resource calculation, gain, science power payment, main phase, and turn end
 - Summon, move, attack, and spell usage in the main phase
 - Melee and ranged targeting rules
-- Counterattack rule for melee-versus-melee only
-- Deck depletion damage when the deck is exhausted
+- Melee-versus-melee counterattack only
+- Draw failure damage to the Master Unit when the deck is empty
 
 See [battle_rules.md](./battle_rules.md).
 
@@ -138,20 +149,8 @@ See [meta_rules.md](./meta_rules.md).
 
 ## Open Issues / TBD
 
-> TBD: Master Unit base stats and board rules
+> TBD: Multi-tile unit and building footprint rules
 
-> TBD: Exact mulligan procedure
+> TBD: Full civilization roster and any civilization rules beyond the confirmed science power-upkeep rule
 
-> TBD: Exact formula for mana, qi, and power gain at turn start
-
-> TBD: Caps, persistence, and reset rules for mana, qi, power, and battle gold
-
-> TBD: Spell timing, targeting, and cost rules
-
-> TBD: Multi-tile card footprint and placement rules
-
-> TBD: Deck depletion damage target and timing details
-
-> TBD: Direct attack rules against the Master Unit
-
-> TBD: Civilization roster and power upkeep handling, including science civilization specifics
+> TBD: Any cross-battle carryover rules for battle resources in the full multi-battle run

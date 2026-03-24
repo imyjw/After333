@@ -28,7 +28,7 @@ The following systems are outside the current vertical slice implementation scop
 - Multi-battle run progression
 - 33 cumulative win tracking
 - 3 cumulative loss tracking
-- Run end reward payout
+- Run-end reward payout
 - Shop
 - Card upgrades
 - Ticket purchase
@@ -39,13 +39,13 @@ The current slice ends after one fixed-deck battle.
 ## Run Definition
 
 - A run is a multi-battle progression sequence.
-- A run uses one drafted 33-card deck.
+- A run uses one drafted `33`-card deck.
 - That deck is reused across repeated battles within the run.
 
 ## Run End Conditions
 
-- A run ends immediately when cumulative wins reach 33.
-- A run ends immediately when cumulative losses reach 3.
+- A run ends immediately when cumulative wins reach `33`.
+- A run ends immediately when cumulative losses reach `3`.
 
 ## Rewards
 
@@ -56,7 +56,7 @@ The current slice ends after one fixed-deck battle.
 
 ## Meta Currency
 
-### Gold (battle resource)
+### Gold
 
 - Gold is an in-battle resource.
 - Gold is used inside battle rules.
@@ -64,7 +64,7 @@ The current slice ends after one fixed-deck battle.
 
 See [battle_rules.md](./battle_rules.md).
 
-### Resource Gold (meta currency)
+### Resource Gold
 
 - Resource Gold is an out-of-battle currency.
 - Resource Gold is gained through run-end rewards.
@@ -106,7 +106,7 @@ Confirmed purpose:
 
 ## Out-of-Scope Notes for the Current Slice
 
-These items should be documented here for future implementation, but should not be treated as current slice implementation requirements:
+These items are intentionally documented for future implementation, but are not current slice requirements:
 
 - Draft UI and deck construction flow
 - Repeated battle chaining

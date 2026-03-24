@@ -22,29 +22,29 @@ This document defines the full-game draft system used to create a 33-card deck b
 
 ## Draft Objective
 
-- Build exactly one 33-card deck.
+- Build exactly one `33`-card deck.
 - That deck is then used for battle play.
 
 ## Core Draft Procedure
 
 The draft loop is:
 
-1. Present 3 candidate cards
-2. Choose 1 card
+1. Present `3` candidate cards
+2. Choose `1` card
 3. Add the chosen card to the deck
-4. Repeat until the deck contains 33 cards
+4. Repeat until the deck contains `33` cards
 
-This means the full draft performs 33 choices.
+This means the full draft performs `33` choices.
 
 ## Deck Output Rule
 
-- Final deck size after draft: 33 cards
+- Final deck size after draft: `33` cards
 - Deck editing after draft: not allowed
 
 ## Duplicate Limits
 
-- Legendary cards: maximum 1 copy
-- All non-Legendary cards: maximum 3 copies
+- Legendary cards: maximum `1` copy
+- All non-Legendary cards: maximum `3` copies
 
 ## Rarity System
 
@@ -64,7 +64,7 @@ Confirmed appearance rule:
 
 Confirmed:
 
-- Each pick presents exactly 3 cards
+- Each pick presents exactly `3` cards
 - Rarity affects how often cards appear
 
 Not yet fixed:
@@ -79,11 +79,11 @@ Not yet fixed:
 
 ## AI and Draft
 
-The current interview only fixed the player's draft rule.
+The player draft rule is fixed, but the full-game AI deck source is not.
 
 > TBD: Whether AI opponents use drafted decks, fixed decks, generated decks, or curated encounter decks in the full game loop
 
-## Document Reference Notes
+## Relationship to Other Documents
 
 - [game_design.md](./game_design.md) explains why draft is outside the current vertical slice implementation scope.
 - [battle_rules.md](./battle_rules.md) defines how the finished deck behaves in battle.
