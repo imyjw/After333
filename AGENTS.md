@@ -108,11 +108,13 @@ Each turn follows this order:
 - All battle resources have no maximum.
 - Unspent battle resources persist between turns.
 - Unit, building, and spell cards all pay their listed battle-resource costs.
+- Gold can substitute for missing mana, qi, and power at a `1:1` rate when paying card costs.
+- Typed resources are spent first when available, then gold covers any remaining mana/qi/power deficit, and finally any listed gold cost is paid from gold.
 - Ongoing payment exists only when a rule or card text explicitly says so.
 
 ### Hand, Deck, And Draw Failure
 
-- Maximum hand size is `9`.
+- Maximum hand size is `13`.
 - If a draw would exceed hand size:
   - the card is not drawn
   - it does not remain in the deck
@@ -138,8 +140,9 @@ No separate global action-point system exists.
 ### Movement
 
 - A movable unit can move to any empty tile on its owner's field.
+- If the chosen destination tile contains another allied movable unit, the two units swap positions instead of blocking the action.
 - Movement is direct.
-- Occupied tiles cannot be moved onto.
+- Occupied tiles that do not contain another allied movable unit cannot be moved onto.
 - Buildings cannot move.
 - Immobile units cannot move.
 - A movable unit may move on the turn it is summoned.

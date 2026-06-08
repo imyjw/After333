@@ -131,6 +131,8 @@ Each turn follows this sequence:
 
 - Mana, qi, power, and gold have no maximum value.
 - Unspent mana, qi, power, and gold persist between turns.
+- Gold can substitute for missing mana, qi, and power at a `1:1` rate when paying card costs.
+- When a card cost includes both gold and another battle resource, pay the listed resource first if available and use gold to cover any remaining deficit.
 
 ## Science-Civilization Power Payment
 
@@ -157,7 +159,7 @@ When a science-civilization unit is disabled:
 - It cannot counterattack.
 - Its effects do not activate.
 - Its effects and special effects are treated as nullified.
-- It takes double damage when attacked.
+- It takes triple damage when attacked.
 - It still occupies its tile.
 - It can still be targeted by attacks and effects.
 - It does not participate in front-row blocking.
@@ -166,7 +168,8 @@ When a science-civilization unit is disabled:
 
 ### Maximum Hand Size
 
-- Maximum hand size is `9`.
+- Maximum hand size is `10`.
+- Some effects may increase maximum hand size, but it can never exceed `13`.
 
 If a draw would exceed the maximum hand size:
 
@@ -215,6 +218,7 @@ Unless another rule or effect says otherwise:
 - Unit, building, and spell cards all use their listed battle-resource costs.
 - Those costs may include mana, qi, power, gold, or any combination defined by the card.
 - Playing or casting a card pays its listed cost once.
+- Gold may substitute for missing mana, qi, or power at a `1:1` rate during that payment.
 - Additional ongoing payment only exists when a rule or card text specifically says so.
 
 ## Summon Rules
@@ -227,9 +231,11 @@ Unless another rule or effect says otherwise:
 ## Move Rules
 
 - The player selects one of their own movable units.
-- The player then selects an empty tile on their own field.
+- The player then selects a tile on their own field.
 - The unit moves directly to that tile.
-- Movement is not allowed onto occupied tiles.
+- If the selected destination tile is empty, the unit moves there normally.
+- If the selected destination tile is occupied by another allied movable unit, the two units swap positions instead.
+- Movement is not allowed onto occupied tiles that do not contain another allied movable unit.
 - Immobile units cannot move.
 - Buildings cannot move.
 - A movable unit may move on the same turn it is summoned.
@@ -239,6 +245,7 @@ Unless another rule or effect says otherwise:
 ### Units
 
 - Units normally attack once per turn.
+- A unit with `0` ATK cannot attack.
 - Some card effects may allow two or more attacks in a turn.
 - A unit summoned this turn cannot normally attack until the next turn.
 - Some special effects can override that restriction.
@@ -246,6 +253,7 @@ Unless another rule or effect says otherwise:
 ### Buildings
 
 - Some buildings can attack.
+- A building with `0` ATK cannot attack.
 - Any building that can attack is always treated as a ranged attacker.
 - An attack-capable building normally cannot attack on the turn it is summoned.
 - Some special effects can override that restriction.
@@ -303,6 +311,7 @@ Using the same example above, all of the following are targetable by ranged atta
 ### Core Rule
 
 Only melee-versus-melee combat causes a counterattack.
+An occupant with `0` ATK cannot counterattack.
 
 ### Resolution Matrix
 
@@ -363,3 +372,4 @@ Only melee-versus-melee combat causes a counterattack.
 > TBD: Any targeting or resolution rules that are unique to multi-tile cards
 
 > TBD: Full civilization roster and any civilization rules beyond the confirmed science power-upkeep rule
+

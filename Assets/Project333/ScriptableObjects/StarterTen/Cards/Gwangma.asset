@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d156977586279774da74f0d5231a78e4, type: 3}
+  m_Name: Gwangma
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.UnitCardDefinitionAsset
+  _cardId: Gwangma
+  _displayName: "\uAD11\uB9C8"
+  _rarity: 3
+  _cost:
+    _mana: 0
+    _qi: 8
+    _power: 0
+    _gold: 0
+  _attribute: Dark
+  _affiliation: 0
+  _chargeTileFootprint: 1
+  _effectText: 
+  _specialEffectText: 'Berserker
+
+    Double Attack'
+  _boardSprite: {fileID: 21300000, guid: daf555557df49a94a930e0171156e67b, type: 3}
+  _boardAnimatorController: {fileID: 0}
+  _attackType: 0
+  _attack: 33
+  _health: 66
+  _hitsPerAttack: 2
+  _hasBerserker: 1
+  _hasEndure: 0
+  _hasGuard: 0
+  _canMove: 1
+  _isScience: 0
+  _sciencePowerUpkeep: 0
+  _turnStartResourceGain:
+    _mana: 0
+    _qi: 0
+    _power: 0
+    _gold: 0
+  _maxAttacksPerTurn: 1
+  _canAttackOnSummon: 0

@@ -10,7 +10,7 @@ This document defines the high-level game design, shared terminology, and the bo
 
 ## Game Snapshot
 
-- Genre: 2.5D mobile portrait turn-based card game
+- Genre: 2.5D mobile landscape turn-based card game
 - Current play mode: offline single-player versus AI
 - Field size: each player owns a 5x2 tile field
 - Core deck concept: build a 33-card deck through a 3-choose-1 draft
@@ -103,7 +103,7 @@ Some cards may occupy more than one tile.
 | Resource Gold | Out-of-battle currency used for shop, upgrades, and tickets |
 | Occupied Tile | A tile currently taken by a unit or building |
 | Occupancy Size | The number of tiles a card requires when summoned |
-| Disabled | A temporary science-civilization state that prevents attack, movement, counterattack, effect use, and effect text while making the unit take double damage |
+| Disabled | A temporary science-civilization state that prevents attack, movement, counterattack, effect use, and effect text while making the unit take triple damage |
 | Persistent Spell | A spell whose effect remains in a separate persistent zone after the card itself is cast and sent to the discard pile |
 
 ## Core Systems Overview
@@ -154,3 +154,5 @@ See [meta_rules.md](./meta_rules.md).
 > TBD: Full civilization roster and any civilization rules beyond the confirmed science power-upkeep rule
 
 > TBD: Any cross-battle carryover rules for battle resources in the full multi-battle run
+
+

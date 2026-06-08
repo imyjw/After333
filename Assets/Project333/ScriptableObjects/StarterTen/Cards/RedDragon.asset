@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d156977586279774da74f0d5231a78e4, type: 3}
+  m_Name: RedDragon
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.UnitCardDefinitionAsset
+  _cardId: RedDragon
+  _displayName: "\uB808\uB4DC \uB4DC\uB798\uACE4"
+  _rarity: 4
+  _cost:
+    _mana: 9
+    _qi: 0
+    _power: 0
+    _gold: 0
+  _attribute: Ignis
+  _affiliation: 1
+  _chargeTileFootprint: 1
+  _effectText: "\uB0B4 \uD134 \uC885\uB8CC \uC2DC \uC0C1\uB300\uBC29 \uD0C0\uC77C
+    \uC804\uCCB4\uC5D0 66\uB370\uBBF8\uC9C0"
+  _specialEffectText: 
+  _boardSprite: {fileID: 954118651, guid: 344e1e15725a74e4e8b22f54f47c25cd, type: 3}
+  _boardAnimatorController: {fileID: 9100000, guid: 96d2d0d396818d24dbc6380f8d565c28, type: 2}
+  _attackType: 0
+  _attack: 66
+  _health: 66
+  _hitsPerAttack: 1
+  _hasBerserker: 0
+  _hasEndure: 0
+  _hasGuard: 0
+  _canMove: 1
+  _isScience: 0
+  _sciencePowerUpkeep: 0
+  _turnStartResourceGain:
+    _mana: 0
+    _qi: 0
+    _power: 0
+    _gold: 0
+  _maxAttacksPerTurn: 1
+  _canAttackOnSummon: 0
