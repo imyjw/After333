@@ -7,6 +7,7 @@ using Project333.Runtime.Infrastructure.Data;
 using Project333.Runtime.Presentation.Cards;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace Project333.Runtime.Presentation.Battle
@@ -22,14 +23,22 @@ namespace Project333.Runtime.Presentation.Battle
         private const string AutoPreviewOverlayName = "CardPreviewOverlay";
         private const string AutoPreviewBackdropName = "PreviewBackdrop";
         private const string AutoPreviewImageName = "PreviewCardImage";
+        private const string AutoPreviewTooltipRootName = "PreviewSpecialEffectTooltips";
+        private const string AutoPreviewTooltipPanelPrefix = "SpecialEffectTooltip";
+        private const string AutoPreviewTooltipTitleName = "Title";
+        private const string AutoPreviewTooltipDescriptionName = "Description";
         private const string AutoInteractionSurfaceName = "TileInteractionSurface";
         private const string CheonraJimangEffectId = "cheonra_jimang";
         private const string CheonraJimangMarkResourcePath = "Project333/SpellEffects/CheonraJimangMark";
         private static readonly Vector2 DefaultOccupantVisualLiftOffset = new Vector2(0f, 60f);
+        private static readonly Vector2 DefaultOccupantVisualReferenceTileSize = new Vector2(80f, 80f);
 
         private static RectTransform s_previewOverlayRoot;
         private static Image s_previewBackdropImage;
         private static Image s_previewCardImage;
+        private static RectTransform s_previewTooltipRoot;
+        private static readonly List<PreviewTooltipPanel> PreviewTooltipPanels =
+            new List<PreviewTooltipPanel>();
         private static RectTransform s_spellEffectOverlayRoot;
         private static RectTransform s_valuePopupOverlayRoot;
         private static Sprite s_cheonraJimangMarkSprite;
@@ -65,11 +74,14 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private RectTransform _occupantVisualRoot;
         [SerializeField] private Image _occupantVisualImage;
         [SerializeField] private Animator _occupantVisualAnimator;
+        [SerializeField] private SpriteRenderer _occupantVisualSpriteRenderer;
         [SerializeField] private bool _showOccupantVisual = true;
         [SerializeField] private Vector2 _occupantVisualSize = new Vector2(96f, 96f);
         [SerializeField] private Vector2 _occupantVisualAnchoredPosition = Vector2.zero;
         [SerializeField] private Vector2 _occupantVisualFineOffset = Vector2.zero;
         [SerializeField] private float _occupantVisualScaleMultiplier = 1.5f;
+        [Tooltip("Tile size at which Occupant Visual Size is used without additional responsive scaling.")]
+        [SerializeField] private Vector2 _occupantVisualReferenceTileSize = new Vector2(80f, 80f);
         [SerializeField] private bool _overrideOccupantVisualSorting = true;
         [SerializeField] private int _occupantVisualSortingOrder = 250;
         [Header("Occupant Stats")]
@@ -81,9 +93,12 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private Color _occupantStatBarColor = new Color(0.08f, 0.08f, 0.1f, 0.82f);
         [SerializeField] private Color _occupantStatTextColor = Color.white;
         [SerializeField] private Color _occupantStatIconColor = Color.white;
-        [SerializeField] private Color _occupantStatDisabledBarColor = new Color(0.18f, 0.18f, 0.2f, 0.88f);
-        [SerializeField] private Color _occupantStatDisabledTextColor = new Color(0.82f, 0.82f, 0.82f, 1f);
-        [SerializeField] private Color _occupantStatDisabledIconColor = new Color(0.72f, 0.72f, 0.72f, 1f);
+        [FormerlySerializedAs("_occupantStatDisabledBarColor")]
+        [SerializeField] private Color _occupantStatErasureBarColor = new Color(0.18f, 0.18f, 0.2f, 0.88f);
+        [FormerlySerializedAs("_occupantStatDisabledTextColor")]
+        [SerializeField] private Color _occupantStatErasureTextColor = new Color(0.82f, 0.82f, 0.82f, 1f);
+        [FormerlySerializedAs("_occupantStatDisabledIconColor")]
+        [SerializeField] private Color _occupantStatErasureIconColor = new Color(0.72f, 0.72f, 0.72f, 1f);
         [Header("Spell Effects")]
         [SerializeField] private Vector2 _spellEffectSize = new Vector2(220f, 220f);
         [SerializeField] private Vector2 _spellEffectOffset = Vector2.zero;
@@ -105,9 +120,21 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private Vector2 _cardPreviewSize = new Vector2(440f, 620f);
         [SerializeField] private Color _cardPreviewBackdropColor = new Color(0f, 0f, 0f, 0.74f);
         [SerializeField] private int _cardPreviewSortingOrder = 5000;
+        [Header("Card Preview Special Effect Tooltips")]
+        [SerializeField] private TMP_FontAsset _cardPreviewTooltipFont;
+        [SerializeField] private Vector2 _cardPreviewTooltipSize = new Vector2(340f, 116f);
+        [SerializeField] private float _cardPreviewTooltipSideGap = 28f;
+        [SerializeField] private float _cardPreviewTooltipVerticalGap = 12f;
+        [SerializeField] private float _cardPreviewTooltipEdgePadding = 24f;
+        [SerializeField] private int _cardPreviewTooltipTitleFontSize = 24;
+        [SerializeField] private int _cardPreviewTooltipDescriptionFontSize = 17;
+        [SerializeField] private Color _cardPreviewTooltipPanelColor = new Color(0.055f, 0.07f, 0.085f, 0.96f);
+        [SerializeField] private Color _cardPreviewTooltipBorderColor = new Color(0.88f, 0.7f, 0.32f, 0.95f);
+        [SerializeField] private Color _cardPreviewTooltipTitleColor = new Color(1f, 0.88f, 0.5f, 1f);
+        [SerializeField] private Color _cardPreviewTooltipDescriptionColor = new Color(0.95f, 0.96f, 1f, 1f);
         [Header("Animation States")]
         [SerializeField] private string _idleStateName = "Idle";
-        [SerializeField] private string _disabledStateName = "Disabled";
+        [SerializeField] private string _drainedStateName = "Drained";
         [SerializeField] private string _runStateName = "Run";
         [SerializeField] private string _attackStateName = "Attack";
         [SerializeField] private string _beAttackedStateName = "BeAttacked";
@@ -123,7 +150,7 @@ namespace Project333.Runtime.Presentation.Battle
         private string _lastVisualRuntimeId = string.Empty;
         private Sprite _lastVisualSprite;
         private RuntimeAnimatorController _lastVisualController;
-        private bool _lastVisualWasDisabled;
+        private bool _lastVisualWasDrained;
         private bool _isVisualActive;
         private Canvas _occupantVisualCanvas;
         private SpriteAnimationSequence _activeSpriteSequence;
@@ -163,6 +190,11 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void OnValidate()
         {
+            if (_occupantVisualReferenceTileSize.x <= 0f || _occupantVisualReferenceTileSize.y <= 0f)
+            {
+                _occupantVisualReferenceTileSize = DefaultOccupantVisualReferenceTileSize;
+            }
+
             AutoAssignView();
             AutoAssignBootstrapper();
             AutoAssignVisualReferences();
@@ -176,6 +208,7 @@ namespace Project333.Runtime.Presentation.Battle
             Refresh();
             EnsureInteractionSurface();
             AdvanceSampledAnimation();
+            SyncAnimatedVisualSprite();
             ApplyPulse();
         }
 
@@ -238,6 +271,16 @@ namespace Project333.Runtime.Presentation.Battle
             return transform.position;
         }
 
+        public float GetResponsiveTileScale()
+        {
+            var tileBackgroundRect = FindTileBackgroundRect();
+            return tileBackgroundRect == null
+                ? 1f
+                : BoardResponsiveLayoutCalculator.CalculateUniformTileScale(
+                    tileBackgroundRect.rect.size,
+                    _occupantVisualReferenceTileSize);
+        }
+
         public Vector3 GetTileAnchorWorldPosition()
         {
             return GetTileAnchorWorldPosition(Vector2.zero);
@@ -248,7 +291,8 @@ namespace Project333.Runtime.Presentation.Battle
             var tileBackgroundRect = FindTileBackgroundRect();
             if (tileBackgroundRect != null)
             {
-                return tileBackgroundRect.TransformPoint(localOffset);
+                var scaledOffset = localOffset * GetResponsiveTileScale();
+                return tileBackgroundRect.TransformPoint(scaledOffset);
             }
 
             if (_interactionSurfaceRoot != null)
@@ -280,6 +324,28 @@ namespace Project333.Runtime.Presentation.Battle
             return targetRect != null && RectTransformUtility.RectangleContainsScreenPoint(targetRect, screenPoint, null);
         }
 
+        public void ApplyResponsiveTileLayout(Vector2 anchoredPosition, Vector2 tileSize)
+        {
+            AutoAssignView();
+            AutoAssignVisualReferences();
+
+            var resolvedSize = new Vector2(
+                Mathf.Max(1f, tileSize.x),
+                Mathf.Max(1f, tileSize.y));
+            var tileBackgroundRect = FindTileBackgroundRect();
+            ApplyCenteredRectLayout(tileBackgroundRect, anchoredPosition, resolvedSize);
+
+            if (_text != null)
+            {
+                ApplyCenteredRectLayout(_text.rectTransform, anchoredPosition, resolvedSize);
+            }
+
+            ApplyInteractionSurfaceLayout();
+            ApplyVisualLayout();
+            ApplyStatBarLayout();
+            ApplyPersistentMarkLayout();
+        }
+
         public void SetVisualWorldPosition(Vector3 worldPosition)
         {
             EnsureRuntimeVisualObjects();
@@ -305,9 +371,9 @@ namespace Project333.Runtime.Presentation.Battle
             PlayAnimationState(_idleStateName);
         }
 
-        public void PlayDisabledAnimation()
+        public void PlayDrainedAnimation()
         {
-            PlayAnimationState(_disabledStateName);
+            PlayAnimationState(_drainedStateName);
         }
 
         public void PlayRunAnimation()
@@ -335,9 +401,9 @@ namespace Project333.Runtime.Presentation.Battle
             return GetAnimationDurationSeconds(_idleStateName);
         }
 
-        public float GetDisabledAnimationDurationSeconds()
+        public float GetDrainedAnimationDurationSeconds()
         {
-            return GetAnimationDurationSeconds(_disabledStateName);
+            return GetAnimationDurationSeconds(_drainedStateName);
         }
 
         public float GetRunAnimationDurationSeconds()
@@ -367,6 +433,7 @@ namespace Project333.Runtime.Presentation.Battle
                 return 0f;
             }
 
+            RestoreVisualLayout();
             EnsureRuntimeSpellEffectObjects();
             if (_spellEffectRoot == null || _spellEffectImage == null)
             {
@@ -393,6 +460,21 @@ namespace Project333.Runtime.Presentation.Battle
             StartCoroutine(PlayFloatingValuePopupSequence(amount, isHealing, delaySeconds, stackIndex));
         }
 
+        public void QueueInvinciblePopup(float delaySeconds = 0f, int stackIndex = 0)
+        {
+            if (!UnityEngine.Application.isPlaying)
+            {
+                return;
+            }
+
+            StartCoroutine(PlayFloatingPopupSequence(
+                "무적",
+                new Color(1f, 0.82f, 0.2f, 1f),
+                false,
+                delaySeconds,
+                stackIndex));
+        }
+
         public bool CanShowCurrentCardPreview()
         {
             return TryGetPreviewSprite(out _);
@@ -413,6 +495,7 @@ namespace Project333.Runtime.Presentation.Battle
 
             s_previewCardImage.sprite = previewSprite;
             s_previewCardImage.enabled = true;
+            ShowCurrentSpecialEffectTooltips();
             s_previewOverlayRoot.SetAsLastSibling();
             s_previewOverlayRoot.gameObject.SetActive(true);
             return true;
@@ -425,6 +508,8 @@ namespace Project333.Runtime.Presentation.Battle
                 s_previewCardImage.sprite = null;
                 s_previewCardImage.enabled = false;
             }
+
+            HideSpecialEffectTooltips();
 
             if (s_previewOverlayRoot != null)
             {
@@ -550,7 +635,7 @@ namespace Project333.Runtime.Presentation.Battle
                 BindVisual(boardSprite, boardAnimatorController, occupant);
                 _isVisualActive = true;
             }
-            else if (_lastVisualWasDisabled != occupant.IsDisabled)
+            else if (_lastVisualWasDrained != occupant.IsDrained)
             {
                 ApplyPassiveAnimationState(occupant);
             }
@@ -619,10 +704,17 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
+            EnsureOccupantVisualSpriteRenderer();
             _occupantVisualImage.sprite = boardSprite;
             _occupantVisualImage.enabled = boardSprite != null;
+            if (_occupantVisualSpriteRenderer != null)
+            {
+                _occupantVisualSpriteRenderer.sprite = boardSprite;
+            }
+
             _occupantVisualAnimator.runtimeAnimatorController = boardAnimatorController;
             _occupantVisualAnimator.enabled = boardAnimatorController != null;
+            _occupantVisualAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             RestoreVisualLayout();
 
             if (boardAnimatorController != null)
@@ -646,11 +738,11 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void ApplyPassiveAnimationState(OccupantState occupant)
         {
-            _lastVisualWasDisabled = occupant != null && occupant.IsDisabled;
+            _lastVisualWasDrained = occupant != null && occupant.IsDrained;
 
-            if (_lastVisualWasDisabled)
+            if (_lastVisualWasDrained)
             {
-                PlayDisabledAnimation();
+                PlayDrainedAnimation();
                 return;
             }
 
@@ -664,14 +756,15 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
-            var barColor = occupant.IsDisabled
-                ? _occupantStatDisabledBarColor
+            var shouldUseSuppressedStatColors = occupant.IsDrained || occupant.IsErasure || occupant.IsSealbound;
+            var barColor = shouldUseSuppressedStatColors
+                ? _occupantStatErasureBarColor
                 : _occupantStatBarColor;
-            var textColor = occupant.IsDisabled
-                ? _occupantStatDisabledTextColor
+            var textColor = shouldUseSuppressedStatColors
+                ? _occupantStatErasureTextColor
                 : _occupantStatTextColor;
-            var iconColor = occupant.IsDisabled
-                ? _occupantStatDisabledIconColor
+            var iconColor = shouldUseSuppressedStatColors
+                ? _occupantStatErasureIconColor
                 : _occupantStatIconColor;
 
             _occupantStatHeartImage.sprite = GetHeartIconSprite();
@@ -697,7 +790,7 @@ namespace Project333.Runtime.Presentation.Battle
             _lastVisualRuntimeId = string.Empty;
             _lastVisualSprite = null;
             _lastVisualController = null;
-            _lastVisualWasDisabled = false;
+            _lastVisualWasDrained = false;
             _isVisualActive = false;
             _activeSpriteSequence = null;
             _activeSequenceFrameIndex = 0;
@@ -707,6 +800,11 @@ namespace Project333.Runtime.Presentation.Battle
             {
                 _occupantVisualAnimator.runtimeAnimatorController = null;
                 _occupantVisualAnimator.enabled = false;
+            }
+
+            if (_occupantVisualSpriteRenderer != null)
+            {
+                _occupantVisualSpriteRenderer.sprite = null;
             }
 
             if (_occupantVisualImage != null)
@@ -804,6 +902,15 @@ namespace Project333.Runtime.Presentation.Battle
 
                 animatorStateWasPlayed = true;
                 break;
+            }
+
+            if (animatorStateWasPlayed && _occupantVisualSpriteRenderer != null)
+            {
+                _activeSpriteSequence = null;
+                _activeSequenceFrameIndex = 0;
+                _activeSequenceFrameTimer = 0f;
+                SyncAnimatedVisualSprite(true);
+                return;
             }
 
             PlaySampledClip(stateName, animatorStateWasPlayed);
@@ -932,6 +1039,32 @@ namespace Project333.Runtime.Presentation.Battle
             }
         }
 
+        private void SyncAnimatedVisualSprite(bool force = false)
+        {
+            if (_occupantVisualImage == null || _occupantVisualSpriteRenderer == null)
+            {
+                return;
+            }
+
+            if (!force && _activeSpriteSequence != null)
+            {
+                return;
+            }
+
+            var sprite = _occupantVisualSpriteRenderer.sprite;
+            if (sprite == null)
+            {
+                return;
+            }
+
+            if (_occupantVisualImage.sprite != sprite)
+            {
+                _occupantVisualImage.sprite = sprite;
+            }
+
+            _occupantVisualImage.enabled = true;
+        }
+
         private SpriteAnimationSequence CreateSpriteSequence(AnimationClip matchingClip, string stateName)
         {
             if (matchingClip == null)
@@ -1001,8 +1134,41 @@ namespace Project333.Runtime.Presentation.Battle
 
             _sampleAnimationObject = new GameObject($"{AutoVisualName}_Sampler", typeof(SpriteRenderer));
             _sampleAnimationObject.hideFlags = HideFlags.HideAndDontSave;
+            _sampleAnimationObject.transform.position = new Vector3(100000f, 100000f, 0f);
             _sampleSpriteRenderer = _sampleAnimationObject.GetComponent<SpriteRenderer>();
-            _sampleSpriteRenderer.enabled = false;
+            _sampleSpriteRenderer.enabled = true;
+            _sampleSpriteRenderer.color = new Color(1f, 1f, 1f, 0f);
+        }
+
+        private void EnsureOccupantVisualSpriteRenderer()
+        {
+            if (_occupantVisualRoot == null)
+            {
+                return;
+            }
+
+            if (_occupantVisualSpriteRenderer == null)
+            {
+                _occupantVisualSpriteRenderer = _occupantVisualRoot.GetComponent<SpriteRenderer>();
+            }
+
+            if (_occupantVisualSpriteRenderer == null && UnityEngine.Application.isPlaying)
+            {
+                _occupantVisualSpriteRenderer = _occupantVisualRoot.gameObject.AddComponent<SpriteRenderer>();
+            }
+
+            ConfigureOccupantVisualSpriteRenderer();
+        }
+
+        private void ConfigureOccupantVisualSpriteRenderer()
+        {
+            if (_occupantVisualSpriteRenderer == null)
+            {
+                return;
+            }
+
+            _occupantVisualSpriteRenderer.enabled = true;
+            _occupantVisualSpriteRenderer.color = new Color(1f, 1f, 1f, 0f);
         }
 
         private void EnsureInteractionSurface()
@@ -1141,8 +1307,24 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void EnsurePreviewOverlay()
         {
-            if (s_previewOverlayRoot != null && s_previewBackdropImage != null && s_previewCardImage != null)
+            if (s_previewOverlayRoot == null)
             {
+                s_previewBackdropImage = null;
+                s_previewCardImage = null;
+                s_previewTooltipRoot = null;
+                PreviewTooltipPanels.Clear();
+            }
+            else if (s_previewTooltipRoot == null)
+            {
+                PreviewTooltipPanels.Clear();
+            }
+
+            if (s_previewOverlayRoot != null &&
+                s_previewBackdropImage != null &&
+                s_previewCardImage != null &&
+                s_previewTooltipRoot != null)
+            {
+                ApplyPreviewOverlayLayout(0);
                 return;
             }
 
@@ -1158,6 +1340,7 @@ namespace Project333.Runtime.Presentation.Battle
                 s_previewOverlayRoot = existingOverlayRoot;
                 s_previewBackdropImage = existingOverlayRoot.Find(AutoPreviewBackdropName)?.GetComponent<Image>();
                 s_previewCardImage = existingOverlayRoot.Find(AutoPreviewImageName)?.GetComponent<Image>();
+                s_previewTooltipRoot = existingOverlayRoot.Find(AutoPreviewTooltipRootName) as RectTransform;
             }
 
             if (s_previewOverlayRoot == null)
@@ -1170,16 +1353,33 @@ namespace Project333.Runtime.Presentation.Battle
                 overlayObject.transform.SetParent(overlayCanvasTransform, false);
                 s_previewOverlayRoot = overlayObject.GetComponent<RectTransform>();
 
+            }
+
+            if (s_previewBackdropImage == null)
+            {
                 var backdropObject = new GameObject(AutoPreviewBackdropName, typeof(RectTransform), typeof(Image));
                 backdropObject.transform.SetParent(s_previewOverlayRoot, false);
                 s_previewBackdropImage = backdropObject.GetComponent<Image>();
+            }
 
+            if (s_previewCardImage == null)
+            {
                 var previewImageObject = new GameObject(AutoPreviewImageName, typeof(RectTransform), typeof(Image));
                 previewImageObject.transform.SetParent(s_previewOverlayRoot, false);
                 s_previewCardImage = previewImageObject.GetComponent<Image>();
             }
 
-            if (s_previewOverlayRoot == null || s_previewBackdropImage == null || s_previewCardImage == null)
+            if (s_previewTooltipRoot == null)
+            {
+                var tooltipRootObject = new GameObject(AutoPreviewTooltipRootName, typeof(RectTransform));
+                tooltipRootObject.transform.SetParent(s_previewOverlayRoot, false);
+                s_previewTooltipRoot = tooltipRootObject.GetComponent<RectTransform>();
+            }
+
+            if (s_previewOverlayRoot == null ||
+                s_previewBackdropImage == null ||
+                s_previewCardImage == null ||
+                s_previewTooltipRoot == null)
             {
                 return;
             }
@@ -1216,7 +1416,267 @@ namespace Project333.Runtime.Presentation.Battle
             s_previewCardImage.color = Color.white;
             s_previewCardImage.preserveAspect = true;
             s_previewCardImage.raycastTarget = false;
+
+            s_previewTooltipRoot.anchorMin = Vector2.zero;
+            s_previewTooltipRoot.anchorMax = Vector2.one;
+            s_previewTooltipRoot.pivot = new Vector2(0.5f, 0.5f);
+            s_previewTooltipRoot.offsetMin = Vector2.zero;
+            s_previewTooltipRoot.offsetMax = Vector2.zero;
+            s_previewTooltipRoot.localScale = Vector3.one;
+            s_previewTooltipRoot.SetAsLastSibling();
+
+            ApplyPreviewOverlayLayout(0);
             s_previewOverlayRoot.gameObject.SetActive(false);
+        }
+
+        private void ShowCurrentSpecialEffectTooltips()
+        {
+            var occupant = _tileView == null ? null : _tileView.CurrentOccupant;
+            if (occupant == null || s_previewTooltipRoot == null)
+            {
+                HideSpecialEffectTooltips();
+                ApplyPreviewOverlayLayout(0);
+                return;
+            }
+
+            CardDefinition definition = null;
+            AutoAssignBootstrapper();
+            _battleBootstrapper?.TryGetCardDefinition(occupant.CardId, out definition);
+            var entries = OccupantSpecialEffectTooltipCatalog.Build(definition, occupant);
+
+            EnsurePreviewTooltipPanelCount(entries.Count);
+            var font = ResolvePreviewTooltipFont();
+            for (var index = 0; index < PreviewTooltipPanels.Count; index++)
+            {
+                var panel = PreviewTooltipPanels[index];
+                var visible = index < entries.Count;
+                panel.Root.gameObject.SetActive(visible);
+                if (!visible)
+                {
+                    continue;
+                }
+
+                var entry = entries[index];
+                panel.Background.color = _cardPreviewTooltipPanelColor;
+                panel.Outline.effectColor = _cardPreviewTooltipBorderColor;
+                panel.Outline.effectDistance = new Vector2(2f, -2f);
+                panel.Title.text = entry.Title;
+                panel.Title.color = _cardPreviewTooltipTitleColor;
+                panel.Title.fontStyle = FontStyles.Bold;
+                panel.Title.fontSize = Mathf.Max(10, _cardPreviewTooltipTitleFontSize);
+                panel.Title.fontSizeMax = Mathf.Max(10, _cardPreviewTooltipTitleFontSize);
+                panel.Title.fontSizeMin = Mathf.Max(8, _cardPreviewTooltipTitleFontSize * 0.58f);
+                panel.Description.text = entry.Description;
+                panel.Description.color = _cardPreviewTooltipDescriptionColor;
+                panel.Description.fontStyle = FontStyles.Normal;
+                panel.Description.fontSize = Mathf.Max(9, _cardPreviewTooltipDescriptionFontSize);
+                panel.Description.fontSizeMax = Mathf.Max(9, _cardPreviewTooltipDescriptionFontSize);
+                panel.Description.fontSizeMin = Mathf.Max(7, _cardPreviewTooltipDescriptionFontSize * 0.56f);
+                if (font != null)
+                {
+                    panel.Title.font = font;
+                    panel.Description.font = font;
+                }
+            }
+
+            s_previewTooltipRoot.gameObject.SetActive(entries.Count > 0);
+            ApplyPreviewOverlayLayout(entries.Count);
+        }
+
+        private void HideSpecialEffectTooltips()
+        {
+            for (var index = 0; index < PreviewTooltipPanels.Count; index++)
+            {
+                if (PreviewTooltipPanels[index]?.Root != null)
+                {
+                    PreviewTooltipPanels[index].Root.gameObject.SetActive(false);
+                }
+            }
+
+            if (s_previewTooltipRoot != null)
+            {
+                s_previewTooltipRoot.gameObject.SetActive(false);
+            }
+        }
+
+        private void EnsurePreviewTooltipPanelCount(int count)
+        {
+            if (s_previewTooltipRoot == null)
+            {
+                return;
+            }
+
+            for (var index = PreviewTooltipPanels.Count; index < count; index++)
+            {
+                PreviewTooltipPanels.Add(FindOrCreatePreviewTooltipPanel(index));
+            }
+        }
+
+        private PreviewTooltipPanel FindOrCreatePreviewTooltipPanel(int index)
+        {
+            var panelName = $"{AutoPreviewTooltipPanelPrefix}_{index:00}";
+            var existingRoot = s_previewTooltipRoot.Find(panelName) as RectTransform;
+            if (existingRoot != null)
+            {
+                var existingBackground = existingRoot.GetComponent<Image>();
+                var existingOutline = existingRoot.GetComponent<Outline>();
+                var existingTitle = existingRoot.Find(AutoPreviewTooltipTitleName)?.GetComponent<TMP_Text>();
+                var existingDescription = existingRoot.Find(AutoPreviewTooltipDescriptionName)?.GetComponent<TMP_Text>();
+                if (existingBackground != null &&
+                    existingOutline != null &&
+                    existingTitle != null &&
+                    existingDescription != null)
+                {
+                    return new PreviewTooltipPanel(
+                        existingRoot,
+                        existingBackground,
+                        existingOutline,
+                        existingTitle,
+                        existingDescription);
+                }
+            }
+
+            var panelObject = new GameObject(panelName, typeof(RectTransform), typeof(Image), typeof(Outline));
+            panelObject.transform.SetParent(s_previewTooltipRoot, false);
+            var panelRoot = panelObject.GetComponent<RectTransform>();
+            var background = panelObject.GetComponent<Image>();
+            var outline = panelObject.GetComponent<Outline>();
+            background.raycastTarget = false;
+
+            var titleObject = new GameObject(
+                AutoPreviewTooltipTitleName,
+                typeof(RectTransform),
+                typeof(TextMeshProUGUI));
+            titleObject.transform.SetParent(panelRoot, false);
+            var title = titleObject.GetComponent<TextMeshProUGUI>();
+            title.alignment = TextAlignmentOptions.MidlineLeft;
+            title.enableAutoSizing = true;
+            title.textWrappingMode = TextWrappingModes.NoWrap;
+            title.overflowMode = TextOverflowModes.Ellipsis;
+            title.raycastTarget = false;
+
+            var descriptionObject = new GameObject(
+                AutoPreviewTooltipDescriptionName,
+                typeof(RectTransform),
+                typeof(TextMeshProUGUI));
+            descriptionObject.transform.SetParent(panelRoot, false);
+            var description = descriptionObject.GetComponent<TextMeshProUGUI>();
+            description.alignment = TextAlignmentOptions.TopLeft;
+            description.enableAutoSizing = true;
+            description.textWrappingMode = TextWrappingModes.Normal;
+            description.overflowMode = TextOverflowModes.Ellipsis;
+            description.raycastTarget = false;
+
+            return new PreviewTooltipPanel(panelRoot, background, outline, title, description);
+        }
+
+        private void ApplyPreviewOverlayLayout(int tooltipCount)
+        {
+            if (s_previewOverlayRoot == null || s_previewCardImage == null)
+            {
+                return;
+            }
+
+            Canvas.ForceUpdateCanvases();
+            var overlaySize = s_previewOverlayRoot.rect.size;
+            if (overlaySize.x <= 1f || overlaySize.y <= 1f)
+            {
+                overlaySize = new Vector2(1920f, 1080f);
+            }
+
+            var edgePadding = Mathf.Max(0f, _cardPreviewTooltipEdgePadding);
+            var sideGap = Mathf.Max(0f, _cardPreviewTooltipSideGap);
+            var verticalGap = Mathf.Max(0f, _cardPreviewTooltipVerticalGap);
+            var baseCardSize = new Vector2(
+                Mathf.Max(1f, _cardPreviewSize.x),
+                Mathf.Max(1f, _cardPreviewSize.y));
+            var minimumPanelWidth = Mathf.Min(210f, Mathf.Max(120f, _cardPreviewTooltipSize.x));
+            var maximumCardWidth = Mathf.Max(
+                baseCardSize.x * 0.45f,
+                overlaySize.x - ((minimumPanelWidth + sideGap + edgePadding) * 2f));
+            var maximumCardHeight = Mathf.Max(baseCardSize.y * 0.45f, overlaySize.y - (edgePadding * 2f));
+            var cardScale = Mathf.Min(
+                1f,
+                maximumCardWidth / baseCardSize.x,
+                maximumCardHeight / baseCardSize.y);
+            cardScale = Mathf.Max(0.45f, cardScale);
+            var resolvedCardSize = baseCardSize * cardScale;
+            s_previewCardImage.rectTransform.sizeDelta = resolvedCardSize;
+
+            if (tooltipCount <= 0 || s_previewTooltipRoot == null)
+            {
+                return;
+            }
+
+            var leftCount = OccupantSpecialEffectTooltipCatalog.GetLeftColumnCount(tooltipCount);
+            var rightCount = tooltipCount - leftCount;
+            var largestColumnCount = Mathf.Max(1, Mathf.Max(leftCount, rightCount));
+            var sideAvailableWidth = Mathf.Max(
+                120f,
+                ((overlaySize.x - resolvedCardSize.x) * 0.5f) - sideGap - edgePadding);
+            var panelWidth = Mathf.Min(
+                Mathf.Max(120f, _cardPreviewTooltipSize.x),
+                sideAvailableWidth);
+            var availableColumnHeight = Mathf.Max(
+                90f,
+                overlaySize.y - (edgePadding * 2f) - (verticalGap * (largestColumnCount - 1)));
+            var panelHeight = Mathf.Min(
+                Mathf.Max(80f, _cardPreviewTooltipSize.y),
+                availableColumnHeight / largestColumnCount);
+            var stride = panelHeight + verticalGap;
+            var horizontalPosition = (resolvedCardSize.x * 0.5f) + sideGap + (panelWidth * 0.5f);
+
+            for (var index = 0; index < tooltipCount; index++)
+            {
+                var panel = PreviewTooltipPanels[index];
+                var isLeft = index < leftCount;
+                var localIndex = isLeft ? index : index - leftCount;
+                var columnCount = isLeft ? leftCount : rightCount;
+                var y = ((columnCount - 1) * stride * 0.5f) - (localIndex * stride);
+
+                panel.Root.anchorMin = new Vector2(0.5f, 0.5f);
+                panel.Root.anchorMax = new Vector2(0.5f, 0.5f);
+                panel.Root.pivot = new Vector2(0.5f, 0.5f);
+                panel.Root.anchoredPosition = new Vector2(isLeft ? -horizontalPosition : horizontalPosition, y);
+                panel.Root.sizeDelta = new Vector2(panelWidth, panelHeight);
+                panel.Root.localScale = Vector3.one;
+
+                ApplyPreviewTooltipTextLayout(panel, panelHeight);
+            }
+        }
+
+        private static void ApplyPreviewTooltipTextLayout(PreviewTooltipPanel panel, float panelHeight)
+        {
+            var horizontalPadding = Mathf.Clamp(panelHeight * 0.11f, 10f, 16f);
+            var verticalPadding = Mathf.Clamp(panelHeight * 0.07f, 6f, 10f);
+            var titleRatio = 0.29f;
+
+            var titleRect = panel.Title.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 1f - titleRatio);
+            titleRect.anchorMax = Vector2.one;
+            titleRect.offsetMin = new Vector2(horizontalPadding, 0f);
+            titleRect.offsetMax = new Vector2(-horizontalPadding, -verticalPadding);
+
+            var descriptionRect = panel.Description.rectTransform;
+            descriptionRect.anchorMin = Vector2.zero;
+            descriptionRect.anchorMax = new Vector2(1f, 1f - titleRatio);
+            descriptionRect.offsetMin = new Vector2(horizontalPadding, verticalPadding);
+            descriptionRect.offsetMax = new Vector2(-horizontalPadding, 0f);
+        }
+
+        private TMP_FontAsset ResolvePreviewTooltipFont()
+        {
+            if (_cardPreviewTooltipFont != null)
+            {
+                return _cardPreviewTooltipFont;
+            }
+
+            var runtimeKoreanFont = CombatLogTextView.ResolveRuntimeKoreanFontAsset();
+            return runtimeKoreanFont != null
+                ? runtimeKoreanFont
+                : _text == null
+                    ? null
+                    : _text.font;
         }
 
         private Transform ResolveOverlayCanvasTransform()
@@ -1252,7 +1712,7 @@ namespace Project333.Runtime.Presentation.Battle
         private bool ShouldLoopState(string stateName, AnimationClip matchingClip)
         {
             if (string.Equals(stateName, _idleStateName, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(stateName, _disabledStateName, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(stateName, _drainedStateName, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(stateName, _runStateName, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
@@ -1384,6 +1844,11 @@ namespace Project333.Runtime.Presentation.Battle
                 _occupantVisualAnimator = _occupantVisualRoot.GetComponent<Animator>();
             }
 
+            if (_occupantVisualRoot != null && _occupantVisualSpriteRenderer == null)
+            {
+                _occupantVisualSpriteRenderer = _occupantVisualRoot.GetComponent<SpriteRenderer>();
+            }
+
             if (_occupantVisualRoot != null && _occupantVisualCanvas == null)
             {
                 _occupantVisualCanvas = _occupantVisualRoot.GetComponent<Canvas>();
@@ -1415,6 +1880,7 @@ namespace Project333.Runtime.Presentation.Battle
                     _occupantVisualRoot.SetParent(visualParent, false);
                 }
 
+                EnsureOccupantVisualSpriteRenderer();
                 return;
             }
 
@@ -1423,13 +1889,21 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
-            var visualObject = new GameObject(AutoVisualName, typeof(RectTransform), typeof(Canvas), typeof(Image), typeof(Animator));
+            var visualObject = new GameObject(
+                AutoVisualName,
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(Image),
+                typeof(Animator),
+                typeof(SpriteRenderer));
             visualObject.transform.SetParent(visualParent, false);
 
             _occupantVisualRoot = visualObject.GetComponent<RectTransform>();
             _occupantVisualCanvas = visualObject.GetComponent<Canvas>();
             _occupantVisualImage = visualObject.GetComponent<Image>();
             _occupantVisualAnimator = visualObject.GetComponent<Animator>();
+            _occupantVisualSpriteRenderer = visualObject.GetComponent<SpriteRenderer>();
+            ConfigureOccupantVisualSpriteRenderer();
         }
 
         private Transform ResolveOccupantVisualParent()
@@ -1456,6 +1930,24 @@ namespace Project333.Runtime.Presentation.Battle
 
             var tileBackground = _text.rectTransform.parent.Find("TileBackground");
             return tileBackground as RectTransform;
+        }
+
+        private static void ApplyCenteredRectLayout(
+            RectTransform rectTransform,
+            Vector2 anchoredPosition,
+            Vector2 size)
+        {
+            if (rectTransform == null)
+            {
+                return;
+            }
+
+            rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+            rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            rectTransform.anchoredPosition = anchoredPosition;
+            rectTransform.sizeDelta = size;
+            rectTransform.localScale = Vector3.one;
         }
 
         private Image FindTileBackgroundImage()
@@ -1584,6 +2076,22 @@ namespace Project333.Runtime.Presentation.Battle
 
         private IEnumerator PlayFloatingValuePopupSequence(int amount, bool isHealing, float delaySeconds, int stackIndex)
         {
+            var popupColor = isHealing ? _healingPopupColor : _damagePopupColor;
+            yield return PlayFloatingPopupSequence(
+                amount.ToString(),
+                popupColor,
+                isHealing,
+                delaySeconds,
+                stackIndex);
+        }
+
+        private IEnumerator PlayFloatingPopupSequence(
+            string popupValue,
+            Color popupColor,
+            bool isHealing,
+            float delaySeconds,
+            int stackIndex)
+        {
             if (delaySeconds > 0f)
             {
                 yield return new WaitForSecondsRealtime(delaySeconds);
@@ -1603,8 +2111,7 @@ namespace Project333.Runtime.Presentation.Battle
 
             var popupRect = popupText.rectTransform;
             var baseAnchoredPosition = ResolveValuePopupAnchoredPosition(stackIndex);
-            var popupColor = isHealing ? _healingPopupColor : _damagePopupColor;
-            popupText.text = amount.ToString();
+            popupText.text = popupValue;
             popupText.color = popupColor;
             popupRect.anchoredPosition = baseAnchoredPosition;
             popupRect.localScale = Vector3.one;
@@ -1733,7 +2240,7 @@ namespace Project333.Runtime.Presentation.Battle
 
             popupText.fontSize = _valuePopupFontSize;
             popupText.alignment = TextAlignmentOptions.Center;
-            popupText.enableWordWrapping = false;
+            popupText.textWrappingMode = TextWrappingModes.NoWrap;
             popupText.overflowMode = TextOverflowModes.Overflow;
             popupText.raycastTarget = false;
             popupText.text = "0";
@@ -1779,12 +2286,14 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
+            var responsiveTileScale = GetResponsiveTileScale();
+            var resolvedMarkOffset = _persistentMarkOffset * responsiveTileScale;
             if (_occupantVisualRoot != null)
             {
                 _persistentMarkRoot.anchorMin = _occupantVisualRoot.anchorMin;
                 _persistentMarkRoot.anchorMax = _occupantVisualRoot.anchorMax;
                 _persistentMarkRoot.pivot = _occupantVisualRoot.pivot;
-                _persistentMarkRoot.anchoredPosition = _occupantVisualRoot.anchoredPosition + _persistentMarkOffset;
+                _persistentMarkRoot.anchoredPosition = _occupantVisualRoot.anchoredPosition + resolvedMarkOffset;
                 _persistentMarkRoot.localRotation = _occupantVisualRoot.localRotation;
             }
             else
@@ -1795,7 +2304,7 @@ namespace Project333.Runtime.Presentation.Battle
                     _persistentMarkRoot.anchorMin = tileBackgroundRect.anchorMin;
                     _persistentMarkRoot.anchorMax = tileBackgroundRect.anchorMax;
                     _persistentMarkRoot.pivot = tileBackgroundRect.pivot;
-                    _persistentMarkRoot.anchoredPosition = tileBackgroundRect.anchoredPosition + _persistentMarkOffset;
+                    _persistentMarkRoot.anchoredPosition = tileBackgroundRect.anchoredPosition + resolvedMarkOffset;
                     _persistentMarkRoot.localRotation = tileBackgroundRect.localRotation;
                 }
                 else
@@ -1803,12 +2312,12 @@ namespace Project333.Runtime.Presentation.Battle
                     _persistentMarkRoot.anchorMin = new Vector2(0.5f, 0.5f);
                     _persistentMarkRoot.anchorMax = new Vector2(0.5f, 0.5f);
                     _persistentMarkRoot.pivot = new Vector2(0.5f, 0.5f);
-                    _persistentMarkRoot.anchoredPosition = _persistentMarkOffset;
+                    _persistentMarkRoot.anchoredPosition = resolvedMarkOffset;
                     _persistentMarkRoot.localRotation = Quaternion.identity;
                 }
             }
 
-            _persistentMarkRoot.sizeDelta = _persistentMarkSize;
+            _persistentMarkRoot.sizeDelta = _persistentMarkSize * responsiveTileScale;
             _persistentMarkRoot.localScale = Vector3.one;
             _persistentMarkRoot.SetAsLastSibling();
 
@@ -1851,7 +2360,7 @@ namespace Project333.Runtime.Presentation.Battle
 
             runtimeText.fontSize = _occupantStatFontSize;
             runtimeText.alignment = alignment;
-            runtimeText.enableWordWrapping = false;
+            runtimeText.textWrappingMode = TextWrappingModes.NoWrap;
             runtimeText.overflowMode = TextOverflowModes.Overflow;
             runtimeText.raycastTarget = false;
             runtimeText.color = _occupantStatTextColor;
@@ -1875,8 +2384,15 @@ namespace Project333.Runtime.Presentation.Battle
 
             EnsureOccupantVisualCanvas();
             var facingScaleX = GetOccupantFacingScaleX();
-            var resolvedVisualOffset = _occupantVisualFineOffset + DefaultOccupantVisualLiftOffset;
             var tileBackgroundRect = FindTileBackgroundRect();
+            var responsiveVisualScale = GetResponsiveTileScale();
+            var referenceVisualOffset = _occupantVisualFineOffset + DefaultOccupantVisualLiftOffset;
+            var resolvedVisualOffset = tileBackgroundRect == null
+                ? referenceVisualOffset
+                : BoardResponsiveLayoutCalculator.ScaleTileRelativeOffset(
+                    referenceVisualOffset,
+                    tileBackgroundRect.rect.size,
+                    _occupantVisualReferenceTileSize);
             if (tileBackgroundRect != null)
             {
                 _occupantVisualRoot.anchorMin = tileBackgroundRect.anchorMin;
@@ -1894,7 +2410,9 @@ namespace Project333.Runtime.Presentation.Battle
                 _occupantVisualRoot.localRotation = Quaternion.identity;
             }
 
-            _occupantVisualRoot.sizeDelta = _occupantVisualSize * Mathf.Max(0.1f, _occupantVisualScaleMultiplier);
+            _occupantVisualRoot.sizeDelta = _occupantVisualSize *
+                                            Mathf.Max(0.1f, _occupantVisualScaleMultiplier) *
+                                            responsiveVisualScale;
             _occupantVisualRoot.localScale = new Vector3(facingScaleX, 1f, 1f);
             _occupantVisualRoot.SetAsFirstSibling();
 
@@ -1944,6 +2462,8 @@ namespace Project333.Runtime.Presentation.Battle
             _spellEffectRoot.pivot = new Vector2(0.5f, 0.5f);
             _spellEffectRoot.localRotation = Quaternion.identity;
             _spellEffectRoot.localScale = Vector3.one;
+            var responsiveTileScale = GetResponsiveTileScale();
+            var resolvedEffectOffset = _spellEffectOffset * responsiveTileScale;
 
             if (s_spellEffectOverlayRoot != null)
             {
@@ -1957,19 +2477,20 @@ namespace Project333.Runtime.Presentation.Battle
                         null,
                         out var localPoint))
                 {
-                    _spellEffectRoot.anchoredPosition = localPoint + _spellEffectOffset;
+                    _spellEffectRoot.anchoredPosition = localPoint + resolvedEffectOffset;
                 }
                 else
                 {
-                    _spellEffectRoot.anchoredPosition = _spellEffectOffset;
+                    _spellEffectRoot.anchoredPosition = resolvedEffectOffset;
                 }
             }
             else
             {
-                _spellEffectRoot.anchoredPosition = _spellEffectOffset;
+                _spellEffectRoot.anchoredPosition = resolvedEffectOffset;
             }
 
-            _spellEffectRoot.sizeDelta = size == Vector2.zero ? _spellEffectSize : size;
+            var resolvedEffectSize = size == Vector2.zero ? _spellEffectSize : size;
+            _spellEffectRoot.sizeDelta = resolvedEffectSize * responsiveTileScale;
             _spellEffectRoot.gameObject.SetActive(false);
 
             if (_spellEffectCanvas == null)
@@ -1997,12 +2518,15 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             var facingScaleX = GetOccupantFacingScaleX();
+            var responsiveTileScale = GetResponsiveTileScale();
             _occupantStatRoot.anchorMin = new Vector2(0.5f, 0.5f);
             _occupantStatRoot.anchorMax = new Vector2(0.5f, 0.5f);
             _occupantStatRoot.pivot = new Vector2(0.5f, 0.5f);
             _occupantStatRoot.anchoredPosition = new Vector2(
-                _occupantStatBarOffset.x,
-                _occupantStatBarOffset.y * Mathf.Max(1f, _occupantVisualScaleMultiplier));
+                _occupantStatBarOffset.x * responsiveTileScale,
+                _occupantStatBarOffset.y *
+                Mathf.Max(1f, _occupantVisualScaleMultiplier) *
+                responsiveTileScale);
             _occupantStatRoot.sizeDelta = _occupantStatBarSize;
             _occupantStatRoot.localScale = new Vector3(facingScaleX, 1f, 1f);
 
@@ -2260,6 +2784,29 @@ namespace Project333.Runtime.Presentation.Battle
             var sprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 16f);
             sprite.name = name;
             return sprite;
+        }
+
+        private sealed class PreviewTooltipPanel
+        {
+            public PreviewTooltipPanel(
+                RectTransform root,
+                Image background,
+                Outline outline,
+                TMP_Text title,
+                TMP_Text description)
+            {
+                Root = root;
+                Background = background;
+                Outline = outline;
+                Title = title;
+                Description = description;
+            }
+
+            public RectTransform Root { get; }
+            public Image Background { get; }
+            public Outline Outline { get; }
+            public TMP_Text Title { get; }
+            public TMP_Text Description { get; }
         }
 
         private sealed class SpriteAnimationSequence

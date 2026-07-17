@@ -81,6 +81,124 @@ namespace Project333.Runtime.Application.Services
             return CurrentOffer;
         }
 
+        public DraftOffer ResumeDraft(
+            IReadOnlyList<string> selectedCardIds,
+            IReadOnlyList<string> currentOfferCardIds = null)
+        {
+            var validation = ValidateCatalog();
+            if (!validation.IsValid)
+            {
+                throw new InvalidOperationException(validation.Message);
+            }
+
+            if (selectedCardIds == null || selectedCardIds.Count == 0)
+            {
+                CurrentOffer = CreateSavedOfferOrDefault(
+                    currentOfferCardIds,
+                    pickNumber: 1,
+                    isLegendaryOpeningOffer: true);
+                return CurrentOffer;
+            }
+
+            if (DeckState.Count > 0)
+            {
+                throw new InvalidOperationException("Draft resume requires a fresh draft session.");
+            }
+
+            for (var i = 0; i < selectedCardIds.Count; i++)
+            {
+                var cardId = selectedCardIds[i];
+                var card = _catalogCards.FirstOrDefault(candidate =>
+                    candidate != null &&
+                    string.Equals(candidate.CardId, cardId, StringComparison.Ordinal));
+                if (card == null)
+                {
+                    throw new InvalidOperationException($"Saved draft card '{cardId}' was not found in the card catalog.");
+                }
+
+                if (i == 0 && card.Rarity != CardRarity.Legendary)
+                {
+                    throw new InvalidOperationException("Saved draft state is invalid: the first draft pick must be legendary.");
+                }
+
+                if (i > 0 && card.Rarity == CardRarity.Legendary)
+                {
+                    throw new InvalidOperationException("Saved draft state is invalid: legendary cards are only allowed as the first draft pick.");
+                }
+
+                DeckState.AddCard(card.CardId, card.Rarity);
+            }
+
+            if (DeckState.IsComplete)
+            {
+                CurrentOffer = null;
+                return null;
+            }
+
+            CurrentOffer = CreateSavedOfferOrDefault(
+                currentOfferCardIds,
+                pickNumber: DeckState.Count + 1,
+                isLegendaryOpeningOffer: false);
+
+            return CurrentOffer;
+        }
+
+        private DraftOffer CreateSavedOfferOrDefault(
+            IReadOnlyList<string> currentOfferCardIds,
+            int pickNumber,
+            bool isLegendaryOpeningOffer)
+        {
+            if (currentOfferCardIds == null || currentOfferCardIds.Count == 0)
+            {
+                return new DraftOffer(
+                    candidateCards: isLegendaryOpeningOffer ? CreateLegendaryOpeningOffer() : CreateNonLegendaryOffer(),
+                    pickNumber: pickNumber,
+                    isLegendaryOpeningOffer: isLegendaryOpeningOffer);
+            }
+
+            if (currentOfferCardIds.Count != OfferSize)
+            {
+                throw new InvalidOperationException("Saved draft offer is invalid: offer must contain exactly 3 cards.");
+            }
+
+            var candidateCards = new List<CardDefinitionAsset>(OfferSize);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = 0; i < currentOfferCardIds.Count; i++)
+            {
+                var cardId = currentOfferCardIds[i];
+                if (string.IsNullOrWhiteSpace(cardId) || !seen.Add(cardId))
+                {
+                    throw new InvalidOperationException("Saved draft offer is invalid: offer cards must be unique.");
+                }
+
+                var card = _catalogCards.FirstOrDefault(candidate =>
+                    candidate != null &&
+                    string.Equals(candidate.CardId, cardId, StringComparison.Ordinal));
+                if (card == null)
+                {
+                    throw new InvalidOperationException($"Saved draft offer card '{cardId}' was not found in the card catalog.");
+                }
+
+                if (isLegendaryOpeningOffer && card.Rarity != CardRarity.Legendary)
+                {
+                    throw new InvalidOperationException("Saved draft offer is invalid: opening offer must contain only legendary cards.");
+                }
+
+                if (!isLegendaryOpeningOffer &&
+                    (card.Rarity == CardRarity.Legendary || !DeckState.CanAddCard(card.CardId, card.Rarity)))
+                {
+                    throw new InvalidOperationException($"Saved draft offer card '{card.CardId}' is no longer eligible.");
+                }
+
+                candidateCards.Add(card);
+            }
+
+            return new DraftOffer(
+                candidateCards: candidateCards,
+                pickNumber: pickNumber,
+                isLegendaryOpeningOffer: isLegendaryOpeningOffer);
+        }
+
         public DraftAdvanceResult SelectCard(string cardId)
         {
             if (CurrentOffer == null)

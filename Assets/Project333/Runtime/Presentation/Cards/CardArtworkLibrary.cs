@@ -50,7 +50,23 @@ namespace Project333.Runtime.Presentation.Cards
         private static Sprite LoadArtwork(string cardId)
         {
             var resourcePath = $"{ResourceFolder}/{cardId}";
+            var artwork = LoadArtworkAtPath(resourcePath, cardId);
+            if (artwork != null)
+            {
+                return artwork;
+            }
 
+            var displayCaseCardId = ToDisplayCaseCardId(cardId);
+            if (!string.Equals(displayCaseCardId, cardId, StringComparison.Ordinal))
+            {
+                return LoadArtworkAtPath($"{ResourceFolder}/{displayCaseCardId}", cardId);
+            }
+
+            return null;
+        }
+
+        private static Sprite LoadArtworkAtPath(string resourcePath, string cardId)
+        {
             var importedSprite = Resources.Load<Sprite>(resourcePath);
             if (importedSprite != null)
             {
@@ -73,6 +89,16 @@ namespace Project333.Runtime.Presentation.Cards
                 100f);
             sprite.name = $"{cardId}_ArtworkSprite";
             return sprite;
+        }
+
+        private static string ToDisplayCaseCardId(string cardId)
+        {
+            if (string.IsNullOrWhiteSpace(cardId))
+            {
+                return string.Empty;
+            }
+
+            return char.ToUpperInvariant(cardId[0]) + cardId.Substring(1);
         }
     }
 }

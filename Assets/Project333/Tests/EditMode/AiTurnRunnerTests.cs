@@ -17,7 +17,7 @@ namespace Project333.Tests.EditMode
             var battleState = flowController.CurrentBattleState;
             battleState.StartNextTurn(PlayerId.AI);
             battleState.SetPhase(PhaseType.Main);
-            battleState.AI.Master.IsDisabled = true;
+            battleState.AI.Master.IsDrained = true;
             ClearHand(battleState.AI);
 
             var aiTurnRunner = new AiTurnRunner(new AiDecisionService(new InMemoryCardDefinitionProvider(new CardDefinition[0])));

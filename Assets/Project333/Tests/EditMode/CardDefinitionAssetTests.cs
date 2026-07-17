@@ -25,7 +25,12 @@ namespace Project333.Tests.EditMode
                 hitsPerAttack: 3,
                 hasBerserker: true,
                 hasEndure: true,
-                hasGuard: true);
+                hasGuard: true,
+                hasLifeSteal: true,
+                damageType: DamageType.Magic,
+                physicalDefense: 2,
+                magicDefense: 3,
+                hasRobot: true);
 
             var definition = (UnitCardDefinition)asset.ToDefinition();
 
@@ -44,11 +49,18 @@ namespace Project333.Tests.EditMode
             Assert.That(definition.TurnStartResourceGain.Qi, Is.EqualTo(1));
             Assert.That(definition.TurnStartResourceGain.Power, Is.EqualTo(1));
             Assert.That(definition.MaxAttacksPerTurn, Is.EqualTo(2));
+            Assert.That(definition.HasRush, Is.True);
             Assert.That(definition.CanAttackOnSummon, Is.True);
             Assert.That(definition.HitsPerAttack, Is.EqualTo(3));
             Assert.That(definition.HasBerserker, Is.True);
             Assert.That(definition.HasEndure, Is.True);
             Assert.That(definition.HasGuard, Is.True);
+            Assert.That(definition.HasLifeSteal, Is.True);
+            Assert.That(definition.DamageType, Is.EqualTo(DamageType.Magic));
+            Assert.That(definition.PhysicalDefense, Is.EqualTo(2));
+            Assert.That(definition.MagicDefense, Is.EqualTo(3));
+            Assert.That(definition.HasRobot, Is.True);
+            Assert.That(asset.SpecialEffectText, Does.Contain("속공"));
         }
 
         [Test]
@@ -75,7 +87,6 @@ namespace Project333.Tests.EditMode
             var asset = ScriptableObject.CreateInstance<UnitCardDefinitionAsset>();
             asset.ConfigureMetadataForTests(
                 CardRarity.Common,
-                "Neutral",
                 CardAffiliation.ScienceCivilization,
                 ChargeTileFootprint.OneByOne,
                 string.Empty,
@@ -96,17 +107,59 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
+        public void UnitCardDefinitionAsset_SpecialEffectText_WhenRobotFlagExists_AppendsRobotText()
+        {
+            var asset = ScriptableObject.CreateInstance<UnitCardDefinitionAsset>();
+            asset.ConfigureForTests(
+                attackType: AttackType.Melee,
+                attack: 2,
+                health: 3,
+                canMove: true,
+                isScience: false,
+                sciencePowerUpkeep: 1,
+                turnStartResourceGain: new ResourceSetData(0, 0, 0, 0),
+                maxAttacksPerTurn: 1,
+                canAttackOnSummon: false,
+                hasRobot: true);
+
+            Assert.That(asset.SpecialEffectText, Is.EqualTo("전력 -1" + System.Environment.NewLine + "로봇"));
+        }
+
+        [Test]
         public void DamageSpellCardDefinitionAsset_ToDefinition_MapsDamageAndCost()
         {
             var asset = ScriptableObject.CreateInstance<DamageSpellCardDefinitionAsset>();
             asset.ConfigureBaseForTests("spell-01", "Spell 01", new ResourceSetData(0, 0, 0, 2));
-            asset.ConfigureForTests(7);
+            asset.ConfigureForTests(7, DamageType.Fixed);
 
             var definition = (DamageSpellCardDefinition)asset.ToDefinition();
 
             Assert.That(definition.CardId, Is.EqualTo("spell-01"));
             Assert.That(definition.Cost.Gold, Is.EqualTo(2));
             Assert.That(definition.Damage, Is.EqualTo(7));
+            Assert.That(definition.DamageType, Is.EqualTo(DamageType.Fixed));
+        }
+
+        [Test]
+        public void BuildingCardDefinitionAsset_ToDefinition_MapsDamageTypeAndDefenses()
+        {
+            var asset = ScriptableObject.CreateInstance<BuildingCardDefinitionAsset>();
+            asset.ConfigureBaseForTests("building-01", "Building 01", new ResourceSetData());
+            asset.ConfigureForTests(
+                canAttack: true,
+                attack: 4,
+                health: 12,
+                turnStartResourceGain: new ResourceSetData(),
+                canAttackOnSummon: false,
+                damageType: DamageType.Physical,
+                physicalDefense: 5,
+                magicDefense: 2);
+
+            var definition = (BuildingCardDefinition)asset.ToDefinition();
+
+            Assert.That(definition.DamageType, Is.EqualTo(DamageType.Physical));
+            Assert.That(definition.PhysicalDefense, Is.EqualTo(5));
+            Assert.That(definition.MagicDefense, Is.EqualTo(2));
         }
 
         [Test]

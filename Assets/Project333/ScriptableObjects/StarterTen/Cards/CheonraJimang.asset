@@ -20,7 +20,6 @@ MonoBehaviour:
     _qi: 5
     _power: 0
     _gold: 0
-  _attribute: Neutral
   _affiliation: 0
   _chargeTileFootprint: 0
   _effectText: "\uC720\uB2DB\uC744 \uD558\uB098 \uC120\uD0DD\uD558\uACE0, \uB0B4

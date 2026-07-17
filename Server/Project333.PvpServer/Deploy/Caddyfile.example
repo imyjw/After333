@@ -1,0 +1,18 @@
+{
+    # Replace this before public deployment so certificate notices go to the right inbox.
+    email admin@example.com
+}
+
+# Replace project333.example.com with the real domain that points to the server PC/VPS.
+project333.example.com {
+    encode gzip
+
+    # Project333.PvpServer should listen only on localhost when it sits behind Caddy.
+    # Example server listen URL:
+    #   http://127.0.0.1:7333
+    reverse_proxy 127.0.0.1:7333 {
+        header_up Host {host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-For {remote_host}
+    }
+}

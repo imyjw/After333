@@ -14,5 +14,10 @@ namespace Project333.Runtime.Domain.Battle
         {
             ActionSequence = 0;
         }
+
+        public void Restore(int actionSequence)
+        {
+            ActionSequence = actionSequence < 0 ? 0 : actionSequence;
+        }
     }
 }

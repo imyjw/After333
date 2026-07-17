@@ -179,7 +179,7 @@ namespace Assets.PixelFantasy.PixelHeroes.Common.Scripts.CharacterScripts
                     var data = Armor == "" ? Body : Armor;
                     var pixels = dict[source].GetPixels(data);
 
-                    if (pixels == null && source == "Bracers")
+                    if (pixels == null && source == "Bracers" || pixels[index].a == 0)
                     {
                         pixels = dict["Arms"].GetPixels(Body);
                     }

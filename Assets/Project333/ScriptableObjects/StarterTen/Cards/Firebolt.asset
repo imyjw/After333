@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e1f60806d223bb34dac6c6e8ac50fd8a, type: 3}
   m_Name: Firebolt
   m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.DamageSpellCardDefinitionAsset
-  _cardId: Firebolt
+  _cardId: firebolt
   _displayName: "\uD30C\uC774\uC5B4\uBCFC"
   _rarity: 0
   _cost:
@@ -20,9 +20,11 @@ MonoBehaviour:
     _qi: 0
     _power: 0
     _gold: 0
-  _attribute: Ignis
   _affiliation: 1
   _chargeTileFootprint: 1
-  _effectText: Damage to one object.
+  _effectText: "\uB300\uC0C1 \uD558\uB098\uC5D0\uAC8C \uB9C8\uBC95 \uD53C\uD574 10"
   _specialEffectText: 
+  _boardSprite: {fileID: 0}
+  _boardAnimatorController: {fileID: 9100000, guid: 580cef9f057f0ab429a673d527abb883, type: 2}
+  _damageType: 2
   _damage: 10

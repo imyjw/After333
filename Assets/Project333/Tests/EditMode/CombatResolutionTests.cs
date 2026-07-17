@@ -223,6 +223,41 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
+        public void Attack_MultiHitAgainstBerserker_CounterattackUsesAttackActionStartAttack()
+        {
+            var battleState = CreateBattleState();
+            var attackService = new AttackService();
+            var attacker = CreateCombatUnit(
+                "attacker",
+                PlayerId.Player,
+                new TileCoord(0, 0),
+                AttackType.Melee,
+                9,
+                66,
+                hitsPerAttack: 3);
+            var defender = CreateCombatUnit(
+                "defender",
+                PlayerId.AI,
+                new TileCoord(0, 0),
+                AttackType.Melee,
+                33,
+                66,
+                hasBerserker: true);
+
+            attacker.HasSummoningSickness = false;
+            defender.HasSummoningSickness = false;
+
+            battleState.PlayerBoard.Place(new TileCoord(0, 0), attacker);
+            battleState.AIBoard.Place(new TileCoord(0, 0), defender);
+
+            attackService.Attack(battleState, PlayerId.Player, new TileCoord(0, 0), new TileCoord(0, 0));
+
+            Assert.That(attacker.CurrentHp, Is.EqualTo(33));
+            Assert.That(defender.CurrentHp, Is.EqualTo(39));
+            Assert.That(defender.Attack, Is.EqualTo(60));
+        }
+
+        [Test]
         public void Attack_PreDamagedBerserkerUsesBoostedAttackForEachHit()
         {
             var battleState = CreateBattleState();
@@ -332,7 +367,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Attack_AgainstDisabledUnitDealsTripleDamage()
+        public void Attack_AgainstDrainedUnitDealsTripleDamage()
         {
             var battleState = CreateBattleState();
             var attackService = new AttackService();
@@ -340,7 +375,7 @@ namespace Project333.Tests.EditMode
             var defender = CreateCombatUnit("defender", PlayerId.AI, new TileCoord(0, 0), AttackType.Melee, 1, 10);
 
             attacker.HasSummoningSickness = false;
-            defender.IsDisabled = true;
+            defender.IsDrained = true;
 
             battleState.PlayerBoard.Place(new TileCoord(0, 0), attacker);
             battleState.AIBoard.Place(new TileCoord(0, 0), defender);
@@ -348,6 +383,46 @@ namespace Project333.Tests.EditMode
             attackService.Attack(battleState, PlayerId.Player, new TileCoord(0, 0), new TileCoord(0, 0));
 
             Assert.That(defender.CurrentHp, Is.EqualTo(4));
+        }
+
+        [Test]
+        public void Attack_DrainedMeleeDefenderDoesNotCounterattack()
+        {
+            var battleState = CreateBattleState();
+            var attackService = new AttackService();
+            var attacker = CreateCombatUnit("attacker", PlayerId.Player, new TileCoord(0, 0), AttackType.Melee, 2, 10);
+            var defender = CreateCombatUnit("defender", PlayerId.AI, new TileCoord(0, 0), AttackType.Melee, 5, 10);
+
+            attacker.HasSummoningSickness = false;
+            defender.IsDrained = true;
+
+            battleState.PlayerBoard.Place(new TileCoord(0, 0), attacker);
+            battleState.AIBoard.Place(new TileCoord(0, 0), defender);
+
+            attackService.Attack(battleState, PlayerId.Player, new TileCoord(0, 0), new TileCoord(0, 0));
+
+            Assert.That(attacker.CurrentHp, Is.EqualTo(10));
+            Assert.That(defender.CurrentHp, Is.EqualTo(4));
+        }
+
+        [Test]
+        public void Attack_ErasureMeleeDefenderStillCounterattacksAndTakesNormalDamage()
+        {
+            var battleState = CreateBattleState();
+            var attackService = new AttackService();
+            var attacker = CreateCombatUnit("attacker", PlayerId.Player, new TileCoord(0, 0), AttackType.Melee, 2, 10);
+            var defender = CreateCombatUnit("defender", PlayerId.AI, new TileCoord(0, 0), AttackType.Melee, 5, 10);
+
+            attacker.HasSummoningSickness = false;
+            defender.ApplyErasure();
+
+            battleState.PlayerBoard.Place(new TileCoord(0, 0), attacker);
+            battleState.AIBoard.Place(new TileCoord(0, 0), defender);
+
+            attackService.Attack(battleState, PlayerId.Player, new TileCoord(0, 0), new TileCoord(0, 0));
+
+            Assert.That(attacker.CurrentHp, Is.EqualTo(5));
+            Assert.That(defender.CurrentHp, Is.EqualTo(8));
         }
 
         private static UnitState CreateCombatUnit(

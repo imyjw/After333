@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: d4648f473f7bc144fbf998750f759bcb
+AssemblyDefinitionImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 271664
+  packageName: 'Pixel Hero Maker [Megapack]'
+  packageVersion: 4.0
+  assetPath: Assets/PixelFantasy/Common/Scripts/Editor/PixelFantasy.Common.Editor.asmdef
+  uploadId: 936602

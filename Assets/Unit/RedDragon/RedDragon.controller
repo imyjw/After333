@@ -1,47 +1,13 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1107 &-9061347816234276500
-AnimatorStateMachine:
-  serializedVersion: 6
-  m_ObjectHideFlags: 1
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Base Layer
-  m_ChildStates:
-  - serializedVersion: 1
-    m_State: {fileID: -6073596215370014584}
-    m_Position: {x: 286.7647, y: 113.90755, z: 0}
-  - serializedVersion: 1
-    m_State: {fileID: 8430269152965863315}
-    m_Position: {x: 521.21844, y: 103.82353, z: 0}
-  - serializedVersion: 1
-    m_State: {fileID: -3930715501431768390}
-    m_Position: {x: 727.9411, y: 38.277298, z: 0}
-  - serializedVersion: 1
-    m_State: {fileID: 4909882258101761604}
-    m_Position: {x: 536.34454, y: 20.630249, z: 0}
-  - serializedVersion: 1
-    m_State: {fileID: -7053715323718029541}
-    m_Position: {x: 586.7647, y: 194.57982, z: 0}
-  m_ChildStateMachines: []
-  m_AnyStateTransitions: []
-  m_EntryTransitions: []
-  m_StateMachineTransitions: {}
-  m_StateMachineBehaviours: []
-  m_AnyStatePosition: {x: 50, y: 20, z: 0}
-  m_EntryPosition: {x: 50, y: 120, z: 0}
-  m_ExitPosition: {x: 800, y: 120, z: 0}
-  m_ParentStateMachinePosition: {x: 800, y: 20, z: 0}
-  m_DefaultState: {fileID: -6073596215370014584}
---- !u!1102 &-7053715323718029541
+--- !u!1102 &-7711332141397446117
 AnimatorState:
   serializedVersion: 6
   m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: BeAttacked
+  m_Name: Run
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions: []
@@ -54,20 +20,20 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 1a1efe909ce2a024cac637d1315d3a1e, type: 2}
+  m_Motion: {fileID: 7400000, guid: 7760d7a3cc5160b4f93751687b0b18e4, type: 2}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
   m_CycleOffsetParameter: 
   m_TimeParameter: 
---- !u!1102 &-6073596215370014584
+--- !u!1102 &-6262817895943712919
 AnimatorState:
   serializedVersion: 6
   m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Idle
+  m_Name: Attack
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions: []
@@ -80,13 +46,13 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 208fcaccbe92b5945a7b2664890e2bcb, type: 2}
+  m_Motion: {fileID: 7400000, guid: c7562e86757dcd2499731953b085ed23, type: 2}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
   m_CycleOffsetParameter: 
   m_TimeParameter: 
---- !u!1102 &-3930715501431768390
+--- !u!1102 &-5483180434178367696
 AnimatorState:
   serializedVersion: 6
   m_ObjectHideFlags: 1
@@ -124,7 +90,7 @@ AnimatorController:
   m_AnimatorLayers:
   - serializedVersion: 5
     m_Name: Base Layer
-    m_StateMachine: {fileID: -9061347816234276500}
+    m_StateMachine: {fileID: 5141431282793663151}
     m_Mask: {fileID: 0}
     m_Motions: []
     m_Behaviours: []
@@ -134,14 +100,14 @@ AnimatorController:
     m_IKPass: 0
     m_SyncedLayerAffectsTiming: 0
     m_Controller: {fileID: 9100000}
---- !u!1102 &4909882258101761604
+--- !u!1102 &185431787629353423
 AnimatorState:
   serializedVersion: 6
   m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Attack
+  m_Name: Idle
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions: []
@@ -154,20 +120,54 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: c7562e86757dcd2499731953b085ed23, type: 2}
+  m_Motion: {fileID: 7400000, guid: 208fcaccbe92b5945a7b2664890e2bcb, type: 2}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
   m_CycleOffsetParameter: 
   m_TimeParameter: 
---- !u!1102 &8430269152965863315
+--- !u!1107 &5141431282793663151
+AnimatorStateMachine:
+  serializedVersion: 6
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Base Layer
+  m_ChildStates:
+  - serializedVersion: 1
+    m_State: {fileID: 185431787629353423}
+    m_Position: {x: 287.68655, y: 130.8209, z: 0}
+  - serializedVersion: 1
+    m_State: {fileID: -7711332141397446117}
+    m_Position: {x: 550.37317, y: 238.28362, z: 0}
+  - serializedVersion: 1
+    m_State: {fileID: -5483180434178367696}
+    m_Position: {x: 684.70154, y: 129.32835, z: 0}
+  - serializedVersion: 1
+    m_State: {fileID: 7225018142849826328}
+    m_Position: {x: 642.9104, y: 29.328354, z: 0}
+  - serializedVersion: 1
+    m_State: {fileID: -6262817895943712919}
+    m_Position: {x: 647.38806, y: -72.164185, z: 0}
+  m_ChildStateMachines: []
+  m_AnyStateTransitions: []
+  m_EntryTransitions: []
+  m_StateMachineTransitions: {}
+  m_StateMachineBehaviours: []
+  m_AnyStatePosition: {x: 50, y: 20, z: 0}
+  m_EntryPosition: {x: 50, y: 120, z: 0}
+  m_ExitPosition: {x: 800, y: 120, z: 0}
+  m_ParentStateMachinePosition: {x: 800, y: 20, z: 0}
+  m_DefaultState: {fileID: 185431787629353423}
+--- !u!1102 &7225018142849826328
 AnimatorState:
   serializedVersion: 6
   m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Run
+  m_Name: BeAttacked
   m_Speed: 1
   m_CycleOffset: 0
   m_Transitions: []
@@ -180,7 +180,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400000, guid: 7760d7a3cc5160b4f93751687b0b18e4, type: 2}
+  m_Motion: {fileID: 7400000, guid: 1a1efe909ce2a024cac637d1315d3a1e, type: 2}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 

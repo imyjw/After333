@@ -10,5 +10,6 @@ namespace Project333.Runtime.Presentation.Battle
         AttackTarget = 5,
         SpellTarget = 6,
         DragHoverTarget = 7,
+        MulliganSelected = 8,
     }
 }

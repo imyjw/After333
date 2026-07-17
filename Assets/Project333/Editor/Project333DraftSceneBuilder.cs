@@ -10,22 +10,83 @@ using UnityEngine.UI;
 
 namespace Project333.Editor
 {
+    [InitializeOnLoad]
     public static class Project333DraftSceneBuilder
     {
         private const string StartScenePath = "Assets/GameStart_VSlice.unity";
         private const string DraftScenePath = "Assets/Draft_VSlice.unity";
+        private const string DeckBuildingScenePath = "Assets/DeckBuilding_VSlice.unity";
         private const string BattleScenePath = "Assets/Battle_VSlice.unity";
         private const string StarterTenCatalogPath = "Assets/Project333/ScriptableObjects/StarterTen/StarterTenCardCatalog.asset";
         private static readonly Color BackgroundColor = new Color(0.06f, 0.07f, 0.1f, 1f);
         private static readonly Color PanelColor = new Color(0.1f, 0.12f, 0.16f, 0.94f);
         private static readonly Color AccentColor = new Color(0.84f, 0.74f, 0.42f, 1f);
         private static readonly Color ButtonColor = new Color(0.18f, 0.28f, 0.46f, 1f);
+        private static bool s_isMaterializingPvpOverlay;
+
+        static Project333DraftSceneBuilder()
+        {
+            EditorSceneManager.sceneOpened -= HandleSceneOpened;
+            EditorSceneManager.sceneOpened += HandleSceneOpened;
+            EditorApplication.delayCall += MaterializeLoadedDraftPvpOverlay;
+        }
 
         [MenuItem("Tools/Project333/Draft/Create Draft Scene")]
         public static void CreateDraftScene()
         {
+            CreateDraftSceneCore("Draft_VSlice", DraftScenePath, false);
+        }
+
+        [MenuItem("Tools/Project333/Draft/Create Deck Building Scene")]
+        public static void CreateDeckBuildingScene()
+        {
+            CreateDraftSceneCore("DeckBuilding_VSlice", DeckBuildingScenePath, true);
+        }
+
+        [MenuItem("Tools/Project333/Draft/Materialize PVP Matchmaking Overlay")]
+        public static void MaterializePvpMatchmakingOverlay()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                Debug.LogWarning("Exit Play Mode before materializing the Draft PVP matchmaking overlay.");
+                return;
+            }
+
+            s_isMaterializingPvpOverlay = true;
+            try
+            {
+                var scene = SceneManager.GetSceneByPath(DraftScenePath);
+                var openedForBuild = !scene.IsValid() || !scene.isLoaded;
+                if (openedForBuild)
+                {
+                    scene = EditorSceneManager.OpenScene(DraftScenePath, OpenSceneMode.Additive);
+                }
+
+                var overlay = DraftPvpMatchmakingOverlayView.GetOrCreate(scene);
+                EditorSceneManager.MarkSceneDirty(scene);
+                EditorSceneManager.SaveScene(scene, DraftScenePath);
+
+                if (openedForBuild)
+                {
+                    EditorSceneManager.CloseScene(scene, true);
+                }
+                else
+                {
+                    Selection.activeGameObject = overlay.gameObject;
+                }
+            }
+            finally
+            {
+                s_isMaterializingPvpOverlay = false;
+            }
+
+            Debug.Log("After333 Draft PVP matchmaking overlay was materialized in Draft_VSlice.");
+        }
+
+        private static void CreateDraftSceneCore(string sceneName, string scenePath, bool isDeckBuildingScene)
+        {
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            scene.name = "Draft_VSlice";
+            scene.name = sceneName;
 
             CreateCamera();
             var canvas = CreateCanvas();
@@ -50,7 +111,7 @@ namespace Project333.Editor
             headerPanel.rectTransform.anchoredPosition = new Vector2(0f, -24f);
 
             var titleText = CreateText("SceneTitle", headerPanel.rectTransform, 48, FontStyle.Bold, TextAnchor.MiddleCenter);
-            titleText.text = "Project 333 Draft";
+            titleText.text = isDeckBuildingScene ? "After333 Deck Building" : "After333 Draft";
             titleText.color = AccentColor;
             titleText.rectTransform.anchorMin = new Vector2(0f, 1f);
             titleText.rectTransform.anchorMax = new Vector2(1f, 1f);
@@ -82,13 +143,22 @@ namespace Project333.Editor
             leftPanel.rectTransform.offsetMin = new Vector2(24f, 24f);
             leftPanel.rectTransform.offsetMax = new Vector2(444f, -208f);
 
-            var startDraftButton = CreateButton("StartDraftButton", leftPanel.rectTransform, "Start Draft");
+            var startDraftButton = CreateButton("StartDraftButton", leftPanel.rectTransform, isDeckBuildingScene ? "Start Deck Building" : "Start Draft");
             startDraftButton.GetComponent<Image>().color = ButtonColor;
             startDraftButton.GetComponent<RectTransform>().anchorMin = new Vector2(0.5f, 1f);
             startDraftButton.GetComponent<RectTransform>().anchorMax = new Vector2(0.5f, 1f);
             startDraftButton.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1f);
             startDraftButton.GetComponent<RectTransform>().sizeDelta = new Vector2(340f, 72f);
             startDraftButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, -28f);
+
+            var claimRewardsButton = CreateButton("ClaimRewardsButton", leftPanel.rectTransform, "보상 받기");
+            claimRewardsButton.GetComponent<Image>().color = new Color(0.48f, 0.32f, 0.08f, 1f);
+            claimRewardsButton.GetComponent<RectTransform>().anchorMin = new Vector2(0.5f, 1f);
+            claimRewardsButton.GetComponent<RectTransform>().anchorMax = new Vector2(0.5f, 1f);
+            claimRewardsButton.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1f);
+            claimRewardsButton.GetComponent<RectTransform>().sizeDelta = new Vector2(340f, 72f);
+            claimRewardsButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, -28f);
+            claimRewardsButton.gameObject.SetActive(false);
 
             var startBattleButton = CreateButton("StartBattleButton", leftPanel.rectTransform, "Start Battle (0/33)");
             startBattleButton.GetComponent<Image>().color = AccentColor;
@@ -105,6 +175,13 @@ namespace Project333.Editor
             returnToStartButton.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1f);
             returnToStartButton.GetComponent<RectTransform>().sizeDelta = new Vector2(340f, 72f);
             returnToStartButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, -204f);
+
+            if (isDeckBuildingScene)
+            {
+                startDraftButton.gameObject.SetActive(false);
+                claimRewardsButton.gameObject.SetActive(false);
+                startBattleButton.gameObject.SetActive(false);
+            }
 
             var statusTitleText = CreateText("StatusTitleText", leftPanel.rectTransform, 24, FontStyle.Bold, TextAnchor.MiddleLeft);
             statusTitleText.text = "Status";
@@ -159,8 +236,12 @@ namespace Project333.Editor
             deckListText.rectTransform.anchoredPosition = Vector2.zero;
             deckListText.rectTransform.sizeDelta = new Vector2(0f, 1200f);
 
-            Project333DraftOverlaySceneBuilder.CreateSceneDraftOverlay();
-            var overlayPresenter = UnityEngine.Object.FindFirstObjectByType<DraftOverlayPresenter>();
+            DraftOverlayPresenter overlayPresenter = null;
+            if (isDeckBuildingScene)
+            {
+                Project333DraftOverlaySceneBuilder.CreateSceneDraftOverlay();
+                overlayPresenter = UnityEngine.Object.FindFirstObjectByType<DraftOverlayPresenter>();
+            }
 
             var controller = controllerObject.GetComponent<DraftSceneController>();
             AssignControllerReferences(
@@ -174,23 +255,78 @@ namespace Project333.Editor
                 startDraftButton,
                 startBattleButton,
                 returnToStartButton,
+                claimRewardsButton,
                 startBattleButton.GetComponentInChildren<Text>(),
-                AssetDatabase.LoadAssetAtPath<CardDefinitionCatalogAsset>(StarterTenCatalogPath));
+                claimRewardsButton.GetComponentInChildren<Text>(true),
+                AssetDatabase.LoadAssetAtPath<CardDefinitionCatalogAsset>(StarterTenCatalogPath),
+                isDeckBuildingScene);
+
+            if (!isDeckBuildingScene)
+            {
+                DraftPvpMatchmakingOverlayView.GetOrCreate(scene);
+            }
 
             UnityEventTools.AddPersistentListener(startDraftButton.onClick, controller.BeginDraftFromUi);
             UnityEventTools.AddPersistentListener(startBattleButton.onClick, controller.StartBattleFromUi);
             UnityEventTools.AddPersistentListener(returnToStartButton.onClick, controller.ReturnToStartSceneFromUi);
+            UnityEventTools.AddPersistentListener(claimRewardsButton.onClick, controller.ClaimRewardsFromUi);
 
-            SaveScene(scene);
+            SaveScene(scene, scenePath);
             EnsureSceneInBuildSettings(StartScenePath);
             EnsureSceneInBuildSettings(DraftScenePath);
+            EnsureSceneInBuildSettings(DeckBuildingScenePath);
             EnsureSceneInBuildSettings(BattleScenePath);
             Selection.activeGameObject = controller.gameObject;
         }
 
-        private static void SaveScene(Scene scene)
+        private static void SaveScene(Scene scene, string scenePath)
         {
-            EditorSceneManager.SaveScene(scene, DraftScenePath);
+            EditorSceneManager.SaveScene(scene, scenePath);
+        }
+
+        private static void HandleSceneOpened(Scene scene, OpenSceneMode mode)
+        {
+            if (string.Equals(scene.name, "Draft_VSlice", System.StringComparison.Ordinal))
+            {
+                EditorApplication.delayCall += MaterializeLoadedDraftPvpOverlay;
+            }
+        }
+
+        private static void MaterializeLoadedDraftPvpOverlay()
+        {
+            if (s_isMaterializingPvpOverlay || EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                return;
+            }
+
+            for (var sceneIndex = 0; sceneIndex < SceneManager.sceneCount; sceneIndex++)
+            {
+                var scene = SceneManager.GetSceneAt(sceneIndex);
+                if (!scene.IsValid() ||
+                    !scene.isLoaded ||
+                    !string.Equals(scene.name, "Draft_VSlice", System.StringComparison.Ordinal) ||
+                    FindSceneComponent<DraftPvpMatchmakingOverlayView>(scene) != null)
+                {
+                    continue;
+                }
+
+                DraftPvpMatchmakingOverlayView.GetOrCreate(scene);
+                EditorSceneManager.MarkSceneDirty(scene);
+            }
+        }
+
+        private static T FindSceneComponent<T>(Scene scene) where T : Component
+        {
+            var components = Resources.FindObjectsOfTypeAll<T>();
+            for (var i = 0; i < components.Length; i++)
+            {
+                if (components[i] != null && components[i].gameObject.scene == scene)
+                {
+                    return components[i];
+                }
+            }
+
+            return null;
         }
 
         private static void EnsureSceneInBuildSettings(string scenePath)
@@ -239,7 +375,7 @@ namespace Project333.Editor
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 0.5f;
+            scaler.matchWidthOrHeight = 1f;
             return canvas;
         }
 
@@ -260,8 +396,11 @@ namespace Project333.Editor
             Button startDraftButton,
             Button startBattleButton,
             Button returnToStartButton,
+            Button claimRewardsButton,
             Text startBattleButtonLabel,
-            CardDefinitionCatalogAsset cardCatalogAsset)
+            Text claimRewardsButtonLabel,
+            CardDefinitionCatalogAsset cardCatalogAsset,
+            bool isDeckBuildingScene)
         {
             var serializedObject = new SerializedObject(controller);
             serializedObject.FindProperty("_cardCatalogAsset").objectReferenceValue = cardCatalogAsset;
@@ -274,10 +413,14 @@ namespace Project333.Editor
             serializedObject.FindProperty("_startDraftButton").objectReferenceValue = startDraftButton;
             serializedObject.FindProperty("_startBattleButton").objectReferenceValue = startBattleButton;
             serializedObject.FindProperty("_returnToStartButton").objectReferenceValue = returnToStartButton;
+            serializedObject.FindProperty("_claimRewardsButton").objectReferenceValue = claimRewardsButton;
             serializedObject.FindProperty("_startBattleButtonLabel").objectReferenceValue = startBattleButtonLabel;
+            serializedObject.FindProperty("_claimRewardsButtonLabel").objectReferenceValue = claimRewardsButtonLabel;
             serializedObject.FindProperty("_startSceneName").stringValue = "GameStart_VSlice";
             serializedObject.FindProperty("_draftSceneName").stringValue = "Draft_VSlice";
+            serializedObject.FindProperty("_deckBuildingSceneName").stringValue = "DeckBuilding_VSlice";
             serializedObject.FindProperty("_battleSceneName").stringValue = "Battle_VSlice";
+            serializedObject.FindProperty("_autoOpenDraftIfNoDeck").boolValue = isDeckBuildingScene;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(controller);
         }

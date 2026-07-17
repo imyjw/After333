@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "Project333.PvpServer/1.0.0": {
+        "runtime": {
+          "Project333.PvpServer.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Project333.PvpServer/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

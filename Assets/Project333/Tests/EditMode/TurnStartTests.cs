@@ -10,7 +10,7 @@ namespace Project333.Tests.EditMode
     public sealed class TurnStartTests
     {
         [Test]
-        public void ResolveTurnStart_DrawsOneCardGainsOneGoldAndMovesToMain()
+        public void ResolveTurnStart_OnFirstBattleTurn_DrawsOneCardWithoutBaseGoldAndMovesToMain()
         {
             var battleState = CreateBattleState(PlayerId.Player);
             var service = new TurnStartService();
@@ -22,30 +22,61 @@ namespace Project333.Tests.EditMode
 
             Assert.That(battleState.Phase, Is.EqualTo(PhaseType.Main));
             Assert.That(battleState.TurnNumber, Is.EqualTo(1));
-            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(startingGold + 1));
+            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(startingGold));
             Assert.That(battleState.Player.Hand.Count, Is.EqualTo(startingHandCount + 1));
             Assert.That(battleState.Player.Deck.Count, Is.EqualTo(startingDeckCount - 1));
             Assert.That(battleState.Player.FailedDrawCount, Is.EqualTo(0));
         }
 
         [Test]
-        public void ResolveTurnStart_WhenHandIsFull_RemovesDrawnCardAndKeepsHandAtNine()
+        public void ResolveTurnStart_OnSecondBattleTurn_SecondPlayerGainsOneGold()
         {
             var battleState = CreateBattleState(PlayerId.Player);
             var service = new TurnStartService();
 
-            battleState.Player.Hand.Add("P-extra-0");
-            battleState.Player.Hand.Add("P-extra-1");
-            battleState.Player.Hand.Add("P-extra-2");
-            battleState.Player.Hand.Add("P-extra-3");
-            battleState.Player.Hand.Add("P-extra-4");
-            battleState.Player.Hand.Add("P-extra-5");
+            service.ResolveTurnStart(battleState);
+            battleState.StartNextTurn(PlayerId.AI);
+            var secondPlayerStartingGold = battleState.AI.Resources.Gold;
+
+            service.ResolveTurnStart(battleState);
+
+            Assert.That(battleState.TurnNumber, Is.EqualTo(2));
+            Assert.That(battleState.AI.Resources.Gold, Is.EqualTo(secondPlayerStartingGold + 1));
+            Assert.That(battleState.AI.Resources.Gold, Is.EqualTo(4));
+            Assert.That(battleState.Phase, Is.EqualTo(PhaseType.Main));
+        }
+
+        [Test]
+        public void ResolveTurnStart_WhenAIIsFirst_SkipsBaseGoldForAIOnFirstBattleTurn()
+        {
+            var battleState = CreateBattleState(PlayerId.AI);
+            var service = new TurnStartService();
+            var startingGold = battleState.AI.Resources.Gold;
+
+            service.ResolveTurnStart(battleState);
+
+            Assert.That(battleState.TurnNumber, Is.EqualTo(1));
+            Assert.That(battleState.ActivePlayerId, Is.EqualTo(PlayerId.AI));
+            Assert.That(battleState.AI.Resources.Gold, Is.EqualTo(startingGold));
+            Assert.That(battleState.AI.Resources.Gold, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void ResolveTurnStart_WhenHandIsFull_RemovesDrawnCardAndKeepsHandAtMaxHandSize()
+        {
+            var battleState = CreateBattleState(PlayerId.Player);
+            var service = new TurnStartService();
+
+            while (battleState.Player.Hand.Count < battleState.Player.MaxHandSize)
+            {
+                battleState.Player.Hand.Add($"P-extra-{battleState.Player.Hand.Count}");
+            }
 
             var startingDeckCount = battleState.Player.Deck.Count;
 
             service.ResolveTurnStart(battleState);
 
-            Assert.That(battleState.Player.Hand.Count, Is.EqualTo(9));
+            Assert.That(battleState.Player.Hand.Count, Is.EqualTo(PlayerState.BaseMaxHandSize));
             Assert.That(battleState.Player.Deck.Count, Is.EqualTo(startingDeckCount - 1));
             Assert.That(battleState.Phase, Is.EqualTo(PhaseType.Main));
         }

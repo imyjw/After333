@@ -43,6 +43,58 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
+        public void CastDamageSpell_CanDamageFriendlyOccupant()
+        {
+            var battleState = CreateBattleState();
+            var spellService = CreateSpellService(new CardDefinition[]
+            {
+                new DamageSpellCardDefinition(
+                    cardId: "spell-damage",
+                    displayName: "Damage Spell",
+                    cost: new ResourceSet(mana: 0, qi: 0, power: 0, gold: 1),
+                    damage: 4),
+            });
+            var target = CreateUnit("friendly-target", PlayerId.Player, new TileCoord(0, 0), AttackType.Melee, 2, 6);
+            battleState.Player.Hand.Add("spell-damage");
+            battleState.PlayerBoard.Place(target.Position, target);
+
+            spellService.CastDamageSpell(
+                battleState,
+                PlayerId.Player,
+                "spell-damage",
+                PlayerId.Player,
+                target.Position);
+
+            Assert.That(target.CurrentHp, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void CastDamageSpell_CanDefeatOwnMasterAndAwardsOpponentVictory()
+        {
+            var battleState = CreateBattleState();
+            var spellService = CreateSpellService(new CardDefinition[]
+            {
+                new DamageSpellCardDefinition(
+                    cardId: "spell-damage",
+                    displayName: "Damage Spell",
+                    cost: new ResourceSet(mana: 0, qi: 0, power: 0, gold: 1),
+                    damage: 4),
+            });
+            battleState.Player.Hand.Add("spell-damage");
+            battleState.Player.Master.CurrentHp = 4;
+
+            spellService.CastDamageSpell(
+                battleState,
+                PlayerId.Player,
+                "spell-damage",
+                PlayerId.Player,
+                battleState.Player.Master.Position);
+
+            Assert.That(battleState.IsEnded, Is.True);
+            Assert.That(battleState.Result.Winner, Is.EqualTo(PlayerId.AI));
+        }
+
+        [Test]
         public void CastDamageSpell_WhenTargetIsProtectedByGuard_DamagesGuardInsteadOfTarget()
         {
             var battleState = CreateBattleState();
@@ -277,7 +329,7 @@ namespace Project333.Tests.EditMode
 
             var goldAfterCasting = battleState.Player.Resources.Gold;
 
-            battleState.SetPhase(PhaseType.TurnStart);
+            battleState.StartNextTurn(PlayerId.Player);
             turnStartService.ResolveTurnStart(battleState);
 
             Assert.That(goldAfterCasting, Is.EqualTo(startingGold - 2));
@@ -366,19 +418,19 @@ namespace Project333.Tests.EditMode
             battleState.Player.Hand.Add("limited-persistent");
             spellService.CastPersistentResourceSpell(battleState, PlayerId.Player, "limited-persistent");
 
-            battleState.SetPhase(PhaseType.TurnStart);
+            battleState.StartNextTurn(PlayerId.Player);
             turnStartService.ResolveTurnStart(battleState);
 
             Assert.That(battleState.Player.Resources.Power, Is.EqualTo(1));
             Assert.That(battleState.PersistentEffects[0].IsExpired, Is.False);
 
-            battleState.SetPhase(PhaseType.TurnStart);
+            battleState.StartNextTurn(PlayerId.Player);
             turnStartService.ResolveTurnStart(battleState);
 
             Assert.That(battleState.Player.Resources.Power, Is.EqualTo(2));
             Assert.That(battleState.PersistentEffects[0].IsExpired, Is.True);
 
-            battleState.SetPhase(PhaseType.TurnStart);
+            battleState.StartNextTurn(PlayerId.Player);
             turnStartService.ResolveTurnStart(battleState);
 
             Assert.That(battleState.Player.Resources.Power, Is.EqualTo(2));

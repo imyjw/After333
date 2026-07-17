@@ -46,7 +46,6 @@ namespace Project333.Editor
             asset.ConfigureBaseForTests("BlueDragon", "블루 드래곤", new ResourceSetData(8, 0, 0, 0));
             asset.ConfigureMetadataForTests(
                 CardRarity.Legendary,
-                "Aqua",
                 CardAffiliation.Fantasy,
                 ChargeTileFootprint.OneByOne,
                 "내 턴 종료 시 내 타일들 위의 유닛들의 체력회복+33",
@@ -54,13 +53,14 @@ namespace Project333.Editor
             asset.ConfigureForTests(
                 attackType: AttackType.Ranged,
                 attack: 40,
-                health: 100,
+                health: 70,
                 canMove: true,
                 isScience: false,
                 sciencePowerUpkeep: 0,
                 turnStartResourceGain: new ResourceSetData(0, 0, 0, 0),
                 maxAttacksPerTurn: 1,
-                canAttackOnSummon: false);
+                canAttackOnSummon: false,
+                hasFlying: true);
             EditorUtility.SetDirty(asset);
             return asset;
         }
@@ -71,21 +71,21 @@ namespace Project333.Editor
             asset.ConfigureBaseForTests("RedDragon", "레드 드래곤", new ResourceSetData(9, 0, 0, 0));
             asset.ConfigureMetadataForTests(
                 CardRarity.Legendary,
-                "Ignis",
                 CardAffiliation.Fantasy,
                 ChargeTileFootprint.OneByOne,
                 "내 턴 종료 시 상대방 타일 전체에 66데미지",
                 string.Empty);
             asset.ConfigureForTests(
                 attackType: AttackType.Melee,
-                attack: 66,
-                health: 66,
+                attack: 50,
+                health: 50,
                 canMove: true,
                 isScience: false,
                 sciencePowerUpkeep: 0,
                 turnStartResourceGain: new ResourceSetData(0, 0, 0, 0),
                 maxAttacksPerTurn: 1,
-                canAttackOnSummon: false);
+                canAttackOnSummon: false,
+                hasFlying: true);
             EditorUtility.SetDirty(asset);
             return asset;
         }
@@ -96,7 +96,6 @@ namespace Project333.Editor
             asset.ConfigureBaseForTests("Goblin", "고블린", new ResourceSetData(1, 0, 0, 0));
             asset.ConfigureMetadataForTests(
                 CardRarity.Common,
-                "Neutral",
                 CardAffiliation.Fantasy,
                 ChargeTileFootprint.OneByOne,
                 string.Empty,
@@ -118,14 +117,13 @@ namespace Project333.Editor
         private static UnitCardDefinitionAsset CreateVampire()
         {
             var asset = LoadOrCreate<UnitCardDefinitionAsset>($"{CardsRoot}/Vampire.asset");
-            asset.ConfigureBaseForTests("Vampire", "뱀파이어", new ResourceSetData(4, 0, 0, 0));
+            asset.ConfigureBaseForTests("Vampire", "뱀파이어", new ResourceSetData(5, 0, 0, 0));
             asset.ConfigureMetadataForTests(
                 CardRarity.Uncommon,
-                "Blood",
                 CardAffiliation.Fantasy,
                 ChargeTileFootprint.OneByOne,
-                "흡혈(공격 시 입힌 피해만큼 체력 회복)",
-                string.Empty);
+                string.Empty,
+                "흡혈: 공격 시 입힌 피해만큼 체력 회복");
             asset.ConfigureForTests(
                 attackType: AttackType.Melee,
                 attack: 20,
@@ -135,7 +133,8 @@ namespace Project333.Editor
                 sciencePowerUpkeep: 0,
                 turnStartResourceGain: new ResourceSetData(0, 0, 0, 0),
                 maxAttacksPerTurn: 1,
-                canAttackOnSummon: false);
+                canAttackOnSummon: false,
+                hasLifeSteal: true);
             EditorUtility.SetDirty(asset);
             return asset;
         }
@@ -146,7 +145,6 @@ namespace Project333.Editor
             asset.ConfigureBaseForTests("CheonraJimang", "천라지망", new ResourceSetData(0, 5, 0, 0));
             asset.ConfigureMetadataForTests(
                 CardRarity.Rare,
-                "Neutral",
                 CardAffiliation.Murim,
                 ChargeTileFootprint.None,
                 "유닛을 하나 선택하고, 내 다음턴 시작 시 그 유닛 파괴",
@@ -162,7 +160,6 @@ namespace Project333.Editor
             asset.ConfigureBaseForTests("Daehwandan", "대환단", new ResourceSetData(0, 0, 0, 3));
             asset.ConfigureMetadataForTests(
                 CardRarity.Legendary,
-                "Terra",
                 CardAffiliation.Murim,
                 ChargeTileFootprint.None,
                 "사용 시 내 마스터의 공격력 +30, 다음 3번의 자기 턴 시작마다 기 +3",

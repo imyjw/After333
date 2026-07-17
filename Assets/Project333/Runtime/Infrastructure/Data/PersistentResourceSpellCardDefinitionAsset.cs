@@ -21,7 +21,8 @@ namespace Project333.Runtime.Infrastructure.Data
                 effectId: _effectId,
                 turnStartResourceGain: _turnStartResourceGain.ToRuntime(),
                 endConditionText: _endConditionText,
-                ownerTurnStartsRemaining: _ownerTurnStartsRemaining);
+                ownerTurnStartsRemaining: _ownerTurnStartsRemaining,
+                hasReplicate: HasReplicate);
         }
 
         public void ConfigureForTests(

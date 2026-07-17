@@ -81,6 +81,29 @@ namespace Project333.Tests.EditMode
             Assert.That(result.NextOffer.CandidateCards.Select(card => card.CardId).Distinct().Count(), Is.EqualTo(3));
         }
 
+        [Test]
+        public void ResumeDraft_WithSavedPickAndOffer_RestoresSameOffer()
+        {
+            var catalog = CreateValidDraftCatalog();
+            var originalService = new DraftSessionService(catalog, new System.Random(11));
+            var openingOffer = originalService.BeginDraft();
+            var firstPickResult = originalService.SelectCard(openingOffer.CandidateCards[0].CardId);
+            var savedPickCardIds = originalService.DeckState.CardIds.ToArray();
+            var savedOfferCardIds = firstPickResult.NextOffer.CandidateCards
+                .Select(card => card.CardId)
+                .ToArray();
+
+            var resumedService = new DraftSessionService(catalog, new System.Random(999));
+            var resumedOffer = resumedService.ResumeDraft(savedPickCardIds, savedOfferCardIds);
+
+            Assert.That(resumedService.DeckState.CardIds.ToArray(), Is.EqualTo(savedPickCardIds));
+            Assert.That(resumedOffer.PickNumber, Is.EqualTo(2));
+            Assert.That(resumedOffer.IsLegendaryOpeningOffer, Is.False);
+            Assert.That(
+                resumedOffer.CandidateCards.Select(card => card.CardId).ToArray(),
+                Is.EqualTo(savedOfferCardIds));
+        }
+
         private static CardDefinitionCatalogAsset CreateValidDraftCatalog()
         {
             var cards = new CardDefinitionAsset[16];
@@ -102,7 +125,7 @@ namespace Project333.Tests.EditMode
         {
             var asset = ScriptableObject.CreateInstance<UnitCardDefinitionAsset>();
             asset.ConfigureBaseForTests(cardId, cardId, new ResourceSetData(0, 0, 0, 0));
-            asset.ConfigureMetadataForTests(rarity, "Neutral", CardAffiliation.Neutral, ChargeTileFootprint.OneByOne, string.Empty, string.Empty);
+            asset.ConfigureMetadataForTests(rarity, CardAffiliation.Neutral, ChargeTileFootprint.OneByOne, string.Empty, string.Empty);
             asset.ConfigureForTests(
                 attackType: AttackType.Melee,
                 attack: 1,

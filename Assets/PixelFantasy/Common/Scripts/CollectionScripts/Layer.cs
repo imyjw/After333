@@ -33,13 +33,13 @@ namespace Assets.PixelFantasy.Common.Scripts.CollectionScripts
                     break;
                 case "PixelHeroes2":
                 {
-                    var i = new Texture2D(40, 40) { filterMode = FilterMode.Point };
+                    //var i = new Texture2D(40, 40) { filterMode = FilterMode.Point };
 
-                    i.SetPixels32(new Color32[i.width * i.height]);
-                    i.SetPixels32((i.width - texture.width) / 2, (i.height - texture.height) / 2, texture.width, texture.height, texture.GetPixels32());
-                    i.Apply();
+                    //i.SetPixels32(new Color32[i.width * i.height]);
+                    //i.SetPixels32((i.width - texture.width) / 2, (i.height - texture.height) / 2, texture.width, texture.height, texture.GetPixels32());
+                    //i.Apply();
 
-                    return Sprite.Create(i, new Rect(0, 0, i.width, i.height), Vector2.one / 2, 16);
+                    return Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), Vector2.one / 2, 16);
                 }
             }
 

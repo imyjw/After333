@@ -6,6 +6,8 @@ namespace Project333.Runtime.Presentation.Draft
     {
         void SelectDraftCard(string cardId);
 
+        void ReturnFromDraftOverlay();
+
         bool TryGetCardDefinitionAsset(string cardId, out CardDefinitionAsset cardAsset);
     }
 }

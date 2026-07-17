@@ -29,28 +29,38 @@ namespace Project333.Runtime.Application.Services
             foreach (var tileCoord in PaymentOrder)
             {
                 var occupant = activeBoard.GetOccupant(tileCoord);
-                if (!(occupant is UnitState unitState) || !unitState.IsScience)
+                if (occupant == null || occupant.IsErasure || occupant.IsSealbound)
                 {
                     continue;
                 }
 
-                if (unitState.SciencePowerUpkeep <= 0)
+                var upkeep = occupant switch
                 {
-                    unitState.IsDisabled = false;
+                    UnitState unit => unit.SciencePowerUpkeep,
+                    BuildingState building => building.SciencePowerUpkeep,
+                    _ => 0,
+                };
+                if (upkeep <= 0)
+                {
                     continue;
                 }
 
-                var upkeepCost = new ResourceSet(mana: 0, qi: 0, power: unitState.SciencePowerUpkeep, gold: 0);
+                var upkeepCost = new ResourceSet(mana: 0, qi: 0, power: upkeep, gold: 0);
                 if (activePlayer.Resources.CanAfford(upkeepCost))
                 {
                     activePlayer.Resources.Spend(upkeepCost);
-                    unitState.IsDisabled = false;
+                    SetUpkeepState(occupant, isUnpaid: false);
                 }
                 else
                 {
-                    unitState.IsDisabled = true;
+                    SetUpkeepState(occupant, isUnpaid: true);
                 }
             }
+        }
+
+        private static void SetUpkeepState(OccupantState occupant, bool isUnpaid)
+        {
+            occupant.IsDrained = isUnpaid;
         }
     }
 }

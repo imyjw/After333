@@ -20,7 +20,6 @@ MonoBehaviour:
     _qi: 0
     _power: 0
     _gold: 2
-  _attribute: Terra
   _affiliation: 3
   _chargeTileFootprint: 1
   _effectText: 
@@ -28,8 +27,11 @@ MonoBehaviour:
   _boardSprite: {fileID: 1891870504, guid: d46e924057ba7204bae951f6fe4c5b85, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: eb4c6b2d97aaea74eb68e6b1e280086f, type: 2}
   _attackType: 0
+  _damageType: 1
   _attack: 0
   _health: 33
+  _physicalDefense: 0
+  _magicDefense: 0
   _hitsPerAttack: 1
   _hasBerserker: 0
   _hasEndure: 0

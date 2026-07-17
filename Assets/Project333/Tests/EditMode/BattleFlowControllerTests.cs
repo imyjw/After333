@@ -69,7 +69,7 @@ namespace Project333.Tests.EditMode
 
             Assert.That(controller.CurrentBattleState.PlayerBoard.GetOccupant(new TileCoord(0, 0)), Is.Not.Null);
             Assert.That(controller.CurrentBattleState.Player.Hand.Contains("unit-card"), Is.False);
-            Assert.That(controller.CurrentBattleState.Player.Resources.Gold, Is.EqualTo(7));
+            Assert.That(controller.CurrentBattleState.Player.Resources.Gold, Is.EqualTo(6));
         }
 
         private static BattleSetupRequest CreateRequest(PlayerId firstPlayerId)

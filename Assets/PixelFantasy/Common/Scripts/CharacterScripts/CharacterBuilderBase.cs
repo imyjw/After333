@@ -1,5 +1,6 @@
-using System.Linq;
 using Assets.PixelFantasy.Common.Scripts.CollectionScripts;
+using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace Assets.PixelFantasy.Common.Scripts.CharacterScripts
@@ -16,6 +17,7 @@ namespace Assets.PixelFantasy.Common.Scripts.CharacterScripts
         public string Armor;
         public string Helmet;
         public string Weapon;
+        public string WeaponSecondary;
         public string Firearm;
         public string Shield;
         public string Cape;
@@ -45,8 +47,6 @@ namespace Assets.PixelFantasy.Common.Scripts.CharacterScripts
             Ears = "Human";
             Eyes = "Human";
             Body = "Human";
-
-            Rebuild();
         }
 
         public void RandomizeEquipment(bool helmet = true, bool armor = true, bool weapon = true, bool shield = true)
@@ -81,15 +81,20 @@ namespace Assets.PixelFantasy.Common.Scripts.CharacterScripts
             var color = colors[Random.Range(0, colors.Length)];
 
             Hair = $"{Randomize("Hair", 20)}#{color}";
-
         }
 
         public void RandomizeRace()
         {
             Body = Randomize("Body");
-            Head = Body;
-            Eyes = Body;
-            Ears = Body;
+
+            var race = Regex.Replace(Body, @"\d", string.Empty);
+            var heads = SpriteCollection.Layers.Single(i => i.Name == "Head").Textures.Select(i => i.name).Where(i => i.StartsWith(race)).ToList();
+            var eyes = SpriteCollection.Layers.Single(i => i.Name == "Eyes").Textures.Select(i => i.name).Where(i => i.StartsWith(race)).ToList();
+            var ears = SpriteCollection.Layers.Single(i => i.Name == "Ears").Textures.Select(i => i.name).Where(i => i.StartsWith(race)).ToList();
+
+            Head = heads[Random.Range(0, heads.Count)];
+            Eyes = eyes[Random.Range(0, eyes.Count)];
+            Ears = ears[Random.Range(0, ears.Count)];
         }
 
         private string Randomize(string part, int emptyChance = 0)

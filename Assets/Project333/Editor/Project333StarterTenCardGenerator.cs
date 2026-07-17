@@ -54,7 +54,6 @@ namespace Project333.Editor
             asset.ConfigureBaseForTests("starter_iron_guard", "Iron Guard", new ResourceSetData(0, 0, 0, 2));
             asset.ConfigureMetadataForTests(
                 CardRarity.Common,
-                "Earth",
                 CardAffiliation.Fantasy,
                 ChargeTileFootprint.OneByOne,
                 "A steady front-line melee unit.",
@@ -70,7 +69,6 @@ namespace Project333.Editor
             asset.ConfigureBaseForTests("starter_longbow_scout", "Longbow Scout", new ResourceSetData(0, 0, 0, 3));
             asset.ConfigureMetadataForTests(
                 CardRarity.Common,
-                "Wind",
                 CardAffiliation.Fantasy,
                 ChargeTileFootprint.OneByOne,
                 "A basic ranged unit.",
@@ -86,7 +84,6 @@ namespace Project333.Editor
             asset.ConfigureBaseForTests("starter_gold_miner", "Gold Miner", new ResourceSetData(0, 0, 0, 2));
             asset.ConfigureMetadataForTests(
                 CardRarity.Common,
-                "Earth",
                 CardAffiliation.Neutral,
                 ChargeTileFootprint.OneByOne,
                 "At turn start, gain Gold +1.",
@@ -102,7 +99,6 @@ namespace Project333.Editor
             asset.ConfigureBaseForTests("starter_mana_acolyte", "Mana Acolyte", new ResourceSetData(0, 0, 0, 2));
             asset.ConfigureMetadataForTests(
                 CardRarity.Common,
-                "Light",
                 CardAffiliation.Murim,
                 ChargeTileFootprint.OneByOne,
                 "At turn start, gain Mana +1.",
@@ -118,12 +114,17 @@ namespace Project333.Editor
             asset.ConfigureBaseForTests("starter_power_turret", "Power Turret", new ResourceSetData(0, 0, 0, 4));
             asset.ConfigureMetadataForTests(
                 CardRarity.Uncommon,
-                "Lightning",
                 CardAffiliation.ScienceCivilization,
                 ChargeTileFootprint.OneByOne,
                 "At turn start, gain Power +1.",
                 "Can attack as a ranged building.");
-            asset.ConfigureForTests(true, 2, 7, new ResourceSetData(0, 0, 1, 0), false);
+            asset.ConfigureForTests(
+                true,
+                2,
+                7,
+                new ResourceSetData(0, 0, 1, 0),
+                false,
+                damageType: DamageType.Physical);
             EditorUtility.SetDirty(asset);
             return asset;
         }
@@ -134,7 +135,6 @@ namespace Project333.Editor
             asset.ConfigureBaseForTests("starter_rush_raider", "Rush Raider", new ResourceSetData(0, 1, 0, 2));
             asset.ConfigureMetadataForTests(
                 CardRarity.Uncommon,
-                "Fire",
                 CardAffiliation.Murim,
                 ChargeTileFootprint.OneByOne,
                 "Can attack on the turn it is summoned.",
@@ -150,7 +150,6 @@ namespace Project333.Editor
             asset.ConfigureBaseForTests("starter_twin_blade_adept", "Twin Blade Adept", new ResourceSetData(1, 0, 0, 3));
             asset.ConfigureMetadataForTests(
                 CardRarity.Rare,
-                "Shadow",
                 CardAffiliation.Murim,
                 ChargeTileFootprint.OneByOne,
                 "Can attack twice each turn.",
@@ -166,11 +165,10 @@ namespace Project333.Editor
             asset.ConfigureBaseForTests("starter_tesla_sentinel", "Tesla Sentinel", new ResourceSetData(0, 0, 0, 4));
             asset.ConfigureMetadataForTests(
                 CardRarity.Rare,
-                "Lightning",
                 CardAffiliation.ScienceCivilization,
                 ChargeTileFootprint.OneByOne,
                 "Requires Power upkeep at turn start.",
-                "Becomes disabled if upkeep cannot be paid.");
+                "Becomes drained if upkeep cannot be paid.");
             asset.ConfigureForTests(AttackType.Melee, 4, 6, true, true, 2, new ResourceSetData(0, 0, 0, 0), 1, false);
             EditorUtility.SetDirty(asset);
             return asset;
@@ -179,15 +177,14 @@ namespace Project333.Editor
         private static DamageSpellCardDefinitionAsset CreateFirebolt()
         {
             var asset = LoadOrCreate<DamageSpellCardDefinitionAsset>($"{CardsRoot}/Firebolt.asset");
-            asset.ConfigureBaseForTests("starter_firebolt", "Firebolt", new ResourceSetData(1, 0, 0, 1));
+            asset.ConfigureBaseForTests("firebolt", "Firebolt", new ResourceSetData(1, 0, 0, 0));
             asset.ConfigureMetadataForTests(
                 CardRarity.Common,
-                "Fire",
                 CardAffiliation.Fantasy,
                 ChargeTileFootprint.None,
-                "Deal 4 damage to one target occupant.",
+                "Deal 10 magic damage to one target occupant.",
                 string.Empty);
-            asset.ConfigureForTests(4);
+            asset.ConfigureForTests(10, DamageType.Magic);
             EditorUtility.SetDirty(asset);
             return asset;
         }
@@ -198,7 +195,6 @@ namespace Project333.Editor
             asset.ConfigureBaseForTests("starter_power_contract", "Power Contract", new ResourceSetData(0, 0, 0, 2));
             asset.ConfigureMetadataForTests(
                 CardRarity.Uncommon,
-                "Arcane",
                 CardAffiliation.ScienceCivilization,
                 ChargeTileFootprint.None,
                 "At turn start, gain Power +1 while active.",

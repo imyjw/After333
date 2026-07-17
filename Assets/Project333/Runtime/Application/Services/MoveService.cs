@@ -26,9 +26,9 @@ namespace Project333.Runtime.Application.Services
                 throw new InvalidOperationException("Cannot move an enemy occupant.");
             }
 
-            if (occupant.IsDisabled)
+            if (occupant.CannotMoveDueToState)
             {
-                throw new InvalidOperationException("Disabled occupants cannot move.");
+                throw new InvalidOperationException("This occupant cannot move in its current state.");
             }
 
             if (!occupant.CanMove)
@@ -53,9 +53,9 @@ namespace Project333.Runtime.Application.Services
                 throw new InvalidOperationException("Cannot move onto an enemy occupant.");
             }
 
-            if (targetOccupant.IsDisabled)
+            if (targetOccupant.CannotMoveDueToState)
             {
-                throw new InvalidOperationException("Cannot swap with a disabled occupant.");
+                throw new InvalidOperationException("Cannot swap with an occupant in its current state.");
             }
 
             if (!targetOccupant.CanMove)

@@ -6,7 +6,13 @@ namespace Project333.Runtime.Infrastructure.Data
 {
     public abstract class CardDefinition
     {
-        protected CardDefinition(string cardId, string displayName, CardType cardType, ResourceSet cost)
+        protected CardDefinition(
+            string cardId,
+            string displayName,
+            CardType cardType,
+            ResourceSet cost,
+            bool includeInDraft = true,
+            bool hasReplicate = false)
         {
             if (string.IsNullOrWhiteSpace(cardId))
             {
@@ -22,6 +28,8 @@ namespace Project333.Runtime.Infrastructure.Data
             DisplayName = displayName;
             CardType = cardType;
             Cost = cost?.Clone() ?? throw new ArgumentNullException(nameof(cost));
+            IncludeInDraft = includeInDraft;
+            HasReplicate = hasReplicate;
         }
 
         public string CardId { get; }
@@ -31,5 +39,9 @@ namespace Project333.Runtime.Infrastructure.Data
         public CardType CardType { get; }
 
         public ResourceSet Cost { get; }
+
+        public bool IncludeInDraft { get; }
+
+        public bool HasReplicate { get; }
     }
 }

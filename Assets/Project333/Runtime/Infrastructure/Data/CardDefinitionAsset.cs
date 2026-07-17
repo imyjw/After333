@@ -11,7 +11,6 @@ namespace Project333.Runtime.Infrastructure.Data
         [SerializeField] private CardRarity _rarity = CardRarity.Common;
         [SerializeField] private ResourceSetData _cost;
         [Header("Theme")]
-        [SerializeField] private string _attribute = "Neutral";
         [SerializeField] private CardAffiliation _affiliation = CardAffiliation.Neutral;
         [SerializeField] private ChargeTileFootprint _chargeTileFootprint = ChargeTileFootprint.OneByOne;
         [Header("Rules Text")]
@@ -19,6 +18,7 @@ namespace Project333.Runtime.Infrastructure.Data
         [SerializeField] private string _effectText;
         [TextArea(2, 4)]
         [SerializeField] private string _specialEffectText;
+        [SerializeField] private bool _hasReplicate;
         [Header("Board Visual")]
         [SerializeField] private Sprite _boardSprite;
         [SerializeField] private RuntimeAnimatorController _boardAnimatorController;
@@ -31,15 +31,31 @@ namespace Project333.Runtime.Infrastructure.Data
 
         public ResourceSetData Cost => _cost;
 
-        public string Attribute => _attribute;
-
         public CardAffiliation Affiliation => _affiliation;
 
         public ChargeTileFootprint ChargeTileFootprint => _chargeTileFootprint;
 
         public string EffectText => _effectText;
 
-        public virtual string SpecialEffectText => _specialEffectText;
+        public virtual string SpecialEffectText
+        {
+            get
+            {
+                var text = _specialEffectText?.Trim() ?? string.Empty;
+                if (!_hasReplicate ||
+                    text.IndexOf("Replicate", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    text.Contains("복제"))
+                {
+                    return text;
+                }
+
+                return string.IsNullOrWhiteSpace(text)
+                    ? "복제"
+                    : $"{text}{Environment.NewLine}복제";
+            }
+        }
+
+        public bool HasReplicate => _hasReplicate;
 
         protected string RawSpecialEffectText => _specialEffectText;
 
@@ -68,14 +84,12 @@ namespace Project333.Runtime.Infrastructure.Data
 
         public void ConfigureMetadataForTests(
             CardRarity rarity,
-            string attribute,
             CardAffiliation affiliation,
             ChargeTileFootprint chargeTileFootprint,
             string effectText,
             string specialEffectText)
         {
             _rarity = rarity;
-            _attribute = string.IsNullOrWhiteSpace(attribute) ? "Neutral" : attribute;
             _affiliation = affiliation;
             _chargeTileFootprint = chargeTileFootprint;
             _effectText = effectText ?? string.Empty;
@@ -86,6 +100,11 @@ namespace Project333.Runtime.Infrastructure.Data
         {
             _boardSprite = boardSprite;
             _boardAnimatorController = boardAnimatorController;
+        }
+
+        public void ConfigureReplicateForTests(bool hasReplicate)
+        {
+            _hasReplicate = hasReplicate;
         }
     }
 }

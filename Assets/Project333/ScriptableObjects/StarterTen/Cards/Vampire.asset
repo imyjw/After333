@@ -16,25 +16,27 @@ MonoBehaviour:
   _displayName: "\uBC40\uD30C\uC774\uC5B4"
   _rarity: 1
   _cost:
-    _mana: 4
+    _mana: 5
     _qi: 0
     _power: 0
     _gold: 0
-  _attribute: Blood
   _affiliation: 1
   _chargeTileFootprint: 1
-  _effectText: "\uD761\uD608(\uACF5\uACA9 \uC2DC \uC785\uD78C \uD53C\uD574\uB9CC\uD07C
-    \uCCB4\uB825 \uD68C\uBCF5)"
-  _specialEffectText: 
+  _effectText: 
+  _specialEffectText: "\uD761\uD608: \uACF5\uACA9 \uC2DC \uC785\uD78C \uD53C\uD574\uB9CC\uD07C \uCCB4\uB825 \uD68C\uBCF5"
   _boardSprite: {fileID: 1294945788, guid: ff9a121216c78f64eb19551bf7588b66, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: 55bf4911c4fccdf419b264f39afa613c, type: 2}
   _attackType: 0
+  _damageType: 1
   _attack: 20
   _health: 50
+  _physicalDefense: 0
+  _magicDefense: 0
   _hitsPerAttack: 1
   _hasBerserker: 0
   _hasEndure: 0
   _hasGuard: 0
+  _hasLifeSteal: 1
   _canMove: 1
   _isScience: 0
   _sciencePowerUpkeep: 0

@@ -8,8 +8,9 @@ namespace Project333.Runtime.Infrastructure.Data
         protected SpellCardDefinition(
             string cardId,
             string displayName,
-            ResourceSet cost)
-            : base(cardId, displayName, CardType.Spell, cost)
+            ResourceSet cost,
+            bool hasReplicate = false)
+            : base(cardId, displayName, CardType.Spell, cost, hasReplicate: hasReplicate)
         {
         }
     }

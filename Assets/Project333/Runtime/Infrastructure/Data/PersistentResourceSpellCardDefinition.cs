@@ -12,8 +12,9 @@ namespace Project333.Runtime.Infrastructure.Data
             string effectId,
             ResourceSet turnStartResourceGain,
             string endConditionText,
-            int ownerTurnStartsRemaining = 0)
-            : base(cardId, displayName, cost)
+            int ownerTurnStartsRemaining = 0,
+            bool hasReplicate = false)
+            : base(cardId, displayName, cost, hasReplicate)
         {
             if (string.IsNullOrWhiteSpace(effectId))
             {

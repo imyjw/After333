@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
 using Project333.Runtime.Infrastructure.Data;
+using UnityEngine;
 
 namespace Project333.Runtime.Presentation.Battle
 {
     public static class BattleBootstrapperConfigResolver
     {
+        private const string CardDefinitionJsonResourcePath = "Project333/Data/cards";
+
         public static BattleBootstrapperResolvedConfig Resolve(
             CardDefinitionCatalogAsset cardCatalogAsset,
             DeckDefinitionAsset playerDeckAsset,
@@ -15,7 +18,8 @@ namespace Project333.Runtime.Presentation.Battle
             bool useGeneratedDebugDecksWhenEmpty,
             int generatedDeckSize,
             IReadOnlyList<string> playerDeckOverrideCardIds = null,
-            IReadOnlyList<string> aiDeckOverrideCardIds = null)
+            IReadOnlyList<string> aiDeckOverrideCardIds = null,
+            bool preferJsonCardDefinitions = false)
         {
             var resolvedPlayerDeckIds = ResolveDeckCardIds(playerDeckAsset, playerDeckCardIds, playerDeckOverrideCardIds);
             var resolvedAIDeckIds = ResolveDeckCardIds(aiDeckAsset, aiDeckCardIds, aiDeckOverrideCardIds);
@@ -33,7 +37,7 @@ namespace Project333.Runtime.Presentation.Battle
                 }
             }
 
-            var provider = ResolveProvider(cardCatalogAsset, playerDeckAsset, aiDeckAsset);
+            var provider = ResolveProvider(cardCatalogAsset, playerDeckAsset, aiDeckAsset, preferJsonCardDefinitions);
 
             return new BattleBootstrapperResolvedConfig(
                 playerDeckCardIds: resolvedPlayerDeckIds,
@@ -68,8 +72,18 @@ namespace Project333.Runtime.Presentation.Battle
         private static ICardDefinitionProvider ResolveProvider(
             CardDefinitionCatalogAsset cardCatalogAsset,
             DeckDefinitionAsset playerDeckAsset,
-            DeckDefinitionAsset aiDeckAsset)
+            DeckDefinitionAsset aiDeckAsset,
+            bool preferJsonCardDefinitions)
         {
+            if (preferJsonCardDefinitions)
+            {
+                var jsonProvider = TryCreateJsonProviderFromResources();
+                if (jsonProvider != null)
+                {
+                    return jsonProvider;
+                }
+            }
+
             if (cardCatalogAsset != null)
             {
                 return cardCatalogAsset.CreateProvider();
@@ -88,6 +102,39 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             return new InMemoryCardDefinitionProvider(definitions);
+        }
+
+        private static ICardDefinitionProvider TryCreateJsonProviderFromResources()
+        {
+            var jsonAsset = Resources.Load<TextAsset>(CardDefinitionJsonResourcePath);
+            if (jsonAsset == null || string.IsNullOrWhiteSpace(jsonAsset.text))
+            {
+                return null;
+            }
+
+            try
+            {
+                var validation = CardDatabaseValidator.ValidateJson(jsonAsset.text);
+                if (!validation.IsValid)
+                {
+                    Debug.LogError(
+                        $"JSON card definitions failed validation from Resources/{CardDefinitionJsonResourcePath}: {string.Join("; ", validation.Errors)}");
+                    return null;
+                }
+
+                foreach (var warning in validation.Warnings)
+                {
+                    Debug.LogWarning($"JSON card definition warning: {warning}");
+                }
+
+                var database = JsonCardDefinitionDatabase.FromJson(jsonAsset.text);
+                return database.CreateProvider();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"Failed to load JSON card definitions from Resources/{CardDefinitionJsonResourcePath}: {exception.Message}");
+                return null;
+            }
         }
     }
 }

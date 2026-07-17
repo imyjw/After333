@@ -72,12 +72,20 @@ mono_crash.*
 *.unitypackage
 *.unitypackage.meta
 *.app
+/Builds/
+/Logs/
+/Backups/
 
 # Crashlytics generated file
 crashlytics-build.properties
 
 # TestRunner generated files
 InitTestScene*.unity*
+
+# Project333 local server secrets
+/Server/Project333.PvpServer/Tools/*.local.ps1
+/Server/Project333.PvpServer/Tools/.env*.ps1
+/Server/Project333.PvpServer/Deploy/Caddyfile
 
 # Addressables default ignores, before user customizations
 /ServerData

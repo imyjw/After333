@@ -1,10 +1,10 @@
-﻿using System;
+﻿using Assets.PixelFantasy.Common.Scripts.CharacterScripts;
+using Assets.PixelFantasy.Common.Scripts.CollectionScripts;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using Assets.PixelFantasy.Common.Scripts.CharacterScripts;
-using Assets.PixelFantasy.Common.Scripts.CollectionScripts;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
@@ -20,6 +20,7 @@ namespace Assets.PixelFantasy.Common.Scripts.EditorScripts
         public Sprite EmptyIcon;
         public AudioSource AudioSource;
         public AudioClip EquipSound;
+        public Inventory Inventory;
 
         public static event Action<string> SliceTextureRequest = _ => {};
         public static event Action<string> CreateSpriteLibraryRequest = _ => { };
@@ -60,7 +61,45 @@ namespace Assets.PixelFantasy.Common.Scripts.EditorScripts
                 }
             }
 
+            SelectLayer("Body");
             Rebuild();
+        }
+
+        public void SelectLayer(string layerName)
+        {
+            var layer = Layers.Single(i => i.Name == layerName);
+
+            if (!Inventory) return;
+            
+            var items = new List<InventoryItem>();
+
+            if (layer.CanBeEmpty)
+            {
+                var item = new InventoryItem
+                {
+                    Name = "Empty",
+                    Icon = null,
+                    OnSelect = () => { SetIndex(layer, 0); }
+                };
+
+                items.Add(item);
+            }
+
+            for (var i = 0; i < layer.Content.Textures.Count; i++)
+            {
+                var texture = layer.Content.Textures[i];
+                var index = i;
+                var item = new InventoryItem
+                {
+                    Name = GetDisplayName(texture.name),
+                    Icon = layer.Content.GetIcon(SpriteCollection.Type, texture),
+                    OnSelect = () => { SetIndex(layer, index + (layer.CanBeEmpty ? 1 : 0)); }
+                };
+
+                items.Add(item);
+            }
+
+            Inventory.Initialize(items, layer.Index + (layer.CanBeEmpty ? 1 : 0));
         }
 
         private void Rebuild()
@@ -76,6 +115,7 @@ namespace Assets.PixelFantasy.Common.Scripts.EditorScripts
             CharacterBuilder.Armor = layers["Armor"];
             CharacterBuilder.Helmet = layers["Helmet"];
             CharacterBuilder.Weapon = layers["Weapon"];
+            CharacterBuilder.WeaponSecondary = layers.GetValueOrDefault("WeaponSecondary");
             CharacterBuilder.Firearm = layers["Firearm"];
             CharacterBuilder.Shield = layers["Shield"];
             CharacterBuilder.Cape = layers["Cape"];
@@ -209,6 +249,7 @@ namespace Assets.PixelFantasy.Common.Scripts.EditorScripts
         public void Reset()
         {
             CharacterBuilder.Reset();
+            CharacterBuilder.Rebuild();
 
             foreach (var layer in Layers)
             {

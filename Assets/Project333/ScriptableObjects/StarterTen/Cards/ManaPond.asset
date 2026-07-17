@@ -16,11 +16,10 @@ MonoBehaviour:
   _displayName: "\uB9C8\uB098\uC758 \uC0D8"
   _rarity: 2
   _cost:
-    _mana: 3
+    _mana: 4
     _qi: 0
     _power: 0
     _gold: 0
-  _attribute: Luminous
   _affiliation: 1
   _chargeTileFootprint: 1
   _effectText: 
@@ -28,10 +27,13 @@ MonoBehaviour:
   _boardSprite: {fileID: 980851926, guid: a4215456ac69ce245a08dc891390573e, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: 0bb8a00653f004647ac86d0ff80220fb, type: 2}
   _canAttack: 0
+  _damageType: 0
   _attack: 0
   _health: 33
+  _physicalDefense: 0
+  _magicDefense: 0
   _turnStartResourceGain:
-    _mana: 4
+    _mana: 3
     _qi: 0
     _power: 0
     _gold: 0

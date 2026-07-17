@@ -1,0 +1,8 @@
+[db] PROJECT333_DB_CONNECTION is not set. Skipping PostgreSQL migrations.
+[cards] loading definitions from C:\Project_333\TempBuild\GolemServerCardPathCheck\Data\cards.json
+[cards] cards.json validation passed.
+Project333 PvP test server listening on http://127.0.0.1:7334
+00:22:24 info: Microsoft.Hosting.Lifetime[14] Now listening on: http://127.0.0.1:7334
+00:22:24 info: Microsoft.Hosting.Lifetime[0] Application started. Press Ctrl+C to shut down.
+00:22:24 info: Microsoft.Hosting.Lifetime[0] Hosting environment: Production
+00:22:24 info: Microsoft.Hosting.Lifetime[0] Content root path: C:\Project_333\TempBuild\GolemServerCardPathCheck

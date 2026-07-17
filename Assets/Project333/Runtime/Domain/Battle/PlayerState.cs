@@ -70,5 +70,17 @@ namespace Project333.Runtime.Domain.Battle
         {
             FailedDrawCount = 0;
         }
+
+        public void RestoreRuntimeState(
+            int failedDrawCount,
+            bool hasUsedMulligan,
+            int maxHandSizeBonus)
+        {
+            FailedDrawCount = Math.Max(0, failedDrawCount);
+            HasUsedMulligan = hasUsedMulligan;
+            MaxHandSizeBonus = Math.Min(
+                AbsoluteMaxHandSize - BaseMaxHandSize,
+                Math.Max(0, maxHandSizeBonus));
+        }
     }
 }

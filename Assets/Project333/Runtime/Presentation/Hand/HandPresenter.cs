@@ -1,9 +1,14 @@
 using System;
 using System.Collections.Generic;
 using Project333.Runtime.Domain.Battle;
+using Project333.Runtime.Presentation;
 using Project333.Runtime.Presentation.Battle;
 using UnityEngine;
 using UnityEngine.UI;
+#if UNITY_EDITOR
+using UnityEditor;
+using UnityEditor.SceneManagement;
+#endif
 
 namespace Project333.Runtime.Presentation.Hand
 {
@@ -29,17 +34,87 @@ namespace Project333.Runtime.Presentation.Hand
         [SerializeField] private float _selectedScaleMultiplier = 1.08f;
         [SerializeField] private int _canvasSortingOrder = 35;
 
+        // Keep authoring values separate from the runtime layout pass. This prevents
+        // editor materialization or play-mode initialization from replacing Inspector tuning.
+        [SerializeField, HideInInspector] private bool _hasAuthoringLayoutSnapshot;
+        [SerializeField, HideInInspector] private HandLayoutSettings _authoringLayoutSnapshot;
+
         private readonly List<VisibleHandCard> _visibleHandCards = new List<VisibleHandCard>(MinimumHandSlotCount);
 
-        private Canvas _runtimeCanvas;
-        private RectTransform _runtimeCanvasRect;
-        private RectTransform _runtimeHandRoot;
+        [SerializeField, HideInInspector] private Canvas _runtimeCanvas;
+        [SerializeField, HideInInspector] private RectTransform _runtimeCanvasRect;
+        [SerializeField, HideInInspector] private RectTransform _runtimeHandRoot;
+        private bool _createdRuntimeCanvasAtRuntime;
 
         public HandCardView[] HandCardViews => _handCardViews;
 
         private void Awake()
         {
+            RestoreAuthoringLayout();
             RebuildCardRegistry();
+        }
+
+        private void OnValidate()
+        {
+#if UNITY_EDITOR
+            if (UnityEngine.Application.isPlaying)
+            {
+                return;
+            }
+
+            CaptureAuthoringLayout();
+#endif
+        }
+
+#if UNITY_EDITOR
+        [ContextMenu("Materialize Missing Persistent Hand UI")]
+        public void MaterializePersistentHandUiForEditor()
+        {
+            if (this == null || UnityEngine.Application.isPlaying)
+            {
+                return;
+            }
+
+            RebuildCardRegistry();
+            EnsureRuntimeHandCanvas(allowCreationInEditMode: true);
+            BindRuntimeVisualParents();
+
+            EditorUtility.SetDirty(this);
+            foreach (var handCardView in _handCardViews)
+            {
+                if (handCardView == null)
+                {
+                    continue;
+                }
+
+                var textView = handCardView.GetComponent<HandCardTextView>();
+                if (textView != null)
+                {
+                    EditorUtility.SetDirty(textView);
+                }
+            }
+
+            if (gameObject.scene.IsValid())
+            {
+                EditorSceneManager.MarkSceneDirty(gameObject.scene);
+            }
+        }
+#endif
+
+        private void CaptureAuthoringLayout()
+        {
+            _authoringLayoutSnapshot = new HandLayoutSettings(this);
+            _hasAuthoringLayoutSnapshot = true;
+        }
+
+        private void RestoreAuthoringLayout()
+        {
+            if (!_hasAuthoringLayoutSnapshot)
+            {
+                return;
+            }
+
+            _authoringLayoutSnapshot.ApplyTo(this);
         }
 
         private void LateUpdate()
@@ -57,7 +132,7 @@ namespace Project333.Runtime.Presentation.Hand
 
         private void OnDestroy()
         {
-            if (_runtimeCanvas != null)
+            if (_createdRuntimeCanvasAtRuntime && _runtimeCanvas != null)
             {
                 Destroy(_runtimeCanvas.gameObject);
             }
@@ -82,7 +157,13 @@ namespace Project333.Runtime.Presentation.Hand
                     continue;
                 }
 
-                handCardView.Present(HandPresenterLayout.GetCardIdForSlot(handState?.CardIds, i));
+                var handCard = handState != null && i < handState.Cards.Count
+                    ? handState.Cards[i]
+                    : null;
+                handCardView.Present(
+                    handCard?.CardId,
+                    handCard?.RuntimeId,
+                    handCard?.IsTemporaryReplicate == true);
             }
 
             if (!UnityEngine.Application.isPlaying)
@@ -146,11 +227,17 @@ namespace Project333.Runtime.Presentation.Hand
             slotTransform.localScale = Vector3.one;
         }
 
-        private void EnsureRuntimeHandCanvas()
+        private void EnsureRuntimeHandCanvas(bool allowCreationInEditMode = false)
         {
+            AutoAssignRuntimeHandHierarchy();
             if (_runtimeCanvas != null && _runtimeHandRoot != null)
             {
                 UpdateRuntimeHandRootRect();
+                return;
+            }
+
+            if (!UnityEngine.Application.isPlaying && !allowCreationInEditMode)
+            {
                 return;
             }
 
@@ -162,6 +249,13 @@ namespace Project333.Runtime.Presentation.Hand
                 typeof(GraphicRaycaster));
 
             canvasObject.transform.SetParent(transform, false);
+#if UNITY_EDITOR
+            if (!UnityEngine.Application.isPlaying)
+            {
+                Undo.RegisterCreatedObjectUndo(canvasObject, "Create Runtime Hand UI");
+            }
+#endif
+            _createdRuntimeCanvasAtRuntime = UnityEngine.Application.isPlaying;
 
             _runtimeCanvasRect = canvasObject.GetComponent<RectTransform>();
             _runtimeCanvas = canvasObject.GetComponent<Canvas>();
@@ -174,18 +268,48 @@ namespace Project333.Runtime.Presentation.Hand
             canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             canvasScaler.referenceResolution = new Vector2(1920f, 1080f);
             canvasScaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            canvasScaler.matchWidthOrHeight = 0.5f;
+            canvasScaler.matchWidthOrHeight = 1f;
 
             _runtimeCanvasRect.anchorMin = Vector2.zero;
             _runtimeCanvasRect.anchorMax = Vector2.one;
             _runtimeCanvasRect.offsetMin = Vector2.zero;
             _runtimeCanvasRect.offsetMax = Vector2.zero;
 
+            var safeAreaRoot = SafeAreaFitter.EnsureCanvasContentRoot(
+                _runtimeCanvasRect,
+                "RuntimeHandSafeArea");
+
             var handRootObject = new GameObject("RuntimeHandRoot", typeof(RectTransform));
             _runtimeHandRoot = handRootObject.GetComponent<RectTransform>();
-            _runtimeHandRoot.SetParent(_runtimeCanvasRect, false);
+            _runtimeHandRoot.SetParent(safeAreaRoot, false);
 
             UpdateRuntimeHandRootRect();
+        }
+
+        private void AutoAssignRuntimeHandHierarchy()
+        {
+            if (_runtimeCanvas == null)
+            {
+                foreach (var canvas in GetComponentsInChildren<Canvas>(includeInactive: true))
+                {
+                    if (canvas != null && canvas.name == "RuntimeHandCanvas")
+                    {
+                        _runtimeCanvas = canvas;
+                        break;
+                    }
+                }
+            }
+
+            if (_runtimeCanvasRect == null && _runtimeCanvas != null)
+            {
+                _runtimeCanvasRect = _runtimeCanvas.transform as RectTransform;
+            }
+
+            if (_runtimeHandRoot == null && _runtimeCanvas != null)
+            {
+                _runtimeHandRoot = _runtimeCanvas.transform.Find("RuntimeHandSafeArea/RuntimeHandRoot") as RectTransform;
+            }
+
         }
 
         private void UpdateRuntimeHandRootRect()
@@ -277,7 +401,8 @@ namespace Project333.Runtime.Presentation.Hand
                     _edgeDrop,
                     _minimumLargeHandScale);
 
-                if (visibleHandCard.View.HighlightState == BattleHighlightState.Selected)
+                if (visibleHandCard.View.HighlightState == BattleHighlightState.Selected ||
+                    visibleHandCard.View.HighlightState == BattleHighlightState.MulliganSelected)
                 {
                     selectedVisibleIndex = i;
                     layout = new HandCardFanLayout(
@@ -348,6 +473,11 @@ namespace Project333.Runtime.Presentation.Hand
                 }
 
                 handCardView.Configure(i);
+                var textView = handCardView.GetComponent<HandCardTextView>();
+                if (textView != null)
+                {
+                    textView.EnsureEditableRuntimeStatOverlayTemplate();
+                }
             }
         }
 
@@ -362,6 +492,58 @@ namespace Project333.Runtime.Presentation.Hand
             public HandCardView View { get; }
 
             public HandCardTextView TextView { get; }
+        }
+
+        [Serializable]
+        private struct HandLayoutSettings
+        {
+            public Vector2 CardSize;
+            public float BottomPadding;
+            public float HandBandHeight;
+            public float HandWidthFactor;
+            public float MinSpacing;
+            public float MaxSpacing;
+            public float MaxRotationDegrees;
+            public float ArcHeight;
+            public float EdgeDrop;
+            public float MinimumLargeHandScale;
+            public float SelectedLift;
+            public float SelectedScaleMultiplier;
+            public int CanvasSortingOrder;
+
+            public HandLayoutSettings(HandPresenter presenter)
+            {
+                CardSize = presenter._cardSize;
+                BottomPadding = presenter._bottomPadding;
+                HandBandHeight = presenter._handBandHeight;
+                HandWidthFactor = presenter._handWidthFactor;
+                MinSpacing = presenter._minSpacing;
+                MaxSpacing = presenter._maxSpacing;
+                MaxRotationDegrees = presenter._maxRotationDegrees;
+                ArcHeight = presenter._arcHeight;
+                EdgeDrop = presenter._edgeDrop;
+                MinimumLargeHandScale = presenter._minimumLargeHandScale;
+                SelectedLift = presenter._selectedLift;
+                SelectedScaleMultiplier = presenter._selectedScaleMultiplier;
+                CanvasSortingOrder = presenter._canvasSortingOrder;
+            }
+
+            public void ApplyTo(HandPresenter presenter)
+            {
+                presenter._cardSize = CardSize;
+                presenter._bottomPadding = BottomPadding;
+                presenter._handBandHeight = HandBandHeight;
+                presenter._handWidthFactor = HandWidthFactor;
+                presenter._minSpacing = MinSpacing;
+                presenter._maxSpacing = MaxSpacing;
+                presenter._maxRotationDegrees = MaxRotationDegrees;
+                presenter._arcHeight = ArcHeight;
+                presenter._edgeDrop = EdgeDrop;
+                presenter._minimumLargeHandScale = MinimumLargeHandScale;
+                presenter._selectedLift = SelectedLift;
+                presenter._selectedScaleMultiplier = SelectedScaleMultiplier;
+                presenter._canvasSortingOrder = CanvasSortingOrder;
+            }
         }
     }
 }

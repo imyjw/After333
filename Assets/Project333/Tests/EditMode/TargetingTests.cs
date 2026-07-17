@@ -46,31 +46,50 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void GetLegalTargets_DisabledScienceUnitDoesNotBlockBackRow()
+        public void GetLegalTargets_DrainedUnitDoesNotBlockBackRow()
         {
             var battleState = CreateBattleState();
             var targetingService = new TargetingService();
             var attacker = CreateUnit("attacker", PlayerId.Player, new TileCoord(0, 0), AttackType.Melee);
-            var disabledScienceFront = new UnitState(
-                runtimeId: "science-front",
-                cardId: "science-front",
+            var drainedFront = new UnitState(
+                runtimeId: "drained-front",
+                cardId: "drained-front",
                 ownerId: PlayerId.AI,
                 position: new TileCoord(2, 0),
                 attackType: AttackType.Melee,
                 attack: 2,
                 maxHp: 5,
                 canMove: true,
-                isScience: true,
+                isScience: false,
                 sciencePowerUpkeep: 1);
 
-            disabledScienceFront.IsDisabled = true;
+            drainedFront.IsDrained = true;
 
             battleState.PlayerBoard.Place(new TileCoord(0, 0), attacker);
-            battleState.AIBoard.Place(new TileCoord(2, 0), disabledScienceFront);
+            battleState.AIBoard.Place(new TileCoord(2, 0), drainedFront);
 
             var legalTargets = targetingService.GetLegalTargets(battleState, PlayerId.Player, new TileCoord(0, 0));
 
             Assert.That(legalTargets, Does.Contain(new TileCoord(2, 1)));
+        }
+
+        [Test]
+        public void GetLegalTargets_ErasureUnitStillBlocksBackRow()
+        {
+            var battleState = CreateBattleState();
+            var targetingService = new TargetingService();
+            var attacker = CreateUnit("attacker", PlayerId.Player, new TileCoord(0, 0), AttackType.Melee);
+            var erasureFront = CreateUnit("erasure-front", PlayerId.AI, new TileCoord(2, 0), AttackType.Melee);
+
+            erasureFront.ApplyErasure();
+
+            battleState.PlayerBoard.Place(new TileCoord(0, 0), attacker);
+            battleState.AIBoard.Place(new TileCoord(2, 0), erasureFront);
+
+            var legalTargets = targetingService.GetLegalTargets(battleState, PlayerId.Player, new TileCoord(0, 0));
+
+            Assert.That(legalTargets, Does.Contain(new TileCoord(2, 0)));
+            Assert.That(legalTargets, Has.No.Member(new TileCoord(2, 1)));
         }
 
         private static UnitState CreateUnit(string id, PlayerId ownerId, TileCoord coord, AttackType attackType)

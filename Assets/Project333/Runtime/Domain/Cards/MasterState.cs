@@ -11,7 +11,11 @@ namespace Project333.Runtime.Domain.Cards
             PlayerId ownerId,
             TileCoord position,
             int attack,
-            int maxHp)
+            int maxHp,
+            int physicalDefense = 0,
+            int magicDefense = 0,
+            bool hasFlying = false,
+            int spellPower = 0)
             : base(
                 runtimeId,
                 "master",
@@ -25,7 +29,12 @@ namespace Project333.Runtime.Domain.Cards
                 0,
                 new ResourceSet(),
                 1,
-                OccupantKind.Master)
+                OccupantKind.Master,
+                damageType: DamageType.Physical,
+                physicalDefense: physicalDefense,
+                magicDefense: magicDefense,
+                hasFlying: hasFlying,
+                spellPower: spellPower)
         {
             HasSummoningSickness = false;
         }

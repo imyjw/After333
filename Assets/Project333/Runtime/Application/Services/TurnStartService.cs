@@ -5,6 +5,7 @@ using Project333.Runtime.Domain.Board;
 using Project333.Runtime.Domain.Cards;
 using Project333.Runtime.Domain.Effects;
 using Project333.Runtime.Domain.Resources;
+using Project333.Runtime.Infrastructure.Data;
 
 namespace Project333.Runtime.Application.Services
 {
@@ -12,19 +13,37 @@ namespace Project333.Runtime.Application.Services
     {
         private const int BaseDrawCount = 1;
         private const int BaseGoldGain = 1;
-        private const int FailedDrawDamageStep = 3;
         private const string CheonraJimangEffectId = "cheonra_jimang";
+        private const string FirewallEffectId = "firewall";
 
         private readonly ScienceUpkeepService _scienceUpkeepService;
+        private readonly RobotFactoryService _robotFactoryService;
 
         public TurnStartService()
-            : this(new ScienceUpkeepService())
+            : this(
+                new ScienceUpkeepService(),
+                new RobotFactoryService(new InMemoryCardDefinitionProvider(Array.Empty<CardDefinition>())))
         {
         }
 
         public TurnStartService(ScienceUpkeepService scienceUpkeepService)
+            : this(
+                scienceUpkeepService,
+                new RobotFactoryService(new InMemoryCardDefinitionProvider(Array.Empty<CardDefinition>())))
         {
-            _scienceUpkeepService = scienceUpkeepService;
+        }
+
+        public TurnStartService(ICardDefinitionProvider cardDefinitionProvider)
+            : this(new ScienceUpkeepService(), new RobotFactoryService(cardDefinitionProvider))
+        {
+        }
+
+        public TurnStartService(
+            ScienceUpkeepService scienceUpkeepService,
+            RobotFactoryService robotFactoryService)
+        {
+            _scienceUpkeepService = scienceUpkeepService ?? throw new ArgumentNullException(nameof(scienceUpkeepService));
+            _robotFactoryService = robotFactoryService ?? throw new ArgumentNullException(nameof(robotFactoryService));
         }
 
         public void ResolveTurnStart(BattleState battleState)
@@ -45,6 +64,7 @@ namespace Project333.Runtime.Application.Services
             }
 
             battleState.ClearValuePopupEvents();
+            battleState.ClearCardGenerationEvents();
 
             ResolveScriptedTurnStartEffects(battleState);
             if (battleState.IsEnded)
@@ -55,9 +75,8 @@ namespace Project333.Runtime.Application.Services
             var activePlayer = battleState.GetPlayer(battleState.ActivePlayerId);
 
             RefreshTurnStartState(battleState);
-            GainBaseResources(activePlayer);
+            GainBaseResources(battleState, activePlayer);
             GainOccupantResources(battleState);
-            ResolveBaseDraw(activePlayer, battleState);
 
             if (!battleState.IsEnded)
             {
@@ -66,6 +85,22 @@ namespace Project333.Runtime.Application.Services
 
             if (!battleState.IsEnded)
             {
+                _robotFactoryService.Resolve(battleState);
+            }
+
+            if (!battleState.IsEnded)
+            {
+                ResolveFirewallEffects(battleState);
+            }
+
+            if (!battleState.IsEnded)
+            {
+                BattleDrawService.DrawCards(activePlayer, battleState, BaseDrawCount);
+            }
+
+            if (!battleState.IsEnded)
+            {
+                ResolveSealboundOwnerTurnStarts(battleState);
                 battleState.SetPhase(PhaseType.Main);
             }
         }
@@ -75,17 +110,84 @@ namespace Project333.Runtime.Application.Services
             var snapshot = new List<PersistentEffectState>(battleState.PersistentEffects);
             foreach (var persistentEffect in snapshot)
             {
-                if (persistentEffect.IsExpired || persistentEffect.OwnerId != battleState.ActivePlayerId)
+                if (persistentEffect.IsExpired)
                 {
                     continue;
                 }
 
-                if (!string.Equals(persistentEffect.EffectId, CheonraJimangEffectId, StringComparison.Ordinal))
+                if (string.Equals(persistentEffect.EffectId, TimedBombRules.EffectId, StringComparison.Ordinal))
+                {
+                    ResolveTimedBomb(battleState, persistentEffect);
+                    if (battleState.IsEnded)
+                    {
+                        return;
+                    }
+
+                    continue;
+                }
+
+                if (persistentEffect.OwnerId == battleState.ActivePlayerId &&
+                    string.Equals(persistentEffect.EffectId, CheonraJimangEffectId, StringComparison.Ordinal))
+                {
+                    ResolveCheonraJimang(battleState, persistentEffect);
+                }
+            }
+        }
+
+        private static void ResolveTimedBomb(BattleState battleState, PersistentEffectState effect)
+        {
+            if (effect.RemainingTriggers <= 0)
+            {
+                effect.Expire();
+                return;
+            }
+
+            if (effect.RemainingTriggers > 1)
+            {
+                effect.ResolveTrigger();
+                return;
+            }
+
+            var targetPlayer = battleState.GetOpponent(effect.OwnerId);
+            var targetBoard = battleState.GetBoard(targetPlayer.Id);
+            var targets = new List<OccupantState>(targetBoard.EnumerateOccupants());
+
+            foreach (var target in targets)
+            {
+                if (target.IsSealbound || targetBoard.GetOccupant(target.Position) != target)
                 {
                     continue;
                 }
 
-                ResolveCheonraJimang(battleState, persistentEffect);
+                var actualDamage = DamageResolutionRules.ApplyEffectDamage(
+                    target,
+                    effect.EffectDamage,
+                    effect.EffectDamageType);
+                BattleValuePopupRecorder.RecordDamage(
+                    battleState,
+                    target,
+                    actualDamage,
+                    BattleValueChangeCause.Spell,
+                    effect.EffectDamageType,
+                    effect.OwnerId,
+                    sourceCardId: effect.SourceCardId);
+            }
+
+            effect.ResolveTrigger();
+
+            foreach (var target in targets)
+            {
+                if (target.Kind != OccupantKind.Master &&
+                    target.CurrentHp <= 0 &&
+                    targetBoard.GetOccupant(target.Position) == target)
+                {
+                    targetBoard.Remove(target.Position);
+                }
+            }
+
+            if (targetPlayer.Master.CurrentHp <= 0)
+            {
+                battleState.EndBattle(effect.OwnerId);
             }
         }
 
@@ -94,12 +196,18 @@ namespace Project333.Runtime.Application.Services
             if (!string.IsNullOrWhiteSpace(persistentEffect.TargetRuntimeId) &&
                 TryFindOccupantByRuntimeId(battleState.PlayerBoard, persistentEffect.TargetRuntimeId, out var playerTarget))
             {
-                battleState.PlayerBoard.Remove(playerTarget.Position);
+                if (!playerTarget.IsSealbound)
+                {
+                    battleState.PlayerBoard.Remove(playerTarget.Position);
+                }
             }
             else if (!string.IsNullOrWhiteSpace(persistentEffect.TargetRuntimeId) &&
                      TryFindOccupantByRuntimeId(battleState.AIBoard, persistentEffect.TargetRuntimeId, out var aiTarget))
             {
-                battleState.AIBoard.Remove(aiTarget.Position);
+                if (!aiTarget.IsSealbound)
+                {
+                    battleState.AIBoard.Remove(aiTarget.Position);
+                }
             }
 
             persistentEffect.Expire();
@@ -120,24 +228,128 @@ namespace Project333.Runtime.Application.Services
             return false;
         }
 
+        private static void ResolveFirewallEffects(BattleState battleState)
+        {
+            var effects = new List<PersistentEffectState>(battleState.PersistentEffects);
+            foreach (var effect in effects)
+            {
+                if (battleState.IsEnded)
+                {
+                    return;
+                }
+
+                if (effect == null ||
+                    effect.IsExpired ||
+                    effect.RemainingTriggers <= 0 ||
+                    !string.Equals(effect.EffectId, FirewallEffectId, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                ResolveFirewallEffect(battleState, effect);
+            }
+        }
+
+        private static void ResolveFirewallEffect(BattleState battleState, PersistentEffectState effect)
+        {
+            var targetPlayerId = effect.TargetsOwnerBoard
+                ? effect.OwnerId
+                : battleState.GetOpponent(effect.OwnerId).Id;
+            var targetBoard = battleState.GetBoard(targetPlayerId);
+            var resolvedEffectDamage = SpellPowerRules.ApplyCaptured(
+                effect.EffectDamage,
+                effect.EffectDamageType,
+                effect.CapturedSpellPower);
+            var targets = new List<OccupantState>();
+            foreach (var occupant in targetBoard.EnumerateOccupants())
+            {
+                if (occupant.Position.Row == effect.TargetRow)
+                {
+                    targets.Add(occupant);
+                }
+            }
+
+            foreach (var target in targets)
+            {
+                if (target.IsSealbound)
+                {
+                    continue;
+                }
+
+                var actualDamage = DamageResolutionRules.ApplyEffectDamage(
+                    target,
+                    resolvedEffectDamage,
+                    effect.EffectDamageType);
+                BattleValuePopupRecorder.RecordDamage(
+                    battleState,
+                    target,
+                    actualDamage,
+                    BattleValueChangeCause.Firewall,
+                    effect.EffectDamageType,
+                    effect.OwnerId,
+                    sourceCardId: effect.SourceCardId);
+            }
+
+            effect.ResolveTrigger();
+
+            foreach (var target in targets)
+            {
+                if (target.Kind != OccupantKind.Master &&
+                    target.CurrentHp <= 0 &&
+                    targetBoard.GetOccupant(target.Position) == target)
+                {
+                    targetBoard.Remove(target.Position);
+                }
+            }
+
+            var targetMaster = battleState.GetPlayer(targetPlayerId).Master;
+            if (targetMaster.CurrentHp <= 0)
+            {
+                battleState.EndBattle(battleState.GetOpponent(targetPlayerId).Id);
+            }
+        }
+
         private static void RefreshTurnStartState(BattleState battleState)
         {
             var activeBoard = battleState.GetBoard(battleState.ActivePlayerId);
 
             foreach (var occupant in activeBoard.EnumerateOccupants())
             {
+                occupant.WasSummonedThisTurn = false;
+                if (occupant.IsSealbound)
+                {
+                    occupant.HasSummoningSickness = true;
+                    occupant.RemainingAttacksThisTurn = 0;
+                    continue;
+                }
+
                 occupant.HasSummoningSickness = false;
-                occupant.RemainingAttacksThisTurn = occupant.MaxAttacksPerTurn;
+                occupant.RemainingAttacksThisTurn = occupant.EffectiveMaxAttacksPerTurn;
             }
         }
 
-        private static void GainBaseResources(PlayerState playerState)
+        private static void ResolveSealboundOwnerTurnStarts(BattleState battleState)
         {
+            var activeBoard = battleState.GetBoard(battleState.ActivePlayerId);
+            for (var column = 0; column < BoardState.ColumnCount; column++)
+            {
+                for (var row = 0; row < BoardState.RowCount; row++)
+                {
+                    var occupant = activeBoard.GetOccupant(new TileCoord(column, row));
+                    occupant?.ResolveSealboundOwnerTurnStart();
+                }
+            }
+        }
+
+        private static void GainBaseResources(BattleState battleState, PlayerState playerState)
+        {
+            // The first player keeps the initial 3 gold on the first battle turn.
+            var goldGain = battleState.TurnNumber == 1 ? 0 : BaseGoldGain;
             playerState.Resources.Add(new ResourceSet(
                 mana: 0,
                 qi: 0,
                 power: 0,
-                gold: BaseGoldGain));
+                gold: goldGain));
         }
 
         private static void GainOccupantResources(BattleState battleState)
@@ -147,7 +359,7 @@ namespace Project333.Runtime.Application.Services
 
             foreach (var occupant in activeBoard.EnumerateOccupants())
             {
-                if (occupant.IsDisabled)
+                if (occupant.EffectsSuppressed)
                 {
                     continue;
                 }
@@ -173,39 +385,6 @@ namespace Project333.Runtime.Application.Services
                 }
 
                 persistentEffect.ResolveOwnerTurnStart();
-            }
-        }
-
-        private static void ResolveBaseDraw(PlayerState playerState, BattleState battleState)
-        {
-            for (var i = 0; i < BaseDrawCount; i++)
-            {
-                if (!playerState.Deck.TryDraw(out var cardId))
-                {
-                    ApplyFailedDrawDamage(playerState, battleState);
-                    continue;
-                }
-
-                if (playerState.Hand.Count >= playerState.MaxHandSize)
-                {
-                    continue;
-                }
-
-                playerState.Hand.Add(cardId);
-            }
-        }
-
-        private static void ApplyFailedDrawDamage(PlayerState playerState, BattleState battleState)
-        {
-            var failedDrawCount = playerState.IncrementFailedDrawCount();
-            var damage = failedDrawCount * FailedDrawDamageStep;
-
-            playerState.Master.CurrentHp -= damage;
-            BattleValuePopupRecorder.RecordDamage(battleState, playerState.Master, damage);
-
-            if (playerState.Master.CurrentHp <= 0)
-            {
-                battleState.EndBattle(battleState.GetOpponent(playerState.Id).Id);
             }
         }
 

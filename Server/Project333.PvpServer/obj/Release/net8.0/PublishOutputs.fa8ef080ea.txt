@@ -1,0 +1,14 @@
+C:\tmp\Project333PublishManifestTest\Project333.PvpServer.exe
+C:\tmp\Project333PublishManifestTest\Data\cards.json
+C:\tmp\Project333PublishManifestTest\Persistence\Migrations\0001_account_meta_schema.sql
+C:\tmp\Project333PublishManifestTest\Persistence\Migrations\0002_auth_sessions.sql
+C:\tmp\Project333PublishManifestTest\Persistence\Migrations\0003_card_upgrade_costs_seed.sql
+C:\tmp\Project333PublishManifestTest\Persistence\Migrations\0004_draft_current_offer.sql
+C:\tmp\Project333PublishManifestTest\Persistence\Migrations\0005_auth_identity_login_expansion.sql
+C:\tmp\Project333PublishManifestTest\Persistence\Migrations\0006_pvp_matchmaking_schema.sql
+C:\tmp\Project333PublishManifestTest\Persistence\Migrations\0007_pvp_battle_snapshots.sql
+C:\tmp\Project333PublishManifestTest\Project333.PvpServer.dll
+C:\tmp\Project333PublishManifestTest\Project333.PvpServer.deps.json
+C:\tmp\Project333PublishManifestTest\Project333.PvpServer.runtimeconfig.json
+C:\tmp\Project333PublishManifestTest\Project333.PvpServer.pdb
+C:\tmp\Project333PublishManifestTest\Npgsql.dll

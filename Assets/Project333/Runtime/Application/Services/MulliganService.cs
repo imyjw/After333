@@ -40,12 +40,13 @@ namespace Project333.Runtime.Application.Services
                 playerState.Hand.Remove(selectedCardId);
             }
 
-            playerState.Deck.AddRangeToTop(selectedCards);
-
             if (selectedCards.Count > 0)
             {
-                deckShuffler.Shuffle(playerState.Deck);
+                // Keep the returned copies out of the deck while drawing replacements.
+                // Another copy of the same card type may still be drawn from the deck.
                 DrawExactCards(playerState, selectedCards.Count);
+                playerState.Deck.AddRangeToTop(selectedCards);
+                deckShuffler.Shuffle(playerState.Deck);
             }
 
             playerState.MarkMulliganUsed();

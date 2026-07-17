@@ -1,5 +1,6 @@
 using System;
 using Project333.Runtime.Application.Commands;
+using Project333.Runtime.Application.Gateways;
 using Project333.Runtime.Domain.Battle;
 
 namespace Project333.Runtime.Application.Services
@@ -20,9 +21,39 @@ namespace Project333.Runtime.Application.Services
                 throw new ArgumentNullException(nameof(battleFlowController));
             }
 
+            RunAiTurnCore(
+                () => battleFlowController.CurrentBattleState,
+                battleFlowController.ResolveTurnStart,
+                battleFlowController.EndTurn,
+                battleFlowController.ExecuteCommand,
+                logEntryCallback);
+        }
+
+        public void RunAiTurn(IBattleGateway battleGateway, Action<string> logEntryCallback = null)
+        {
+            if (battleGateway == null)
+            {
+                throw new ArgumentNullException(nameof(battleGateway));
+            }
+
+            RunAiTurnCore(
+                () => battleGateway.CurrentBattleState,
+                battleGateway.ResolveTurnStart,
+                battleGateway.EndTurn,
+                battleGateway.ExecuteCommand,
+                logEntryCallback);
+        }
+
+        private void RunAiTurnCore(
+            Func<BattleState> getBattleState,
+            Action resolveTurnStart,
+            Action endTurn,
+            Action<PlayerId, IBattleCommand> executeCommand,
+            Action<string> logEntryCallback)
+        {
             while (true)
             {
-                var battleState = battleFlowController.CurrentBattleState;
+                var battleState = getBattleState();
                 if (battleState == null || battleState.IsEnded || battleState.ActivePlayerId != PlayerId.AI)
                 {
                     return;
@@ -30,8 +61,13 @@ namespace Project333.Runtime.Application.Services
 
                 if (battleState.Phase == PhaseType.TurnStart)
                 {
-                    battleFlowController.ResolveTurnStart();
-                    logEntryCallback?.Invoke(CombatLogFormatter.FormatTurnStartResolved(PlayerId.AI, battleFlowController.CurrentBattleState.TurnNumber));
+                    resolveTurnStart();
+                    var resolvedBattleState = getBattleState();
+                    if (resolvedBattleState != null)
+                    {
+                        logEntryCallback?.Invoke(CombatLogFormatter.FormatTurnStartResolved(PlayerId.AI, resolvedBattleState.TurnNumber));
+                    }
+
                     continue;
                 }
 
@@ -44,11 +80,11 @@ namespace Project333.Runtime.Application.Services
                 if (command is EndTurnCommand)
                 {
                     logEntryCallback?.Invoke(CombatLogFormatter.FormatEndTurn(PlayerId.AI));
-                    battleFlowController.EndTurn();
+                    endTurn();
                     return;
                 }
 
-                battleFlowController.ExecuteCommand(PlayerId.AI, command);
+                executeCommand(PlayerId.AI, command);
                 logEntryCallback?.Invoke(CombatLogFormatter.FormatCommand(PlayerId.AI, command));
             }
         }

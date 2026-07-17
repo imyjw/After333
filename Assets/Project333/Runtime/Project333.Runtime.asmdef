@@ -2,6 +2,7 @@
   "name": "Project333.Runtime",
   "rootNamespace": "Project333",
   "references": [
+    "Unity.Newtonsoft.Json",
     "Unity.TextMeshPro",
     "UnityEngine.UI"
   ],

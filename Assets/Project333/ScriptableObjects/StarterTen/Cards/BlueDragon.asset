@@ -20,22 +20,25 @@ MonoBehaviour:
     _qi: 0
     _power: 0
     _gold: 0
-  _attribute: Aqua
   _affiliation: 1
   _chargeTileFootprint: 1
   _effectText: "\uB0B4 \uD134 \uC885\uB8CC \uC2DC \uB0B4 \uD0C0\uC77C\uB4E4 \uC704\uC758
     \uC720\uB2DB\uB4E4\uC758 \uCCB4\uB825\uD68C\uBCF5+33"
-  _specialEffectText: 
+  _specialEffectText: "\uBE44\uD589"
   _boardSprite: {fileID: 1856248917, guid: b914b57a16c4e264abacdb7ac6001859, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: b21e4ede7a930084d848f96345173b35, type: 2}
   _attackType: 1
+  _damageType: 2
   _attack: 40
-  _health: 100
+  _health: 70
+  _physicalDefense: 0
+  _magicDefense: 0
   _hitsPerAttack: 1
   _hasBerserker: 0
   _hasEndure: 0
   _hasGuard: 0
   _canMove: 1
+  _hasFlying: 1
   _isScience: 0
   _sciencePowerUpkeep: 0
   _turnStartResourceGain:

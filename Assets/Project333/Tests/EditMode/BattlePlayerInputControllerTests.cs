@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
+using Project333.Runtime.Application.Gateways;
 using Project333.Runtime.Application.Services;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Board;
 using Project333.Runtime.Presentation.Battle;
 using Project333.Runtime.Presentation.Hand;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Project333.Tests.EditMode
 {
@@ -74,6 +76,46 @@ namespace Project333.Tests.EditMode
             Assert.That(controller.InteractionStatus, Does.Contain("Selected occupant at (2,1)"));
         }
 
+        [Test]
+        public void ClickingBackground_WhenHandCardWasSelected_ClearsCardSelection()
+        {
+            var controller = CreateControllerWithHand(out var handCardView);
+            handCardView.NotifyClicked();
+
+            InvokePrivateMethod(controller, "TryClearCardSelectionFromPointerTarget", new object[] { null });
+
+            Assert.That(controller.SelectedCardId, Is.Empty);
+            Assert.That(controller.SelectedSlotIndex, Is.EqualTo(-1));
+            Assert.That(controller.InteractionStatus, Does.Contain("selection cleared"));
+        }
+
+        [Test]
+        public void ClickingButton_WhenHandCardWasSelected_KeepsCardSelection()
+        {
+            var controller = CreateControllerWithHand(out var handCardView);
+            var buttonObject = Track(new GameObject("Button", typeof(RectTransform), typeof(Button)));
+            handCardView.NotifyClicked();
+
+            InvokePrivateMethod(controller, "TryClearCardSelectionFromPointerTarget", buttonObject);
+
+            Assert.That(controller.SelectedCardId, Is.EqualTo("sample_firebolt"));
+            Assert.That(controller.SelectedSlotIndex, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClickingTile_WhenHandCardWasSelected_KeepsCardSelection()
+        {
+            var controller = CreateControllerWithHand(out var handCardView);
+            var tileObject = Track(new GameObject("Tile"));
+            tileObject.AddComponent<TileView>();
+            handCardView.NotifyClicked();
+
+            InvokePrivateMethod(controller, "TryClearCardSelectionFromPointerTarget", tileObject);
+
+            Assert.That(controller.SelectedCardId, Is.EqualTo("sample_firebolt"));
+            Assert.That(controller.SelectedSlotIndex, Is.EqualTo(0));
+        }
+
         private BattlePlayerInputController CreateControllerWithHand(out HandCardView handCardView)
         {
             var controllerGameObject = Track(new GameObject("BattlePlayerInputController"));
@@ -111,7 +153,9 @@ namespace Project333.Tests.EditMode
 
             var bootstrapperObject = Track(new GameObject("BattleBootstrapper"));
             var bootstrapper = bootstrapperObject.AddComponent<BattleBootstrapper>();
-            SetPrivateField(bootstrapper, "_battleFlowController", CreateFlowControllerInMainPhase());
+            var battleFlowController = CreateFlowControllerInMainPhase();
+            SetPrivateField(bootstrapper, "_battleFlowController", battleFlowController);
+            SetPrivateField(bootstrapper, "_battleGateway", new LocalBattleGateway(battleFlowController));
 
             SetPrivateField(controller, "_battleBootstrapper", bootstrapper);
             SetPrivateField(controller, "_boardPresenter", boardPresenter);
@@ -145,6 +189,18 @@ namespace Project333.Tests.EditMode
             }
 
             fieldInfo.SetValue(target, value);
+        }
+
+        private static void InvokePrivateMethod<TTarget>(TTarget target, string methodName, params object[] arguments)
+            where TTarget : class
+        {
+            var methodInfo = typeof(TTarget).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+            if (methodInfo == null)
+            {
+                throw new InvalidOperationException($"Method '{methodName}' was not found on '{typeof(TTarget).Name}'.");
+            }
+
+            methodInfo.Invoke(target, arguments);
         }
 
         private static IReadOnlyList<string> CreateDeck(string prefix)

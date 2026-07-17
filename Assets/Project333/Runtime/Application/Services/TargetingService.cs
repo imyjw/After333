@@ -38,14 +38,20 @@ namespace Project333.Runtime.Application.Services
                 var frontOccupant = enemyBoard.GetOccupant(frontCoord);
                 var backOccupant = enemyBoard.GetOccupant(backCoord);
 
-                if (attacker.AttackType == AttackType.Ranged)
+                if (attacker.AttackType == AttackType.Ranged || attacker.HasActiveFlying)
                 {
-                    if (frontOccupant != null)
+                    if (CanBeTargetedByNormalAttack(
+                            attacker.AttackType,
+                            attacker.HasActiveFlying,
+                            frontOccupant))
                     {
                         legalTargets.Add(frontCoord);
                     }
 
-                    if (backOccupant != null)
+                    if (CanBeTargetedByNormalAttack(
+                            attacker.AttackType,
+                            attacker.HasActiveFlying,
+                            backOccupant))
                     {
                         legalTargets.Add(backCoord);
                     }
@@ -53,12 +59,19 @@ namespace Project333.Runtime.Application.Services
                     continue;
                 }
 
-                if (frontOccupant != null)
+                if (CanBeTargetedByNormalAttack(
+                        attacker.AttackType,
+                        attacker.HasActiveFlying,
+                        frontOccupant))
                 {
                     legalTargets.Add(frontCoord);
                 }
 
-                if (backOccupant != null && !HasFrontRowBlocker(frontOccupant))
+                if (CanBeTargetedByNormalAttack(
+                        attacker.AttackType,
+                        attacker.HasActiveFlying,
+                        backOccupant) &&
+                    !HasFrontRowBlocker(frontOccupant))
                 {
                     legalTargets.Add(backCoord);
                 }
@@ -88,12 +101,27 @@ namespace Project333.Runtime.Application.Services
                 return false;
             }
 
-            if (frontOccupant is UnitState unitState && unitState.IsScience && unitState.IsDisabled)
+            if (frontOccupant.DoesNotBlockFrontRow)
             {
                 return false;
             }
 
             return true;
+        }
+
+        public static bool CanBeTargetedByNormalAttack(
+            AttackType attackerAttackType,
+            bool attackerHasActiveFlying,
+            OccupantState occupant)
+        {
+            if (occupant == null || !occupant.CanBeAffected || occupant.IsHiding)
+            {
+                return false;
+            }
+
+            return !occupant.HasActiveFlying ||
+                   attackerAttackType == AttackType.Ranged ||
+                   attackerHasActiveFlying;
         }
     }
 }

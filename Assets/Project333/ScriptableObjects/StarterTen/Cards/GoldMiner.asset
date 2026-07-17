@@ -20,7 +20,6 @@ MonoBehaviour:
     _qi: 0
     _power: 0
     _gold: 3
-  _attribute: Terra
   _affiliation: 3
   _chargeTileFootprint: 1
   _effectText: At turn start, gain Gold +1.
@@ -28,8 +27,11 @@ MonoBehaviour:
   _boardSprite: {fileID: -1637270728, guid: c9ce02b83261f6c4082818d09baeb445, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: da596f900f1adf74d8f8b5f56e4d2d8f, type: 2}
   _attackType: 0
+  _damageType: 1
   _attack: 3
   _health: 15
+  _physicalDefense: 0
+  _magicDefense: 0
   _hitsPerAttack: 1
   _hasBerserker: 0
   _hasEndure: 0

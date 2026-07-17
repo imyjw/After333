@@ -1,4 +1,5 @@
 using UnityEngine;
+using Project333.Runtime.Domain.Cards;
 
 namespace Project333.Runtime.Infrastructure.Data
 {
@@ -6,6 +7,9 @@ namespace Project333.Runtime.Infrastructure.Data
     public sealed class ScriptedSpellCardDefinitionAsset : CardDefinitionAsset
     {
         [SerializeField] private string _effectId;
+        [SerializeField] private int _damage;
+        [SerializeField] private DamageType _damageType = DamageType.None;
+        [SerializeField] private int _triggerCount;
 
         public string EffectId => _effectId;
 
@@ -15,12 +19,23 @@ namespace Project333.Runtime.Infrastructure.Data
                 cardId: CardId,
                 displayName: DisplayName,
                 cost: Cost.ToRuntime(),
-                effectId: _effectId);
+                effectId: _effectId,
+                damage: _damage,
+                damageType: _damageType,
+                triggerCount: _triggerCount,
+                hasReplicate: HasReplicate);
         }
 
-        public void ConfigureForTests(string effectId)
+        public void ConfigureForTests(
+            string effectId,
+            int damage = 0,
+            DamageType damageType = DamageType.None,
+            int triggerCount = 0)
         {
             _effectId = effectId;
+            _damage = damage;
+            _damageType = damageType;
+            _triggerCount = triggerCount;
         }
     }
 }

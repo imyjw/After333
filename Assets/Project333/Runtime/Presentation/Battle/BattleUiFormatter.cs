@@ -24,13 +24,45 @@ namespace Project333.Runtime.Presentation.Battle
                           $"ATK {occupant.Attack} / HP {occupant.CurrentHp}/{occupant.MaxHp}";
 
             var statusLabels = new List<string>();
-            if (occupant.IsDisabled)
+            if (occupant.IsDrained)
             {
-                statusLabels.Add("Disabled");
+                statusLabels.Add("Drained");
             }
-            else if (occupant.HasSummoningSickness)
+
+            if (occupant.IsErasure)
+            {
+                statusLabels.Add("Erasure");
+            }
+
+            if (occupant.IsSealbound)
+            {
+                statusLabels.Add($"Sealbound {occupant.SealboundOwnerTurnStartsRemaining}");
+            }
+            else if (!occupant.IsDrained && occupant.HasSummoningSickness)
             {
                 statusLabels.Add("Summoning Sick");
+            }
+
+            if (occupant.IsHiding)
+            {
+                statusLabels.Add("Hiding");
+            }
+
+            if (occupant.HasFlying)
+            {
+                statusLabels.Add(occupant.HasActiveFlying ? "Flying" : "Flying Off");
+            }
+
+            if (occupant.SpellPower > 0)
+            {
+                statusLabels.Add(occupant.EffectiveSpellPower > 0
+                    ? $"SpellPower +{occupant.SpellPower}"
+                    : $"SpellPower +{occupant.SpellPower} Off");
+            }
+
+            if (occupant.InvincibleEffects.Count > 0)
+            {
+                statusLabels.Add(occupant.IsInvincible ? "Invincible" : "Invincible Off");
             }
 
             if (occupant.HasGuard)

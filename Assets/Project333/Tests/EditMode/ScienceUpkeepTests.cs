@@ -53,36 +53,36 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void ResolveTurnStart_DisabledScienceUnitDoesNotContributeResourceGainDuringGainStep()
+        public void ResolveTurnStart_DrainedUnitDoesNotContributeResourceGainDuringGainStep()
         {
             var battleState = CreateBattleState(PlayerId.Player);
             var service = new TurnStartService();
 
-            var disabledScienceUnit = new UnitState(
-                runtimeId: "disabled-science",
-                cardId: "disabled-science",
+            var drainedUnit = new UnitState(
+                runtimeId: "drained-upkeep",
+                cardId: "drained-upkeep",
                 ownerId: PlayerId.Player,
                 position: new TileCoord(0, 0),
                 attackType: AttackType.Melee,
                 attack: 2,
                 maxHp: 5,
                 canMove: true,
-                isScience: true,
+                isScience: false,
                 sciencePowerUpkeep: 1,
                 turnStartResourceGain: new ResourceSet(mana: 0, qi: 0, power: 2, gold: 0));
 
-            disabledScienceUnit.IsDisabled = true;
-            battleState.PlayerBoard.Place(new TileCoord(0, 0), disabledScienceUnit);
+            drainedUnit.IsDrained = true;
+            battleState.PlayerBoard.Place(new TileCoord(0, 0), drainedUnit);
 
             service.ResolveTurnStart(battleState);
 
             Assert.That(battleState.Player.Resources.Power, Is.EqualTo(0));
             Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(3));
-            Assert.That(disabledScienceUnit.IsDisabled, Is.False);
+            Assert.That(drainedUnit.IsDrained, Is.False);
         }
 
         [Test]
-        public void ResolveTurnStart_ScienceUpkeepUsesFixedTileOrderAndDisablesOnlyUnpaidUnits()
+        public void ResolveTurnStart_PowerUpkeepUsesFixedTileOrderAndDrainsOnlyUnpaidUnits()
         {
             var battleState = CreateBattleState(PlayerId.Player);
             var service = new TurnStartService();
@@ -101,12 +101,71 @@ namespace Project333.Tests.EditMode
 
             service.ResolveTurnStart(battleState);
 
-            Assert.That(upkeepSeven.IsDisabled, Is.False);
-            Assert.That(upkeepThree.IsDisabled, Is.True);
-            Assert.That(upkeepFour.IsDisabled, Is.True);
-            Assert.That(upkeepTwo.IsDisabled, Is.False);
+            Assert.That(upkeepSeven.IsDrained, Is.False);
+            Assert.That(upkeepThree.IsDrained, Is.True);
+            Assert.That(upkeepFour.IsDrained, Is.True);
+            Assert.That(upkeepTwo.IsDrained, Is.False);
             Assert.That(battleState.Player.Resources.Power, Is.EqualTo(0));
             Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ResolveTurnStart_PowerUpkeepSpendsPowerFirstAndGoldForTheDeficit()
+        {
+            var battleState = CreateBattleState(PlayerId.Player);
+            var service = new TurnStartService();
+            var upkeepUnit = CreateScienceUnit("gold-backed-upkeep", new TileCoord(0, 0), 3);
+
+            battleState.Player.Resources.Add(new ResourceSet(mana: 0, qi: 0, power: 1, gold: 0));
+            battleState.PlayerBoard.Place(upkeepUnit.Position, upkeepUnit);
+
+            service.ResolveTurnStart(battleState);
+
+            Assert.That(upkeepUnit.IsDrained, Is.False);
+            Assert.That(battleState.Player.Resources.Power, Is.EqualTo(0));
+            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void ResolveTurnStart_NonScienceUnitWithPowerUpkeepCanBecomeDrained()
+        {
+            var battleState = CreateBattleState(PlayerId.Player);
+            var service = new TurnStartService();
+            var upkeepUnit = new UnitState(
+                runtimeId: "upkeep-unit",
+                cardId: "upkeep-unit",
+                ownerId: PlayerId.Player,
+                position: new TileCoord(0, 0),
+                attackType: AttackType.Melee,
+                attack: 3,
+                maxHp: 5,
+                canMove: true,
+                isScience: false,
+                sciencePowerUpkeep: 99);
+
+            battleState.PlayerBoard.Place(new TileCoord(0, 0), upkeepUnit);
+
+            service.ResolveTurnStart(battleState);
+
+            Assert.That(upkeepUnit.IsDrained, Is.True);
+        }
+
+        [Test]
+        public void ResolveTurnStart_ErasureOccupantDoesNotPayUpkeepOrBecomeDrained()
+        {
+            var battleState = CreateBattleState(PlayerId.Player);
+            var service = new TurnStartService();
+            var upkeepUnit = CreateScienceUnit("erasure-upkeep", new TileCoord(0, 0), 3);
+            upkeepUnit.IsDrained = true;
+            upkeepUnit.ApplyErasure();
+            battleState.Player.Resources.Add(new ResourceSet(mana: 0, qi: 0, power: 3, gold: 0));
+            battleState.PlayerBoard.Place(upkeepUnit.Position, upkeepUnit);
+
+            service.ResolveTurnStart(battleState);
+
+            Assert.That(upkeepUnit.IsErasure, Is.True);
+            Assert.That(upkeepUnit.IsDrained, Is.False);
+            Assert.That(battleState.Player.Resources.Power, Is.EqualTo(3));
         }
 
         private static UnitState CreateScienceUnit(string id, TileCoord coord, int upkeep)
@@ -131,6 +190,10 @@ namespace Project333.Tests.EditMode
             var battleState = setupService.CreateInitialState(CreateRequest(firstPlayerId));
 
             mulliganService.PassMulligan(battleState, PlayerId.Player);
+            battleState.RestoreRuntimeState(
+                turnNumber: 3,
+                activePlayerId: firstPlayerId,
+                phase: PhaseType.TurnStart);
             return battleState;
         }
 

@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using Project333.Runtime.Presentation.Hand;
+using UnityEngine;
 
 namespace Project333.Tests.EditMode
 {
@@ -89,6 +91,55 @@ namespace Project333.Tests.EditMode
             var order = HandPresenterLayout.GetSiblingOrderForFan(layouts, 0);
 
             Assert.That(order[^1], Is.EqualTo(0));
+        }
+
+        [Test]
+        public void RestoreAuthoringLayout_WhenRuntimeValuesChange_RestoresInspectorSnapshot()
+        {
+            var gameObject = new GameObject("HandPresenterTest");
+
+            try
+            {
+                var presenter = gameObject.AddComponent<HandPresenter>();
+                SetPrivateField(presenter, "_cardSize", new Vector2(212f, 318f));
+                SetPrivateField(presenter, "_bottomPadding", 144f);
+                SetPrivateField(presenter, "_selectedScaleMultiplier", 1.75f);
+                InvokePrivateMethod(presenter, "CaptureAuthoringLayout");
+
+                SetPrivateField(presenter, "_cardSize", new Vector2(270f, 378f));
+                SetPrivateField(presenter, "_bottomPadding", 18f);
+                SetPrivateField(presenter, "_selectedScaleMultiplier", 1.08f);
+                InvokePrivateMethod(presenter, "RestoreAuthoringLayout");
+
+                Assert.That(GetPrivateField<Vector2>(presenter, "_cardSize"), Is.EqualTo(new Vector2(212f, 318f)));
+                Assert.That(GetPrivateField<float>(presenter, "_bottomPadding"), Is.EqualTo(144f));
+                Assert.That(GetPrivateField<float>(presenter, "_selectedScaleMultiplier"), Is.EqualTo(1.75f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        private static void SetPrivateField<T>(HandPresenter presenter, string fieldName, T value)
+        {
+            typeof(HandPresenter)
+                .GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.SetValue(presenter, value);
+        }
+
+        private static T GetPrivateField<T>(HandPresenter presenter, string fieldName)
+        {
+            return (T)typeof(HandPresenter)
+                .GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(presenter);
+        }
+
+        private static void InvokePrivateMethod(HandPresenter presenter, string methodName)
+        {
+            typeof(HandPresenter)
+                .GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.Invoke(presenter, null);
         }
     }
 }

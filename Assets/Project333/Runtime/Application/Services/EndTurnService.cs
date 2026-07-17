@@ -29,14 +29,18 @@ namespace Project333.Runtime.Application.Services
                 throw new InvalidOperationException("Turns can only end during the Main phase.");
             }
 
+            battleState.GetPlayer(battleState.ActivePlayerId).Hand.RemoveTemporaryReplicates();
+
             ResolveEndTurnOccupantEffects(battleState);
             if (battleState.IsEnded)
             {
                 return;
             }
 
+            var endingPlayerId = battleState.ActivePlayerId;
+            battleState.ResolveInvincibleTurnEnd(endingPlayerId);
             battleState.SetPhase(PhaseType.TurnEnd);
-            battleState.StartNextTurn(GetNextPlayerId(battleState.ActivePlayerId));
+            battleState.StartNextTurn(GetNextPlayerId(endingPlayerId));
         }
 
         private static void ResolveEndTurnOccupantEffects(BattleState battleState)
@@ -53,7 +57,7 @@ namespace Project333.Runtime.Application.Services
                 }
 
                 if (occupant == null ||
-                    occupant.IsDisabled ||
+                    occupant.EffectsSuppressed ||
                     activeBoard.GetOccupant(occupant.Position) != occupant)
                 {
                     continue;
@@ -62,31 +66,61 @@ namespace Project333.Runtime.Application.Services
                 switch (occupant.CardId)
                 {
                     case BlueDragonCardId:
-                        ResolveBlueDragonEffect(battleState, activePlayerId);
+                        ResolveBlueDragonEffect(battleState, activePlayerId, occupant);
                         break;
 
                     case RedDragonCardId:
-                        ResolveRedDragonEffect(battleState, activePlayerId);
+                        ResolveRedDragonEffect(battleState, activePlayerId, occupant);
+                        break;
+
+                    case GaebangBranchRules.CardId:
+                        ResolveGaebangBranchEffect(battleState, activePlayerId);
                         break;
                 }
             }
         }
 
-        private static void ResolveBlueDragonEffect(BattleState battleState, PlayerId ownerId)
+        private static void ResolveGaebangBranchEffect(BattleState battleState, PlayerId ownerId)
+        {
+            var owner = battleState.GetPlayer(ownerId);
+            if (owner.Resources.Gold != 0)
+            {
+                return;
+            }
+
+            BattleDrawService.DrawCards(owner, battleState, GaebangBranchRules.DrawCount);
+        }
+
+        private static void ResolveBlueDragonEffect(
+            BattleState battleState,
+            PlayerId ownerId,
+            OccupantState source)
         {
             var alliedBoard = battleState.GetBoard(ownerId);
             foreach (var occupant in alliedBoard.EnumerateOccupants())
             {
-                if (occupant.Kind == OccupantKind.Building || occupant.CurrentHp <= 0)
+                if (occupant.Kind == OccupantKind.Building ||
+                    occupant.CurrentHp <= 0 ||
+                    occupant.IsSealbound)
                 {
                     continue;
                 }
 
-                BattleValuePopupRecorder.HealAndRecord(battleState, occupant, BlueDragonHealAmount);
+                BattleValuePopupRecorder.HealAndRecord(
+                    battleState,
+                    occupant,
+                    BlueDragonHealAmount,
+                    BattleValueChangeCause.BlueDragon,
+                    ownerId,
+                    source?.RuntimeId,
+                    BlueDragonCardId);
             }
         }
 
-        private static void ResolveRedDragonEffect(BattleState battleState, PlayerId ownerId)
+        private static void ResolveRedDragonEffect(
+            BattleState battleState,
+            PlayerId ownerId,
+            OccupantState source)
         {
             var enemyBoard = battleState.GetOpponentBoard(ownerId);
             var damagedOccupants = new List<OccupantState>(enemyBoard.EnumerateOccupants());
@@ -98,8 +132,24 @@ namespace Project333.Runtime.Application.Services
                     continue;
                 }
 
-                var actualDamage = DamageResolutionRules.ApplyEffectDamage(occupant, RedDragonDamageAmount);
-                BattleValuePopupRecorder.RecordDamage(battleState, occupant, actualDamage);
+                if (occupant.IsSealbound)
+                {
+                    continue;
+                }
+
+                var actualDamage = DamageResolutionRules.ApplyEffectDamage(
+                    occupant,
+                    RedDragonDamageAmount,
+                    DamageType.Physical);
+                BattleValuePopupRecorder.RecordDamage(
+                    battleState,
+                    occupant,
+                    actualDamage,
+                    BattleValueChangeCause.RedDragon,
+                    DamageType.Physical,
+                    ownerId,
+                    source?.RuntimeId,
+                    RedDragonCardId);
             }
 
             foreach (var occupant in damagedOccupants)

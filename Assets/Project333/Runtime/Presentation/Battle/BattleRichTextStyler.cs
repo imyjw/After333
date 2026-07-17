@@ -266,44 +266,61 @@ namespace Project333.Runtime.Presentation.Battle
         {
             var color = "#DCE6F2";
 
-            if (line.IndexOf("attacked", StringComparison.OrdinalIgnoreCase) >= 0)
+            if (ContainsAny(line, "회복", "HP +"))
+            {
+                color = "#8FF7A7";
+            }
+            else if (ContainsAny(line, "공격", "피해", "처치", "반격"))
             {
                 color = "#FFB0B0";
             }
-            else if (line.IndexOf("cast", StringComparison.OrdinalIgnoreCase) >= 0)
+            else if (ContainsAny(line, "마법카드", " 효과로", "표식"))
             {
                 color = "#FFD28F";
             }
-            else if (line.IndexOf("played", StringComparison.OrdinalIgnoreCase) >= 0)
+            else if (ContainsAny(line, "소환", "건설", "강화 적용"))
             {
                 color = "#A8F5B0";
             }
-            else if (line.IndexOf("moved", StringComparison.OrdinalIgnoreCase) >= 0)
+            else if (line.IndexOf("이동", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 color = "#A8DFFF";
             }
-            else if (line.IndexOf("swapped", StringComparison.OrdinalIgnoreCase) >= 0)
+            else if (line.IndexOf("교환", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 color = "#FFE8A8";
             }
-            else if (line.IndexOf("turn start", StringComparison.OrdinalIgnoreCase) >= 0)
+            else if (line.IndexOf("턴 시작", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 color = "#BFE8FF";
             }
-            else if (line.IndexOf("ended their turn", StringComparison.OrdinalIgnoreCase) >= 0)
+            else if (line.IndexOf("턴 종료", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 color = "#D1D9E6";
             }
-            else if (line.IndexOf("battle started", StringComparison.OrdinalIgnoreCase) >= 0)
+            else if (line.IndexOf("전투 시작", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 color = "#CFF4FF";
             }
-            else if (line.IndexOf("mulligan", StringComparison.OrdinalIgnoreCase) >= 0)
+            else if (line.IndexOf("멀리건", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 color = "#E4D6FF";
             }
 
             return $"<color={color}>{line}</color>";
+        }
+
+        private static bool ContainsAny(string value, params string[] candidates)
+        {
+            for (var i = 0; i < candidates.Length; i++)
+            {
+                if (value.IndexOf(candidates[i], StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static string[] SplitLines(string text)

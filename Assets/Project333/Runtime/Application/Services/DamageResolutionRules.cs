@@ -20,50 +20,150 @@ namespace Project333.Runtime.Application.Services
             return attacker.Attack;
         }
 
-        public static int ApplyAttackDamage(OccupantState recipient, int damage)
-        {
-            return ApplyDamage(recipient, damage, allowEndure: true);
-        }
-
-        public static int ApplyEffectDamage(OccupantState recipient, int damage)
-        {
-            return ApplyDamage(recipient, damage, allowEndure: false);
-        }
-
-        public static int ProjectAttackDamageTaken(
-            int currentHp,
-            bool isDisabled,
-            bool canTriggerEndure,
+        public static int ResolveIncomingDamage(
+            OccupantState recipient,
             int damage,
-            out int remainingHp,
-            out bool triggeredEndure)
-        {
-            return ProjectDamageTaken(currentHp, isDisabled, canTriggerEndure, damage, allowEndure: true, out remainingHp, out triggeredEndure);
-        }
-
-        public static int ProjectEffectDamageTaken(
-            int currentHp,
-            bool isDisabled,
-            int damage,
-            out int remainingHp)
-        {
-            return ProjectDamageTaken(currentHp, isDisabled, false, damage, allowEndure: false, out remainingHp, out _);
-        }
-
-        private static int ApplyDamage(OccupantState recipient, int damage, bool allowEndure)
+            DamageType damageType)
         {
             if (recipient == null)
             {
                 throw new ArgumentNullException(nameof(recipient));
             }
 
+            if (recipient.IsSealbound)
+            {
+                return 0;
+            }
+
+            if (recipient.IsInvincible)
+            {
+                return 0;
+            }
+
+            return ResolveIncomingDamage(
+                damage,
+                damageType,
+                recipient.IsDrained,
+                recipient.PhysicalDefense,
+                recipient.MagicDefense);
+        }
+
+        public static int ResolveIncomingDamage(
+            int damage,
+            DamageType damageType,
+            bool isDrained,
+            int physicalDefense,
+            int magicDefense)
+        {
             if (damage < 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(damage));
             }
 
+            if (physicalDefense < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(physicalDefense));
+            }
+
+            if (magicDefense < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(magicDefense));
+            }
+
+            var effectivePhysicalDefense = isDrained ? 0 : physicalDefense;
+            var effectiveMagicDefense = isDrained ? 0 : magicDefense;
+            var mitigatedDamage = damageType switch
+            {
+                DamageType.None => 0,
+                DamageType.Physical => Math.Max(0, damage - effectivePhysicalDefense),
+                DamageType.Magic => Math.Max(0, damage - effectiveMagicDefense),
+                DamageType.Fixed => damage,
+                _ => throw new ArgumentOutOfRangeException(nameof(damageType)),
+            };
+
+            return isDrained ? mitigatedDamage * 3 : mitigatedDamage;
+        }
+
+        public static int ApplyAttackDamage(
+            OccupantState recipient,
+            int damage,
+            DamageType damageType)
+        {
+            return ApplyDamage(recipient, damage, damageType, allowEndure: true);
+        }
+
+        public static int ApplyEffectDamage(
+            OccupantState recipient,
+            int damage,
+            DamageType damageType)
+        {
+            return ApplyDamage(recipient, damage, damageType, allowEndure: false);
+        }
+
+        public static int ProjectAttackDamageTaken(
+            int currentHp,
+            bool isDrained,
+            int physicalDefense,
+            int magicDefense,
+            bool canTriggerEndure,
+            int damage,
+            DamageType damageType,
+            out int remainingHp,
+            out bool triggeredEndure)
+        {
+            return ProjectDamageTaken(
+                currentHp,
+                isDrained,
+                physicalDefense,
+                magicDefense,
+                canTriggerEndure,
+                damage,
+                damageType,
+                allowEndure: true,
+                out remainingHp,
+                out triggeredEndure);
+        }
+
+        public static int ProjectEffectDamageTaken(
+            int currentHp,
+            bool isDrained,
+            int physicalDefense,
+            int magicDefense,
+            int damage,
+            DamageType damageType,
+            out int remainingHp)
+        {
+            return ProjectDamageTaken(
+                currentHp,
+                isDrained,
+                physicalDefense,
+                magicDefense,
+                false,
+                damage,
+                damageType,
+                allowEndure: false,
+                out remainingHp,
+                out _);
+        }
+
+        private static int ApplyDamage(
+            OccupantState recipient,
+            int damage,
+            DamageType damageType,
+            bool allowEndure)
+        {
+            if (recipient == null)
+            {
+                throw new ArgumentNullException(nameof(recipient));
+            }
+
+            if (recipient.IsSealbound)
+            {
+                return 0;
+            }
+
             var hpBefore = recipient.CurrentHp;
-            var resolvedDamage = recipient.IsDisabled ? damage * 3 : damage;
+            var resolvedDamage = ResolveIncomingDamage(recipient, damage, damageType);
             recipient.CurrentHp -= resolvedDamage;
 
             if (allowEndure && recipient.CurrentHp <= 0 && recipient.CanTriggerEndure)
@@ -78,19 +178,22 @@ namespace Project333.Runtime.Application.Services
 
         private static int ProjectDamageTaken(
             int currentHp,
-            bool isDisabled,
+            bool isDrained,
+            int physicalDefense,
+            int magicDefense,
             bool canTriggerEndure,
             int damage,
+            DamageType damageType,
             bool allowEndure,
             out int remainingHp,
             out bool triggeredEndure)
         {
-            if (damage < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(damage));
-            }
-
-            var resolvedDamage = isDisabled ? damage * 3 : damage;
+            var resolvedDamage = ResolveIncomingDamage(
+                damage,
+                damageType,
+                isDrained,
+                physicalDefense,
+                magicDefense);
             remainingHp = currentHp - resolvedDamage;
             triggeredEndure = allowEndure && remainingHp <= 0 && canTriggerEndure;
             if (triggeredEndure)
@@ -103,5 +206,3 @@ namespace Project333.Runtime.Application.Services
         }
     }
 }
-
-

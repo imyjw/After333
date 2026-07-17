@@ -1,6 +1,6 @@
-﻿using System;
-using Assets.PixelFantasy.Common.Scripts.CollectionScripts;
+﻿using Assets.PixelFantasy.Common.Scripts.CollectionScripts;
 using Assets.PixelFantasy.Common.Scripts.UI;
+using System;
 using UnityEngine;
 
 namespace Assets.PixelFantasy.Common.Scripts.EditorScripts
@@ -45,9 +45,9 @@ namespace Assets.PixelFantasy.Common.Scripts.EditorScripts
 
         public void SetValue(string value)
         {
-            var index = Controls.Dropdown.options.FindIndex(i => i.text == value);
+            var index = Content.Textures.FindIndex(i => i.name == value.Replace(" ", ""));
 
-            SetIndex(index);
+            SetIndex(index + (CanBeEmpty ? 1 : 0));
         }
 
         public Color32[] GetPixels()

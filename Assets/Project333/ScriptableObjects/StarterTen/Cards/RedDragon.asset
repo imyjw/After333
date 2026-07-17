@@ -20,22 +20,25 @@ MonoBehaviour:
     _qi: 0
     _power: 0
     _gold: 0
-  _attribute: Ignis
   _affiliation: 1
   _chargeTileFootprint: 1
   _effectText: "\uB0B4 \uD134 \uC885\uB8CC \uC2DC \uC0C1\uB300\uBC29 \uD0C0\uC77C
-    \uC804\uCCB4\uC5D0 66\uB370\uBBF8\uC9C0"
-  _specialEffectText: 
+    \uC804\uCCB4\uC5D0 66 \uBB3C\uB9AC \uD53C\uD574"
+  _specialEffectText: "\uBE44\uD589"
   _boardSprite: {fileID: 954118651, guid: 344e1e15725a74e4e8b22f54f47c25cd, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: 96d2d0d396818d24dbc6380f8d565c28, type: 2}
   _attackType: 0
-  _attack: 66
-  _health: 66
+  _damageType: 1
+  _attack: 50
+  _health: 50
+  _physicalDefense: 0
+  _magicDefense: 0
   _hitsPerAttack: 1
   _hasBerserker: 0
   _hasEndure: 0
   _hasGuard: 0
   _canMove: 1
+  _hasFlying: 1
   _isScience: 0
   _sciencePowerUpkeep: 0
   _turnStartResourceGain:

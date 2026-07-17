@@ -1,4 +1,5 @@
 using System;
+using Project333.Runtime.Domain.Cards;
 using Project333.Runtime.Domain.Resources;
 
 namespace Project333.Runtime.Infrastructure.Data
@@ -9,8 +10,12 @@ namespace Project333.Runtime.Infrastructure.Data
             string cardId,
             string displayName,
             ResourceSet cost,
-            string effectId)
-            : base(cardId, displayName, cost)
+            string effectId,
+            int damage = 0,
+            DamageType damageType = DamageType.None,
+            int triggerCount = 0,
+            bool hasReplicate = false)
+            : base(cardId, displayName, cost, hasReplicate)
         {
             if (string.IsNullOrWhiteSpace(effectId))
             {
@@ -18,8 +23,17 @@ namespace Project333.Runtime.Infrastructure.Data
             }
 
             EffectId = effectId;
+            Damage = damage;
+            DamageType = damageType;
+            TriggerCount = triggerCount;
         }
 
         public string EffectId { get; }
+
+        public int Damage { get; }
+
+        public DamageType DamageType { get; }
+
+        public int TriggerCount { get; }
     }
 }

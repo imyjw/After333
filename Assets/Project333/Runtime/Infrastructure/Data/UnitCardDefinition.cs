@@ -1,3 +1,4 @@
+using System;
 using Project333.Runtime.Domain.Cards;
 using Project333.Runtime.Domain.Resources;
 
@@ -21,9 +22,35 @@ namespace Project333.Runtime.Infrastructure.Data
             int hitsPerAttack = 1,
             bool hasBerserker = false,
             bool hasEndure = false,
-            bool hasGuard = false)
-            : base(cardId, displayName, CardType.Unit, cost)
+            bool hasGuard = false,
+            bool hasLifeSteal = false,
+            DamageType damageType = DamageType.Physical,
+            int physicalDefense = 0,
+            int magicDefense = 0,
+            bool hasRobot = false,
+            bool includeInDraft = true,
+            bool hasRush = false,
+            bool hasReplicate = false,
+            int sealboundOwnerTurnStarts = 0,
+            bool hasHiding = false,
+            bool hasFlying = false,
+            int spellPower = 0,
+            InvincibleDurationType invincibleDuration = InvincibleDurationType.None,
+            int invincibleOwnerTurns = 0)
+            : base(cardId, displayName, CardType.Unit, cost, includeInDraft, hasReplicate)
         {
+            if (sealboundOwnerTurnStarts < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(sealboundOwnerTurnStarts));
+            }
+
+            if (spellPower < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(spellPower));
+            }
+
+            ValidateInvincible(invincibleDuration, invincibleOwnerTurns);
+
             AttackType = attackType;
             Attack = attack;
             Health = health;
@@ -32,11 +59,22 @@ namespace Project333.Runtime.Infrastructure.Data
             SciencePowerUpkeep = sciencePowerUpkeep;
             TurnStartResourceGain = turnStartResourceGain?.Clone() ?? new ResourceSet();
             MaxAttacksPerTurn = maxAttacksPerTurn;
-            CanAttackOnSummon = canAttackOnSummon;
+            HasRush = hasRush || canAttackOnSummon;
             HitsPerAttack = hitsPerAttack < 1 ? 1 : hitsPerAttack;
             HasBerserker = hasBerserker;
             HasEndure = hasEndure;
             HasGuard = hasGuard;
+            HasLifeSteal = hasLifeSteal;
+            DamageType = damageType;
+            PhysicalDefense = physicalDefense;
+            MagicDefense = magicDefense;
+            HasRobot = hasRobot;
+            SealboundOwnerTurnStarts = sealboundOwnerTurnStarts;
+            HasHiding = hasHiding;
+            HasFlying = hasFlying;
+            SpellPower = spellPower;
+            InvincibleDuration = invincibleDuration;
+            InvincibleOwnerTurns = invincibleOwnerTurns;
         }
 
         public AttackType AttackType { get; }
@@ -47,10 +85,44 @@ namespace Project333.Runtime.Infrastructure.Data
         public int SciencePowerUpkeep { get; }
         public ResourceSet TurnStartResourceGain { get; }
         public int MaxAttacksPerTurn { get; }
-        public bool CanAttackOnSummon { get; }
+        public bool HasRush { get; }
+        public bool CanAttackOnSummon => HasRush;
         public int HitsPerAttack { get; }
         public bool HasBerserker { get; }
         public bool HasEndure { get; }
         public bool HasGuard { get; }
+        public bool HasLifeSteal { get; }
+        public DamageType DamageType { get; }
+        public int PhysicalDefense { get; }
+        public int MagicDefense { get; }
+        public bool HasRobot { get; }
+        public int SealboundOwnerTurnStarts { get; }
+        public bool HasHiding { get; }
+        public bool HasFlying { get; }
+        public int SpellPower { get; }
+        public InvincibleDurationType InvincibleDuration { get; }
+        public int InvincibleOwnerTurns { get; }
+
+        private static void ValidateInvincible(
+            InvincibleDurationType duration,
+            int ownerTurns)
+        {
+            if (!Enum.IsDefined(typeof(InvincibleDurationType), duration))
+            {
+                throw new ArgumentOutOfRangeException(nameof(duration));
+            }
+
+            if (duration == InvincibleDurationType.OwnerTurns && ownerTurns <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(ownerTurns));
+            }
+
+            if (duration != InvincibleDurationType.OwnerTurns && ownerTurns != 0)
+            {
+                throw new ArgumentException(
+                    "invincibleOwnerTurns must be 0 unless InvincibleDuration is OwnerTurns.",
+                    nameof(ownerTurns));
+            }
+        }
     }
 }

@@ -41,8 +41,9 @@ namespace Project333.Runtime.Application.Services
             }
 
             occupant.Position = targetCoord;
+            occupant.WasSummonedThisTurn = true;
             occupant.HasSummoningSickness = true;
-            occupant.RemainingAttacksThisTurn = occupant.MaxAttacksPerTurn;
+            occupant.RemainingAttacksThisTurn = occupant.EffectiveMaxAttacksPerTurn;
 
             board.Place(targetCoord, occupant);
         }

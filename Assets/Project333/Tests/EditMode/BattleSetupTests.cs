@@ -32,15 +32,15 @@ namespace Project333.Tests.EditMode
             AssertResources(battleState.AI.Resources);
 
             Assert.That(battleState.Player.Hand.Count, Is.EqualTo(3));
-            Assert.That(battleState.AI.Hand.Count, Is.EqualTo(4));
+            Assert.That(battleState.AI.Hand.Count, Is.EqualTo(3));
             Assert.That(battleState.Player.Deck.Count, Is.EqualTo(7));
-            Assert.That(battleState.AI.Deck.Count, Is.EqualTo(6));
+            Assert.That(battleState.AI.Deck.Count, Is.EqualTo(7));
             Assert.That(battleState.Player.HasUsedMulligan, Is.False);
             Assert.That(battleState.AI.HasUsedMulligan, Is.True);
         }
 
         [Test]
-        public void CreateInitialState_AIFirst_UsesReversedOpeningHandSizes()
+        public void CreateInitialState_AIFirst_GivesBothPlayersThreeOpeningCards()
         {
             var service = new BattleSetupService();
             var request = CreateRequest(PlayerId.AI);
@@ -48,10 +48,68 @@ namespace Project333.Tests.EditMode
             var battleState = service.CreateInitialState(request);
 
             Assert.That(battleState.ActivePlayerId, Is.EqualTo(PlayerId.AI));
-            Assert.That(battleState.Player.Hand.Count, Is.EqualTo(4));
+            Assert.That(battleState.Player.Hand.Count, Is.EqualTo(3));
             Assert.That(battleState.AI.Hand.Count, Is.EqualTo(3));
-            Assert.That(battleState.Player.Deck.Count, Is.EqualTo(6));
+            Assert.That(battleState.Player.Deck.Count, Is.EqualTo(7));
             Assert.That(battleState.AI.Deck.Count, Is.EqualTo(7));
+        }
+
+        [Test]
+        public void CreateInitialState_WhenAIMulliganIsEnabled_WaitsForBothPlayers()
+        {
+            var service = new BattleSetupService(new TrackingReverseDeckShuffler());
+            var request = new BattleSetupRequest(
+                CreateDeck("P"),
+                CreateDeck("A"),
+                PlayerId.Player,
+                aiMulliganEnabled: true);
+
+            var battleState = service.CreateInitialState(request);
+
+            Assert.That(battleState.Player.HasUsedMulligan, Is.False);
+            Assert.That(battleState.AI.HasUsedMulligan, Is.False);
+            Assert.That(battleState.Phase, Is.EqualTo(PhaseType.Mulligan));
+        }
+
+        [Test]
+        public void CreateInitialState_ShufflesBothDecksBeforeDrawingOpeningHands()
+        {
+            var shuffler = new TrackingReverseDeckShuffler();
+            var service = new BattleSetupService(shuffler);
+
+            var battleState = service.CreateInitialState(CreateRequest(PlayerId.Player));
+
+            Assert.That(shuffler.ShuffleCount, Is.EqualTo(2));
+            Assert.That(
+                battleState.Player.Hand.CardIds,
+                Is.EqualTo(new[] { "P-00", "P-01", "P-02" }));
+            Assert.That(
+                battleState.AI.Hand.CardIds,
+                Is.EqualTo(new[] { "A-00", "A-01", "A-02" }));
+        }
+
+        [Test]
+        public void SystemDeckShuffler_WithSameSeed_ProducesSameOrder()
+        {
+            var firstDeck = new DeckState(CreateDeck("P"));
+            var secondDeck = new DeckState(CreateDeck("P"));
+
+            new SystemDeckShuffler(new Random(333)).Shuffle(firstDeck);
+            new SystemDeckShuffler(new Random(333)).Shuffle(secondDeck);
+
+            Assert.That(firstDeck.CardIds, Is.EqualTo(secondDeck.CardIds));
+        }
+
+        [Test]
+        public void SystemDeckShuffler_WithDifferentSeeds_ProducesDifferentOrder()
+        {
+            var firstDeck = new DeckState(CreateDeck("P"));
+            var secondDeck = new DeckState(CreateDeck("P"));
+
+            new SystemDeckShuffler(new Random(333)).Shuffle(firstDeck);
+            new SystemDeckShuffler(new Random(334)).Shuffle(secondDeck);
+
+            Assert.That(firstDeck.CardIds, Is.Not.EqualTo(secondDeck.CardIds));
         }
 
         [Test]
@@ -90,6 +148,25 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.TurnNumber, Is.EqualTo(1));
             Assert.That(battleState.Player.Hand.Count, Is.EqualTo(3));
             Assert.That(battleState.Player.Hand.Contains(selectedCardId), Is.False);
+            Assert.That(battleState.Player.Deck.Count, Is.EqualTo(7));
+        }
+
+        [Test]
+        public void ApplyMulligan_DrawsReplacementBeforeReturningSelectedCopyToDeck()
+        {
+            var setupService = new BattleSetupService(new TrackingReverseDeckShuffler());
+            var battleState = setupService.CreateInitialState(CreateRequest(PlayerId.Player));
+            var selectedCardId = battleState.Player.Hand.CardIds[0];
+
+            new MulliganService().ApplyMulligan(
+                battleState,
+                PlayerId.Player,
+                new[] { selectedCardId },
+                new NoOpDeckShuffler());
+
+            Assert.That(battleState.Player.Hand.Contains(selectedCardId), Is.False);
+            Assert.That(battleState.Player.Deck.CardIds, Does.Contain(selectedCardId));
+            Assert.That(battleState.Player.Hand.Count, Is.EqualTo(3));
             Assert.That(battleState.Player.Deck.Count, Is.EqualTo(7));
         }
 
@@ -153,6 +230,33 @@ namespace Project333.Tests.EditMode
                 {
                     deckState.AddToBottom(topToBottom[i]);
                 }
+            }
+        }
+
+        private sealed class TrackingReverseDeckShuffler : IDeckShuffler
+        {
+            public int ShuffleCount { get; private set; }
+
+            public void Shuffle(DeckState deckState)
+            {
+                ShuffleCount++;
+
+                var cards = new List<string>(deckState.CardIds);
+                while (deckState.TryDraw(out _))
+                {
+                }
+
+                for (var i = cards.Count - 1; i >= 0; i--)
+                {
+                    deckState.AddToTop(cards[i]);
+                }
+            }
+        }
+
+        private sealed class NoOpDeckShuffler : IDeckShuffler
+        {
+            public void Shuffle(DeckState deckState)
+            {
             }
         }
     }

@@ -20,7 +20,6 @@ MonoBehaviour:
     _qi: 0
     _power: 0
     _gold: 0
-  _attribute: Luminous
   _affiliation: 1
   _chargeTileFootprint: 1
   _effectText: 
@@ -28,8 +27,11 @@ MonoBehaviour:
   _boardSprite: {fileID: -1189008354, guid: d797ff20d0ca28845bf82b26f7e6396a, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: 2e15f1178132d4c4e92eb0581ea0e21a, type: 2}
   _attackType: 1
+  _damageType: 2
   _attack: 5
   _health: 10
+  _physicalDefense: 0
+  _magicDefense: 0
   _hitsPerAttack: 1
   _hasBerserker: 0
   _hasEndure: 0

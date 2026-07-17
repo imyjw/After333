@@ -80,6 +80,35 @@ namespace Project333.Tests.EditMode
                 moveService.Move(battleState, PlayerId.Player, new TileCoord(1, 1), new TileCoord(4, 1)));
         }
 
+        [Test]
+        public void Move_AllowsErasureMovableUnit()
+        {
+            var battleState = CreateBattleState();
+            var moveService = new MoveService();
+            var mover = CreateUnit("erasure-mover", new TileCoord(1, 1), canMove: true);
+
+            mover.ApplyErasure();
+            battleState.PlayerBoard.Place(new TileCoord(1, 1), mover);
+
+            moveService.Move(battleState, PlayerId.Player, new TileCoord(1, 1), new TileCoord(3, 1));
+
+            Assert.That(battleState.PlayerBoard.GetOccupant(new TileCoord(3, 1)), Is.SameAs(mover));
+        }
+
+        [Test]
+        public void Move_ThrowsForDrainedUnit()
+        {
+            var battleState = CreateBattleState();
+            var moveService = new MoveService();
+            var mover = CreateUnit("drained-mover", new TileCoord(1, 1), canMove: true);
+
+            mover.IsDrained = true;
+            battleState.PlayerBoard.Place(new TileCoord(1, 1), mover);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                moveService.Move(battleState, PlayerId.Player, new TileCoord(1, 1), new TileCoord(3, 1)));
+        }
+
         private static UnitState CreateUnit(string id, TileCoord coord, bool canMove)
         {
             return new UnitState(

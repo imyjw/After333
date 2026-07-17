@@ -28,7 +28,7 @@ namespace Project333.Tests.EditMode
             Assert.That(summary, Does.Contain("Active Player: Player"));
             Assert.That(summary, Does.Contain("Player Master HP: 333/333"));
             Assert.That(summary, Does.Contain("AI Master HP: 333/333"));
-            Assert.That(summary, Does.Contain("Player Resources: M:0 Q:0 P:0 G:4"));
+            Assert.That(summary, Does.Contain("Player Resources: M:0 Q:0 P:0 G:3"));
             Assert.That(summary, Does.Contain("Persistent Effects: 0"));
             Assert.That(summary, Does.Contain("Battle Ended: False"));
         }

@@ -8,11 +8,13 @@ namespace Project333.Runtime.Application.Services
         public BattleSetupRequest(
             IEnumerable<string> playerDeckCardIds,
             IEnumerable<string> aiDeckCardIds,
-            PlayerId firstPlayerId)
+            PlayerId firstPlayerId,
+            bool aiMulliganEnabled = false)
         {
             PlayerDeckCardIds = new List<string>(playerDeckCardIds);
             AIDeckCardIds = new List<string>(aiDeckCardIds);
             FirstPlayerId = firstPlayerId;
+            AIMulliganEnabled = aiMulliganEnabled;
         }
 
         public IReadOnlyList<string> PlayerDeckCardIds { get; }
@@ -20,5 +22,7 @@ namespace Project333.Runtime.Application.Services
         public IReadOnlyList<string> AIDeckCardIds { get; }
 
         public PlayerId FirstPlayerId { get; }
+
+        public bool AIMulliganEnabled { get; }
     }
 }

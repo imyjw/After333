@@ -20,7 +20,6 @@ MonoBehaviour:
     _qi: 0
     _power: 0
     _gold: 3
-  _attribute: Ignis
   _affiliation: 1
   _chargeTileFootprint: 1
   _effectText: 
@@ -28,8 +27,11 @@ MonoBehaviour:
   _boardSprite: {fileID: 207813287, guid: 0ec2f550154d717438e5f13c43a960d4, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: 855e6254183e3d34e99d2a4180321673, type: 2}
   _attackType: 0
+  _damageType: 1
   _attack: 9
   _health: 66
+  _physicalDefense: 0
+  _magicDefense: 0
   _hitsPerAttack: 3
   _hasBerserker: 0
   _hasEndure: 0

@@ -12,35 +12,111 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void ResetSessionState_RestoresDefaultTicketCount()
+        public void QueueBattleStart_WhenDraftDeckReady_PreservesLaunchModeUntilConsumed()
         {
-            Assert.That(DraftRunSessionState.AvailableTickets, Is.EqualTo(DraftRunSessionState.DefaultStartingTickets));
+            var draftedDeck = CreateDeck(33);
+            DraftRunSessionState.SetDraftDeck(draftedDeck);
+
+            DraftRunSessionState.QueueBattleStart(DraftBattleLaunchMode.OnlineMatchmaking);
+
+            Assert.That(DraftRunSessionState.HasPendingBattleStart, Is.True);
+            Assert.That(
+                DraftRunSessionState.TryConsumePendingBattleStart(out var consumedDeck, out var launchMode),
+                Is.True);
+            Assert.That(launchMode, Is.EqualTo(DraftBattleLaunchMode.OnlineMatchmaking));
+            Assert.That(consumedDeck, Is.EqualTo(draftedDeck));
+            Assert.That(DraftRunSessionState.HasPendingBattleStart, Is.False);
         }
 
         [Test]
-        public void TrySpendTicketsForNewRun_WhenEnoughTickets_SpendsTicketsAndClearsDraftState()
+        public void QueueBattleStart_WhenDraftDeckIsIncomplete_DoesNotQueueBattle()
         {
-            DraftRunSessionState.SetDraftDeck(new[] { "card-a", "card-b" });
+            DraftRunSessionState.SetDraftDeck(CreateDeck(32));
+
+            DraftRunSessionState.QueueBattleStart(DraftBattleLaunchMode.OnlineMatchmaking);
+
+            Assert.That(DraftRunSessionState.HasPendingBattleStart, Is.False);
+            Assert.That(DraftRunSessionState.PendingBattleLaunchMode, Is.EqualTo(DraftBattleLaunchMode.Local));
+            Assert.That(
+                DraftRunSessionState.TryConsumePendingBattleStart(out var consumedDeck, out var launchMode),
+                Is.False);
+            Assert.That(consumedDeck, Is.Empty);
+            Assert.That(launchMode, Is.EqualTo(DraftBattleLaunchMode.Local));
+        }
+
+        [Test]
+        public void RecordBattleResult_WhenDeckWasCompleted_KeepsDeckAvailableForDraftReturn()
+        {
+            var draftedDeck = CreateDeck(33);
+            DraftRunSessionState.SetDraftDeck(draftedDeck);
+
             DraftRunSessionState.RecordBattleResult(playerWon: true);
 
-            var didSpend = DraftRunSessionState.TrySpendTicketsForNewRun(3);
-
-            Assert.That(didSpend, Is.True);
-            Assert.That(DraftRunSessionState.AvailableTickets, Is.EqualTo(DraftRunSessionState.DefaultStartingTickets - 3));
-            Assert.That(DraftRunSessionState.CurrentDraftDeckCardIds, Is.Empty);
-            Assert.That(DraftRunSessionState.Wins, Is.EqualTo(0));
+            Assert.That(DraftRunSessionState.Wins, Is.EqualTo(1));
             Assert.That(DraftRunSessionState.Losses, Is.EqualTo(0));
+            Assert.That(DraftRunSessionState.LastBattleOutcomeText, Is.EqualTo("Victory"));
+            Assert.That(DraftRunSessionState.HasDraftedDeckReady, Is.True);
+            Assert.That(DraftRunSessionState.CurrentDraftDeckCardIds, Is.EqualTo(draftedDeck));
+            Assert.That(DraftRunSessionState.LastCompletedDraftDeckCardIds, Is.EqualTo(draftedDeck));
         }
 
         [Test]
-        public void TrySpendTicketsForNewRun_WhenTicketsAreInsufficient_DoesNotSpend()
+        public void RecordBattleResult_WhenCurrentDeckWasCleared_RestoresCompletedDeckForDraftReturn()
         {
-            Assert.That(DraftRunSessionState.TrySpendTicketsForNewRun(9), Is.True);
+            var draftedDeck = CreateDeck(33);
+            DraftRunSessionState.SetDraftDeck(draftedDeck);
+            DraftRunSessionState.SetDraftDeck(new string[0]);
 
-            var didSpend = DraftRunSessionState.TrySpendTicketsForNewRun(3);
+            DraftRunSessionState.RecordBattleResult(playerWon: false);
 
-            Assert.That(didSpend, Is.False);
-            Assert.That(DraftRunSessionState.AvailableTickets, Is.EqualTo(0));
+            Assert.That(DraftRunSessionState.Wins, Is.EqualTo(0));
+            Assert.That(DraftRunSessionState.Losses, Is.EqualTo(1));
+            Assert.That(DraftRunSessionState.LastBattleOutcomeText, Is.EqualTo("Defeat"));
+            Assert.That(DraftRunSessionState.HasDraftedDeckReady, Is.True);
+            Assert.That(DraftRunSessionState.CurrentDraftDeckCardIds, Is.EqualTo(draftedDeck));
+            Assert.That(DraftRunSessionState.LastCompletedDraftDeckCardIds, Is.EqualTo(draftedDeck));
+        }
+
+        [Test]
+        public void TryApplyAuthoritativeServerRunRecord_WhenRunCompleted_OverridesStaleLocalRecord()
+        {
+            DraftRunSessionState.ApplyServerRunRecord(3, 2);
+
+            var applied = DraftRunSessionState.TryApplyAuthoritativeServerRunRecord(
+                3,
+                3,
+                isCompletedRun: true);
+
+            Assert.That(applied, Is.True);
+            Assert.That(DraftRunSessionState.Wins, Is.EqualTo(3));
+            Assert.That(DraftRunSessionState.Losses, Is.EqualTo(3));
+            Assert.That(DraftRunSessionState.HasRunEnded, Is.True);
+        }
+
+        [Test]
+        public void TryApplyAuthoritativeServerRunRecord_WhenActiveServerRecordIsBehind_KeepsLocalRecord()
+        {
+            DraftRunSessionState.ApplyServerRunRecord(3, 2);
+
+            var applied = DraftRunSessionState.TryApplyAuthoritativeServerRunRecord(
+                3,
+                1,
+                isCompletedRun: false);
+
+            Assert.That(applied, Is.False);
+            Assert.That(DraftRunSessionState.Wins, Is.EqualTo(3));
+            Assert.That(DraftRunSessionState.Losses, Is.EqualTo(2));
+        }
+
+        private static string[] CreateDeck(int count)
+        {
+            var deck = new string[count];
+            for (var i = 0; i < deck.Length; i++)
+            {
+                deck[i] = $"card-{i:D2}";
+            }
+
+            return deck;
         }
     }
 }

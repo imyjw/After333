@@ -27,18 +27,35 @@ namespace Project333.Runtime.Application.Services
 
         private readonly ICardDefinitionProvider _cardDefinitionProvider;
         private readonly TargetingService _targetingService;
+        private readonly ICardUpgradeLevelProvider _cardUpgradeLevelProvider;
 
         public AiDecisionService(ICardDefinitionProvider cardDefinitionProvider)
-            : this(cardDefinitionProvider, new TargetingService())
+            : this(cardDefinitionProvider, new TargetingService(), ZeroCardUpgradeLevelProvider.Instance)
+        {
+        }
+
+        public AiDecisionService(
+            ICardDefinitionProvider cardDefinitionProvider,
+            ICardUpgradeLevelProvider cardUpgradeLevelProvider)
+            : this(cardDefinitionProvider, new TargetingService(), cardUpgradeLevelProvider)
         {
         }
 
         public AiDecisionService(
             ICardDefinitionProvider cardDefinitionProvider,
             TargetingService targetingService)
+            : this(cardDefinitionProvider, targetingService, ZeroCardUpgradeLevelProvider.Instance)
+        {
+        }
+
+        public AiDecisionService(
+            ICardDefinitionProvider cardDefinitionProvider,
+            TargetingService targetingService,
+            ICardUpgradeLevelProvider cardUpgradeLevelProvider)
         {
             _cardDefinitionProvider = cardDefinitionProvider ?? throw new ArgumentNullException(nameof(cardDefinitionProvider));
             _targetingService = targetingService ?? throw new ArgumentNullException(nameof(targetingService));
+            _cardUpgradeLevelProvider = cardUpgradeLevelProvider ?? ZeroCardUpgradeLevelProvider.Instance;
         }
 
         public IBattleCommand GetNextCommand(BattleState battleState)
@@ -114,7 +131,11 @@ namespace Project333.Runtime.Application.Services
                         continue;
                     }
 
-                    if (IsProtectedByActiveGuard(enemyBoard, targetCoord))
+                    if (IsProtectedByActiveGuardForNormalAttack(
+                            enemyBoard,
+                            targetCoord,
+                            attacker.AttackType,
+                            attacker.HasActiveFlying))
                     {
                         continue;
                     }
@@ -153,7 +174,7 @@ namespace Project333.Runtime.Application.Services
                 foreach (var targetCoord in CoordPriority)
                 {
                     var target = enemyBoard.GetOccupant(targetCoord);
-                    if (target == null)
+                    if (target == null || target.IsSealbound || target.IsHiding)
                     {
                         continue;
                     }
@@ -163,11 +184,18 @@ namespace Project333.Runtime.Application.Services
                         continue;
                     }
 
-                    var damage = damageSpellDefinition.Damage;
-                    if (target.IsDisabled)
-                    {
-                        damage *= 3;
-                    }
+                    var cardLevelDamage = CardLevelSpellRules.ApplyDamageBonus(
+                        damageSpellDefinition.Damage,
+                        _cardUpgradeLevelProvider.GetUpgradeLevel(PlayerId.AI, damageSpellDefinition.CardId));
+                    var rawDamage = SpellPowerRules.ApplyCurrent(
+                        battleState,
+                        PlayerId.AI,
+                        cardLevelDamage,
+                        damageSpellDefinition.DamageType);
+                    var damage = DamageResolutionRules.ResolveIncomingDamage(
+                        target,
+                        rawDamage,
+                        damageSpellDefinition.DamageType);
 
                     if (damage < target.CurrentHp)
                     {
@@ -291,8 +319,12 @@ namespace Project333.Runtime.Application.Services
         {
             return definition switch
             {
-                UnitCardDefinition unitCardDefinition => unitCardDefinition.CanAttackOnSummon,
-                BuildingCardDefinition buildingCardDefinition => buildingCardDefinition.CanAttack && buildingCardDefinition.CanAttackOnSummon,
+                UnitCardDefinition unitCardDefinition =>
+                    unitCardDefinition.SealboundOwnerTurnStarts == 0 && unitCardDefinition.HasRush,
+                BuildingCardDefinition buildingCardDefinition =>
+                    buildingCardDefinition.SealboundOwnerTurnStarts == 0 &&
+                    buildingCardDefinition.CanAttack &&
+                    buildingCardDefinition.CanAttackOnSummon,
                 _ => false,
             };
         }
@@ -307,7 +339,12 @@ namespace Project333.Runtime.Application.Services
             var enemyBoard = battleState.GetBoard(PlayerId.Player);
             TargetPreference bestPreference = null;
 
-            foreach (var targetCoord in GetLegalTargetsForAttackType(battleState, GetAttackType(definition)))
+            var attackType = GetAttackType(definition);
+            var hasFlying = HasFlying(definition);
+            foreach (var targetCoord in GetLegalTargetsForAttackType(
+                         battleState,
+                         attackType,
+                         hasFlying))
             {
                 var defender = enemyBoard.GetOccupant(targetCoord);
                 if (defender == null)
@@ -326,7 +363,10 @@ namespace Project333.Runtime.Application.Services
             return bestPreference;
         }
 
-        private static IEnumerable<TileCoord> GetLegalTargetsForAttackType(BattleState battleState, AttackType attackType)
+        private static IEnumerable<TileCoord> GetLegalTargetsForAttackType(
+            BattleState battleState,
+            AttackType attackType,
+            bool attackerHasFlying)
         {
             var enemyBoard = battleState.GetBoard(PlayerId.Player);
 
@@ -337,14 +377,19 @@ namespace Project333.Runtime.Application.Services
                 var frontOccupant = enemyBoard.GetOccupant(frontCoord);
                 var backOccupant = enemyBoard.GetOccupant(backCoord);
 
-                if (attackType == AttackType.Ranged)
+                if (attackType == AttackType.Ranged || attackerHasFlying)
                 {
-                    if (frontOccupant != null)
+                    if (CanBeTargeted(attackType, attackerHasFlying, frontOccupant))
                     {
                         yield return frontCoord;
                     }
 
-                    if (backOccupant != null && !IsProtectedByActiveGuard(enemyBoard, backCoord))
+                    if (CanBeTargeted(attackType, attackerHasFlying, backOccupant) &&
+                        !IsProtectedByActiveGuardForNormalAttack(
+                            enemyBoard,
+                            backCoord,
+                            attackType,
+                            attackerHasFlying))
                     {
                         yield return backCoord;
                     }
@@ -352,12 +397,13 @@ namespace Project333.Runtime.Application.Services
                     continue;
                 }
 
-                if (frontOccupant != null)
+                if (CanBeTargeted(attackType, attackerHasFlying, frontOccupant))
                 {
                     yield return frontCoord;
                 }
 
-                if (backOccupant != null && !IsFrontRowBlocker(frontOccupant))
+                if (CanBeTargeted(attackType, attackerHasFlying, backOccupant) &&
+                    !IsFrontRowBlocker(frontOccupant))
                 {
                     yield return backCoord;
                 }
@@ -374,6 +420,24 @@ namespace Project333.Runtime.Application.Services
             return GuardService.Resolve(board, targetCoord).IsProtected;
         }
 
+        private static bool IsProtectedByActiveGuardForNormalAttack(
+            BoardState board,
+            TileCoord targetCoord,
+            AttackType attackerAttackType,
+            bool attackerHasFlying)
+        {
+            if (board.GetOccupant(targetCoord) == null)
+            {
+                return false;
+            }
+
+            return GuardService.ResolveForNormalAttack(
+                board,
+                targetCoord,
+                attackerAttackType,
+                attackerHasFlying).IsProtected;
+        }
+
         private static bool IsFrontRowBlocker(OccupantState frontOccupant)
         {
             if (frontOccupant == null)
@@ -381,7 +445,18 @@ namespace Project333.Runtime.Application.Services
                 return false;
             }
 
-            return !(frontOccupant is UnitState unitState && unitState.IsScience && unitState.IsDisabled);
+            return !frontOccupant.DoesNotBlockFrontRow;
+        }
+
+        private static bool CanBeTargeted(
+            AttackType attackerAttackType,
+            bool attackerHasFlying,
+            OccupantState occupant)
+        {
+            return TargetingService.CanBeTargetedByNormalAttack(
+                attackerAttackType,
+                attackerHasFlying,
+                occupant);
         }
 
         private static AttackType GetAttackType(CardDefinition definition)
@@ -394,18 +469,30 @@ namespace Project333.Runtime.Application.Services
             };
         }
 
+        private static bool HasFlying(CardDefinition definition)
+        {
+            return definition switch
+            {
+                UnitCardDefinition unitCardDefinition => unitCardDefinition.HasFlying,
+                BuildingCardDefinition buildingCardDefinition => buildingCardDefinition.HasFlying,
+                _ => false,
+            };
+        }
+
         private static int GetProjectedTargetRemainingHpAfterAttackAction(CardDefinition definition, OccupantState defender)
         {
             return definition switch
             {
                 UnitCardDefinition unitCardDefinition => GetProjectedTargetRemainingHpAfterAttackAction(
                     attackPerHit: unitCardDefinition.Attack,
+                    damageType: unitCardDefinition.DamageType,
                     attackType: unitCardDefinition.AttackType,
                     hitsPerAttack: unitCardDefinition.HitsPerAttack,
                     defender: defender,
                     defenderCounterAttack: defender.Attack),
                 BuildingCardDefinition buildingCardDefinition => GetProjectedTargetRemainingHpAfterAttackAction(
                     attackPerHit: buildingCardDefinition.Attack,
+                    damageType: buildingCardDefinition.DamageType,
                     attackType: AttackType.Ranged,
                     hitsPerAttack: 1,
                     defender: defender,
@@ -418,14 +505,16 @@ namespace Project333.Runtime.Application.Services
         {
             return GetProjectedTargetRemainingHpAfterAttackAction(
                 attackPerHit: attacker.Attack,
+                damageType: attacker.DamageType,
                 attackType: attacker.AttackType,
-                hitsPerAttack: attacker.HitsPerAttack,
+                hitsPerAttack: attacker.EffectiveHitsPerAttack,
                 defender: defender,
                 defenderCounterAttack: defender.Attack);
         }
 
         private static int GetProjectedTargetRemainingHpAfterAttackAction(
             int attackPerHit,
+            DamageType damageType,
             AttackType attackType,
             int hitsPerAttack,
             OccupantState defender,
@@ -437,44 +526,71 @@ namespace Project333.Runtime.Application.Services
             var defenderCanCounterattack =
                 attackType == AttackType.Melee &&
                 defender.AttackType == AttackType.Melee &&
-                !defender.IsDisabled &&
+                !defender.CannotCounterattack &&
                 defender.Attack > 0;
-            var singleHitDamage = GetSingleHitDamage(attackPerHit, defender.IsDisabled);
 
             if (defenderCanCounterattack)
             {
                 for (var hitIndex = 0; hitIndex < resolvedHits - 1; hitIndex++)
                 {
-                    projectedTargetHp = ApplyProjectedAttackDamage(projectedTargetHp, singleHitDamage, ref canTriggerEndure);
+                    projectedTargetHp = ApplyProjectedAttackDamage(
+                        projectedTargetHp,
+                        attackPerHit,
+                        damageType,
+                        defender,
+                        ref canTriggerEndure);
                 }
 
-                projectedTargetHp = ApplyProjectedAttackDamage(projectedTargetHp, singleHitDamage, ref canTriggerEndure);
+                projectedTargetHp = ApplyProjectedAttackDamage(
+                    projectedTargetHp,
+                    attackPerHit,
+                    damageType,
+                    defender,
+                    ref canTriggerEndure);
                 return projectedTargetHp;
             }
 
             for (var hitIndex = 0; hitIndex < resolvedHits; hitIndex++)
             {
-                projectedTargetHp = ApplyProjectedAttackDamage(projectedTargetHp, singleHitDamage, ref canTriggerEndure);
+                projectedTargetHp = ApplyProjectedAttackDamage(
+                    projectedTargetHp,
+                    attackPerHit,
+                    damageType,
+                    defender,
+                    ref canTriggerEndure);
             }
 
             return projectedTargetHp;
         }
 
-        private static int ApplyProjectedAttackDamage(int currentHp, int damage, ref bool canTriggerEndure)
+        private static int ApplyProjectedAttackDamage(
+            int currentHp,
+            int damage,
+            DamageType damageType,
+            OccupantState defender,
+            ref bool canTriggerEndure)
         {
-            currentHp -= damage;
-            if (currentHp <= 0 && canTriggerEndure)
+            if (defender.IsInvincible)
             {
-                currentHp = 1;
+                return currentHp;
+            }
+
+            DamageResolutionRules.ProjectAttackDamageTaken(
+                currentHp,
+                defender.IsDrained,
+                defender.PhysicalDefense,
+                defender.MagicDefense,
+                canTriggerEndure,
+                damage,
+                damageType,
+                out var remainingHp,
+                out var triggeredEndure);
+            if (triggeredEndure)
+            {
                 canTriggerEndure = false;
             }
 
-            return currentHp;
-        }
-
-        private static int GetSingleHitDamage(int attack, bool defenderIsDisabled)
-        {
-            return defenderIsDisabled ? attack * 3 : attack;
+            return remainingHp;
         }
 
         private static IBattleCommand TryCreateSummonCommand(BattleState battleState, CardDefinition definition)
@@ -502,7 +618,7 @@ namespace Project333.Runtime.Application.Services
 
         private static bool CanOccupantAttack(OccupantState occupant)
         {
-            if (occupant == null || occupant.IsDisabled || occupant.HasSummoningSickness || occupant.RemainingAttacksThisTurn <= 0 || occupant.Attack <= 0)
+            if (occupant == null || occupant.CannotAttack || occupant.HasSummoningSickness || occupant.RemainingAttacksThisTurn <= 0 || occupant.Attack <= 0)
             {
                 return false;
             }

@@ -20,7 +20,6 @@ MonoBehaviour:
     _qi: 8
     _power: 0
     _gold: 0
-  _attribute: Dark
   _affiliation: 0
   _chargeTileFootprint: 1
   _effectText: 
@@ -30,8 +29,11 @@ MonoBehaviour:
   _boardSprite: {fileID: 21300000, guid: daf555557df49a94a930e0171156e67b, type: 3}
   _boardAnimatorController: {fileID: 0}
   _attackType: 0
+  _damageType: 1
   _attack: 33
   _health: 66
+  _physicalDefense: 0
+  _magicDefense: 0
   _hitsPerAttack: 2
   _hasBerserker: 1
   _hasEndure: 0

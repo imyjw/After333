@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using Project333.Runtime.Application.Commands;
 using Project333.Runtime.Application.Services;
@@ -39,7 +40,7 @@ namespace Project333.Tests.EditMode
                 new PlayUnitCardCommand("unit-card", new TileCoord(0, 0)));
 
             Assert.That(battleState.PlayerBoard.GetOccupant(new TileCoord(0, 0)), Is.Not.Null);
-            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(7));
+            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(6));
             Assert.That(battleState.Player.Hand.Contains("unit-card"), Is.False);
         }
 
@@ -128,6 +129,246 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
+        public void Execute_ReplicateUnit_CreatesTemporaryCopyAfterSuccessfulPlay()
+        {
+            var battleState = CreateBattleStateInMainPhase();
+            var original = battleState.Player.Hand.Add("replicate-unit");
+            var processor = CreateProcessor(new CardDefinition[]
+            {
+                CreateReplicateUnit("replicate-unit", new ResourceSet()),
+            });
+
+            processor.Execute(
+                battleState,
+                PlayerId.Player,
+                new PlayUnitCardCommand(
+                    "replicate-unit",
+                    new TileCoord(0, 0),
+                    original.RuntimeId));
+
+            var copy = battleState.Player.Hand.Cards.Single(card => card.CardId == "replicate-unit");
+            Assert.That(copy.RuntimeId, Is.Not.EqualTo(original.RuntimeId));
+            Assert.That(copy.IsTemporaryReplicate, Is.True);
+        }
+
+        [Test]
+        public void Execute_ReplicateBuilding_CreatesTemporaryCopyAfterSuccessfulPlay()
+        {
+            var battleState = CreateBattleStateInMainPhase();
+            var original = battleState.Player.Hand.Add("replicate-building");
+            var definition = new BuildingCardDefinition(
+                cardId: "replicate-building",
+                displayName: "Replicate Building",
+                cost: new ResourceSet(),
+                canAttack: false,
+                attack: 0,
+                health: 10,
+                hasReplicate: true);
+            var processor = CreateProcessor(new CardDefinition[] { definition });
+
+            processor.Execute(
+                battleState,
+                PlayerId.Player,
+                new PlayBuildingCardCommand(
+                    definition.CardId,
+                    new TileCoord(0, 0),
+                    original.RuntimeId));
+
+            var copy = battleState.Player.Hand.Cards.Single(card => card.CardId == definition.CardId);
+            Assert.That(copy.IsTemporaryReplicate, Is.True);
+            Assert.That(battleState.PlayerBoard.GetOccupant(new TileCoord(0, 0)), Is.TypeOf<BuildingState>());
+        }
+
+        [Test]
+        public void Execute_RejectedReplicatePlay_DoesNotCreateTemporaryCopy()
+        {
+            var battleState = CreateBattleStateInMainPhase();
+            var original = battleState.Player.Hand.Add("replicate-unit");
+            var processor = CreateProcessor(new CardDefinition[]
+            {
+                CreateReplicateUnit("replicate-unit", new ResourceSet()),
+            });
+
+            Assert.Throws<System.InvalidOperationException>(() =>
+                processor.Execute(
+                    battleState,
+                    PlayerId.Player,
+                    new PlayUnitCardCommand(
+                        "replicate-unit",
+                        new TileCoord(2, 1),
+                        original.RuntimeId)));
+
+            Assert.That(battleState.Player.Hand.Contains(original.CardId, original.RuntimeId), Is.True);
+            Assert.That(
+                battleState.Player.Hand.Cards.Any(card => card.IsTemporaryReplicate),
+                Is.False);
+        }
+
+        [Test]
+        public void Execute_ZeroCostReplicateSpell_CanChainAndKeepsOriginalDefinitionCost()
+        {
+            var battleState = CreateBattleStateInMainPhase();
+            var original = battleState.Player.Hand.Add("replicate-spell");
+            var firstTarget = CreateUnit("target-1", PlayerId.AI, new TileCoord(0, 0), 0, 5);
+            var secondTarget = CreateUnit("target-2", PlayerId.AI, new TileCoord(1, 0), 0, 5);
+            battleState.AIBoard.Place(firstTarget.Position, firstTarget);
+            battleState.AIBoard.Place(secondTarget.Position, secondTarget);
+
+            var processor = CreateProcessor(new CardDefinition[]
+            {
+                new DamageSpellCardDefinition(
+                    cardId: "replicate-spell",
+                    displayName: "Replicate Spell",
+                    cost: new ResourceSet(),
+                    damage: 1,
+                    hasReplicate: true),
+            });
+
+            processor.Execute(
+                battleState,
+                PlayerId.Player,
+                new CastDamageSpellCommand(
+                    "replicate-spell",
+                    PlayerId.AI,
+                    firstTarget.Position,
+                    original.RuntimeId));
+            var firstCopy = battleState.Player.Hand.Cards.Single(card => card.CardId == "replicate-spell");
+
+            processor.Execute(
+                battleState,
+                PlayerId.Player,
+                new CastDamageSpellCommand(
+                    "replicate-spell",
+                    PlayerId.AI,
+                    secondTarget.Position,
+                    firstCopy.RuntimeId));
+
+            var secondCopy = battleState.Player.Hand.Cards.Single(card => card.CardId == "replicate-spell");
+            Assert.That(firstTarget.CurrentHp, Is.EqualTo(4));
+            Assert.That(secondTarget.CurrentHp, Is.EqualTo(4));
+            Assert.That(secondCopy.RuntimeId, Is.Not.EqualTo(firstCopy.RuntimeId));
+            Assert.That(secondCopy.IsTemporaryReplicate, Is.True);
+        }
+
+        [Test]
+        public void Execute_ReplicateWithRuntimeId_RemovesSelectedOriginalAndPreservesOtherCopy()
+        {
+            var battleState = CreateBattleStateInMainPhase();
+            var selectedOriginal = battleState.Player.Hand.Add("replicate-unit");
+            var otherOriginal = battleState.Player.Hand.Add("replicate-unit");
+            var existingTemporary = battleState.Player.Hand.AddTemporaryReplicate("replicate-unit");
+            var processor = CreateProcessor(new CardDefinition[]
+            {
+                CreateReplicateUnit("replicate-unit", new ResourceSet()),
+            });
+
+            processor.Execute(
+                battleState,
+                PlayerId.Player,
+                new PlayUnitCardCommand(
+                    "replicate-unit",
+                    new TileCoord(0, 0),
+                    selectedOriginal.RuntimeId));
+
+            Assert.That(battleState.Player.Hand.Contains("replicate-unit", selectedOriginal.RuntimeId), Is.False);
+            Assert.That(battleState.Player.Hand.Contains("replicate-unit", otherOriginal.RuntimeId), Is.True);
+            Assert.That(battleState.Player.Hand.Contains("replicate-unit", existingTemporary.RuntimeId), Is.True);
+            Assert.That(
+                battleState.Player.Hand.Cards.Count(card =>
+                    card.CardId == "replicate-unit" && card.IsTemporaryReplicate),
+                Is.EqualTo(2));
+        }
+
+        [Test]
+        public void Execute_ReplicateCopy_UsesOwnersAccountUpgradeLevelAgain()
+        {
+            var battleState = CreateBattleStateInMainPhase();
+            var original = battleState.Player.Hand.Add("leveled-replicate");
+            var definition = new UnitCardDefinition(
+                cardId: "leveled-replicate",
+                displayName: "Leveled Replicate",
+                cost: new ResourceSet(),
+                attackType: AttackType.Melee,
+                attack: 10,
+                health: 20,
+                canMove: true,
+                isScience: false,
+                sciencePowerUpkeep: 0,
+                hasReplicate: true);
+            var provider = new InMemoryCardDefinitionProvider(new CardDefinition[] { definition });
+            var processor = new BattleCommandProcessor(
+                new PlayCardService(provider, new SummonService(), new FixedUpgradeLevelProvider(5)),
+                new SpellService(provider, new FixedUpgradeLevelProvider(5)),
+                new MoveService(),
+                new AttackService(),
+                new EndTurnService());
+
+            processor.Execute(
+                battleState,
+                PlayerId.Player,
+                new PlayUnitCardCommand(
+                    definition.CardId,
+                    new TileCoord(0, 0),
+                    original.RuntimeId));
+            var copy = battleState.Player.Hand.Cards.Single(card => card.CardId == definition.CardId);
+            processor.Execute(
+                battleState,
+                PlayerId.Player,
+                new PlayUnitCardCommand(
+                    definition.CardId,
+                    new TileCoord(1, 0),
+                    copy.RuntimeId));
+
+            var originalUnit = battleState.PlayerBoard.GetOccupant(new TileCoord(0, 0));
+            var copiedUnit = battleState.PlayerBoard.GetOccupant(new TileCoord(1, 0));
+            Assert.That(originalUnit.Attack, Is.EqualTo(11));
+            Assert.That(originalUnit.MaxHp, Is.EqualTo(24));
+            Assert.That(copiedUnit.Attack, Is.EqualTo(originalUnit.Attack));
+            Assert.That(copiedUnit.MaxHp, Is.EqualTo(originalUnit.MaxHp));
+        }
+
+        [Test]
+        public void Execute_EndTurn_RemovesOnlyTemporaryReplicateCards()
+        {
+            var battleState = CreateBattleStateInMainPhase();
+            var permanent = battleState.Player.Hand.Add("replicate-unit");
+            var expectedPermanentHandCount = battleState.Player.Hand.Count;
+            battleState.Player.Hand.AddTemporaryReplicate("replicate-unit");
+            battleState.Player.Hand.AddTemporaryReplicate("another-replicate");
+            var processor = CreateProcessor(System.Array.Empty<CardDefinition>());
+
+            processor.Execute(battleState, PlayerId.Player, new EndTurnCommand());
+
+            Assert.That(battleState.Player.Hand.Cards, Has.Count.EqualTo(expectedPermanentHandCount));
+            Assert.That(battleState.Player.Hand.Contains("replicate-unit", permanent.RuntimeId), Is.True);
+            Assert.That(battleState.Player.Hand.Cards.All(card => !card.IsTemporaryReplicate), Is.True);
+        }
+
+        [Test]
+        public void ReplicateService_WhenHandIsFull_DoesNotCreateCopy()
+        {
+            var battleState = CreateBattleStateInMainPhase();
+            while (battleState.Player.Hand.Count < battleState.Player.MaxHandSize)
+            {
+                battleState.Player.Hand.Add($"filler-{battleState.Player.Hand.Count}");
+            }
+
+            var provider = new InMemoryCardDefinitionProvider(new CardDefinition[]
+            {
+                CreateReplicateUnit("replicate-unit", new ResourceSet()),
+            });
+            var service = new ReplicateService(provider);
+
+            var result = service.TryCreateTemporaryCopy(
+                battleState,
+                PlayerId.Player,
+                "replicate-unit");
+
+            Assert.That(result, Is.Null);
+            Assert.That(battleState.Player.Hand.Count, Is.EqualTo(battleState.Player.MaxHandSize));
+        }
+
+        [Test]
         public void Execute_WhenActorIsNotActivePlayer_Throws()
         {
             var battleState = CreateBattleStateInMainPhase();
@@ -151,6 +392,21 @@ namespace Project333.Tests.EditMode
                 new MoveService(),
                 new AttackService(),
                 new EndTurnService());
+        }
+
+        private static UnitCardDefinition CreateReplicateUnit(string cardId, ResourceSet cost)
+        {
+            return new UnitCardDefinition(
+                cardId: cardId,
+                displayName: "Replicate Unit",
+                cost: cost,
+                attackType: AttackType.Melee,
+                attack: 1,
+                health: 1,
+                canMove: true,
+                isScience: false,
+                sciencePowerUpkeep: 0,
+                hasReplicate: true);
         }
 
         private static UnitState CreateUnit(
@@ -201,6 +457,21 @@ namespace Project333.Tests.EditMode
                 prefix + "-08",
                 prefix + "-09",
             };
+        }
+
+        private sealed class FixedUpgradeLevelProvider : ICardUpgradeLevelProvider
+        {
+            private readonly int _level;
+
+            public FixedUpgradeLevelProvider(int level)
+            {
+                _level = level;
+            }
+
+            public int GetUpgradeLevel(PlayerId ownerId, string cardId)
+            {
+                return _level;
+            }
         }
     }
 }

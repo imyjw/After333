@@ -13,37 +13,29 @@ namespace Project333.Runtime.Application.Services
     {
         private const string DaehwandanEffectId = "daehwandan";
         private const string CheonraJimangEffectId = "cheonra_jimang";
+        private const string FirewallEffectId = "firewall";
         private const int DaehwandanMasterAttackBonus = 30;
         private const int DaehwandanQiGain = 3;
         private const int DaehwandanOwnerTurnStarts = 3;
 
         private readonly ICardDefinitionProvider _cardDefinitionProvider;
+        private readonly ICardUpgradeLevelProvider _cardUpgradeLevelProvider = ZeroCardUpgradeLevelProvider.Instance;
 
         public SpellService()
         {
         }
 
         public SpellService(ICardDefinitionProvider cardDefinitionProvider)
+            : this(cardDefinitionProvider, ZeroCardUpgradeLevelProvider.Instance)
         {
-            _cardDefinitionProvider = cardDefinitionProvider ?? throw new ArgumentNullException(nameof(cardDefinitionProvider));
         }
 
-        public void CastDamageSpell(
-            BattleState battleState,
-            PlayerId casterId,
-            string cardId,
-            PlayerId targetOwnerId,
-            TileCoord targetCoord)
+        public SpellService(
+            ICardDefinitionProvider cardDefinitionProvider,
+            ICardUpgradeLevelProvider cardUpgradeLevelProvider)
         {
-            var definition = GetRequiredDefinition<DamageSpellCardDefinition>(cardId);
-            CastResolvedDamageSpell(
-                battleState,
-                casterId,
-                cardId,
-                targetOwnerId,
-                targetCoord,
-                definition.Damage,
-                definition.Cost);
+            _cardDefinitionProvider = cardDefinitionProvider ?? throw new ArgumentNullException(nameof(cardDefinitionProvider));
+            _cardUpgradeLevelProvider = cardUpgradeLevelProvider ?? ZeroCardUpgradeLevelProvider.Instance;
         }
 
         public void CastDamageSpell(
@@ -52,7 +44,31 @@ namespace Project333.Runtime.Application.Services
             string cardId,
             PlayerId targetOwnerId,
             TileCoord targetCoord,
-            int damage)
+            string handCardRuntimeId = null)
+        {
+            var definition = GetRequiredDefinition<DamageSpellCardDefinition>(cardId);
+            CastResolvedDamageSpell(
+                battleState,
+                casterId,
+                cardId,
+                targetOwnerId,
+                targetCoord,
+                CardLevelSpellRules.ApplyDamageBonus(
+                    definition.Damage,
+                    _cardUpgradeLevelProvider.GetUpgradeLevel(casterId, definition.CardId)),
+                definition.DamageType,
+                definition.Cost,
+                handCardRuntimeId);
+        }
+
+        public void CastDamageSpell(
+            BattleState battleState,
+            PlayerId casterId,
+            string cardId,
+            PlayerId targetOwnerId,
+            TileCoord targetCoord,
+            int damage,
+            DamageType damageType = DamageType.Magic)
         {
             CastResolvedDamageSpell(
                 battleState,
@@ -61,13 +77,16 @@ namespace Project333.Runtime.Application.Services
                 targetOwnerId,
                 targetCoord,
                 damage,
-                new ResourceSet());
+                damageType,
+                new ResourceSet(),
+                handCardRuntimeId: null);
         }
 
         public void CastPersistentResourceSpell(
             BattleState battleState,
             PlayerId casterId,
-            string cardId)
+            string cardId,
+            string handCardRuntimeId = null)
         {
             var definition = GetRequiredDefinition<PersistentResourceSpellCardDefinition>(cardId);
             CastResolvedPersistentResourceSpell(
@@ -78,7 +97,8 @@ namespace Project333.Runtime.Application.Services
                 definition.TurnStartResourceGain,
                 definition.EndConditionText,
                 definition.Cost,
-                definition.OwnerTurnStartsRemaining);
+                definition.OwnerTurnStartsRemaining,
+                handCardRuntimeId);
         }
 
         public void CastPersistentResourceSpell(
@@ -98,12 +118,24 @@ namespace Project333.Runtime.Application.Services
                 turnStartResourceGain,
                 endConditionText,
                 new ResourceSet(),
-                ownerTurnStartsRemaining);
+                ownerTurnStartsRemaining,
+                handCardRuntimeId: null);
         }
 
-        public void CastScriptedSpell(BattleState battleState, PlayerId casterId, string cardId)
+        public void CastScriptedSpell(
+            BattleState battleState,
+            PlayerId casterId,
+            string cardId,
+            string handCardRuntimeId = null)
         {
-            CastResolvedScriptedSpell(battleState, casterId, cardId, hasTarget: false, PlayerId.Player, default(TileCoord));
+            CastResolvedScriptedSpell(
+                battleState,
+                casterId,
+                cardId,
+                hasTarget: false,
+                PlayerId.Player,
+                default(TileCoord),
+                handCardRuntimeId);
         }
 
         public void CastScriptedSpell(
@@ -111,9 +143,49 @@ namespace Project333.Runtime.Application.Services
             PlayerId casterId,
             string cardId,
             PlayerId targetOwnerId,
-            TileCoord targetCoord)
+            TileCoord targetCoord,
+            string handCardRuntimeId = null)
         {
-            CastResolvedScriptedSpell(battleState, casterId, cardId, hasTarget: true, targetOwnerId, targetCoord);
+            CastResolvedScriptedSpell(
+                battleState,
+                casterId,
+                cardId,
+                hasTarget: true,
+                targetOwnerId,
+                targetCoord,
+                handCardRuntimeId);
+        }
+
+        public RobotFusionResult CastScriptedSpell(
+            BattleState battleState,
+            PlayerId casterId,
+            string cardId,
+            IReadOnlyList<TileCoord> targetCoords)
+        {
+            if (string.IsNullOrWhiteSpace(cardId))
+            {
+                throw new ArgumentException("Spell card id is required.", nameof(cardId));
+            }
+
+            var definition = GetRequiredDefinition<ScriptedSpellCardDefinition>(cardId);
+            ValidateSpellCastPhase(battleState, casterId);
+            if (!string.Equals(definition.EffectId, RobotFusionRules.EffectId, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Scripted spell effect '{definition.EffectId}' does not accept ordered Robot targets.");
+            }
+
+            var pending = battleState.PendingRobotFusion;
+            if (pending == null ||
+                pending.OwnerId != casterId ||
+                !string.Equals(pending.CardId, cardId, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Robot Fusion must enter selection mode before it can resolve.");
+            }
+
+            var result = RobotFusionRules.Resolve(battleState, casterId, targetCoords);
+            battleState.CompleteRobotFusion(casterId, cardId);
+            return result;
         }
 
         private static void ValidateSpellCastPhase(BattleState battleState, PlayerId casterId)
@@ -141,7 +213,9 @@ namespace Project333.Runtime.Application.Services
             PlayerId targetOwnerId,
             TileCoord targetCoord,
             int damage,
-            ResourceSet cost)
+            DamageType damageType,
+            ResourceSet cost,
+            string handCardRuntimeId)
         {
             if (string.IsNullOrWhiteSpace(cardId))
             {
@@ -152,15 +226,32 @@ namespace Project333.Runtime.Application.Services
 
             var caster = battleState.GetPlayer(casterId);
             var targetBoard = battleState.GetBoard(targetOwnerId);
-            if (targetBoard.GetOccupant(targetCoord) == null)
+            var declaredTarget = targetBoard.GetOccupant(targetCoord);
+            if (declaredTarget == null)
             {
                 throw new InvalidOperationException("Damage spell target tile is empty.");
             }
 
-            ConsumeSpellCard(caster, cardId, cost);
+            EnsureSingleTargetSpellCanTarget(casterId, targetOwnerId, declaredTarget);
+
+            var resolvedDamage = SpellPowerRules.ApplyCurrent(
+                battleState,
+                casterId,
+                damage,
+                damageType);
+
+            ConsumeSpellCard(caster, cardId, cost, handCardRuntimeId);
 
             var affectedTargets = new HashSet<OccupantState>();
-            ApplyEffectDamageToDeclaredTarget(battleState, targetBoard, targetCoord, damage, affectedTargets);
+            ApplyEffectDamageToDeclaredTarget(
+                battleState,
+                targetBoard,
+                targetCoord,
+                resolvedDamage,
+                damageType,
+                casterId,
+                cardId,
+                affectedTargets);
 
             ResolveSpellDefeat(battleState, affectedTargets);
             RemoveDefeatedOccupants(targetBoard, affectedTargets);
@@ -174,7 +265,8 @@ namespace Project333.Runtime.Application.Services
             ResourceSet turnStartResourceGain,
             string endConditionText,
             ResourceSet cost,
-            int ownerTurnStartsRemaining)
+            int ownerTurnStartsRemaining,
+            string handCardRuntimeId)
         {
             if (string.IsNullOrWhiteSpace(cardId))
             {
@@ -204,7 +296,7 @@ namespace Project333.Runtime.Application.Services
             ValidateSpellCastPhase(battleState, casterId);
 
             var caster = battleState.GetPlayer(casterId);
-            ConsumeSpellCard(caster, cardId, cost);
+            ConsumeSpellCard(caster, cardId, cost, handCardRuntimeId);
 
             battleState.PersistentEffects.Add(new PersistentEffectState(
                 sourceCardId: cardId,
@@ -222,7 +314,8 @@ namespace Project333.Runtime.Application.Services
             string cardId,
             bool hasTarget,
             PlayerId targetOwnerId,
-            TileCoord targetCoord)
+            TileCoord targetCoord,
+            string handCardRuntimeId)
         {
             if (string.IsNullOrWhiteSpace(cardId))
             {
@@ -240,7 +333,7 @@ namespace Project333.Runtime.Application.Services
                         throw new InvalidOperationException("This scripted spell does not use a board target.");
                     }
 
-                    CastDaehwandan(battleState, casterId, cardId, definition.Cost);
+                    CastDaehwandan(battleState, casterId, cardId, definition.Cost, handCardRuntimeId);
                     return;
 
                 case CheonraJimangEffectId:
@@ -249,7 +342,53 @@ namespace Project333.Runtime.Application.Services
                         throw new InvalidOperationException("This scripted spell requires a target.");
                     }
 
-                    CastCheonraJimang(battleState, casterId, cardId, definition.Cost, targetOwnerId, targetCoord);
+                    CastCheonraJimang(
+                        battleState,
+                        casterId,
+                        cardId,
+                        definition.Cost,
+                        targetOwnerId,
+                        targetCoord,
+                        handCardRuntimeId);
+                    return;
+
+                case FirewallEffectId:
+                    if (!hasTarget)
+                    {
+                        throw new InvalidOperationException("Firewall requires an enemy row target.");
+                    }
+
+                    CastFirewall(
+                        battleState,
+                        casterId,
+                        cardId,
+                        definition,
+                        targetOwnerId,
+                        targetCoord,
+                        handCardRuntimeId);
+                    return;
+
+                case TimedBombRules.EffectId:
+                    if (hasTarget)
+                    {
+                        throw new InvalidOperationException("Timed Bomb does not use a board target.");
+                    }
+
+                    CastTimedBomb(
+                        battleState,
+                        casterId,
+                        cardId,
+                        definition,
+                        handCardRuntimeId);
+                    return;
+
+                case RobotFusionRules.EffectId:
+                    if (hasTarget)
+                    {
+                        throw new InvalidOperationException("Robot Fusion uses ordered friendly Robot targets.");
+                    }
+
+                    BeginRobotFusion(battleState, casterId, cardId, definition.Cost, handCardRuntimeId);
                     return;
 
                 default:
@@ -258,14 +397,37 @@ namespace Project333.Runtime.Application.Services
             }
         }
 
+        private static void BeginRobotFusion(
+            BattleState battleState,
+            PlayerId casterId,
+            string cardId,
+            ResourceSet cost,
+            string handCardRuntimeId)
+        {
+            if (battleState.PendingRobotFusion != null)
+            {
+                throw new InvalidOperationException("A Robot Fusion selection is already pending.");
+            }
+
+            if (!RobotFusionRules.CanBegin(battleState, casterId))
+            {
+                throw new InvalidOperationException(
+                    "Robot Fusion requires at least two living Robot units on the caster's field.");
+            }
+
+            ConsumeSpellCard(battleState.GetPlayer(casterId), cardId, cost, handCardRuntimeId);
+            battleState.BeginRobotFusion(casterId, cardId);
+        }
+
         private static void CastDaehwandan(
             BattleState battleState,
             PlayerId casterId,
             string cardId,
-            ResourceSet cost)
+            ResourceSet cost,
+            string handCardRuntimeId)
         {
             var caster = battleState.GetPlayer(casterId);
-            ConsumeSpellCard(caster, cardId, cost);
+            ConsumeSpellCard(caster, cardId, cost, handCardRuntimeId);
             caster.Master.IncreaseBaseAttack(DaehwandanMasterAttackBonus);
 
             battleState.PersistentEffects.Add(new PersistentEffectState(
@@ -284,7 +446,8 @@ namespace Project333.Runtime.Application.Services
             string cardId,
             ResourceSet cost,
             PlayerId targetOwnerId,
-            TileCoord targetCoord)
+            TileCoord targetCoord,
+            string handCardRuntimeId)
         {
             var targetBoard = battleState.GetBoard(targetOwnerId);
             var target = targetBoard.GetOccupant(targetCoord);
@@ -298,8 +461,10 @@ namespace Project333.Runtime.Application.Services
                 throw new InvalidOperationException("Cheonra Jimang can only target non-Master units.");
             }
 
+            EnsureSingleTargetSpellCanTarget(casterId, targetOwnerId, target);
+
             var caster = battleState.GetPlayer(casterId);
-            ConsumeSpellCard(caster, cardId, cost);
+            ConsumeSpellCard(caster, cardId, cost, handCardRuntimeId);
 
             battleState.PersistentEffects.Add(new PersistentEffectState(
                 sourceCardId: cardId,
@@ -312,33 +477,156 @@ namespace Project333.Runtime.Application.Services
                 targetRuntimeId: target.RuntimeId));
         }
 
+        private void CastFirewall(
+            BattleState battleState,
+            PlayerId casterId,
+            string cardId,
+            ScriptedSpellCardDefinition definition,
+            PlayerId targetOwnerId,
+            TileCoord targetCoord,
+            string handCardRuntimeId)
+        {
+            var opponentId = battleState.GetOpponent(casterId).Id;
+            if (targetOwnerId != casterId && targetOwnerId != opponentId)
+            {
+                throw new InvalidOperationException("Firewall can only target a row on either player's board.");
+            }
+
+            var targetBoard = battleState.GetBoard(targetOwnerId);
+            if (!targetBoard.IsInside(targetCoord))
+            {
+                throw new InvalidOperationException("Firewall target row is outside the opponent board.");
+            }
+
+            var caster = battleState.GetPlayer(casterId);
+            ConsumeSpellCard(caster, cardId, definition.Cost, handCardRuntimeId);
+
+            var upgradeLevel = _cardUpgradeLevelProvider.GetUpgradeLevel(casterId, definition.CardId);
+            var effectDamage = CardLevelSpellRules.ApplyDamageBonus(definition.Damage, upgradeLevel);
+            var capturedSpellPower = SpellPowerRules.Capture(
+                battleState,
+                casterId,
+                definition.DamageType);
+            battleState.PersistentEffects.Add(new PersistentEffectState(
+                sourceCardId: cardId,
+                ownerId: casterId,
+                effectId: FirewallEffectId,
+                appliedTurn: battleState.TurnNumber,
+                endConditionText: "Triggers at the next two turn starts, then expires.",
+                turnStartResourceGain: new ResourceSet(),
+                targetRow: targetCoord.Row,
+                remainingTriggers: definition.TriggerCount,
+                effectDamage: effectDamage,
+                effectDamageType: definition.DamageType,
+                targetsOwnerBoard: targetOwnerId == casterId,
+                capturedSpellPower: capturedSpellPower));
+        }
+
+        private void CastTimedBomb(
+            BattleState battleState,
+            PlayerId casterId,
+            string cardId,
+            ScriptedSpellCardDefinition definition,
+            string handCardRuntimeId)
+        {
+            var caster = battleState.GetPlayer(casterId);
+            ConsumeSpellCard(caster, cardId, definition.Cost, handCardRuntimeId);
+
+            var upgradeLevel = _cardUpgradeLevelProvider.GetUpgradeLevel(casterId, definition.CardId);
+            var effectDamage = CardLevelSpellRules.ApplyDamageBonus(definition.Damage, upgradeLevel);
+            battleState.PersistentEffects.Add(new PersistentEffectState(
+                sourceCardId: cardId,
+                ownerId: casterId,
+                effectId: TimedBombRules.EffectId,
+                appliedTurn: battleState.TurnNumber,
+                endConditionText: "Detonates at the third turn start after it is cast.",
+                turnStartResourceGain: new ResourceSet(),
+                remainingTriggers: definition.TriggerCount,
+                effectDamage: effectDamage,
+                effectDamageType: definition.DamageType));
+        }
+
+        private static void EnsureSingleTargetSpellCanTarget(
+            PlayerId casterId,
+            PlayerId targetOwnerId,
+            OccupantState target)
+        {
+            if (target.IsSealbound)
+            {
+                throw new InvalidOperationException("Sealbound occupants cannot be targeted by spells.");
+            }
+
+            if (targetOwnerId != casterId && target.IsHiding)
+            {
+                throw new InvalidOperationException("Hiding units cannot be targeted by enemy single-target spells.");
+            }
+        }
+
         private static void ApplyEffectDamageToDeclaredTarget(
             BattleState battleState,
             BoardState targetBoard,
             TileCoord targetCoord,
             int damage,
+            DamageType damageType,
+            PlayerId casterId,
+            string sourceCardId,
             ISet<OccupantState> affectedTargets)
         {
             var guardInfo = GuardService.Resolve(targetBoard, targetCoord);
             if (guardInfo.IsProtected)
             {
                 affectedTargets.Add(guardInfo.Guard);
-                var absorbedDamage = DamageResolutionRules.ApplyEffectDamage(guardInfo.Guard, damage);
-                BattleValuePopupRecorder.RecordDamage(battleState, guardInfo.Guard, absorbedDamage);
-                var remainingDamage = Math.Max(0, damage - absorbedDamage);
+                var guardHpBefore = Math.Max(0, guardInfo.Guard.CurrentHp);
+                var resolvedGuardDamage = DamageResolutionRules.ResolveIncomingDamage(
+                    guardInfo.Guard,
+                    damage,
+                    damageType);
+                var absorbedDamage = DamageResolutionRules.ApplyEffectDamage(
+                    guardInfo.Guard,
+                    damage,
+                    damageType);
+                BattleValuePopupRecorder.RecordDamage(
+                    battleState,
+                    guardInfo.Guard,
+                    absorbedDamage,
+                    BattleValueChangeCause.Spell,
+                    damageType,
+                    casterId,
+                    sourceCardId: sourceCardId);
+                var remainingDamage = Math.Max(0, resolvedGuardDamage - guardHpBefore);
                 if (remainingDamage > 0)
                 {
                     affectedTargets.Add(guardInfo.OriginalTarget);
-                    var overflowDamage = DamageResolutionRules.ApplyEffectDamage(guardInfo.OriginalTarget, remainingDamage);
-                    BattleValuePopupRecorder.RecordDamage(battleState, guardInfo.OriginalTarget, overflowDamage);
+                    var overflowDamage = DamageResolutionRules.ApplyEffectDamage(
+                        guardInfo.OriginalTarget,
+                        remainingDamage,
+                        damageType);
+                    BattleValuePopupRecorder.RecordDamage(
+                        battleState,
+                        guardInfo.OriginalTarget,
+                        overflowDamage,
+                        BattleValueChangeCause.Spell,
+                        damageType,
+                        casterId,
+                        sourceCardId: sourceCardId);
                 }
 
                 return;
             }
 
             affectedTargets.Add(guardInfo.OriginalTarget);
-            var actualDamage = DamageResolutionRules.ApplyEffectDamage(guardInfo.OriginalTarget, damage);
-            BattleValuePopupRecorder.RecordDamage(battleState, guardInfo.OriginalTarget, actualDamage);
+            var actualDamage = DamageResolutionRules.ApplyEffectDamage(
+                guardInfo.OriginalTarget,
+                damage,
+                damageType);
+            BattleValuePopupRecorder.RecordDamage(
+                battleState,
+                guardInfo.OriginalTarget,
+                actualDamage,
+                BattleValueChangeCause.Spell,
+                damageType,
+                casterId,
+                sourceCardId: sourceCardId);
         }
 
         private static void RemoveDefeatedOccupants(BoardState board, IEnumerable<OccupantState> occupants)
@@ -357,9 +645,13 @@ namespace Project333.Runtime.Application.Services
             }
         }
 
-        private static void ConsumeSpellCard(PlayerState caster, string cardId, ResourceSet cost)
+        private static void ConsumeSpellCard(
+            PlayerState caster,
+            string cardId,
+            ResourceSet cost,
+            string handCardRuntimeId)
         {
-            if (!caster.Hand.Contains(cardId))
+            if (!caster.Hand.Contains(cardId, handCardRuntimeId))
             {
                 throw new InvalidOperationException("The spell card is not in the caster's hand.");
             }
@@ -370,7 +662,10 @@ namespace Project333.Runtime.Application.Services
             }
 
             caster.Resources.Spend(cost);
-            caster.Hand.Remove(cardId);
+            if (!caster.Hand.Remove(cardId, handCardRuntimeId))
+            {
+                throw new InvalidOperationException("The selected spell card could not be consumed.");
+            }
             caster.Discard.Add(cardId);
         }
 

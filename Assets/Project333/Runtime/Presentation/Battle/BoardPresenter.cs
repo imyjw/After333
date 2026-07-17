@@ -12,6 +12,26 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private TileView[] _playerTileViews = Array.Empty<TileView>();
         [SerializeField] private TileView[] _aiTileViews = Array.Empty<TileView>();
 
+        [Header("Responsive Board Layout")]
+        [SerializeField] private bool _useResponsiveLayout = true;
+        [SerializeField] private bool _respectSafeArea = true;
+        [Range(0.1f, 1f)]
+        [SerializeField] private float _safeAreaHeightUsage = 0.9f;
+        [Min(0f)]
+        [SerializeField] private float _outerHorizontalPadding = 24f;
+        [Min(0f)]
+        [SerializeField] private float _centerGap = 48f;
+        [Min(0f)]
+        [SerializeField] private float _boardOutwardOffset = 170f;
+        [SerializeField] private Vector2 _tileGap = new Vector2(8f, 8f);
+        [Min(0.1f)]
+        [SerializeField] private float _tileAspectRatio = 1f;
+
+        private int _lastScreenWidth = -1;
+        private int _lastScreenHeight = -1;
+        private Rect _lastSafeArea;
+        private bool _hasAppliedResponsiveLayout;
+
         public TileView[] PlayerTileViews => _playerTileViews;
 
         public TileView[] AITileViews => _aiTileViews;
@@ -19,6 +39,28 @@ namespace Project333.Runtime.Presentation.Battle
         private void Awake()
         {
             RebuildTileRegistry();
+            ApplyResponsiveLayout(true);
+        }
+
+        private void LateUpdate()
+        {
+            ApplyResponsiveLayout(false);
+        }
+
+        private void OnValidate()
+        {
+            _safeAreaHeightUsage = Mathf.Clamp(_safeAreaHeightUsage, 0.1f, 1f);
+            _outerHorizontalPadding = Mathf.Max(0f, _outerHorizontalPadding);
+            _centerGap = Mathf.Max(0f, _centerGap);
+            _boardOutwardOffset = Mathf.Max(0f, _boardOutwardOffset);
+            _tileGap = new Vector2(Mathf.Max(0f, _tileGap.x), Mathf.Max(0f, _tileGap.y));
+            _tileAspectRatio = Mathf.Max(0.1f, _tileAspectRatio);
+
+            if (!UnityEngine.Application.isPlaying)
+            {
+                RebuildTileRegistry();
+                ApplyResponsiveLayout(true);
+            }
         }
 
         public void RebuildTileRegistry()
@@ -28,6 +70,13 @@ namespace Project333.Runtime.Presentation.Battle
 
             ConfigureTileViews(_playerTileViews, PlayerId.Player);
             ConfigureTileViews(_aiTileViews, PlayerId.AI);
+        }
+
+        [ContextMenu("Apply Responsive Board Layout")]
+        public void ApplyResponsiveLayoutNow()
+        {
+            RebuildTileRegistry();
+            ApplyResponsiveLayout(true);
         }
 
         public void Present(BattleState battleState)
@@ -53,6 +102,71 @@ namespace Project333.Runtime.Presentation.Battle
             if (_aiTileViews.Length == 0 && _aiBoardRoot != null)
             {
                 RebuildTileRegistry();
+            }
+        }
+
+        private void ApplyResponsiveLayout(bool force)
+        {
+            if (!_useResponsiveLayout || Screen.width <= 0 || Screen.height <= 0)
+            {
+                return;
+            }
+
+            var safeArea = _respectSafeArea
+                ? Screen.safeArea
+                : new Rect(0f, 0f, Screen.width, Screen.height);
+            if (!force &&
+                _hasAppliedResponsiveLayout &&
+                _lastScreenWidth == Screen.width &&
+                _lastScreenHeight == Screen.height &&
+                _lastSafeArea == safeArea)
+            {
+                return;
+            }
+
+            EnsureTileRegistry();
+            var layout = BoardResponsiveLayoutCalculator.Calculate(
+                Screen.width,
+                Screen.height,
+                safeArea,
+                _safeAreaHeightUsage,
+                _outerHorizontalPadding,
+                _centerGap,
+                _tileGap,
+                _tileAspectRatio,
+                _boardOutwardOffset);
+
+            ApplyResponsiveLayout(_playerTileViews, PlayerId.Player, layout);
+            ApplyResponsiveLayout(_aiTileViews, PlayerId.AI, layout);
+
+            _lastScreenWidth = Screen.width;
+            _lastScreenHeight = Screen.height;
+            _lastSafeArea = safeArea;
+            _hasAppliedResponsiveLayout = true;
+        }
+
+        private static void ApplyResponsiveLayout(
+            TileView[] tileViews,
+            PlayerId ownerId,
+            BoardResponsiveLayout layout)
+        {
+            if (tileViews == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < tileViews.Length; i++)
+            {
+                var tileView = tileViews[i];
+                if (tileView == null)
+                {
+                    continue;
+                }
+
+                var coord = tileView.Coord;
+                var tileCenter = layout.GetTileCenter(ownerId, coord);
+                var tileTextView = tileView.GetComponent<TileTextView>();
+                tileTextView?.ApplyResponsiveTileLayout(tileCenter, layout.TileSize);
             }
         }
 

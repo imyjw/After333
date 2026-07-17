@@ -15,7 +15,13 @@ namespace Project333.Runtime.Domain.Cards
             int attack,
             int maxHp,
             ResourceSet turnStartResourceGain = null,
-            int hitsPerAttack = 1)
+            int hitsPerAttack = 1,
+            DamageType damageType = DamageType.Physical,
+            int physicalDefense = 0,
+            int magicDefense = 0,
+            int sciencePowerUpkeep = 0,
+            bool hasFlying = false,
+            int spellPower = 0)
             : base(
                 runtimeId,
                 cardId,
@@ -28,11 +34,18 @@ namespace Project333.Runtime.Domain.Cards
                 false,
                 turnStartResourceGain ?? new ResourceSet(),
                 canAttack ? 1 : 0,
-                hitsPerAttack)
+                hitsPerAttack,
+                damageType: damageType,
+                physicalDefense: physicalDefense,
+                magicDefense: magicDefense,
+                hasFlying: hasFlying,
+                spellPower: spellPower)
         {
             CanAttackAsBuilding = canAttack;
+            SciencePowerUpkeep = sciencePowerUpkeep;
         }
 
         public bool CanAttackAsBuilding { get; }
+        public int SciencePowerUpkeep { get; }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Security.Cryptography;
 using Project333.Runtime.Domain.Battle;
 
 namespace Project333.Runtime.Application.Services
@@ -8,7 +9,7 @@ namespace Project333.Runtime.Application.Services
         private readonly Random _random;
 
         public SystemDeckShuffler()
-            : this(new Random())
+            : this(CreateRandom())
         {
         }
 
@@ -19,7 +20,23 @@ namespace Project333.Runtime.Application.Services
 
         public void Shuffle(DeckState deckState)
         {
+            if (deckState == null)
+            {
+                throw new ArgumentNullException(nameof(deckState));
+            }
+
             deckState.Shuffle(_random);
+        }
+
+        private static Random CreateRandom()
+        {
+            var seedBytes = new byte[sizeof(int)];
+            using (var randomNumberGenerator = RandomNumberGenerator.Create())
+            {
+                randomNumberGenerator.GetBytes(seedBytes);
+            }
+
+            return new Random(BitConverter.ToInt32(seedBytes, 0));
         }
     }
 }

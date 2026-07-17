@@ -47,6 +47,11 @@ namespace Project333.Runtime.Application.Services
             return CurrentBattleState;
         }
 
+        public void RestoreBattleState(BattleState battleState)
+        {
+            CurrentBattleState = battleState ?? throw new ArgumentNullException(nameof(battleState));
+        }
+
         public void ApplyMulligan(
             PlayerId playerId,
             IEnumerable<string> selectedCardIds,

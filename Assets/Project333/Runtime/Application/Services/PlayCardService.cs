@@ -10,52 +10,80 @@ namespace Project333.Runtime.Application.Services
     {
         private readonly ICardDefinitionProvider _cardDefinitionProvider;
         private readonly SummonService _summonService;
+        private readonly ICardUpgradeLevelProvider _cardUpgradeLevelProvider;
+
+        internal ICardDefinitionProvider CardDefinitionProvider => _cardDefinitionProvider;
 
         public PlayCardService(ICardDefinitionProvider cardDefinitionProvider)
-            : this(cardDefinitionProvider, new SummonService())
+            : this(cardDefinitionProvider, new SummonService(), ZeroCardUpgradeLevelProvider.Instance)
         {
         }
 
         public PlayCardService(ICardDefinitionProvider cardDefinitionProvider, SummonService summonService)
+            : this(cardDefinitionProvider, summonService, ZeroCardUpgradeLevelProvider.Instance)
+        {
+        }
+
+        public PlayCardService(
+            ICardDefinitionProvider cardDefinitionProvider,
+            SummonService summonService,
+            ICardUpgradeLevelProvider cardUpgradeLevelProvider)
         {
             _cardDefinitionProvider = cardDefinitionProvider ?? throw new ArgumentNullException(nameof(cardDefinitionProvider));
             _summonService = summonService ?? throw new ArgumentNullException(nameof(summonService));
+            _cardUpgradeLevelProvider = cardUpgradeLevelProvider ?? ZeroCardUpgradeLevelProvider.Instance;
         }
 
-        public UnitState PlayUnitCard(BattleState battleState, PlayerId playerId, string cardId, TileCoord targetCoord)
+        public UnitState PlayUnitCard(
+            BattleState battleState,
+            PlayerId playerId,
+            string cardId,
+            TileCoord targetCoord,
+            string handCardRuntimeId = null)
         {
-            ValidateCommonPlayRequirements(battleState, playerId, cardId, targetCoord);
+            ValidateCommonPlayRequirements(battleState, playerId, cardId, targetCoord, handCardRuntimeId);
 
             var definition = _cardDefinitionProvider.GetRequired(cardId) as UnitCardDefinition
                 ?? throw new InvalidOperationException("The specified card is not a unit card.");
 
-            return PlayUnitCardInternal(battleState, playerId, definition, targetCoord);
+            return PlayUnitCardInternal(battleState, playerId, definition, targetCoord, handCardRuntimeId);
         }
 
-        public BuildingState PlayBuildingCard(BattleState battleState, PlayerId playerId, string cardId, TileCoord targetCoord)
+        public BuildingState PlayBuildingCard(
+            BattleState battleState,
+            PlayerId playerId,
+            string cardId,
+            TileCoord targetCoord,
+            string handCardRuntimeId = null)
         {
-            ValidateCommonPlayRequirements(battleState, playerId, cardId, targetCoord);
+            ValidateCommonPlayRequirements(battleState, playerId, cardId, targetCoord, handCardRuntimeId);
 
             var definition = _cardDefinitionProvider.GetRequired(cardId) as BuildingCardDefinition
                 ?? throw new InvalidOperationException("The specified card is not a building card.");
 
-            return PlayBuildingCardInternal(battleState, playerId, definition, targetCoord);
+            return PlayBuildingCardInternal(battleState, playerId, definition, targetCoord, handCardRuntimeId);
         }
 
-        private UnitState PlayUnitCardInternal(BattleState battleState, PlayerId playerId, UnitCardDefinition definition, TileCoord targetCoord)
+        private UnitState PlayUnitCardInternal(
+            BattleState battleState,
+            PlayerId playerId,
+            UnitCardDefinition definition,
+            TileCoord targetCoord,
+            string handCardRuntimeId)
         {
             var playerState = battleState.GetPlayer(playerId);
             EnsureCardCanBeAfforded(playerState, definition);
             EnsureSummonTargetIsValid(battleState, playerId, targetCoord);
 
+            var upgradeLevel = _cardUpgradeLevelProvider.GetUpgradeLevel(playerId, definition.CardId);
             var unit = new UnitState(
                 runtimeId: CreateRuntimeId(playerId, definition.CardId),
                 cardId: definition.CardId,
                 ownerId: playerId,
                 position: targetCoord,
                 attackType: definition.AttackType,
-                attack: definition.Attack,
-                maxHp: definition.Health,
+                attack: CardLevelStatRules.ApplyAttackBonus(definition.CardId, definition.Attack, upgradeLevel),
+                maxHp: CardLevelStatRules.ApplyHpBonus(definition.CardId, definition.Health, upgradeLevel),
                 canMove: definition.CanMove,
                 isScience: definition.IsScience,
                 sciencePowerUpkeep: definition.SciencePowerUpkeep,
@@ -64,51 +92,103 @@ namespace Project333.Runtime.Application.Services
                 hitsPerAttack: definition.HitsPerAttack,
                 hasBerserker: definition.HasBerserker,
                 hasEndure: definition.HasEndure,
-                hasGuard: definition.HasGuard);
+                hasGuard: definition.HasGuard,
+                hasLifeSteal: definition.HasLifeSteal,
+                damageType: definition.DamageType,
+                physicalDefense: definition.PhysicalDefense,
+                magicDefense: definition.MagicDefense,
+                hasRobot: definition.HasRobot,
+                hasRush: definition.HasRush,
+                hasHiding: definition.HasHiding,
+                hasFlying: definition.HasFlying,
+                spellPower: definition.SpellPower);
 
             playerState.Resources.Spend(definition.Cost);
-            playerState.Hand.Remove(definition.CardId);
+            if (!playerState.Hand.Remove(definition.CardId, handCardRuntimeId))
+            {
+                throw new InvalidOperationException("The selected hand card could not be consumed.");
+            }
 
             _summonService.Summon(battleState, playerId, unit, targetCoord);
 
-            if (definition.CanAttackOnSummon)
+            if (definition.SealboundOwnerTurnStarts > 0)
+            {
+                unit.EnterSealbound(definition.SealboundOwnerTurnStarts);
+            }
+            else if (definition.HasRush)
             {
                 unit.HasSummoningSickness = false;
             }
 
+            unit.AddInvincibleEffect(
+                definition.InvincibleDuration,
+                definition.InvincibleOwnerTurns,
+                battleState.TurnNumber,
+                battleState.ActivePlayerId);
+
             return unit;
         }
 
-        private BuildingState PlayBuildingCardInternal(BattleState battleState, PlayerId playerId, BuildingCardDefinition definition, TileCoord targetCoord)
+        private BuildingState PlayBuildingCardInternal(
+            BattleState battleState,
+            PlayerId playerId,
+            BuildingCardDefinition definition,
+            TileCoord targetCoord,
+            string handCardRuntimeId)
         {
             var playerState = battleState.GetPlayer(playerId);
             EnsureCardCanBeAfforded(playerState, definition);
             EnsureSummonTargetIsValid(battleState, playerId, targetCoord);
 
+            var upgradeLevel = _cardUpgradeLevelProvider.GetUpgradeLevel(playerId, definition.CardId);
             var building = new BuildingState(
                 runtimeId: CreateRuntimeId(playerId, definition.CardId),
                 cardId: definition.CardId,
                 ownerId: playerId,
                 position: targetCoord,
                 canAttack: definition.CanAttack,
-                attack: definition.Attack,
-                maxHp: definition.Health,
-                turnStartResourceGain: definition.TurnStartResourceGain.Clone());
+                attack: CardLevelStatRules.ApplyAttackBonus(definition.CardId, definition.Attack, upgradeLevel),
+                maxHp: CardLevelStatRules.ApplyHpBonus(definition.CardId, definition.Health, upgradeLevel),
+                turnStartResourceGain: definition.TurnStartResourceGain.Clone(),
+                damageType: definition.DamageType,
+                physicalDefense: definition.PhysicalDefense,
+                magicDefense: definition.MagicDefense,
+                sciencePowerUpkeep: definition.SciencePowerUpkeep,
+                hasFlying: definition.HasFlying,
+                spellPower: definition.SpellPower);
 
             playerState.Resources.Spend(definition.Cost);
-            playerState.Hand.Remove(definition.CardId);
+            if (!playerState.Hand.Remove(definition.CardId, handCardRuntimeId))
+            {
+                throw new InvalidOperationException("The selected hand card could not be consumed.");
+            }
 
             _summonService.Summon(battleState, playerId, building, targetCoord);
 
-            if (definition.CanAttackOnSummon)
+            if (definition.SealboundOwnerTurnStarts > 0)
+            {
+                building.EnterSealbound(definition.SealboundOwnerTurnStarts);
+            }
+            else if (definition.CanAttackOnSummon)
             {
                 building.HasSummoningSickness = false;
             }
 
+            building.AddInvincibleEffect(
+                definition.InvincibleDuration,
+                definition.InvincibleOwnerTurns,
+                battleState.TurnNumber,
+                battleState.ActivePlayerId);
+
             return building;
         }
 
-        private static void ValidateCommonPlayRequirements(BattleState battleState, PlayerId playerId, string cardId, TileCoord targetCoord)
+        private static void ValidateCommonPlayRequirements(
+            BattleState battleState,
+            PlayerId playerId,
+            string cardId,
+            TileCoord targetCoord,
+            string handCardRuntimeId)
         {
             if (battleState == null)
             {
@@ -131,7 +211,7 @@ namespace Project333.Runtime.Application.Services
             }
 
             var playerState = battleState.GetPlayer(playerId);
-            if (!playerState.Hand.Contains(cardId))
+            if (!playerState.Hand.Contains(cardId, handCardRuntimeId))
             {
                 throw new InvalidOperationException("The specified card is not in the player's hand.");
             }

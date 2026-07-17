@@ -33,14 +33,36 @@ namespace Project333.Tests.EditMode
                 sciencePowerUpkeep: 0);
 
             occupant.CurrentHp = 4;
-            occupant.IsDisabled = true;
+            occupant.ApplyErasure();
 
             var summary = BattleUiFormatter.FormatTileOccupant(occupant);
 
             Assert.That(summary, Does.Contain("unit-1"));
             Assert.That(summary, Does.Contain("Unit / Melee"));
             Assert.That(summary, Does.Contain("ATK 3 / HP 4/6"));
-            Assert.That(summary, Does.Contain("Disabled"));
+            Assert.That(summary, Does.Contain("Erasure"));
+        }
+
+        [Test]
+        public void FormatTileOccupant_WhenOccupantIsDrained_ShowsDrainedStatus()
+        {
+            var occupant = new UnitState(
+                runtimeId: "unit-drained",
+                cardId: "unit-drained",
+                ownerId: PlayerId.Player,
+                position: new TileCoord(0, 0),
+                attackType: AttackType.Melee,
+                attack: 3,
+                maxHp: 6,
+                canMove: true,
+                isScience: false,
+                sciencePowerUpkeep: 1);
+
+            occupant.IsDrained = true;
+
+            var summary = BattleUiFormatter.FormatTileOccupant(occupant);
+
+            Assert.That(summary, Does.Contain("Drained"));
         }
 
         [Test]

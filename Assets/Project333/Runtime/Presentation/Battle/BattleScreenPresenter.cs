@@ -5,7 +5,12 @@ using Project333.Runtime.Presentation.Hand;
 using Project333.Runtime.Presentation.HUD;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+#if UNITY_EDITOR
+using UnityEditor;
+using UnityEditor.SceneManagement;
+#endif
 
 namespace Project333.Runtime.Presentation.Battle
 {
@@ -28,7 +33,12 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private BattleBootstrapper _battleBootstrapper;
         [SerializeField] private BoardPresenter _boardPresenter;
         [SerializeField] private HandPresenter _handPresenter;
+        [SerializeField] private OpponentHandPresenter _opponentHandPresenter;
+        [SerializeField] private OpponentDeckPresenter _opponentDeckPresenter;
+        [SerializeField] private PlayerDeckPresenter _playerDeckPresenter;
         [SerializeField] private ResourceBarPresenter _resourceBarPresenter;
+        [SerializeField] private BattleMulliganOverlayPresenter _mulliganOverlayPresenter;
+        [SerializeField] private Button _endTurnButton;
         [SerializeField] private Image _backgroundImage;
         [SerializeField] private Sprite _backgroundSprite;
         [SerializeField] private string _backgroundResourcePath = DefaultBackgroundResourcePath;
@@ -39,14 +49,23 @@ namespace Project333.Runtime.Presentation.Battle
 
         private readonly List<ManagedBattleUiObject> _managedBattleUiObjects = new List<ManagedBattleUiObject>();
         private bool _hasBuiltBattleUiCache;
-        private Canvas _runtimeBackgroundCanvas;
+        [SerializeField, HideInInspector] private Canvas _runtimeBackgroundCanvas;
+#if UNITY_EDITOR
+        private bool _hasQueuedEditorUiMaterialization;
+#endif
 
         public string DebugSummary => _debugSummary;
 
         public BoardPresenter BoardPresenter => _boardPresenter;
 
+        public bool IsMulliganPresentationActive =>
+            _mulliganOverlayPresenter != null && _mulliganOverlayPresenter.IsSessionActive;
+
         private void Awake()
         {
+            EnsureOpponentHandPresenter();
+            EnsureOpponentDeckPresenter();
+            EnsurePlayerDeckPresenter();
             AutoAssignBackgroundImage();
             EnsureBackgroundSprite();
             EnsureBackgroundImage();
@@ -55,6 +74,9 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void OnEnable()
         {
+            EnsureOpponentHandPresenter();
+            EnsureOpponentDeckPresenter();
+            EnsurePlayerDeckPresenter();
             AutoAssignBackgroundImage();
             EnsureBackgroundSprite();
             EnsureBackgroundImage();
@@ -63,14 +85,79 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void OnValidate()
         {
+            AutoAssignOpponentHandPresenter();
+            AutoAssignOpponentDeckPresenter();
+            AutoAssignPlayerDeckPresenter();
             AutoAssignBackgroundImage();
             EnsureBackgroundSprite();
             ApplyBackgroundVisual();
+#if UNITY_EDITOR
+            QueuePersistentBattleUiMaterialization();
+#endif
         }
+
+#if UNITY_EDITOR
+        private void QueuePersistentBattleUiMaterialization()
+        {
+            if (_hasQueuedEditorUiMaterialization || UnityEngine.Application.isPlaying)
+            {
+                return;
+            }
+
+            _hasQueuedEditorUiMaterialization = true;
+            EditorApplication.delayCall += MaterializePersistentBattleUiForEditor;
+        }
+
+        [ContextMenu("Materialize Missing Persistent Battle UI")]
+        public void MaterializePersistentBattleUiForEditor()
+        {
+            _hasQueuedEditorUiMaterialization = false;
+            if (this == null || UnityEngine.Application.isPlaying)
+            {
+                return;
+            }
+
+            EnsureOpponentHandPresenter(allowCreationInEditMode: true);
+            _opponentHandPresenter?.EnsureEditableCardBackSlots();
+            EnsureOpponentDeckPresenter(allowCreationInEditMode: true);
+            _opponentDeckPresenter?.EnsureEditableDeckUi();
+            EnsurePlayerDeckPresenter(allowCreationInEditMode: true);
+            _playerDeckPresenter?.EnsureEditableDeckUi();
+            AutoAssignBackgroundImage();
+            EnsureBackgroundSprite();
+            if (_backgroundImage == null)
+            {
+                CreateRuntimeBackgroundImage();
+            }
+
+            ApplyBackgroundVisual();
+            EditorUtility.SetDirty(this);
+            if (_opponentHandPresenter != null)
+            {
+                EditorUtility.SetDirty(_opponentHandPresenter);
+            }
+
+            if (_opponentDeckPresenter != null)
+            {
+                EditorUtility.SetDirty(_opponentDeckPresenter);
+            }
+
+            if (_playerDeckPresenter != null)
+            {
+                EditorUtility.SetDirty(_playerDeckPresenter);
+            }
+
+            if (gameObject.scene.IsValid())
+            {
+                EditorSceneManager.MarkSceneDirty(gameObject.scene);
+            }
+        }
+#endif
 
         public void Bind(BattleBootstrapper battleBootstrapper)
         {
             _battleBootstrapper = battleBootstrapper;
+            _mulliganOverlayPresenter?.Bind(battleBootstrapper);
         }
 
         public void Present(BattleState battleState)
@@ -78,7 +165,12 @@ namespace Project333.Runtime.Presentation.Battle
             _debugSummary = BattleStateSummaryFormatter.Format(battleState);
             _boardPresenter?.Present(battleState);
             _handPresenter?.Present(battleState?.Player.Hand);
+            _opponentHandPresenter?.Present(battleState?.AI.Hand);
+            _opponentDeckPresenter?.Present(battleState?.AI.Deck);
+            _playerDeckPresenter?.Present(battleState?.Player.Deck);
             _resourceBarPresenter?.Present(battleState);
+            PresentMulliganControls(battleState);
+            _mulliganOverlayPresenter?.Present(battleState);
             _onSummaryChanged.Invoke(_debugSummary);
         }
 
@@ -97,14 +189,24 @@ namespace Project333.Runtime.Presentation.Battle
             }
         }
 
-        public void StartBattleFromUi()
-        {
-            _battleBootstrapper?.StartBattle();
-        }
-
         public void PassMulliganFromUi()
         {
+            if (_mulliganOverlayPresenter != null)
+            {
+                _mulliganOverlayPresenter.ConfirmSelectionFromUi();
+                return;
+            }
+
             _battleBootstrapper?.PassPlayerMulligan();
+        }
+
+        private void PresentMulliganControls(BattleState battleState)
+        {
+            var isMulligan = battleState != null && battleState.Phase == PhaseType.Mulligan;
+            if (_endTurnButton != null)
+            {
+                _endTurnButton.gameObject.SetActive(!isMulligan);
+            }
         }
 
         public void ResolveTurnStartFromUi()
@@ -128,6 +230,9 @@ namespace Project333.Runtime.Presentation.Battle
 
             RegisterManagedObject(_boardPresenter == null ? null : _boardPresenter.gameObject);
             RegisterManagedObject(_handPresenter == null ? null : _handPresenter.gameObject);
+            RegisterManagedObject(_opponentHandPresenter == null ? null : _opponentHandPresenter.gameObject);
+            RegisterManagedObject(_opponentDeckPresenter == null ? null : _opponentDeckPresenter.gameObject);
+            RegisterManagedObject(_playerDeckPresenter == null ? null : _playerDeckPresenter.gameObject);
             RegisterManagedObject(_resourceBarPresenter == null ? null : _resourceBarPresenter.gameObject);
 
             RegisterManagedObjects(UnityEngine.Object.FindObjectsByType<BattleSummaryTextView>(FindObjectsSortMode.None));
@@ -222,6 +327,173 @@ namespace Project333.Runtime.Presentation.Battle
             }
         }
 
+        private void EnsureOpponentHandPresenter(bool allowCreationInEditMode = false)
+        {
+            AutoAssignOpponentHandPresenter();
+            if (_opponentHandPresenter != null ||
+                (!UnityEngine.Application.isPlaying && !allowCreationInEditMode))
+            {
+                return;
+            }
+
+            var presenterObject = new GameObject(
+                "OpponentHandCanvas",
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(CanvasScaler),
+                typeof(OpponentHandPresenter));
+            presenterObject.transform.SetParent(transform, false);
+#if UNITY_EDITOR
+            if (!UnityEngine.Application.isPlaying)
+            {
+                Undo.RegisterCreatedObjectUndo(presenterObject, "Create Opponent Hand UI");
+            }
+#endif
+            _opponentHandPresenter = presenterObject.GetComponent<OpponentHandPresenter>();
+        }
+
+        private void AutoAssignOpponentHandPresenter()
+        {
+            if (_opponentHandPresenter != null)
+            {
+                return;
+            }
+
+            _opponentHandPresenter = GetComponentInChildren<OpponentHandPresenter>(includeInactive: true);
+            if (_opponentHandPresenter != null)
+            {
+                return;
+            }
+
+            foreach (var presenter in UnityEngine.Object.FindObjectsByType<OpponentHandPresenter>(
+                         FindObjectsInactive.Include,
+                         FindObjectsSortMode.None))
+            {
+                if (presenter != null && presenter.gameObject.scene == gameObject.scene)
+                {
+                    _opponentHandPresenter = presenter;
+                    return;
+                }
+            }
+        }
+
+        private void EnsurePlayerDeckPresenter(bool allowCreationInEditMode = false)
+        {
+            AutoAssignPlayerDeckPresenter();
+            if (_playerDeckPresenter != null ||
+                (!UnityEngine.Application.isPlaying && !allowCreationInEditMode))
+            {
+                return;
+            }
+
+            var presenterObject = new GameObject(
+                "PlayerDeckCanvas",
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(CanvasScaler),
+                typeof(GraphicRaycaster),
+                typeof(PlayerDeckPresenter));
+            presenterObject.transform.SetParent(transform, false);
+#if UNITY_EDITOR
+            if (!UnityEngine.Application.isPlaying)
+            {
+                Undo.RegisterCreatedObjectUndo(presenterObject, "Create Player Deck UI");
+            }
+#endif
+            _playerDeckPresenter = presenterObject.GetComponent<PlayerDeckPresenter>();
+        }
+
+        private void AutoAssignPlayerDeckPresenter()
+        {
+            if (_playerDeckPresenter != null)
+            {
+                return;
+            }
+
+            if (transform.Find("PlayerDeckCanvas") is Transform playerDeckTransform)
+            {
+                var namedPresenter = playerDeckTransform.GetComponent<PlayerDeckPresenter>();
+                if (namedPresenter != null && !(namedPresenter is OpponentDeckPresenter))
+                {
+                    _playerDeckPresenter = namedPresenter;
+                    return;
+                }
+            }
+
+            foreach (var presenter in UnityEngine.Object.FindObjectsByType<PlayerDeckPresenter>(
+                         FindObjectsInactive.Include,
+                         FindObjectsSortMode.None))
+            {
+                if (presenter != null &&
+                    !(presenter is OpponentDeckPresenter) &&
+                    presenter.gameObject.scene == gameObject.scene)
+                {
+                    _playerDeckPresenter = presenter;
+                    return;
+                }
+            }
+        }
+
+        private void EnsureOpponentDeckPresenter(bool allowCreationInEditMode = false)
+        {
+            AutoAssignOpponentDeckPresenter();
+            if (_opponentDeckPresenter != null ||
+                (!UnityEngine.Application.isPlaying && !allowCreationInEditMode))
+            {
+                return;
+            }
+
+            var presenterObject = new GameObject(
+                "OpponentDeckCanvas",
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(CanvasScaler),
+                typeof(GraphicRaycaster),
+                typeof(OpponentDeckPresenter));
+            presenterObject.transform.SetParent(transform, false);
+#if UNITY_EDITOR
+            if (!UnityEngine.Application.isPlaying)
+            {
+                Undo.RegisterCreatedObjectUndo(presenterObject, "Create Opponent Deck UI");
+            }
+#endif
+            _opponentDeckPresenter = presenterObject.GetComponent<OpponentDeckPresenter>();
+        }
+
+        private void AutoAssignOpponentDeckPresenter()
+        {
+            if (_opponentDeckPresenter != null)
+            {
+                return;
+            }
+
+            if (transform.Find("OpponentDeckCanvas") is Transform opponentDeckTransform)
+            {
+                _opponentDeckPresenter = opponentDeckTransform.GetComponent<OpponentDeckPresenter>();
+                if (_opponentDeckPresenter != null)
+                {
+                    return;
+                }
+            }
+
+            _opponentDeckPresenter = GetComponentInChildren<OpponentDeckPresenter>(includeInactive: true);
+            if (_opponentDeckPresenter != null)
+            {
+                return;
+            }
+
+            foreach (var presenter in UnityEngine.Object.FindObjectsByType<OpponentDeckPresenter>(
+                         FindObjectsInactive.Include,
+                         FindObjectsSortMode.None))
+            {
+                if (presenter != null && presenter.gameObject.scene == gameObject.scene)
+                {
+                    _opponentDeckPresenter = presenter;
+                    return;
+                }
+            }
+        }
+
         private void EnsureBackgroundSprite()
         {
             if (_backgroundSprite != null || string.IsNullOrWhiteSpace(_backgroundResourcePath))
@@ -258,6 +530,16 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             var canvasObject = new GameObject(RuntimeBackgroundCanvasName, typeof(Canvas), typeof(CanvasScaler));
+            if (gameObject.scene.IsValid())
+            {
+                SceneManager.MoveGameObjectToScene(canvasObject, gameObject.scene);
+            }
+#if UNITY_EDITOR
+            if (!UnityEngine.Application.isPlaying)
+            {
+                Undo.RegisterCreatedObjectUndo(canvasObject, "Create Battle Background UI");
+            }
+#endif
             var canvas = canvasObject.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = -1000;
@@ -266,7 +548,7 @@ namespace Project333.Runtime.Presentation.Battle
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 0.5f;
+            scaler.matchWidthOrHeight = 1f;
 
             var imageObject = new GameObject("Background", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
             imageObject.transform.SetParent(canvasObject.transform, false);

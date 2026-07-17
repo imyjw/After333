@@ -1,4 +1,5 @@
 using Project333.Runtime.Presentation.Startup;
+using Project333.Runtime.Presentation.Ads;
 using UnityEditor;
 using UnityEditor.Events;
 using UnityEditor.SceneManagement;
@@ -13,7 +14,9 @@ namespace Project333.Editor
     {
         private const string StartScenePath = "Assets/GameStart_VSlice.unity";
         private const string DraftScenePath = "Assets/Draft_VSlice.unity";
+        private const string DeckBuildingScenePath = "Assets/DeckBuilding_VSlice.unity";
         private const string BattleScenePath = "Assets/Battle_VSlice.unity";
+        private const string OwnedCardsScenePath = "Assets/OwnedCards_VSlice.unity";
         private const string StartBackgroundAssetPath = "Assets/Project333/Resources/Project333/StartScene/GameStartBackground.png";
         private const string StartButtonAssetPath = "Assets/Project333/Resources/Project333/StartScene/GameStartButton.png";
 
@@ -32,13 +35,30 @@ namespace Project333.Editor
             var canvas = CreateCanvas();
             CreateEventSystem();
 
-            var controllerObject = new GameObject("GameStartSceneController", typeof(RectTransform), typeof(GameStartSceneController));
+            var controllerObject = new GameObject(
+                "GameStartSceneController",
+                typeof(RectTransform),
+                typeof(GameStartSceneController),
+                typeof(RewardedTicketController));
             var controllerRect = controllerObject.GetComponent<RectTransform>();
             controllerRect.SetParent(canvas.transform, false);
             StretchFull(controllerRect);
 
             var background = CreateImage("Background", controllerRect, BackgroundColor);
             StretchFull(background.rectTransform);
+
+            var accountInfoPanel = CreateImage("AccountInfoPanel", controllerRect, new Color(0f, 0f, 0f, 0.62f));
+            accountInfoPanel.raycastTarget = false;
+            accountInfoPanel.rectTransform.anchorMin = new Vector2(0f, 1f);
+            accountInfoPanel.rectTransform.anchorMax = new Vector2(0f, 1f);
+            accountInfoPanel.rectTransform.pivot = new Vector2(0f, 1f);
+            accountInfoPanel.rectTransform.sizeDelta = new Vector2(560f, 116f);
+            accountInfoPanel.rectTransform.anchoredPosition = new Vector2(32f, -32f);
+
+            var accountInfoText = CreateText("AccountInfoText", accountInfoPanel.rectTransform, 24, FontStyle.Bold, TextAnchor.MiddleCenter);
+            accountInfoText.text = "서버 계정 로그인 중...\nServer Tickets: -   Gold: -";
+            accountInfoText.raycastTarget = false;
+            StretchFull(accountInfoText.rectTransform, 18f);
 
             var centerPanel = CreateImage("CenterPanel", controllerRect, PanelColor);
             centerPanel.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
@@ -48,7 +68,7 @@ namespace Project333.Editor
             centerPanel.rectTransform.anchoredPosition = Vector2.zero;
 
             var titleText = CreateText("TitleText", centerPanel.rectTransform, 56, FontStyle.Bold, TextAnchor.MiddleCenter);
-            titleText.text = "Project 333";
+            titleText.text = "After333";
             titleText.color = AccentColor;
             titleText.rectTransform.anchorMin = new Vector2(0f, 1f);
             titleText.rectTransform.anchorMax = new Vector2(1f, 1f);
@@ -73,6 +93,15 @@ namespace Project333.Editor
             startButtonRect.anchoredPosition = new Vector2(0f, -8f);
             startButton.GetComponent<Image>().color = ButtonColor;
 
+            var ownedCardsButton = CreateButton("OwnedCardsButton", centerPanel.rectTransform, "보유 카드");
+            var ownedCardsButtonRect = ownedCardsButton.GetComponent<RectTransform>();
+            ownedCardsButtonRect.anchorMin = new Vector2(0.5f, 0.5f);
+            ownedCardsButtonRect.anchorMax = new Vector2(0.5f, 0.5f);
+            ownedCardsButtonRect.pivot = new Vector2(0.5f, 0.5f);
+            ownedCardsButtonRect.sizeDelta = new Vector2(280f, 64f);
+            ownedCardsButtonRect.anchoredPosition = new Vector2(0f, -304f);
+            ownedCardsButton.GetComponent<Image>().color = new Color(0.16f, 0.2f, 0.32f, 0.94f);
+
             var statusText = CreateText("StatusText", centerPanel.rectTransform, 26, FontStyle.Normal, TextAnchor.UpperCenter);
             statusText.text = "게임을 시작하면 티켓 3개를 차감하고 드래프트로 이동합니다.";
             statusText.rectTransform.anchorMin = new Vector2(0f, 0f);
@@ -90,16 +119,86 @@ namespace Project333.Editor
                 startButton.GetComponent<Image>(),
                 ticketText,
                 statusText,
+                accountInfoPanel.rectTransform,
+                accountInfoText,
                 startButton,
-                startButton.GetComponentInChildren<Text>());
+                startButton.GetComponentInChildren<Text>(),
+                ownedCardsButton,
+                ownedCardsButton.GetComponentInChildren<Text>());
 
             UnityEventTools.AddPersistentListener(startButton.onClick, controller.StartGameFromUi);
+            controllerObject.GetComponent<RewardedTicketController>()?.EnsureEditableHierarchy();
 
             SaveScene(scene);
             EnsureSceneInBuildSettings(StartScenePath, insertAtFront: true);
+            EnsureSceneInBuildSettings(OwnedCardsScenePath, insertAtFront: false);
             EnsureSceneInBuildSettings(DraftScenePath, insertAtFront: false);
+            EnsureSceneInBuildSettings(DeckBuildingScenePath, insertAtFront: false);
             EnsureSceneInBuildSettings(BattleScenePath, insertAtFront: false);
             Selection.activeGameObject = controller.gameObject;
+        }
+
+        [MenuItem("Tools/Project333/Start/Add Owned Cards Button To Start Scene")]
+        public static void AddOwnedCardsButtonToStartScene()
+        {
+            var scene = EditorSceneManager.OpenScene(StartScenePath, OpenSceneMode.Single);
+            var controller = Object.FindFirstObjectByType<GameStartSceneController>();
+            if (controller == null)
+            {
+                Debug.LogWarning("GameStartSceneController was not found in GameStart_VSlice.");
+                return;
+            }
+
+            var controllerRect = controller.transform as RectTransform;
+            if (controllerRect == null)
+            {
+                Debug.LogWarning("GameStartSceneController does not have a RectTransform.");
+                return;
+            }
+
+            var parent = controllerRect.Find("CenterPanel") as RectTransform ?? controllerRect;
+            var ownedCardsButtonTransform = parent.Find("OwnedCardsButton") as RectTransform;
+            Button ownedCardsButton;
+            if (ownedCardsButtonTransform == null)
+            {
+                ownedCardsButton = CreateButton("OwnedCardsButton", parent, "보유 카드");
+                ownedCardsButtonTransform = ownedCardsButton.GetComponent<RectTransform>();
+            }
+            else
+            {
+                ownedCardsButton = ownedCardsButtonTransform.GetComponent<Button>();
+                if (ownedCardsButton == null)
+                {
+                    ownedCardsButton = ownedCardsButtonTransform.gameObject.AddComponent<Button>();
+                }
+            }
+
+            ownedCardsButtonTransform.anchorMin = new Vector2(0.5f, 0.5f);
+            ownedCardsButtonTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            ownedCardsButtonTransform.pivot = new Vector2(0.5f, 0.5f);
+            ownedCardsButtonTransform.sizeDelta = new Vector2(280f, 64f);
+            ownedCardsButtonTransform.anchoredPosition = new Vector2(0f, -304f);
+
+            var ownedCardsButtonImage = ownedCardsButton.GetComponent<Image>() ??
+                                        ownedCardsButton.gameObject.AddComponent<Image>();
+            ownedCardsButtonImage.color = new Color(0.16f, 0.2f, 0.32f, 0.94f);
+
+            var label = ownedCardsButton.GetComponentInChildren<Text>(true);
+            if (label == null)
+            {
+                label = CreateText("Label", ownedCardsButtonTransform, 24, FontStyle.Bold, TextAnchor.MiddleCenter);
+                StretchFull(label.rectTransform, 10f);
+            }
+
+            label.text = "보유 카드";
+            AssignOwnedCardsButtonReferences(controller, ownedCardsButton, label);
+
+            EditorUtility.SetDirty(controller);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            EnsureSceneInBuildSettings(StartScenePath, insertAtFront: true);
+            EnsureSceneInBuildSettings(OwnedCardsScenePath, insertAtFront: false);
+            Selection.activeGameObject = ownedCardsButton.gameObject;
         }
 
         private static void AssignControllerReferences(
@@ -108,8 +207,12 @@ namespace Project333.Editor
             Image startButtonImage,
             Text ticketText,
             Text statusText,
+            RectTransform accountInfoPanel,
+            Text accountInfoText,
             Button startButton,
-            Text startButtonLabel)
+            Text startButtonLabel,
+            Button ownedCardsButton,
+            Text ownedCardsButtonLabel)
         {
             var serializedObject = new SerializedObject(controller);
             serializedObject.FindProperty("_backgroundImage").objectReferenceValue = backgroundImage;
@@ -122,11 +225,45 @@ namespace Project333.Editor
             serializedObject.FindProperty("_startButtonResourcePath").stringValue = "Project333/StartScene/GameStartButton";
             serializedObject.FindProperty("_ticketText").objectReferenceValue = ticketText;
             serializedObject.FindProperty("_statusText").objectReferenceValue = statusText;
+            serializedObject.FindProperty("_accountInfoPanel").objectReferenceValue = accountInfoPanel;
+            serializedObject.FindProperty("_accountInfoText").objectReferenceValue = accountInfoText;
+            serializedObject.FindProperty("_accountInfoPanelSize").vector2Value = new Vector2(560f, 116f);
+            serializedObject.FindProperty("_accountInfoPanelPosition").vector2Value = new Vector2(32f, -32f);
+            serializedObject.FindProperty("_accountInfoPanelColor").colorValue = new Color(0f, 0f, 0f, 0.62f);
+            serializedObject.FindProperty("_accountInfoTextColor").colorValue = Color.white;
+            serializedObject.FindProperty("_accountInfoFontSize").intValue = 24;
             serializedObject.FindProperty("_startGameButton").objectReferenceValue = startButton;
             serializedObject.FindProperty("_startGameButtonLabel").objectReferenceValue = startButtonLabel;
+            serializedObject.FindProperty("_ownedCardsButton").objectReferenceValue = ownedCardsButton;
+            serializedObject.FindProperty("_ownedCardsButtonLabel").objectReferenceValue = ownedCardsButtonLabel;
+            serializedObject.FindProperty("_applyOwnedCardsButtonLayout").boolValue = true;
+            serializedObject.FindProperty("_ownedCardsButtonSize").vector2Value = new Vector2(280f, 64f);
+            serializedObject.FindProperty("_ownedCardsButtonPosition").vector2Value = new Vector2(0f, -304f);
+            serializedObject.FindProperty("_accountServerUrl").stringValue = "http://127.0.0.1:7333";
+            serializedObject.FindProperty("_clientVersion").stringValue =
+                Project333.Runtime.Presentation.Project333ClientBuildInfo.CurrentClientVersion;
+            serializedObject.FindProperty("_useServerAccount").boolValue = true;
             serializedObject.FindProperty("_draftSceneName").stringValue = "Draft_VSlice";
+            serializedObject.FindProperty("_deckBuildingSceneName").stringValue = "DeckBuilding_VSlice";
             serializedObject.FindProperty("_battleSceneName").stringValue = "Battle_VSlice";
+            serializedObject.FindProperty("_ownedCardsSceneName").stringValue = "OwnedCards_VSlice";
             serializedObject.FindProperty("_ticketCost").intValue = 3;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(controller);
+        }
+
+        private static void AssignOwnedCardsButtonReferences(
+            GameStartSceneController controller,
+            Button ownedCardsButton,
+            Text ownedCardsButtonLabel)
+        {
+            var serializedObject = new SerializedObject(controller);
+            serializedObject.FindProperty("_ownedCardsButton").objectReferenceValue = ownedCardsButton;
+            serializedObject.FindProperty("_ownedCardsButtonLabel").objectReferenceValue = ownedCardsButtonLabel;
+            serializedObject.FindProperty("_applyOwnedCardsButtonLayout").boolValue = true;
+            serializedObject.FindProperty("_ownedCardsButtonSize").vector2Value = new Vector2(280f, 64f);
+            serializedObject.FindProperty("_ownedCardsButtonPosition").vector2Value = new Vector2(0f, -304f);
+            serializedObject.FindProperty("_ownedCardsSceneName").stringValue = "OwnedCards_VSlice";
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(controller);
         }
@@ -208,7 +345,7 @@ namespace Project333.Editor
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 0.5f;
+            scaler.matchWidthOrHeight = 1f;
             return canvas;
         }
 

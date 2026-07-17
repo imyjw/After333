@@ -8,6 +8,8 @@ namespace Project333.Runtime.Application.Services
 {
     public sealed class BattleSetupService
     {
+        private readonly IDeckShuffler _deckShuffler;
+
         private static readonly TileCoord MasterStartCoord = new TileCoord(2, 1);
 
         private const int StartingMana = 0;
@@ -18,8 +20,17 @@ namespace Project333.Runtime.Application.Services
         private const int MasterAttack = 3;
         private const int MasterHp = 333;
 
-        private const int FirstPlayerOpeningHand = 3;
-        private const int SecondPlayerOpeningHand = 4;
+        private const int OpeningHandSize = 3;
+
+        public BattleSetupService()
+            : this(new SystemDeckShuffler())
+        {
+        }
+
+        public BattleSetupService(IDeckShuffler deckShuffler)
+        {
+            _deckShuffler = deckShuffler ?? throw new ArgumentNullException(nameof(deckShuffler));
+        }
 
         public BattleState CreateInitialState(BattleSetupRequest request)
         {
@@ -43,10 +54,16 @@ namespace Project333.Runtime.Application.Services
             playerBoard.Place(MasterStartCoord, playerMaster);
             aiBoard.Place(MasterStartCoord, aiMaster);
 
+            var playerDeck = new DeckState(request.PlayerDeckCardIds);
+            var aiDeck = new DeckState(request.AIDeckCardIds);
+
+            _deckShuffler.Shuffle(playerDeck);
+            _deckShuffler.Shuffle(aiDeck);
+
             var player = new PlayerState(
                 id: PlayerId.Player,
                 resources: CreateStartingResources(),
-                deck: new DeckState(request.PlayerDeckCardIds),
+                deck: playerDeck,
                 hand: new HandState(),
                 discard: new DiscardState(),
                 master: playerMaster);
@@ -54,13 +71,15 @@ namespace Project333.Runtime.Application.Services
             var ai = new PlayerState(
                 id: PlayerId.AI,
                 resources: CreateStartingResources(),
-                deck: new DeckState(request.AIDeckCardIds),
+                deck: aiDeck,
                 hand: new HandState(),
                 discard: new DiscardState(),
                 master: aiMaster);
 
-            // Current slice AI never performs a mulligan.
-            ai.MarkMulliganUsed();
+            if (!request.AIMulliganEnabled)
+            {
+                ai.MarkMulliganUsed();
+            }
 
             var battleState = new BattleState(
                 player: player,
@@ -68,7 +87,7 @@ namespace Project333.Runtime.Application.Services
                 playerBoard: playerBoard,
                 aiBoard: aiBoard);
 
-            DrawOpeningHands(player, ai, request.FirstPlayerId);
+            DrawOpeningHands(player, ai);
 
             battleState.SetActivePlayer(request.FirstPlayerId);
             battleState.SetPhase(PhaseType.Mulligan);
@@ -85,18 +104,10 @@ namespace Project333.Runtime.Application.Services
                 gold: StartingGold);
         }
 
-        private static void DrawOpeningHands(PlayerState player, PlayerState ai, PlayerId firstPlayerId)
+        private static void DrawOpeningHands(PlayerState player, PlayerState ai)
         {
-            var playerOpeningHand = firstPlayerId == PlayerId.Player
-                ? FirstPlayerOpeningHand
-                : SecondPlayerOpeningHand;
-
-            var aiOpeningHand = firstPlayerId == PlayerId.AI
-                ? FirstPlayerOpeningHand
-                : SecondPlayerOpeningHand;
-
-            DrawExactCards(player, playerOpeningHand);
-            DrawExactCards(ai, aiOpeningHand);
+            DrawExactCards(player, OpeningHandSize);
+            DrawExactCards(ai, OpeningHandSize);
         }
 
         private static void DrawExactCards(PlayerState playerState, int drawCount)

@@ -17,6 +17,8 @@ namespace Project333.Runtime.Presentation.Hand
         [SerializeField] private string _label = "Slot 0: Empty";
         [SerializeField] private bool _hasCard;
         [SerializeField] private string _cardId;
+        [SerializeField] private string _runtimeId;
+        [SerializeField] private bool _isTemporaryReplicate;
         [SerializeField] private BattleHighlightState _highlightState;
         [SerializeField] private HandCardChangedEvent _onHandCardChanged = new HandCardChangedEvent();
 
@@ -33,6 +35,10 @@ namespace Project333.Runtime.Presentation.Hand
 
         public string CardId => _cardId;
 
+        public string RuntimeId => _runtimeId;
+
+        public bool IsTemporaryReplicate => _isTemporaryReplicate;
+
         public BattleHighlightState HighlightState => _highlightState;
 
         public void Configure(int slotIndex)
@@ -43,7 +49,14 @@ namespace Project333.Runtime.Presentation.Hand
 
         public void Present(string cardId)
         {
+            Present(cardId, string.Empty, isTemporaryReplicate: false);
+        }
+
+        public void Present(string cardId, string runtimeId, bool isTemporaryReplicate)
+        {
             _cardId = cardId ?? string.Empty;
+            _runtimeId = runtimeId ?? string.Empty;
+            _isTemporaryReplicate = isTemporaryReplicate;
             _hasCard = !string.IsNullOrWhiteSpace(cardId);
             _label = BattleUiFormatter.FormatHandCard(_slotIndex, cardId);
             _onHandCardChanged.Invoke(_label, _hasCard);

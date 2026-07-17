@@ -11,6 +11,13 @@ namespace Project333.Editor
 {
     public static class Project333DraftOverlaySceneBuilder
     {
+        private const string DeckBuildingSceneName = "DeckBuilding_VSlice";
+        private const float OptionSpacing = 50f;
+        private const float OptionAreaLeftPadding = 24f;
+        private const float OptionVerticalOffset = -40f;
+        private const float DefaultEditorOptionScale = 0.85f;
+        private static readonly Vector2 OptionCardSize = new Vector2(550f, 733f);
+
         private static readonly string[] KoreanFontCandidates =
         {
             "Malgun Gothic",
@@ -21,6 +28,14 @@ namespace Project333.Editor
         [MenuItem("Tools/Project333/Draft/Create Scene Draft Overlay")]
         public static void CreateSceneDraftOverlay()
         {
+            var activeScene = SceneManager.GetActiveScene();
+            if (!string.Equals(activeScene.name, DeckBuildingSceneName, StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.LogWarning(
+                    $"Draft offer UI belongs only in {DeckBuildingSceneName}. Open that scene before creating the overlay.");
+                return;
+            }
+
             var canvas = GetOrCreateCanvas();
             if (canvas == null)
             {
@@ -55,44 +70,37 @@ namespace Project333.Editor
             }
 
             var contentRoot = CreateRectChild("ContentRoot", rectTransform);
-            contentRoot.anchorMin = new Vector2(0.5f, 0.5f);
-            contentRoot.anchorMax = new Vector2(0.5f, 0.5f);
+            contentRoot.anchorMin = Vector2.zero;
+            contentRoot.anchorMax = Vector2.one;
             contentRoot.pivot = new Vector2(0.5f, 0.5f);
-            contentRoot.sizeDelta = new Vector2(1480f, 650f);
+            contentRoot.offsetMin = Vector2.zero;
+            contentRoot.offsetMax = Vector2.zero;
 
             var titleText = CreateText("TitleText", contentRoot, 42, FontStyle.Bold, TextAnchor.MiddleCenter);
-            StretchTop(titleText.rectTransform, 0f, 54f, 20f);
+            StretchTop(titleText.rectTransform, 16f, 54f, 20f);
             titleText.text = "Legendary Opening Pick";
 
-            var progressText = CreateText("ProgressText", contentRoot, 26, FontStyle.Bold, TextAnchor.MiddleCenter);
-            StretchTop(progressText.rectTransform, 62f, 38f, 20f);
-            progressText.text = "Pick 1 / 33";
-
             var statusText = CreateText("StatusText", contentRoot, 22, FontStyle.Normal, TextAnchor.MiddleCenter);
-            StretchBottom(statusText.rectTransform, 0f, 46f, 24f);
+            StretchTop(statusText.rectTransform, 78f, 46f, 24f);
             statusText.text = "Current Deck: 0 / 33   Unique Cards: 0";
 
-            var bodyRow = CreateRectChild("BodyRow", contentRoot);
-            bodyRow.anchorMin = new Vector2(0.5f, 0.5f);
-            bodyRow.anchorMax = new Vector2(0.5f, 0.5f);
-            bodyRow.pivot = new Vector2(0.5f, 0.5f);
-            bodyRow.sizeDelta = new Vector2(1380f, 490f);
-            bodyRow.anchoredPosition = new Vector2(0f, -6f);
-
-            var bodyLayout = bodyRow.gameObject.AddComponent<HorizontalLayoutGroup>();
-            bodyLayout.childAlignment = TextAnchor.MiddleCenter;
-            bodyLayout.childControlHeight = false;
-            bodyLayout.childControlWidth = false;
-            bodyLayout.childForceExpandHeight = false;
-            bodyLayout.childForceExpandWidth = false;
-            bodyLayout.spacing = 26f;
-
-            var optionsRoot = CreateRectChild("OptionsRoot", bodyRow);
-            optionsRoot.sizeDelta = new Vector2(970f, 470f);
+            var optionsRoot = CreateRectChild("OptionsRoot", rectTransform);
+            optionsRoot.anchorMin = new Vector2(0f, 0.5f);
+            optionsRoot.anchorMax = new Vector2(0f, 0.5f);
+            optionsRoot.pivot = new Vector2(0f, 0.5f);
+            optionsRoot.anchoredPosition = new Vector2(OptionAreaLeftPadding, OptionVerticalOffset);
+            optionsRoot.sizeDelta = new Vector2(
+                (OptionCardSize.x * 3f) + (OptionSpacing * 2f),
+                OptionCardSize.y);
+            optionsRoot.localScale = new Vector3(
+                DefaultEditorOptionScale,
+                DefaultEditorOptionScale,
+                1f);
 
             var optionsLayoutElement = optionsRoot.gameObject.AddComponent<LayoutElement>();
-            optionsLayoutElement.preferredWidth = 970f;
-            optionsLayoutElement.preferredHeight = 470f;
+            optionsLayoutElement.ignoreLayout = true;
+            optionsLayoutElement.preferredWidth = optionsRoot.sizeDelta.x;
+            optionsLayoutElement.preferredHeight = OptionCardSize.y;
 
             var optionsLayout = optionsRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
             optionsLayout.childAlignment = TextAnchor.MiddleCenter;
@@ -100,7 +108,7 @@ namespace Project333.Editor
             optionsLayout.childControlWidth = false;
             optionsLayout.childForceExpandHeight = false;
             optionsLayout.childForceExpandWidth = false;
-            optionsLayout.spacing = 30f;
+            optionsLayout.spacing = OptionSpacing;
 
             var optionBindings = new DraftOptionReferences[3];
             for (var i = 0; i < optionBindings.Length; i++)
@@ -108,17 +116,19 @@ namespace Project333.Editor
                 optionBindings[i] = CreateOptionView(optionsRoot, i);
             }
 
-            var deckPanelReferences = CreateDeckPanel(bodyRow);
+            var deckPanelReferences = CreateDeckPanel(rectTransform);
 
             ApplySerializedReferences(
                 presenter,
                 canvas,
                 canvasGroup,
                 titleText,
-                progressText,
                 statusText,
                 deckPanelReferences.TitleText,
                 deckPanelReferences.ListText,
+                deckPanelReferences.ScrollRect,
+                optionsRoot,
+                deckPanelReferences.RectTransform,
                 optionBindings);
 
             AssignBootstrapperReference(presenter);
@@ -173,6 +183,8 @@ namespace Project333.Editor
             var scaler = canvasObject.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 1f;
 
             return canvas;
         }
@@ -196,20 +208,24 @@ namespace Project333.Editor
             Canvas canvas,
             CanvasGroup canvasGroup,
             Text titleText,
-            Text progressText,
             Text statusText,
             Text deckPanelTitleText,
             Text deckListText,
+            ScrollRect deckListScrollRect,
+            RectTransform optionsRoot,
+            RectTransform deckPanelRectTransform,
             DraftOptionReferences[] optionReferences)
         {
             var serializedObject = new SerializedObject(presenter);
             serializedObject.FindProperty("_targetCanvas").objectReferenceValue = canvas;
             serializedObject.FindProperty("_rootCanvasGroup").objectReferenceValue = canvasGroup;
             serializedObject.FindProperty("_titleText").objectReferenceValue = titleText;
-            serializedObject.FindProperty("_progressText").objectReferenceValue = progressText;
             serializedObject.FindProperty("_statusText").objectReferenceValue = statusText;
             serializedObject.FindProperty("_deckPanelTitleText").objectReferenceValue = deckPanelTitleText;
             serializedObject.FindProperty("_deckListText").objectReferenceValue = deckListText;
+            serializedObject.FindProperty("_deckListScrollRect").objectReferenceValue = deckListScrollRect;
+            serializedObject.FindProperty("_optionsRoot").objectReferenceValue = optionsRoot;
+            serializedObject.FindProperty("_deckPanelRectTransform").objectReferenceValue = deckPanelRectTransform;
 
             var optionBindingsProperty = serializedObject.FindProperty("_optionBindings");
             optionBindingsProperty.arraySize = optionReferences.Length;
@@ -219,8 +235,6 @@ namespace Project333.Editor
                 var optionProperty = optionBindingsProperty.GetArrayElementAtIndex(i);
                 optionProperty.FindPropertyRelative("_button").objectReferenceValue = optionReferences[i].Button;
                 optionProperty.FindPropertyRelative("_artworkImage").objectReferenceValue = optionReferences[i].ArtworkImage;
-                optionProperty.FindPropertyRelative("_titleText").objectReferenceValue = optionReferences[i].TitleText;
-                optionProperty.FindPropertyRelative("_subtitleText").objectReferenceValue = optionReferences[i].SubtitleText;
             }
 
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
@@ -233,11 +247,11 @@ namespace Project333.Editor
             Undo.RegisterCreatedObjectUndo(optionRoot, "Create Draft Option");
             var optionRectTransform = optionRoot.GetComponent<RectTransform>();
             optionRectTransform.SetParent(parent, false);
-            optionRectTransform.sizeDelta = new Vector2(290f, 460f);
+            optionRectTransform.sizeDelta = OptionCardSize;
 
             var layoutElement = optionRoot.GetComponent<LayoutElement>();
-            layoutElement.preferredWidth = 290f;
-            layoutElement.preferredHeight = 460f;
+            layoutElement.preferredWidth = OptionCardSize.x;
+            layoutElement.preferredHeight = OptionCardSize.y;
 
             var backgroundImage = optionRoot.GetComponent<Image>();
             backgroundImage.color = new Color(0.14f, 0.16f, 0.2f, 0.96f);
@@ -255,31 +269,21 @@ namespace Project333.Editor
             Undo.RegisterCreatedObjectUndo(artworkObject, "Create Draft Artwork");
             var artworkRectTransform = artworkObject.GetComponent<RectTransform>();
             artworkRectTransform.SetParent(optionRectTransform, false);
-            artworkRectTransform.anchorMin = new Vector2(0.5f, 0.5f);
-            artworkRectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            artworkRectTransform.anchorMin = Vector2.zero;
+            artworkRectTransform.anchorMax = Vector2.one;
             artworkRectTransform.pivot = new Vector2(0.5f, 0.5f);
-            artworkRectTransform.sizeDelta = new Vector2(272f, 364f);
-            artworkRectTransform.anchoredPosition = new Vector2(0f, 20f);
+            artworkRectTransform.offsetMin = Vector2.zero;
+            artworkRectTransform.offsetMax = Vector2.zero;
 
             var artworkImage = artworkObject.GetComponent<Image>();
             artworkImage.preserveAspect = true;
             artworkImage.raycastTarget = false;
             artworkImage.color = new Color(0.18f, 0.2f, 0.25f, 1f);
 
-            var titleText = CreateText("OptionTitle", optionRectTransform, 24, FontStyle.Bold, TextAnchor.MiddleCenter);
-            StretchBottom(titleText.rectTransform, 44f, 48f, 12f);
-            titleText.text = $"Draft Card {index + 1}";
-
-            var subtitleText = CreateText("OptionSubtitle", optionRectTransform, 18, FontStyle.Normal, TextAnchor.MiddleCenter);
-            StretchBottom(subtitleText.rectTransform, 8f, 30f, 12f);
-            subtitleText.text = "Unit  M 3";
-
             return new DraftOptionReferences
             {
                 Button = button,
                 ArtworkImage = artworkImage,
-                TitleText = titleText,
-                SubtitleText = subtitleText,
             };
         }
 
@@ -289,11 +293,16 @@ namespace Project333.Editor
             Undo.RegisterCreatedObjectUndo(deckPanel, "Create Deck Panel");
             var deckPanelRectTransform = deckPanel.GetComponent<RectTransform>();
             deckPanelRectTransform.SetParent(parent, false);
-            deckPanelRectTransform.sizeDelta = new Vector2(384f, 470f);
+            deckPanelRectTransform.anchorMin = new Vector2(1f, 0.5f);
+            deckPanelRectTransform.anchorMax = new Vector2(1f, 0.5f);
+            deckPanelRectTransform.pivot = new Vector2(1f, 0.5f);
+            deckPanelRectTransform.anchoredPosition = new Vector2(-24f, 0f);
+            deckPanelRectTransform.sizeDelta = new Vector2(384f, 700f);
 
             var layoutElement = deckPanel.GetComponent<LayoutElement>();
+            layoutElement.ignoreLayout = true;
             layoutElement.preferredWidth = 384f;
-            layoutElement.preferredHeight = 470f;
+            layoutElement.preferredHeight = 700f;
 
             var panelImage = deckPanel.GetComponent<Image>();
             panelImage.color = new Color(0.1f, 0.12f, 0.16f, 0.96f);
@@ -303,17 +312,60 @@ namespace Project333.Editor
             StretchTop(titleText.rectTransform, 14f, 38f, 16f);
             titleText.text = "Current Deck";
 
-            var listText = CreateText("DeckListText", deckPanelRectTransform, 20, FontStyle.Normal, TextAnchor.UpperLeft);
+            var scrollObject = new GameObject(
+                "DeckListScrollView",
+                typeof(RectTransform),
+                typeof(Image),
+                typeof(RectMask2D),
+                typeof(ScrollRect));
+            Undo.RegisterCreatedObjectUndo(scrollObject, "Create Deck List Scroll View");
+            var scrollRectTransform = scrollObject.GetComponent<RectTransform>();
+            scrollRectTransform.SetParent(deckPanelRectTransform, false);
+            StretchFill(scrollRectTransform, 60f, 18f, 18f, 16f);
+
+            var inputImage = scrollObject.GetComponent<Image>();
+            inputImage.color = Color.clear;
+            inputImage.raycastTarget = true;
+
+            var contentObject = new GameObject("Content", typeof(RectTransform));
+            Undo.RegisterCreatedObjectUndo(contentObject, "Create Deck List Content");
+            var contentRect = contentObject.GetComponent<RectTransform>();
+            contentRect.SetParent(scrollRectTransform, false);
+            ConfigureTopAnchoredRect(contentRect, 1f);
+
+            var listText = CreateText("DeckListText", contentRect, 16, FontStyle.Normal, TextAnchor.UpperLeft);
             listText.horizontalOverflow = HorizontalWrapMode.Wrap;
             listText.verticalOverflow = VerticalWrapMode.Overflow;
-            StretchFill(listText.rectTransform, 60f, 18f, 18f, 16f);
+            listText.raycastTarget = false;
+            ConfigureTopAnchoredRect(listText.rectTransform, 1f);
             listText.text = "No picks yet.";
+
+            var scrollRect = scrollObject.GetComponent<ScrollRect>();
+            scrollRect.viewport = scrollRectTransform;
+            scrollRect.content = contentRect;
+            scrollRect.horizontal = false;
+            scrollRect.vertical = true;
+            scrollRect.movementType = ScrollRect.MovementType.Clamped;
+            scrollRect.inertia = true;
+            scrollRect.decelerationRate = 0.135f;
+            scrollRect.scrollSensitivity = 30f;
 
             return new DeckPanelReferences
             {
+                RectTransform = deckPanelRectTransform,
                 TitleText = titleText,
                 ListText = listText,
+                ScrollRect = scrollRect,
             };
+        }
+
+        private static void ConfigureTopAnchoredRect(RectTransform rectTransform, float height)
+        {
+            rectTransform.anchorMin = new Vector2(0f, 1f);
+            rectTransform.anchorMax = new Vector2(1f, 1f);
+            rectTransform.pivot = new Vector2(0.5f, 1f);
+            rectTransform.offsetMin = new Vector2(0f, -Mathf.Max(1f, height));
+            rectTransform.offsetMax = Vector2.zero;
         }
 
         private static Text CreateText(string name, RectTransform parent, int fontSize, FontStyle fontStyle, TextAnchor alignment)
@@ -394,14 +446,14 @@ namespace Project333.Editor
         {
             public Button Button;
             public Image ArtworkImage;
-            public Text TitleText;
-            public Text SubtitleText;
         }
 
         private sealed class DeckPanelReferences
         {
+            public RectTransform RectTransform;
             public Text TitleText;
             public Text ListText;
+            public ScrollRect ScrollRect;
         }
     }
 }
