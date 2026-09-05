@@ -29,7 +29,7 @@ MonoBehaviour:
   _canAttack: 0
   _damageType: 0
   _attack: 0
-  _health: 33
+  _health: 20
   _physicalDefense: 0
   _magicDefense: 0
   _turnStartResourceGain:

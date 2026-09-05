@@ -8,10 +8,13 @@ namespace Project333.Runtime.Domain.Cards
 {
     public abstract class OccupantState
     {
+        private const int ActiveHuanShuStateMarker = 1;
         private bool _isDrained;
         private readonly List<InvincibleEffectState> _invincibleEffects = new List<InvincibleEffectState>();
+        private BoardState _currentBoard;
         private PlayerId _currentActivePlayerId;
         private int _currentBattleTurnNumber;
+        private int _huanShuEligibleAfterTurnNumber;
 
         protected OccupantState(
             string runtimeId,
@@ -28,7 +31,7 @@ namespace Project333.Runtime.Domain.Cards
             int hitsPerAttack,
             bool hasBerserker = false,
             bool hasEndure = false,
-            bool hasGuard = false,
+            bool hasShielder = false,
             bool hasLifeSteal = false,
             DamageType damageType = DamageType.Physical,
             int physicalDefense = 0,
@@ -36,7 +39,8 @@ namespace Project333.Runtime.Domain.Cards
             bool hasRush = false,
             bool hasHiding = false,
             bool hasFlying = false,
-            int spellPower = 0)
+            int spellPower = 0,
+            bool hasPiercing = false)
         {
             if (physicalDefense < 0)
             {
@@ -76,7 +80,7 @@ namespace Project333.Runtime.Domain.Cards
             HitsPerAttack = hitsPerAttack < 1 ? 1 : hitsPerAttack;
             HasBerserker = hasBerserker;
             HasEndure = hasEndure;
-            HasGuard = hasGuard;
+            HasShielder = hasShielder;
             HasLifeSteal = hasLifeSteal;
             DamageType = damageType;
             OriginalPhysicalDefense = physicalDefense;
@@ -87,19 +91,21 @@ namespace Project333.Runtime.Domain.Cards
             HasHiding = hasHiding;
             HasFlying = hasFlying;
             SpellPower = spellPower;
+            HasPiercing = hasPiercing;
             HasSummoningSickness = true;
             RemainingAttacksThisTurn = maxAttacksPerTurn;
         }
 
         public string RuntimeId { get; }
         public string CardId { get; }
-        public PlayerId OwnerId { get; }
+        public PlayerId OwnerId { get; private set; }
         public OccupantKind Kind { get; }
         public TileCoord Position { get; set; }
         public AttackType AttackType { get; protected set; }
         public int OriginalAttack { get; private set; }
         public int BaseAttack { get; protected set; }
-        public int Attack => GetAttackForCurrentState();
+        public int Attack => GetAttackForCurrentState() +
+                             WerewolfRules.CalculatePackAttackBonus(this, _currentBoard);
         public int OriginalMaxHp { get; private set; }
         public int MaxHp { get; protected set; }
         public int CurrentHp { get; set; }
@@ -109,7 +115,7 @@ namespace Project333.Runtime.Domain.Cards
         public int HitsPerAttack { get; protected set; }
         public bool HasBerserker { get; protected set; }
         public bool HasEndure { get; protected set; }
-        public bool HasGuard { get; protected set; }
+        public bool HasShielder { get; protected set; }
         public bool HasLifeSteal { get; protected set; }
         public DamageType DamageType { get; protected set; }
         public int OriginalPhysicalDefense { get; private set; }
@@ -124,6 +130,8 @@ namespace Project333.Runtime.Domain.Cards
         public bool HasActiveFlying => HasFlying && !EffectsSuppressed;
         public int SpellPower { get; protected set; }
         public int EffectiveSpellPower => IsAlive && !EffectsSuppressed ? SpellPower : 0;
+        public bool HasPiercing { get; protected set; }
+        public bool HasActivePiercing => HasPiercing && IsAlive && !EffectsSuppressed;
         public IReadOnlyList<InvincibleEffectState> InvincibleEffects => _invincibleEffects;
         public bool IsInvincible
         {
@@ -147,7 +155,7 @@ namespace Project333.Runtime.Domain.Cards
         }
         public int EffectivePhysicalDefense => IsDrained ? 0 : PhysicalDefense;
         public int EffectiveMagicDefense => IsDrained ? 0 : MagicDefense;
-        public bool HasActiveGuard => HasGuard && !EffectsSuppressed && !IsHiding && CurrentHp > 0;
+        public bool HasActiveShielder => HasShielder && !EffectsSuppressed && !IsHiding && CurrentHp > 0;
         public int EffectiveMaxAttacksPerTurn => IsSealbound
             ? 0
             : EffectsSuppressed
@@ -173,6 +181,14 @@ namespace Project333.Runtime.Domain.Cards
         public bool IsErasure { get; private set; }
         public bool IsSealbound { get; private set; }
         public int SealboundOwnerTurnStartsRemaining { get; private set; }
+        public bool IsDemonKingRevivalPending { get; private set; }
+        public int DemonKingRevivalTurnStartsRemaining { get; private set; }
+        public PlayerId DemonKingRevivalCountdownPlayerId { get; private set; }
+        public int DemonKingRevivalEligibleAfterTurnNumber { get; private set; }
+        public int DemonKingRevivalCount { get; private set; }
+        public int HuanShuOwnerTurnsRemaining { get; private set; }
+        public int HuanShuEligibleAfterTurnNumber => _huanShuEligibleAfterTurnNumber;
+        public bool IsUnderHuanShu => HuanShuOwnerTurnsRemaining > 0;
         public bool WasSummonedThisTurn { get; set; }
         public bool HasSummoningSickness { get; set; }
         public int RemainingAttacksThisTurn { get; set; }
@@ -189,10 +205,33 @@ namespace Project333.Runtime.Domain.Cards
 
         public bool CanTriggerEndure => HasEndure && !EndureUsed && !EffectsSuppressed;
 
+        internal void AttachToBoard(BoardState board)
+        {
+            _currentBoard = board;
+        }
+
+        internal void DetachFromBoard(BoardState board)
+        {
+            if (ReferenceEquals(_currentBoard, board))
+            {
+                _currentBoard = null;
+            }
+        }
+
         public void SetBattleTurnContext(PlayerId activePlayerId, int turnNumber)
         {
             _currentActivePlayerId = activePlayerId;
             _currentBattleTurnNumber = Math.Max(0, turnNumber);
+        }
+
+        public void TransferOwnership(PlayerId newOwnerId)
+        {
+            if (Kind == OccupantKind.Master)
+            {
+                throw new InvalidOperationException("Master Units cannot change ownership.");
+            }
+
+            OwnerId = newOwnerId;
         }
 
         public InvincibleEffectState AddInvincibleEffect(
@@ -214,7 +253,10 @@ namespace Project333.Runtime.Domain.Cards
             _currentActivePlayerId = resolvedActivePlayerId;
             var effect = new InvincibleEffectState(
                 duration,
-                duration == InvincibleDurationType.OwnerTurns ? ownerTurns : 0,
+                duration == InvincibleDurationType.OwnerTurns ||
+                duration == InvincibleDurationType.GlobalTurnEnds
+                    ? ownerTurns
+                    : 0,
                 resolvedTurnNumber,
                 resolvedActivePlayerId);
             _invincibleEffects.Add(effect);
@@ -263,6 +305,7 @@ namespace Project333.Runtime.Domain.Cards
             var attacksSpent = Math.Max(0, MaxAttacksPerTurn - RemainingAttacksThisTurn);
 
             RevealHiding();
+            ClearHuanShu();
             IsErasure = true;
             _isDrained = false;
             BaseAttack = OriginalAttack;
@@ -309,6 +352,42 @@ namespace Project333.Runtime.Domain.Cards
             return true;
         }
 
+        public void ApplyHuanShu()
+        {
+            if (IsSealbound)
+            {
+                throw new InvalidOperationException("Sealbound occupants cannot receive HuanShu.");
+            }
+
+            // The legacy integer fields remain as a serialized active marker so old snapshots
+            // with a positive remaining-turn value restore as permanent HuanShu.
+            HuanShuOwnerTurnsRemaining = ActiveHuanShuStateMarker;
+            _huanShuEligibleAfterTurnNumber = 0;
+        }
+
+        /// <summary>
+        /// Retained for compatibility with older callers. HuanShu is permanent and no longer
+        /// consumes owner turns.
+        /// </summary>
+        public bool ResolveHuanShuOwnerTurnEnd(PlayerId endingPlayerId, int endingTurnNumber)
+        {
+            return false;
+        }
+
+        public void ClearHuanShu()
+        {
+            HuanShuOwnerTurnsRemaining = 0;
+            _huanShuEligibleAfterTurnNumber = 0;
+        }
+
+        public void RestoreHuanShuState(int ownerTurnsRemaining, int eligibleAfterTurnNumber)
+        {
+            HuanShuOwnerTurnsRemaining = ownerTurnsRemaining > 0
+                ? ActiveHuanShuStateMarker
+                : 0;
+            _huanShuEligibleAfterTurnNumber = 0;
+        }
+
         public void EnterSealbound(int ownerTurnStarts)
         {
             if (ownerTurnStarts < 0)
@@ -334,7 +413,7 @@ namespace Project333.Runtime.Domain.Cards
 
         public bool ResolveSealboundOwnerTurnStart()
         {
-            if (!IsSealbound)
+            if (!IsSealbound || IsDemonKingRevivalPending)
             {
                 return false;
             }
@@ -350,6 +429,111 @@ namespace Project333.Runtime.Domain.Cards
             HasSummoningSickness = !canAttackOnReleaseTurn;
             RemainingAttacksThisTurn = canAttackOnReleaseTurn ? EffectiveMaxAttacksPerTurn : 0;
             return true;
+        }
+
+        public bool TryEnterDemonKingRevivalSeal(
+            PlayerId countdownPlayerId,
+            int deathTurnNumber)
+        {
+            if (!DemonKingRules.IsDemonKing(this) ||
+                IsDemonKingRevivalPending ||
+                EffectsSuppressed)
+            {
+                return false;
+            }
+
+            CurrentHp = 0;
+            IsSealbound = true;
+            SealboundOwnerTurnStartsRemaining = DemonKingRules.RevivalTurnStarts;
+            IsDemonKingRevivalPending = true;
+            DemonKingRevivalTurnStartsRemaining = DemonKingRules.RevivalTurnStarts;
+            DemonKingRevivalCountdownPlayerId = countdownPlayerId;
+            DemonKingRevivalEligibleAfterTurnNumber = Math.Max(0, deathTurnNumber);
+            HasSummoningSickness = true;
+            RemainingAttacksThisTurn = 0;
+            return true;
+        }
+
+        public bool ResolveDemonKingRevivalTurnStart(
+            PlayerId activePlayerId,
+            int turnNumber)
+        {
+            if (!IsDemonKingRevivalPending ||
+                activePlayerId != DemonKingRevivalCountdownPlayerId ||
+                turnNumber <= DemonKingRevivalEligibleAfterTurnNumber)
+            {
+                return false;
+            }
+
+            DemonKingRevivalTurnStartsRemaining = Math.Max(
+                0,
+                DemonKingRevivalTurnStartsRemaining - 1);
+            SealboundOwnerTurnStartsRemaining = DemonKingRevivalTurnStartsRemaining;
+            if (DemonKingRevivalTurnStartsRemaining > 0)
+            {
+                return false;
+            }
+
+            DemonKingRevivalCount = DemonKingRevivalCount == int.MaxValue
+                ? int.MaxValue
+                : DemonKingRevivalCount + 1;
+            IsDemonKingRevivalPending = false;
+            DemonKingRevivalEligibleAfterTurnNumber = 0;
+            IsSealbound = false;
+            SealboundOwnerTurnStartsRemaining = 0;
+
+            RevealHiding();
+            ClearHuanShu();
+            _invincibleEffects.Clear();
+            IsErasure = false;
+            _isDrained = false;
+            HidingRevealed = false;
+            EndureUsed = false;
+
+            BaseAttack = DemonKingRules.CalculateRevivedStat(
+                OriginalAttack,
+                DemonKingRevivalCount);
+            MaxHp = DemonKingRules.CalculateRevivedStat(
+                OriginalMaxHp,
+                DemonKingRevivalCount);
+            CurrentHp = MaxHp;
+            PhysicalDefense = OriginalPhysicalDefense;
+            MagicDefense = OriginalMagicDefense;
+            WasSummonedThisTurn = true;
+            HasSummoningSickness = true;
+            RemainingAttacksThisTurn = 0;
+            return true;
+        }
+
+        public void RestoreDemonKingRevivalState(
+            bool isPending,
+            int turnStartsRemaining,
+            PlayerId countdownPlayerId,
+            int eligibleAfterTurnNumber,
+            int revivalCount)
+        {
+            DemonKingRevivalCount = Math.Max(0, revivalCount);
+            IsDemonKingRevivalPending = DemonKingRules.IsDemonKing(this) && isPending;
+            DemonKingRevivalTurnStartsRemaining = IsDemonKingRevivalPending
+                ? Math.Max(1, turnStartsRemaining)
+                : 0;
+            DemonKingRevivalCountdownPlayerId = countdownPlayerId;
+            DemonKingRevivalEligibleAfterTurnNumber = IsDemonKingRevivalPending
+                ? Math.Max(0, eligibleAfterTurnNumber)
+                : 0;
+
+            if (!IsDemonKingRevivalPending)
+            {
+                return;
+            }
+
+            CurrentHp = 0;
+            IsSealbound = true;
+            SealboundOwnerTurnStartsRemaining = DemonKingRevivalTurnStartsRemaining;
+            IsErasure = false;
+            _isDrained = false;
+            HasSummoningSickness = true;
+            RemainingAttacksThisTurn = 0;
         }
 
         /// <summary>

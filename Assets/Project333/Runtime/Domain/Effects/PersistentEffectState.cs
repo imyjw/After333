@@ -21,7 +21,8 @@ namespace Project333.Runtime.Domain.Effects
             int effectDamage = 0,
             DamageType effectDamageType = DamageType.None,
             bool targetsOwnerBoard = false,
-            int capturedSpellPower = 0)
+            int capturedSpellPower = 0,
+            int targetStartColumn = -1)
         {
             if (capturedSpellPower < 0)
             {
@@ -42,6 +43,7 @@ namespace Project333.Runtime.Domain.Effects
             EffectDamageType = effectDamageType;
             TargetsOwnerBoard = targetsOwnerBoard;
             CapturedSpellPower = capturedSpellPower;
+            TargetStartColumn = targetStartColumn;
         }
 
         public string SourceCardId { get; }
@@ -71,6 +73,8 @@ namespace Project333.Runtime.Domain.Effects
         public bool TargetsOwnerBoard { get; }
 
         public int CapturedSpellPower { get; }
+
+        public int TargetStartColumn { get; }
 
         public bool IsExpired { get; private set; }
 

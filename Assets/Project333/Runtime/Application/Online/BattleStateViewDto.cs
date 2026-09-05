@@ -32,6 +32,8 @@ namespace Project333.Runtime.Application.Online
 
         public bool HasWinner { get; set; }
 
+        public bool IsDraw { get; set; }
+
         public PlayerId WinnerId { get; set; }
 
         public OnlineBattleSeatId WinnerOnlineSeatId { get; set; }
@@ -92,6 +94,9 @@ namespace Project333.Runtime.Application.Online
 
     public sealed class BoardOccupantViewDto
     {
+        private bool _hasShielder;
+        private bool _legacyHasGuard;
+
         public PlayerId OwnerId { get; set; }
 
         public OnlineBattleSeatId OwnerOnlineSeatId { get; set; }
@@ -110,7 +115,19 @@ namespace Project333.Runtime.Application.Online
 
         public int Attack { get; set; }
 
+        public int BaseAttack { get; set; }
+
+        public bool HasBaseAttack { get; set; }
+
         public int OriginalAttack { get; set; }
+
+        public int MaxAttacksPerTurn { get; set; }
+
+        public int HitsPerAttack { get; set; }
+
+        public bool HasBerserker { get; set; }
+
+        public int SciencePowerUpkeep { get; set; }
 
         public int PhysicalDefense { get; set; }
 
@@ -138,6 +155,20 @@ namespace Project333.Runtime.Application.Online
 
         public int SealboundOwnerTurnStartsRemaining { get; set; }
 
+        public bool IsDemonKingRevivalPending { get; set; }
+
+        public int DemonKingRevivalTurnStartsRemaining { get; set; }
+
+        public PlayerId DemonKingRevivalCountdownPlayerId { get; set; }
+
+        public int DemonKingRevivalEligibleAfterTurnNumber { get; set; }
+
+        public int DemonKingRevivalCount { get; set; }
+
+        public int HuanShuOwnerTurnsRemaining { get; set; }
+
+        public int HuanShuEligibleAfterTurnNumber { get; set; }
+
         public bool HasRush { get; set; }
 
         public bool HasHiding { get; set; }
@@ -146,12 +177,31 @@ namespace Project333.Runtime.Application.Online
 
         public bool HasFlying { get; set; }
 
+        public bool HasPiercing { get; set; }
+
         public int SpellPower { get; set; }
 
         public List<InvincibleEffectViewDto> InvincibleEffects { get; set; } =
             new List<InvincibleEffectViewDto>();
 
-        public bool HasGuard { get; set; }
+        public bool HasShielder
+        {
+            get => _hasShielder;
+            set => _hasShielder = value || _legacyHasGuard;
+        }
+
+        // Write-only compatibility bridge for StateView messages created before the Shielder rename.
+        public bool HasGuard
+        {
+            set
+            {
+                _legacyHasGuard = value;
+                if (value)
+                {
+                    _hasShielder = true;
+                }
+            }
+        }
 
         public bool HasEndure { get; set; }
 
@@ -210,6 +260,8 @@ namespace Project333.Runtime.Application.Online
         public bool TargetsOwnerBoard { get; set; }
 
         public int CapturedSpellPower { get; set; }
+
+        public int TargetStartColumn { get; set; } = -1;
 
         public bool IsExpired { get; set; }
     }

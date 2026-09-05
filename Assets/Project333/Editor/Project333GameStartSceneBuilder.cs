@@ -1,5 +1,4 @@
 using Project333.Runtime.Presentation.Startup;
-using Project333.Runtime.Presentation.Ads;
 using UnityEditor;
 using UnityEditor.Events;
 using UnityEditor.SceneManagement;
@@ -17,6 +16,7 @@ namespace Project333.Editor
         private const string DeckBuildingScenePath = "Assets/DeckBuilding_VSlice.unity";
         private const string BattleScenePath = "Assets/Battle_VSlice.unity";
         private const string OwnedCardsScenePath = "Assets/OwnedCards_VSlice.unity";
+        private const string ShopScenePath = "Assets/Shop_VSlice.unity";
         private const string StartBackgroundAssetPath = "Assets/Project333/Resources/Project333/StartScene/GameStartBackground.png";
         private const string StartButtonAssetPath = "Assets/Project333/Resources/Project333/StartScene/GameStartButton.png";
 
@@ -38,8 +38,7 @@ namespace Project333.Editor
             var controllerObject = new GameObject(
                 "GameStartSceneController",
                 typeof(RectTransform),
-                typeof(GameStartSceneController),
-                typeof(RewardedTicketController));
+                typeof(GameStartSceneController));
             var controllerRect = controllerObject.GetComponent<RectTransform>();
             controllerRect.SetParent(canvas.transform, false);
             StretchFull(controllerRect);
@@ -93,6 +92,15 @@ namespace Project333.Editor
             startButtonRect.anchoredPosition = new Vector2(0f, -8f);
             startButton.GetComponent<Image>().color = ButtonColor;
 
+            var shopButton = CreateButton("ShopButton", centerPanel.rectTransform, "상점");
+            var shopButtonRect = shopButton.GetComponent<RectTransform>();
+            shopButtonRect.anchorMin = new Vector2(0.5f, 0.5f);
+            shopButtonRect.anchorMax = new Vector2(0.5f, 0.5f);
+            shopButtonRect.pivot = new Vector2(0.5f, 0.5f);
+            shopButtonRect.sizeDelta = new Vector2(280f, 72f);
+            shopButtonRect.anchoredPosition = new Vector2(0f, -220f);
+            shopButton.GetComponent<Image>().color = new Color(0.03f, 0.32f, 0.46f, 0.92f);
+
             var ownedCardsButton = CreateButton("OwnedCardsButton", centerPanel.rectTransform, "보유 카드");
             var ownedCardsButtonRect = ownedCardsButton.GetComponent<RectTransform>();
             ownedCardsButtonRect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -123,15 +131,17 @@ namespace Project333.Editor
                 accountInfoText,
                 startButton,
                 startButton.GetComponentInChildren<Text>(),
+                shopButton,
+                shopButton.GetComponentInChildren<Text>(),
                 ownedCardsButton,
                 ownedCardsButton.GetComponentInChildren<Text>());
 
             UnityEventTools.AddPersistentListener(startButton.onClick, controller.StartGameFromUi);
-            controllerObject.GetComponent<RewardedTicketController>()?.EnsureEditableHierarchy();
 
             SaveScene(scene);
             EnsureSceneInBuildSettings(StartScenePath, insertAtFront: true);
             EnsureSceneInBuildSettings(OwnedCardsScenePath, insertAtFront: false);
+            EnsureSceneInBuildSettings(ShopScenePath, insertAtFront: false);
             EnsureSceneInBuildSettings(DraftScenePath, insertAtFront: false);
             EnsureSceneInBuildSettings(DeckBuildingScenePath, insertAtFront: false);
             EnsureSceneInBuildSettings(BattleScenePath, insertAtFront: false);
@@ -211,6 +221,8 @@ namespace Project333.Editor
             Text accountInfoText,
             Button startButton,
             Text startButtonLabel,
+            Button shopButton,
+            Text shopButtonLabel,
             Button ownedCardsButton,
             Text ownedCardsButtonLabel)
         {
@@ -234,6 +246,8 @@ namespace Project333.Editor
             serializedObject.FindProperty("_accountInfoFontSize").intValue = 24;
             serializedObject.FindProperty("_startGameButton").objectReferenceValue = startButton;
             serializedObject.FindProperty("_startGameButtonLabel").objectReferenceValue = startButtonLabel;
+            serializedObject.FindProperty("_shopButton").objectReferenceValue = shopButton;
+            serializedObject.FindProperty("_shopButtonLabel").objectReferenceValue = shopButtonLabel;
             serializedObject.FindProperty("_ownedCardsButton").objectReferenceValue = ownedCardsButton;
             serializedObject.FindProperty("_ownedCardsButtonLabel").objectReferenceValue = ownedCardsButtonLabel;
             serializedObject.FindProperty("_applyOwnedCardsButtonLayout").boolValue = true;
@@ -247,6 +261,7 @@ namespace Project333.Editor
             serializedObject.FindProperty("_deckBuildingSceneName").stringValue = "DeckBuilding_VSlice";
             serializedObject.FindProperty("_battleSceneName").stringValue = "Battle_VSlice";
             serializedObject.FindProperty("_ownedCardsSceneName").stringValue = "OwnedCards_VSlice";
+            serializedObject.FindProperty("_shopSceneName").stringValue = "Shop_VSlice";
             serializedObject.FindProperty("_ticketCost").intValue = 3;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(controller);

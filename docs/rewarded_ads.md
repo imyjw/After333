@@ -2,7 +2,7 @@
 
 ## Goal
 
-The Game Start scene can show an opt-in rewarded video. A successfully verified completion grants exactly `1` account ticket.
+The Shop scene can show an opt-in rewarded video. A successfully verified completion grants exactly `1` account ticket.
 
 The Unity client never grants the ticket directly. PostgreSQL wallet data changes only after the server verifies a Unity LevelPlay server-to-server callback.
 
@@ -12,7 +12,7 @@ The Unity client never grants the ticket directly. PostgreSQL wallet data change
 - Reward: `1` ticket
 - Daily limit: `3` rewarded tickets per account, reset at `00:00 UTC`
 - Reward cooldown: `60` seconds per account
-- Guests and registered accounts are both eligible because both are server accounts.
+- Authenticated registered accounts are eligible.
 - Closing or skipping an ad does not grant a ticket.
 - A LevelPlay event ID can grant a reward only once.
 
@@ -43,7 +43,7 @@ The unique `(provider, provider_event_id)` constraint and a transaction-level wa
 1. Create the Android app for package `com.after333.game` in the LevelPlay dashboard.
 2. Create a Rewarded Ad Unit and a placement named `start_ticket_reward`.
 3. Set the placement reward amount to `1`.
-4. Copy the Android App Key and Rewarded Ad Unit ID into the `RewardedTicketController` component in `GameStart_VSlice`.
+4. Copy the Android App Key and Rewarded Ad Unit ID into the `RewardedTicketController` component in `Shop_VSlice`.
 5. Open the app's `Set S2S callback` page.
 6. Use this callback endpoint:
 

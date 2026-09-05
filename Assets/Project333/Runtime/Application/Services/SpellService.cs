@@ -253,8 +253,7 @@ namespace Project333.Runtime.Application.Services
                 cardId,
                 affectedTargets);
 
-            ResolveSpellDefeat(battleState, affectedTargets);
-            RemoveDefeatedOccupants(targetBoard, affectedTargets);
+            OccupantDestructionService.ResolveDefeatedOccupants(battleState);
         }
 
         private void CastResolvedPersistentResourceSpell(
@@ -382,6 +381,67 @@ namespace Project333.Runtime.Application.Services
                         handCardRuntimeId);
                     return;
 
+                case BiochemicalBombRules.EffectId:
+                    if (!hasTarget)
+                    {
+                        throw new InvalidOperationException("Biochemical Bomb requires an enemy 4x2 area target.");
+                    }
+
+                    CastBiochemicalBomb(
+                        battleState,
+                        casterId,
+                        cardId,
+                        definition,
+                        targetOwnerId,
+                        targetCoord,
+                        handCardRuntimeId);
+                    return;
+
+                case PowerBankRules.EffectId:
+                    if (hasTarget)
+                    {
+                        throw new InvalidOperationException("Power Bank does not use a board target.");
+                    }
+
+                    CastImmediateResourceSpell(
+                        battleState,
+                        casterId,
+                        cardId,
+                        definition.Cost,
+                        new ResourceSet(mana: 0, qi: 0, power: PowerBankRules.PowerGain, gold: 0),
+                        handCardRuntimeId);
+                    return;
+
+                case ManaStoneRules.EffectId:
+                    if (hasTarget)
+                    {
+                        throw new InvalidOperationException("Mana Stone does not use a board target.");
+                    }
+
+                    CastImmediateResourceSpell(
+                        battleState,
+                        casterId,
+                        cardId,
+                        definition.Cost,
+                        new ResourceSet(mana: ManaStoneRules.ManaGain, qi: 0, power: 0, gold: 0),
+                        handCardRuntimeId);
+                    return;
+
+                case ManaStoneBundleRules.EffectId:
+                    if (hasTarget)
+                    {
+                        throw new InvalidOperationException("Mana Stone Bundle does not use a board target.");
+                    }
+
+                    CastImmediateResourceSpell(
+                        battleState,
+                        casterId,
+                        cardId,
+                        definition.Cost,
+                        new ResourceSet(mana: ManaStoneBundleRules.ManaGain, qi: 0, power: 0, gold: 0),
+                        handCardRuntimeId);
+                    return;
+
                 case RobotFusionRules.EffectId:
                     if (hasTarget)
                     {
@@ -389,6 +449,38 @@ namespace Project333.Runtime.Application.Services
                     }
 
                     BeginRobotFusion(battleState, casterId, cardId, definition.Cost, handCardRuntimeId);
+                    return;
+
+                case GuRules.EffectId:
+                    if (!hasTarget)
+                    {
+                        throw new InvalidOperationException("Gu requires an enemy Unit target.");
+                    }
+
+                    CastGu(
+                        battleState,
+                        casterId,
+                        cardId,
+                        definition.Cost,
+                        targetOwnerId,
+                        targetCoord,
+                        handCardRuntimeId);
+                    return;
+
+                case HuanShuRules.EffectId:
+                    if (!hasTarget)
+                    {
+                        throw new InvalidOperationException("HuanShu requires an enemy Unit target.");
+                    }
+
+                    CastHuanShu(
+                        battleState,
+                        casterId,
+                        cardId,
+                        definition.Cost,
+                        targetOwnerId,
+                        targetCoord,
+                        handCardRuntimeId);
                     return;
 
                 default:
@@ -477,6 +569,72 @@ namespace Project333.Runtime.Application.Services
                 targetRuntimeId: target.RuntimeId));
         }
 
+        private static void CastGu(
+            BattleState battleState,
+            PlayerId casterId,
+            string cardId,
+            ResourceSet cost,
+            PlayerId targetOwnerId,
+            TileCoord targetCoord,
+            string handCardRuntimeId)
+        {
+            if (!GuRules.TryFindDestination(battleState, casterId, out var destination))
+            {
+                throw new InvalidOperationException("Gu requires an empty tile on the caster's field.");
+            }
+
+            if (!GuRules.IsLegalTarget(battleState, casterId, targetOwnerId, targetCoord))
+            {
+                throw new InvalidOperationException(
+                    "Gu can only target a living, non-Sealbound, non-Hiding enemy Unit.");
+            }
+
+            var targetBoard = battleState.GetBoard(targetOwnerId);
+            var target = targetBoard.GetOccupant(targetCoord);
+            var caster = battleState.GetPlayer(casterId);
+            ConsumeSpellCard(caster, cardId, cost, handCardRuntimeId);
+
+            targetBoard.Remove(targetCoord);
+            target.TransferOwnership(casterId);
+            target.SetBattleTurnContext(battleState.ActivePlayerId, battleState.TurnNumber);
+
+            var canAttackImmediately = target.HasRush && !target.EffectsSuppressed;
+            target.HasSummoningSickness = !canAttackImmediately;
+            target.RemainingAttacksThisTurn = canAttackImmediately
+                ? target.EffectiveMaxAttacksPerTurn
+                : 0;
+
+            battleState.GetBoard(casterId).Place(destination, target);
+        }
+
+        private static void CastHuanShu(
+            BattleState battleState,
+            PlayerId casterId,
+            string cardId,
+            ResourceSet cost,
+            PlayerId targetOwnerId,
+            TileCoord targetCoord,
+            string handCardRuntimeId)
+        {
+            if (!HuanShuRules.IsLegalTarget(
+                    battleState,
+                    casterId,
+                    targetOwnerId,
+                    targetCoord))
+            {
+                throw new InvalidOperationException(
+                    "HuanShu can only target a living, non-Sealbound, non-Hiding enemy Unit.");
+            }
+
+            var target = battleState.GetBoard(targetOwnerId).GetOccupant(targetCoord);
+            ConsumeSpellCard(
+                battleState.GetPlayer(casterId),
+                cardId,
+                cost,
+                handCardRuntimeId);
+            target.ApplyHuanShu();
+        }
+
         private void CastFirewall(
             BattleState battleState,
             PlayerId casterId,
@@ -546,6 +704,60 @@ namespace Project333.Runtime.Application.Services
                 effectDamageType: definition.DamageType));
         }
 
+        private void CastBiochemicalBomb(
+            BattleState battleState,
+            PlayerId casterId,
+            string cardId,
+            ScriptedSpellCardDefinition definition,
+            PlayerId targetOwnerId,
+            TileCoord targetCoord,
+            string handCardRuntimeId)
+        {
+            if (targetOwnerId != battleState.GetOpponent(casterId).Id)
+            {
+                throw new InvalidOperationException("Biochemical Bomb can only target the opponent board.");
+            }
+
+            if (!BiochemicalBombRules.IsValidTargetStart(targetCoord))
+            {
+                throw new InvalidOperationException("Biochemical Bomb target must be the left or right 4x2 area.");
+            }
+
+            var caster = battleState.GetPlayer(casterId);
+            ConsumeSpellCard(caster, cardId, definition.Cost, handCardRuntimeId);
+
+            var upgradeLevel = _cardUpgradeLevelProvider.GetUpgradeLevel(casterId, definition.CardId);
+            var effectDamage = CardLevelSpellRules.ApplyDamageBonus(definition.Damage, upgradeLevel);
+            battleState.PersistentEffects.Add(new PersistentEffectState(
+                sourceCardId: cardId,
+                ownerId: casterId,
+                effectId: BiochemicalBombRules.EffectId,
+                appliedTurn: battleState.TurnNumber,
+                endConditionText: "Triggers at the next four global turn starts, then expires.",
+                turnStartResourceGain: new ResourceSet(),
+                remainingTriggers: definition.TriggerCount,
+                effectDamage: effectDamage,
+                effectDamageType: definition.DamageType,
+                targetStartColumn: targetCoord.Column));
+        }
+
+        private static void CastImmediateResourceSpell(
+            BattleState battleState,
+            PlayerId casterId,
+            string cardId,
+            ResourceSet cost,
+            ResourceSet resourceGain,
+            string handCardRuntimeId)
+        {
+            var caster = battleState.GetPlayer(casterId);
+            ConsumeSpellCard(caster, cardId, cost, handCardRuntimeId);
+            caster.Resources.Add(resourceGain);
+            battleState.RecordResourceChange(new BattleResourceChangeEvent(
+                casterId,
+                cardId,
+                gained: resourceGain));
+        }
+
         private static void EnsureSingleTargetSpellCanTarget(
             PlayerId casterId,
             PlayerId targetOwnerId,
@@ -572,38 +784,38 @@ namespace Project333.Runtime.Application.Services
             string sourceCardId,
             ISet<OccupantState> affectedTargets)
         {
-            var guardInfo = GuardService.Resolve(targetBoard, targetCoord);
-            if (guardInfo.IsProtected)
+            var shielderInfo = ShielderService.Resolve(targetBoard, targetCoord);
+            if (shielderInfo.IsProtected)
             {
-                affectedTargets.Add(guardInfo.Guard);
-                var guardHpBefore = Math.Max(0, guardInfo.Guard.CurrentHp);
-                var resolvedGuardDamage = DamageResolutionRules.ResolveIncomingDamage(
-                    guardInfo.Guard,
+                affectedTargets.Add(shielderInfo.Shielder);
+                var shielderHpBefore = Math.Max(0, shielderInfo.Shielder.CurrentHp);
+                var resolvedShielderDamage = DamageResolutionRules.ResolveIncomingDamage(
+                    shielderInfo.Shielder,
                     damage,
                     damageType);
                 var absorbedDamage = DamageResolutionRules.ApplyEffectDamage(
-                    guardInfo.Guard,
+                    shielderInfo.Shielder,
                     damage,
                     damageType);
                 BattleValuePopupRecorder.RecordDamage(
                     battleState,
-                    guardInfo.Guard,
+                    shielderInfo.Shielder,
                     absorbedDamage,
                     BattleValueChangeCause.Spell,
                     damageType,
                     casterId,
                     sourceCardId: sourceCardId);
-                var remainingDamage = Math.Max(0, resolvedGuardDamage - guardHpBefore);
+                var remainingDamage = Math.Max(0, resolvedShielderDamage - shielderHpBefore);
                 if (remainingDamage > 0)
                 {
-                    affectedTargets.Add(guardInfo.OriginalTarget);
+                    affectedTargets.Add(shielderInfo.OriginalTarget);
                     var overflowDamage = DamageResolutionRules.ApplyEffectDamage(
-                        guardInfo.OriginalTarget,
+                        shielderInfo.OriginalTarget,
                         remainingDamage,
                         damageType);
                     BattleValuePopupRecorder.RecordDamage(
                         battleState,
-                        guardInfo.OriginalTarget,
+                        shielderInfo.OriginalTarget,
                         overflowDamage,
                         BattleValueChangeCause.Spell,
                         damageType,
@@ -614,35 +826,19 @@ namespace Project333.Runtime.Application.Services
                 return;
             }
 
-            affectedTargets.Add(guardInfo.OriginalTarget);
+            affectedTargets.Add(shielderInfo.OriginalTarget);
             var actualDamage = DamageResolutionRules.ApplyEffectDamage(
-                guardInfo.OriginalTarget,
+                shielderInfo.OriginalTarget,
                 damage,
                 damageType);
             BattleValuePopupRecorder.RecordDamage(
                 battleState,
-                guardInfo.OriginalTarget,
+                shielderInfo.OriginalTarget,
                 actualDamage,
                 BattleValueChangeCause.Spell,
                 damageType,
                 casterId,
                 sourceCardId: sourceCardId);
-        }
-
-        private static void RemoveDefeatedOccupants(BoardState board, IEnumerable<OccupantState> occupants)
-        {
-            foreach (var occupant in occupants)
-            {
-                if (occupant == null || occupant.Kind == OccupantKind.Master || occupant.CurrentHp > 0)
-                {
-                    continue;
-                }
-
-                if (board.GetOccupant(occupant.Position) == occupant)
-                {
-                    board.Remove(occupant.Position);
-                }
-            }
         }
 
         private static void ConsumeSpellCard(
@@ -681,18 +877,5 @@ namespace Project333.Runtime.Application.Services
                 ?? throw new InvalidOperationException("The specified spell card does not match the expected definition type.");
         }
 
-        private static void ResolveSpellDefeat(BattleState battleState, IEnumerable<OccupantState> occupants)
-        {
-            foreach (var occupant in occupants)
-            {
-                if (occupant == null || occupant.Kind != OccupantKind.Master || occupant.CurrentHp > 0)
-                {
-                    continue;
-                }
-
-                battleState.EndBattle(battleState.GetOpponent(occupant.OwnerId).Id);
-                return;
-            }
-        }
     }
 }

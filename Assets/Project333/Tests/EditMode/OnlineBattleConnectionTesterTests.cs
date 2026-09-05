@@ -22,5 +22,26 @@ namespace Project333.Tests.EditMode
 
             Assert.That(result, Is.EqualTo(expectedSeconds));
         }
+
+        [Test]
+        public void IsExpiredPveReconnect_AutomaticPveExpiry_ReturnsTrue()
+        {
+            var result = OnlineBattleConnectionTester.IsExpiredPveReconnect(
+                "battle_reconnect_expired", true, true, false);
+
+            Assert.That(result, Is.True);
+        }
+
+        [TestCase("battle_reconnect_expired", false, true, false)]
+        [TestCase("battle_reconnect_expired", true, false, true)]
+        [TestCase("match_full", true, true, false)]
+        public void IsExpiredPveReconnect_OtherCases_ReturnFalse(
+            string code, bool reconnecting, bool serverAi, bool matchmaking)
+        {
+            var result = OnlineBattleConnectionTester.IsExpiredPveReconnect(
+                code, reconnecting, serverAi, matchmaking);
+
+            Assert.That(result, Is.False);
+        }
     }
 }

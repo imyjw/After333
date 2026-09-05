@@ -89,43 +89,43 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Attack_RangedVersusProtectedBackRow_HitsGuardInsteadOfOriginalTarget()
+        public void Attack_RangedVersusProtectedBackRow_HitsShielderInsteadOfOriginalTarget()
         {
             var battleState = CreateBattleState();
             var attackService = new AttackService();
             var attacker = CreateCombatUnit("attacker", PlayerId.Player, new TileCoord(0, 0), AttackType.Ranged, 4, 7);
-            var guard = CreateCombatUnit("guard", PlayerId.AI, new TileCoord(0, 0), AttackType.Melee, 0, 6, hasGuard: true);
+            var shielder = CreateCombatUnit("shielder", PlayerId.AI, new TileCoord(0, 0), AttackType.Melee, 0, 6, hasShielder: true);
             var defender = CreateCombatUnit("defender", PlayerId.AI, new TileCoord(0, 1), AttackType.Melee, 2, 5);
 
             attacker.HasSummoningSickness = false;
-            guard.HasSummoningSickness = false;
+            shielder.HasSummoningSickness = false;
             defender.HasSummoningSickness = false;
 
             battleState.PlayerBoard.Place(new TileCoord(0, 0), attacker);
-            battleState.AIBoard.Place(new TileCoord(0, 0), guard);
+            battleState.AIBoard.Place(new TileCoord(0, 0), shielder);
             battleState.AIBoard.Place(new TileCoord(0, 1), defender);
 
             attackService.Attack(battleState, PlayerId.Player, new TileCoord(0, 0), new TileCoord(0, 1));
 
-            Assert.That(guard.CurrentHp, Is.EqualTo(2));
+            Assert.That(shielder.CurrentHp, Is.EqualTo(2));
             Assert.That(defender.CurrentHp, Is.EqualTo(5));
         }
 
         [Test]
-        public void Attack_RangedVersusProtectedBackRow_WhenGuardHpIsInsufficient_SpillsRemainingDamageToOriginalTarget()
+        public void Attack_RangedVersusProtectedBackRow_WhenShielderHpIsInsufficient_SpillsRemainingDamageToOriginalTarget()
         {
             var battleState = CreateBattleState();
             var attackService = new AttackService();
             var attacker = CreateCombatUnit("attacker", PlayerId.Player, new TileCoord(0, 0), AttackType.Ranged, 8, 7);
-            var guard = CreateCombatUnit("guard", PlayerId.AI, new TileCoord(0, 0), AttackType.Melee, 0, 3, hasGuard: true);
+            var shielder = CreateCombatUnit("shielder", PlayerId.AI, new TileCoord(0, 0), AttackType.Melee, 0, 3, hasShielder: true);
             var defender = CreateCombatUnit("defender", PlayerId.AI, new TileCoord(0, 1), AttackType.Melee, 2, 6);
 
             attacker.HasSummoningSickness = false;
-            guard.HasSummoningSickness = false;
+            shielder.HasSummoningSickness = false;
             defender.HasSummoningSickness = false;
 
             battleState.PlayerBoard.Place(new TileCoord(0, 0), attacker);
-            battleState.AIBoard.Place(new TileCoord(0, 0), guard);
+            battleState.AIBoard.Place(new TileCoord(0, 0), shielder);
             battleState.AIBoard.Place(new TileCoord(0, 1), defender);
 
             attackService.Attack(battleState, PlayerId.Player, new TileCoord(0, 0), new TileCoord(0, 1));
@@ -425,6 +425,28 @@ namespace Project333.Tests.EditMode
             Assert.That(defender.CurrentHp, Is.EqualTo(8));
         }
 
+        [Test]
+        public void Attack_WhenBothMastersReachSameFinalHp_EndsBattleAsDraw()
+        {
+            var battleState = CreateBattleState();
+            battleState.Player.Master.CurrentHp = 3;
+            battleState.AI.Master.CurrentHp = 3;
+            battleState.Player.Master.HasSummoningSickness = false;
+            battleState.Player.Master.RemainingAttacksThisTurn = 1;
+
+            new AttackService().Attack(
+                battleState,
+                PlayerId.Player,
+                battleState.Player.Master.Position,
+                battleState.AI.Master.Position);
+
+            Assert.That(battleState.Player.Master.CurrentHp, Is.EqualTo(0));
+            Assert.That(battleState.AI.Master.CurrentHp, Is.EqualTo(0));
+            Assert.That(battleState.IsEnded, Is.True);
+            Assert.That(battleState.Result.HasWinner, Is.False);
+            Assert.That(battleState.Result.IsDraw, Is.True);
+        }
+
         private static UnitState CreateCombatUnit(
             string id,
             PlayerId ownerId,
@@ -435,7 +457,7 @@ namespace Project333.Tests.EditMode
             int hitsPerAttack = 1,
             bool hasBerserker = false,
             bool hasEndure = false,
-            bool hasGuard = false)
+            bool hasShielder = false)
         {
             return new UnitState(
                 runtimeId: id,
@@ -451,7 +473,7 @@ namespace Project333.Tests.EditMode
                 hitsPerAttack: hitsPerAttack,
                 hasBerserker: hasBerserker,
                 hasEndure: hasEndure,
-                hasGuard: hasGuard);
+                hasShielder: hasShielder);
         }
 
         private static BattleState CreateBattleState()

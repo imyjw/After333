@@ -13,6 +13,10 @@ namespace Project333.Runtime.Presentation.Draft
 {
     public sealed class DraftOverlayPresenter : MonoBehaviour
     {
+        [SerializeField, HideInInspector] private int _deckBuildingVisualVersion;
+        [SerializeField] private Font _interfaceFont;
+        public int DeckBuildingVisualVersion => _deckBuildingVisualVersion;
+
         [Serializable]
         private sealed class DraftOptionBinding
         {
@@ -138,6 +142,21 @@ namespace Project333.Runtime.Presentation.Draft
         {
             _host = host;
         }
+
+#if UNITY_EDITOR
+        [ContextMenu("Refresh Editable Draft UI")]
+        public void RefreshEditableSceneUi()
+        {
+            if (UnityEngine.Application.isPlaying || !TryInitializeFromSceneReferences()) return;
+            EnsureBackButton();
+            foreach (var option in _optionViews)
+            {
+                EnsureOptionStatTexts(option);
+                RefreshOptionStatLayout(option);
+            }
+            RefreshResponsiveOptionLayout(force: true);
+        }
+#endif
 
         public void ShowOffer(DraftOffer draftOffer, IReadOnlyList<string> draftedCardIds)
         {
@@ -309,7 +328,8 @@ namespace Project333.Runtime.Presentation.Draft
                 return;
             }
 
-            text.font = ResolveFont();
+            if (_deckBuildingVisualVersion == 0 || text.font == null)
+                text.font = ResolveFont();
             text.fontSize = Mathf.Max(1, _optionStatFontSize);
             text.fontStyle = FontStyle.Bold;
             text.color = _optionStatTextColor;
@@ -582,9 +602,11 @@ namespace Project333.Runtime.Presentation.Draft
                 }
             }
 
+            var createdButton = false;
             if (_backButton == null)
             {
                 var buttonObject = new GameObject("BackToStartButton", typeof(RectTransform), typeof(Image), typeof(Button));
+                createdButton = true;
                 var buttonRect = buttonObject.GetComponent<RectTransform>();
                 buttonRect.SetParent(_rootRectTransform, false);
 
@@ -605,7 +627,7 @@ namespace Project333.Runtime.Presentation.Draft
             }
 
             var rectTransform = _backButton.transform as RectTransform;
-            if (rectTransform != null)
+            if (rectTransform != null && (_deckBuildingVisualVersion == 0 || createdButton))
             {
                 rectTransform.anchorMin = new Vector2(0f, 1f);
                 rectTransform.anchorMax = new Vector2(0f, 1f);
@@ -615,7 +637,7 @@ namespace Project333.Runtime.Presentation.Draft
                 rectTransform.SetAsLastSibling();
             }
 
-            if (_backButton.TryGetComponent<Image>(out var image))
+            if ((_deckBuildingVisualVersion == 0 || createdButton) && _backButton.TryGetComponent<Image>(out var image))
             {
                 image.color = _backButtonColor;
                 image.raycastTarget = true;
@@ -640,11 +662,14 @@ namespace Project333.Runtime.Presentation.Draft
             if (_backButtonText != null)
             {
                 _backButtonText.text = string.IsNullOrWhiteSpace(_backButtonLabel) ? "Back To Start" : _backButtonLabel;
-                _backButtonText.font = ResolveFont();
-                _backButtonText.fontSize = Mathf.Max(1, _backButtonFontSize);
-                _backButtonText.color = _backButtonTextColor;
-                _backButtonText.alignment = TextAnchor.MiddleCenter;
-                _backButtonText.fontStyle = FontStyle.Bold;
+                if (_deckBuildingVisualVersion == 0 || createdButton)
+                {
+                    _backButtonText.font = ResolveFont();
+                    _backButtonText.fontSize = Mathf.Max(1, _backButtonFontSize);
+                    _backButtonText.color = _backButtonTextColor;
+                    _backButtonText.alignment = TextAnchor.MiddleCenter;
+                    _backButtonText.fontStyle = FontStyle.Bold;
+                }
             }
         }
 
@@ -805,13 +830,13 @@ namespace Project333.Runtime.Presentation.Draft
 
         private void ApplyResponsiveChromeLayout(float layoutScale, Rect rootRect)
         {
-            if (_titleText != null)
+            if (_titleText != null && _deckBuildingVisualVersion == 0)
             {
                 StretchTop(_titleText.rectTransform, 16f * layoutScale, 54f * layoutScale, 20f * layoutScale);
                 _titleText.fontSize = ScaleFontSize(_titleReferenceFontSize, layoutScale);
             }
 
-            if (_statusText != null)
+            if (_statusText != null && _deckBuildingVisualVersion == 0)
             {
                 StretchTop(_statusText.rectTransform, 78f * layoutScale, 46f * layoutScale, 24f * layoutScale);
                 _statusText.fontSize = ScaleFontSize(_statusReferenceFontSize, layoutScale);
@@ -845,13 +870,13 @@ namespace Project333.Runtime.Presentation.Draft
                 }
             }
 
-            if (_deckPanelTitleText != null)
+            if (_deckPanelTitleText != null && _deckBuildingVisualVersion == 0)
             {
                 StretchTop(_deckPanelTitleText.rectTransform, 14f * layoutScale, 38f * layoutScale, 16f * layoutScale);
                 _deckPanelTitleText.fontSize = ScaleFontSize(_deckTitleReferenceFontSize, layoutScale);
             }
 
-            if (_deckListScrollRect != null)
+            if (_deckListScrollRect != null && _deckBuildingVisualVersion == 0)
             {
                 StretchFill(
                     _deckListScrollRect.GetComponent<RectTransform>(),
@@ -861,7 +886,7 @@ namespace Project333.Runtime.Presentation.Draft
                     16f * layoutScale);
             }
 
-            if (_deckListText != null)
+            if (_deckListText != null && _deckBuildingVisualVersion == 0)
             {
                 _deckListText.fontSize = ScaleFontSize(_deckListReferenceFontSize, layoutScale);
             }
@@ -873,7 +898,7 @@ namespace Project333.Runtime.Presentation.Draft
 
         private void ApplyResponsiveBackButtonLayout(float layoutScale)
         {
-            if (_backButton == null)
+            if (_backButton == null || _deckBuildingVisualVersion > 0)
             {
                 return;
             }
@@ -1089,6 +1114,7 @@ namespace Project333.Runtime.Presentation.Draft
 
         private Font ResolveFont()
         {
+            if (_interfaceFont != null) return _interfaceFont;
             var draftFont = ResolveDraftFont();
             if (draftFont != null)
             {

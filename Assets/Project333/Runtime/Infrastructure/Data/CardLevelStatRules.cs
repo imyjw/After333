@@ -18,15 +18,46 @@ namespace Project333.Runtime.Infrastructure.Data
         public static CardLevelStatBonus CalculateBonus(string cardId, int upgradeLevel)
         {
             var normalizedLevel = NormalizeLevel(upgradeLevel);
+            if (string.Equals(cardId, DemonKingRules.CardId, System.StringComparison.Ordinal) ||
+                string.Equals(cardId, HeroRules.CardId, System.StringComparison.Ordinal))
+            {
+                return CalculateLevelThirteenTripleAttackBonus(normalizedLevel);
+            }
+
             return GrantsHpAtEveryLevel(cardId)
                 ? new CardLevelStatBonus(0, normalizedLevel)
                 : CalculateBonus(normalizedLevel);
         }
 
+        private static CardLevelStatBonus CalculateLevelThirteenTripleAttackBonus(int normalizedLevel)
+        {
+            var attackBonus = 0;
+            var attackMilestoneCount = 0;
+            for (var i = 0; i < AttackBonusLevels.Length; i++)
+            {
+                var milestone = AttackBonusLevels[i];
+                if (normalizedLevel < milestone)
+                {
+                    continue;
+                }
+
+                attackMilestoneCount++;
+                attackBonus += milestone == CardUpgradeRules.MaxLevel ? 3 : 1;
+            }
+
+            return new CardLevelStatBonus(
+                attackBonus,
+                normalizedLevel - attackMilestoneCount);
+        }
+
         private static bool GrantsHpAtEveryLevel(string cardId)
         {
             return string.Equals(cardId, RobotFactoryCardId, System.StringComparison.Ordinal) ||
-                   string.Equals(cardId, GaebangBranchRules.CardId, System.StringComparison.Ordinal);
+                   string.Equals(cardId, GaebangBranchRules.CardId, System.StringComparison.Ordinal) ||
+                   string.Equals(cardId, InnRules.CardId, System.StringComparison.Ordinal) ||
+                   string.Equals(cardId, MerchantCaravanRules.CardId, System.StringComparison.Ordinal) ||
+                   string.Equals(cardId, PowerPlantRules.CardId, System.StringComparison.Ordinal) ||
+                   string.Equals(cardId, NuclearPowerPlantRules.CardId, System.StringComparison.Ordinal);
         }
 
         public static int ApplyAttackBonus(int baseAttack, int upgradeLevel)

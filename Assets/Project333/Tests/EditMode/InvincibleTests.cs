@@ -67,7 +67,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Attack_InvincibleGuard_BlocksHitWithoutOverflow()
+        public void Attack_InvincibleShielder_BlocksHitWithoutOverflow()
         {
             var battleState = CreateBattleStateInMainPhase();
             var attacker = CreateUnit(
@@ -77,14 +77,14 @@ namespace Project333.Tests.EditMode
                 AttackType.Ranged,
                 attack: 20);
             attacker.HasSummoningSickness = false;
-            var guard = CreateUnit(
-                "guard",
+            var shielder = CreateUnit(
+                "shielder",
                 PlayerId.AI,
                 new TileCoord(0, 0),
                 attack: 0,
                 maxHp: 3,
-                hasGuard: true);
-            guard.AddInvincibleEffect(
+                hasShielder: true);
+            shielder.AddInvincibleEffect(
                 InvincibleDurationType.Always,
                 appliedTurnNumber: battleState.TurnNumber,
                 appliedActivePlayerId: battleState.ActivePlayerId);
@@ -94,7 +94,7 @@ namespace Project333.Tests.EditMode
                 new TileCoord(0, 1),
                 maxHp: 6);
             battleState.PlayerBoard.Place(attacker.Position, attacker);
-            battleState.AIBoard.Place(guard.Position, guard);
+            battleState.AIBoard.Place(shielder.Position, shielder);
             battleState.AIBoard.Place(protectedUnit.Position, protectedUnit);
 
             new AttackService().Attack(
@@ -103,7 +103,7 @@ namespace Project333.Tests.EditMode
                 attacker.Position,
                 protectedUnit.Position);
 
-            Assert.That(guard.CurrentHp, Is.EqualTo(3));
+            Assert.That(shielder.CurrentHp, Is.EqualTo(3));
             Assert.That(protectedUnit.CurrentHp, Is.EqualTo(6));
             Assert.That(battleState.ValuePopupEvents, Has.Count.EqualTo(1));
             Assert.That(battleState.ValuePopupEvents[0].IsInvinciblePrevented, Is.True);
@@ -299,7 +299,7 @@ namespace Project333.Tests.EditMode
             int maxHp = 20,
             int hitsPerAttack = 1,
             bool hasEndure = false,
-            bool hasGuard = false,
+            bool hasShielder = false,
             bool hasLifeSteal = false)
         {
             return new UnitState(
@@ -315,7 +315,7 @@ namespace Project333.Tests.EditMode
                 sciencePowerUpkeep: 0,
                 hitsPerAttack: hitsPerAttack,
                 hasEndure: hasEndure,
-                hasGuard: hasGuard,
+                hasShielder: hasShielder,
                 hasLifeSteal: hasLifeSteal);
         }
 

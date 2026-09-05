@@ -2,11 +2,11 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Project333.Runtime.Application.Accounts;
-using Project333.Runtime.Presentation.Ads;
 using Project333.Runtime.Presentation.Development;
 using Project333.Runtime.Presentation.Draft;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -17,6 +17,8 @@ namespace Project333.Runtime.Presentation.Startup
 {
     public sealed class GameStartSceneController : MonoBehaviour
     {
+        [SerializeField, HideInInspector] private int _pixelMenuLayoutVersion = 0;
+        public int PixelMenuLayoutVersion => _pixelMenuLayoutVersion;
         [SerializeField] private Image _backgroundImage;
         [SerializeField] private Sprite _backgroundSprite;
         [SerializeField] private string _backgroundResourcePath = "Project333/StartScene/GameStartBackground";
@@ -36,14 +38,20 @@ namespace Project333.Runtime.Presentation.Startup
         [SerializeField] private int _accountInfoFontSize = 24;
         [SerializeField] private Button _startGameButton;
         [SerializeField] private Text _startGameButtonLabel;
-        [SerializeField] private Button _purchaseTicketButton;
-        [SerializeField] private Text _purchaseTicketButtonLabel;
-        [SerializeField] private RewardedTicketController _rewardedTicketController;
-        [SerializeField] private Vector2 _purchaseTicketButtonSize = new Vector2(280f, 72f);
-        [SerializeField] private Vector2 _purchaseTicketButtonPosition = new Vector2(0f, -220f);
-        [SerializeField] private Color _purchaseTicketButtonColor = new Color(0.03f, 0.32f, 0.46f, 0.92f);
-        [SerializeField] private Color _purchaseTicketButtonTextColor = Color.white;
-        [SerializeField] private int _purchaseTicketButtonFontSize = 26;
+        [FormerlySerializedAs("_purchaseTicketButton")]
+        [SerializeField] private Button _shopButton;
+        [FormerlySerializedAs("_purchaseTicketButtonLabel")]
+        [SerializeField] private Text _shopButtonLabel;
+        [FormerlySerializedAs("_purchaseTicketButtonSize")]
+        [SerializeField] private Vector2 _shopButtonSize = new Vector2(280f, 72f);
+        [FormerlySerializedAs("_purchaseTicketButtonPosition")]
+        [SerializeField] private Vector2 _shopButtonPosition = new Vector2(0f, -220f);
+        [FormerlySerializedAs("_purchaseTicketButtonColor")]
+        [SerializeField] private Color _shopButtonColor = new Color(0.03f, 0.32f, 0.46f, 0.92f);
+        [FormerlySerializedAs("_purchaseTicketButtonTextColor")]
+        [SerializeField] private Color _shopButtonTextColor = Color.white;
+        [FormerlySerializedAs("_purchaseTicketButtonFontSize")]
+        [SerializeField] private int _shopButtonFontSize = 26;
         [SerializeField] private Button _ownedCardsButton;
         [SerializeField] private Text _ownedCardsButtonLabel;
         [SerializeField] private bool _applyOwnedCardsButtonLayout;
@@ -144,21 +152,19 @@ namespace Project333.Runtime.Presentation.Startup
         [SerializeField] private string _deckBuildingSceneName = "DeckBuilding_VSlice";
         [SerializeField] private string _battleSceneName = "Battle_VSlice";
         [SerializeField] private string _ownedCardsSceneName = "OwnedCards_VSlice";
+        [SerializeField] private string _shopSceneName = "Shop_VSlice";
         [SerializeField] private int _ticketCost = 3;
-        [SerializeField] private int _ticketPurchaseGoldCost = 3;
 
         private CancellationTokenSource _authCancellation;
         private CancellationTokenSource _gameIdAuthCancellation;
         private CancellationTokenSource _googleAuthCancellation;
         private CancellationTokenSource _logoutCancellation;
         private CancellationTokenSource _runStartCancellation;
-        private CancellationTokenSource _purchaseTicketCancellation;
         private bool _isAuthenticating;
         private bool _isGameIdAuthBusy;
         private bool _isGoogleAuthBusy;
         private bool _isLoggingOut;
         private bool _isStartingRun;
-        private bool _isPurchasingTicket;
         private bool _authFailed;
         private string _accountLoginGateStatus = "로그인 방법을 선택해주세요.";
         private ServerStatusResponse _serverStatus;
@@ -166,8 +172,8 @@ namespace Project333.Runtime.Presentation.Startup
         private ServerAccountSmokePanel _developmentSmokePanel;
         private bool _accountInfoPanelNeedsDefaultLayout;
         private bool _accountInfoTextNeedsDefaultLayout;
-        private bool _purchaseTicketButtonNeedsDefaultLayout;
-        private bool _purchaseTicketButtonLabelNeedsDefaultLayout;
+        private bool _shopButtonNeedsDefaultLayout;
+        private bool _shopButtonLabelNeedsDefaultLayout;
         private bool _ownedCardsButtonNeedsDefaultLayout;
         private bool _ownedCardsButtonLabelNeedsDefaultLayout;
         private bool _reconnectPvpButtonNeedsDefaultLayout;
@@ -216,8 +222,7 @@ namespace Project333.Runtime.Presentation.Startup
             !_isGameIdAuthBusy &&
             !_isGoogleAuthBusy &&
             !_isLoggingOut &&
-            !_isStartingRun &&
-            !_isPurchasingTicket;
+            !_isStartingRun;
 
         private void Awake()
         {
@@ -226,15 +231,14 @@ namespace Project333.Runtime.Presentation.Startup
             AutoAssignBackgroundImage();
             AutoAssignStartButtonImage();
             AutoAssignAccountInfoPanel();
-            AutoAssignPurchaseTicketButton();
+            AutoAssignShopButton();
             AutoAssignOwnedCardsButton();
             AutoAssignReconnectPvpButton();
             AutoAssignAccountLoginGate();
             AutoAssignServerSettingsPanel();
             RemoveLegacyAccountManagementPanels();
             EnsureAccountInfoPanel();
-            EnsurePurchaseTicketButton();
-            EnsureRewardedTicketController();
+            EnsureShopButton();
             EnsureOwnedCardsButton();
             EnsureReconnectPvpButton();
             EnsureAccountLoginGate();
@@ -244,7 +248,7 @@ namespace Project333.Runtime.Presentation.Startup
             ApplyBackgroundVisual();
             ApplyStartButtonVisual();
             ApplyAccountInfoVisual();
-            ApplyPurchaseTicketButtonVisual();
+            ApplyShopButtonVisual();
             ApplyOwnedCardsButtonVisual();
             ApplyReconnectPvpButtonVisual();
             ApplyServerSettingsPanelVisual();
@@ -261,15 +265,14 @@ namespace Project333.Runtime.Presentation.Startup
             AutoAssignBackgroundImage();
             AutoAssignStartButtonImage();
             AutoAssignAccountInfoPanel();
-            AutoAssignPurchaseTicketButton();
+            AutoAssignShopButton();
             AutoAssignOwnedCardsButton();
             AutoAssignReconnectPvpButton();
             AutoAssignAccountLoginGate();
             AutoAssignServerSettingsPanel();
             RemoveLegacyAccountManagementPanels();
             EnsureAccountInfoPanel();
-            EnsurePurchaseTicketButton();
-            EnsureRewardedTicketController();
+            EnsureShopButton();
             EnsureOwnedCardsButton();
             EnsureReconnectPvpButton();
             EnsureAccountLoginGate();
@@ -279,7 +282,7 @@ namespace Project333.Runtime.Presentation.Startup
             ApplyBackgroundVisual();
             ApplyStartButtonVisual();
             ApplyAccountInfoVisual();
-            ApplyPurchaseTicketButtonVisual();
+            ApplyShopButtonVisual();
             ApplyOwnedCardsButtonVisual();
             ApplyReconnectPvpButtonVisual();
             ApplyServerSettingsPanelVisual();
@@ -296,7 +299,6 @@ namespace Project333.Runtime.Presentation.Startup
             CancelGoogleAuth();
             CancelLogout();
             CancelRunStart();
-            CancelPurchaseTicket();
         }
 
         private void Update()
@@ -338,7 +340,6 @@ namespace Project333.Runtime.Presentation.Startup
             CancelGoogleAuth();
             CancelLogout();
             CancelRunStart();
-            CancelPurchaseTicket();
         }
 
         private void OnValidate()
@@ -381,7 +382,7 @@ namespace Project333.Runtime.Presentation.Startup
             AutoAssignBackgroundImage();
             AutoAssignStartButtonImage();
             AutoAssignAccountInfoPanel();
-            AutoAssignPurchaseTicketButton();
+            AutoAssignShopButton();
             AutoAssignOwnedCardsButton();
             AutoAssignReconnectPvpButton();
             AutoAssignAccountLoginGate();
@@ -390,8 +391,7 @@ namespace Project333.Runtime.Presentation.Startup
             if (!UnityEngine.Application.isPlaying)
             {
                 EnsureAccountInfoPanel();
-                EnsurePurchaseTicketButton();
-                EnsureRewardedTicketController();
+                EnsureShopButton();
                 EnsureOwnedCardsButton();
                 EnsureReconnectPvpButton();
                 EnsureAccountLoginGate();
@@ -403,7 +403,7 @@ namespace Project333.Runtime.Presentation.Startup
             ApplyBackgroundVisual();
             ApplyStartButtonVisual();
             ApplyAccountInfoVisual();
-            ApplyPurchaseTicketButtonVisual();
+            ApplyShopButtonVisual();
             ApplyOwnedCardsButtonVisual();
             ApplyReconnectPvpButtonVisual();
             ApplyServerSettingsPanelVisual();
@@ -459,86 +459,6 @@ namespace Project333.Runtime.Presentation.Startup
             }
 
             await StartServerDraftRunFromUiAsync();
-        }
-
-        public async void PurchaseTicketFromUi()
-        {
-            if (_isPurchasingTicket)
-            {
-                return;
-            }
-
-            if (!_useServerAccount)
-            {
-                SetStatus("서버 계정 모드에서만 티켓을 구매할 수 있습니다.");
-                RefreshUi();
-                return;
-            }
-
-            if (_isAuthenticating)
-            {
-                SetStatus("계정 정보를 불러오는 중입니다.");
-                RefreshUi();
-                return;
-            }
-
-            if (_authFailed)
-            {
-                SetStatus("서버 계정 로그인에 실패했습니다. 서버를 확인해주세요.");
-                RefreshUi();
-                return;
-            }
-
-            if (!AccountSessionState.IsAuthenticated)
-            {
-                SetStatus("게임을 이용하려면 먼저 로그인해주세요.");
-                RefreshUi();
-                return;
-            }
-
-            if (AccountSessionState.ResourceGold < _ticketPurchaseGoldCost)
-            {
-                SetStatus($"서버 골드가 부족합니다. 티켓 1개 구매에는 Gold {_ticketPurchaseGoldCost}개가 필요합니다.");
-                RefreshUi();
-                return;
-            }
-
-            CancelPurchaseTicket();
-            _purchaseTicketCancellation = new CancellationTokenSource();
-            _isPurchasingTicket = true;
-            SetStatus($"Gold {_ticketPurchaseGoldCost}개로 티켓 1개를 구매하는 중입니다.");
-            RefreshUi();
-
-            try
-            {
-                var client = new ServerRunClient(AccountServerUrl);
-                var response = await client.PurchaseTicketAsync(
-                    AccountSessionState.SessionToken,
-                    _purchaseTicketCancellation.Token);
-                AccountSessionState.ApplyPurchaseTicketResponse(response);
-                var goldCost = response.ResolvedResourceGoldCost > 0
-                    ? response.ResolvedResourceGoldCost
-                    : _ticketPurchaseGoldCost;
-                var ticketCount = response.ResolvedTicketCount > 0
-                    ? response.ResolvedTicketCount
-                    : 1;
-                Debug.Log($"After333 server ticket purchased: tickets=+{ticketCount}, gold=-{goldCost}, remainingTickets={AccountSessionState.Tickets}, remainingGold={AccountSessionState.ResourceGold}");
-                SetStatus($"티켓 구매 완료: Gold -{goldCost}, Ticket +{ticketCount}");
-            }
-            catch (OperationCanceledException)
-            {
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"After333 ticket purchase failed: {ex.Message}");
-                SetStatus($"티켓 구매 실패: {ex.Message}");
-            }
-            finally
-            {
-                _isPurchasingTicket = false;
-                CancelPurchaseTicket();
-                RefreshUi();
-            }
         }
 
         public void UseLocalServerEndpointFromUi()
@@ -848,6 +768,22 @@ namespace Project333.Runtime.Presentation.Startup
             SceneManager.LoadScene(sceneName);
         }
 
+        public void OpenShopSceneFromUi()
+        {
+            var sceneName = string.IsNullOrWhiteSpace(_shopSceneName)
+                ? "Shop_VSlice"
+                : _shopSceneName;
+
+            if (!UnityEngine.Application.CanStreamedLevelBeLoaded(sceneName))
+            {
+                SetStatus("상점 씬을 찾을 수 없습니다. Build Settings에 Shop_VSlice가 포함되어 있는지 확인해 주세요.");
+                RefreshUi();
+                return;
+            }
+
+            SceneManager.LoadScene(sceneName);
+        }
+
         public async void ReconnectPvpBattleFromUi()
         {
             if (!CanReconnectPvpBattle())
@@ -1030,19 +966,24 @@ namespace Project333.Runtime.Presentation.Startup
 
             if (_startGameButtonLabel != null)
             {
+                _startGameButtonLabel.gameObject.SetActive(true);
+                _startGameButtonLabel.enabled = true;
                 _startGameButtonLabel.text = BuildStartButtonLabel();
-                _startGameButtonLabel.enabled = _startButtonSprite == null;
             }
 
-            if (_purchaseTicketButton != null)
+            if (_shopButton != null)
             {
-                _purchaseTicketButton.gameObject.SetActive(_useServerAccount);
-                _purchaseTicketButton.interactable = CanPurchaseTicket();
+                _shopButton.gameObject.SetActive(_useServerAccount);
+                _shopButton.interactable =
+                    AccountSessionState.IsAuthenticated &&
+                    !_isAuthenticating &&
+                    !IsAccountAuthBusy &&
+                    !_isStartingRun;
             }
 
-            if (_purchaseTicketButtonLabel != null)
+            if (_shopButtonLabel != null)
             {
-                _purchaseTicketButtonLabel.text = BuildPurchaseTicketButtonLabel();
+                _shopButtonLabel.text = "상점";
             }
 
             if (_ownedCardsButton != null)
@@ -1052,8 +993,7 @@ namespace Project333.Runtime.Presentation.Startup
                     AccountSessionState.IsAuthenticated &&
                     !_isAuthenticating &&
                     !IsAccountAuthBusy &&
-                    !_isStartingRun &&
-                    !_isPurchasingTicket;
+                    !_isStartingRun;
             }
 
             if (_ownedCardsButtonLabel != null)
@@ -1086,7 +1026,6 @@ namespace Project333.Runtime.Presentation.Startup
 
             RefreshAccountLoginGateUi();
             RefreshDevelopmentSmokePanel();
-            _rewardedTicketController?.RefreshUi();
         }
 
         public void RefreshUiFromExternalState()
@@ -1428,36 +1367,14 @@ namespace Project333.Runtime.Presentation.Startup
             _runStartCancellation = null;
         }
 
-        private void CancelPurchaseTicket()
-        {
-            if (_purchaseTicketCancellation == null)
-            {
-                return;
-            }
-
-            _purchaseTicketCancellation.Cancel();
-            _purchaseTicketCancellation.Dispose();
-            _purchaseTicketCancellation = null;
-        }
-
         private string BuildTicketText()
         {
             if (!AccountSessionState.IsAuthenticated)
             {
-                return "Server Tickets: -   Gold: -";
+                return "Server Tickets: -     GOLD: -";
             }
 
-            return $"Server Tickets: {AccountSessionState.Tickets}   Gold: {AccountSessionState.ResourceGold}";
-        }
-
-        private string BuildPurchaseTicketButtonLabel()
-        {
-            if (_isPurchasingTicket)
-            {
-                return "티켓 구매 중...";
-            }
-
-            return $"티켓 구매\n{_ticketPurchaseGoldCost} Gold -> 1 Ticket";
+            return $"Server Tickets: {AccountSessionState.Tickets}     GOLD: {AccountSessionState.ResourceGold}";
         }
 
         private string BuildReconnectPvpButtonLabel()
@@ -1489,11 +1406,6 @@ namespace Project333.Runtime.Presentation.Startup
         {
             if (_useServerAccount)
             {
-                if (_isPurchasingTicket)
-                {
-                    return $"Gold {_ticketPurchaseGoldCost}개로 티켓 1개를 구매하는 중입니다.";
-                }
-
                 if (_isGameIdAuthBusy)
                 {
                     return "Game ID 계정 요청을 처리하는 중입니다.";
@@ -1557,42 +1469,37 @@ namespace Project333.Runtime.Presentation.Startup
             var serverStatusLine = BuildServerStatusLine();
             if (!_useServerAccount)
             {
-                return $"서버 계정 모드가 비활성화되었습니다.\nServer Tickets: -   Gold: -\n{serverStatusLine}";
+                return $"서버 계정 모드가 비활성화되었습니다.\n{serverStatusLine}";
             }
 
             if (_isAuthenticating)
             {
-                return $"서버 계정 로그인 중...\nServer Tickets: -   Gold: -\n{serverStatusLine}";
+                return $"서버 계정 로그인 중...\n{serverStatusLine}";
             }
 
             if (_isStartingRun)
             {
-                return $"서버 런 시작 중...\nServer Tickets: {AccountSessionState.Tickets}   Gold: {AccountSessionState.ResourceGold}\n{serverStatusLine}";
-            }
-
-            if (_isPurchasingTicket)
-            {
-                return $"티켓 구매 중...\nServer Tickets: {AccountSessionState.Tickets}   Gold: {AccountSessionState.ResourceGold}\n{serverStatusLine}";
+                return $"서버 런 시작 중...\n{serverStatusLine}";
             }
 
             if (_isGameIdAuthBusy)
             {
-                return $"Game ID 처리 중...\nServer Tickets: {AccountSessionState.Tickets}   Gold: {AccountSessionState.ResourceGold}\n{serverStatusLine}";
+                return $"Game ID 처리 중...\n{serverStatusLine}";
             }
 
             if (_isGoogleAuthBusy)
             {
-                return $"Google 로그인 처리 중...\nServer Tickets: {AccountSessionState.Tickets}   Gold: {AccountSessionState.ResourceGold}\n{serverStatusLine}";
+                return $"Google 로그인 처리 중...\n{serverStatusLine}";
             }
 
             if (_authFailed)
             {
-                return $"서버 계정 로그인 실패\nServer Tickets: -   Gold: -\n서버 주소: {AccountServerUrl}\n{serverStatusLine}";
+                return $"서버 계정 로그인 실패\n서버 주소: {AccountServerUrl}\n{serverStatusLine}";
             }
 
             if (!AccountSessionState.IsAuthenticated)
             {
-                return $"서버 계정 정보 없음\nServer Tickets: -   Gold: -\n{serverStatusLine}";
+                return $"서버 계정 정보 없음\n{serverStatusLine}";
             }
 
             var displayName = string.IsNullOrWhiteSpace(AccountSessionState.DisplayName)
@@ -1600,20 +1507,20 @@ namespace Project333.Runtime.Presentation.Startup
                 : AccountSessionState.DisplayName;
             if (AccountSessionState.HasResumableRun)
             {
-                return $"서버 계정: {displayName}\nServer Tickets: {AccountSessionState.Tickets}   Gold: {AccountSessionState.ResourceGold}\nActive Run: {AccountSessionState.ActiveRunStatus}  W:{AccountSessionState.ActiveRunWins} L:{AccountSessionState.ActiveRunLosses}\n{serverStatusLine}";
+                return $"서버 계정: {displayName}\nActive Run: {AccountSessionState.ActiveRunStatus}  W:{AccountSessionState.ActiveRunWins} L:{AccountSessionState.ActiveRunLosses}\n{serverStatusLine}";
             }
 
             if (AccountSessionState.HasUnclaimedLatestRunRewards)
             {
-                return $"서버 계정: {displayName}\nServer Tickets: {AccountSessionState.Tickets}   Gold: {AccountSessionState.ResourceGold}\nRewards Pending: W:{AccountSessionState.LatestRunWins} L:{AccountSessionState.LatestRunLosses}\n{serverStatusLine}";
+                return $"서버 계정: {displayName}\nRewards Pending: W:{AccountSessionState.LatestRunWins} L:{AccountSessionState.LatestRunLosses}\n{serverStatusLine}";
             }
 
             if (AccountSessionState.IsLatestRunRewardClaimed)
             {
-                return $"서버 계정: {displayName}\nServer Tickets: {AccountSessionState.Tickets}   Gold: {AccountSessionState.ResourceGold}\nLast Run: 보상 수령 완료\n{serverStatusLine}";
+                return $"서버 계정: {displayName}\nLast Run: 보상 수령 완료\n{serverStatusLine}";
             }
 
-            return $"서버 계정: {displayName}\nServer Tickets: {AccountSessionState.Tickets}   Gold: {AccountSessionState.ResourceGold}\n{serverStatusLine}";
+            return $"서버 계정: {displayName}\n{serverStatusLine}";
         }
 
         private string BuildServerStatusLine()
@@ -1755,24 +1662,11 @@ namespace Project333.Runtime.Presentation.Startup
             return !_isAuthenticating &&
                    !IsAccountAuthBusy &&
                    !_isStartingRun &&
-                   !_isPurchasingTicket &&
                    !_authFailed &&
                    AccountSessionState.IsAuthenticated &&
                    (AccountSessionState.HasResumableRun ||
                      AccountSessionState.HasUnclaimedLatestRunRewards ||
                      AccountSessionState.Tickets >= _ticketCost);
-        }
-
-        private bool CanPurchaseTicket()
-        {
-            return _useServerAccount &&
-                   !_isAuthenticating &&
-                   !IsAccountAuthBusy &&
-                   !_isStartingRun &&
-                   !_isPurchasingTicket &&
-                   !_authFailed &&
-                   AccountSessionState.IsAuthenticated &&
-                   AccountSessionState.ResourceGold >= _ticketPurchaseGoldCost;
         }
 
         private bool CanReconnectPvpBattle()
@@ -1783,7 +1677,6 @@ namespace Project333.Runtime.Presentation.Startup
                    !_isAuthenticating &&
                    !IsAccountAuthBusy &&
                    !_isStartingRun &&
-                   !_isPurchasingTicket &&
                    !_authFailed;
         }
 
@@ -1793,8 +1686,7 @@ namespace Project333.Runtime.Presentation.Startup
                 _useServerAccount &&
                 !_isAuthenticating &&
                 !IsAccountAuthBusy &&
-                !_isStartingRun &&
-                !_isPurchasingTicket;
+                !_isStartingRun;
 
             if (_gameIdAuthPanel != null)
             {
@@ -1860,8 +1752,7 @@ namespace Project333.Runtime.Presentation.Startup
                 serverConfigured &&
                 !_isAuthenticating &&
                 !IsAccountAuthBusy &&
-                !_isStartingRun &&
-                !_isPurchasingTicket;
+                !_isStartingRun;
 
             if (_googleAuthPanel != null)
             {
@@ -1944,8 +1835,7 @@ namespace Project333.Runtime.Presentation.Startup
                 _useServerAccount &&
                 !_isAuthenticating &&
                 !IsAccountAuthBusy &&
-                !_isStartingRun &&
-                !_isPurchasingTicket;
+                !_isStartingRun;
 
             if (_serverHttpUrlInput != null)
             {
@@ -2092,11 +1982,6 @@ namespace Project333.Runtime.Presentation.Startup
                 return "Wait for account sign-in restoration.";
             }
 
-            if (_isPurchasingTicket)
-            {
-                return "Wait for ticket purchase response.";
-            }
-
             if (_isStartingRun)
             {
                 return "Wait for run start response.";
@@ -2127,19 +2012,14 @@ namespace Project333.Runtime.Presentation.Startup
                 return "Click Game Start. Expected: tickets -3, Draft scene.";
             }
 
-            if (AccountSessionState.ResourceGold >= _ticketPurchaseGoldCost)
-            {
-                return "Click Buy Ticket. Expected: gold -3, tickets +1.";
-            }
-
-            return "Need more gold/rewards before starting a new run.";
+            return "Open Shop to buy tickets or earn more rewards.";
         }
 
         private string BuildDevelopmentSmokeExtraLine()
         {
             var startState = CanStartGame() ? "ON" : "OFF";
-            var buyState = CanPurchaseTicket() ? "ON" : "OFF";
-            return $"Buttons: Start {startState} / BuyTicket {buyState}";
+            var shopState = _shopButton != null && _shopButton.interactable ? "ON" : "OFF";
+            return $"Buttons: Start {startState} / Shop {shopState}";
         }
 
         private async Task RefreshServerStatusAsync(
@@ -2415,29 +2295,52 @@ namespace Project333.Runtime.Presentation.Startup
             }
         }
 
-        private void AutoAssignPurchaseTicketButton()
+        private void AutoAssignShopButton()
         {
-            if (_purchaseTicketButton == null)
+            if (_shopButton != null &&
+                string.Equals(_shopButton.name, "PurchaseTicketButton", StringComparison.Ordinal))
+            {
+                _shopButton.name = "ShopButton";
+            }
+
+            if (_shopButton == null)
             {
                 RectTransform buttonTransform = null;
-                if (transform.Find("CenterPanel/PurchaseTicketButton") is RectTransform centerButtonTransform)
+                if (transform.Find("CenterPanel/ShopButton") is RectTransform centerButtonTransform)
                 {
                     buttonTransform = centerButtonTransform;
                 }
-                else if (transform.Find("PurchaseTicketButton") is RectTransform rootButtonTransform)
+                else if (transform.Find("ShopButton") is RectTransform rootButtonTransform)
                 {
                     buttonTransform = rootButtonTransform;
+                }
+                else if (transform.Find("CenterPanel/PurchaseTicketButton") is RectTransform legacyCenterButtonTransform)
+                {
+                    buttonTransform = legacyCenterButtonTransform;
+                    buttonTransform.name = "ShopButton";
+                }
+                else if (transform.Find("PurchaseTicketButton") is RectTransform legacyRootButtonTransform)
+                {
+                    buttonTransform = legacyRootButtonTransform;
+                    buttonTransform.name = "ShopButton";
                 }
 
                 if (buttonTransform != null)
                 {
-                    _purchaseTicketButton = buttonTransform.GetComponent<Button>();
+                    _shopButton = buttonTransform.GetComponent<Button>();
                 }
             }
 
-            if (_purchaseTicketButtonLabel == null && _purchaseTicketButton != null)
+            if (_shopButtonLabel == null && _shopButton != null)
             {
-                _purchaseTicketButtonLabel = _purchaseTicketButton.GetComponentInChildren<Text>(true);
+                _shopButtonLabel = _shopButton.GetComponentInChildren<Text>(true);
+            }
+
+            if (_shopButtonLabel != null &&
+                (string.Equals(_shopButtonLabel.name, "PurchaseTicketButtonLabel", StringComparison.Ordinal) ||
+                 string.Equals(_shopButtonLabel.name, "Label", StringComparison.Ordinal)))
+            {
+                _shopButtonLabel.name = "ShopButtonLabel";
             }
         }
 
@@ -3541,7 +3444,7 @@ namespace Project333.Runtime.Presentation.Startup
 
         private void EnsureOwnedCardsButton()
         {
-            var parent = ResolvePurchaseTicketButtonParent();
+            var parent = ResolveCenterButtonParent();
             if (parent == null)
             {
                 return;
@@ -3593,7 +3496,7 @@ namespace Project333.Runtime.Presentation.Startup
 
         private void EnsureReconnectPvpButton()
         {
-            var parent = ResolvePurchaseTicketButtonParent();
+            var parent = ResolveCenterButtonParent();
             if (parent == null)
             {
                 return;
@@ -3643,71 +3546,50 @@ namespace Project333.Runtime.Presentation.Startup
             ApplyReconnectPvpButtonVisual();
         }
 
-        private void EnsureRewardedTicketController()
+        private void EnsureShopButton()
         {
-            if (_rewardedTicketController == null)
-            {
-                _rewardedTicketController = GetComponent<RewardedTicketController>();
-            }
-
-            if (_rewardedTicketController == null)
-            {
-#if UNITY_EDITOR
-                _rewardedTicketController = !UnityEngine.Application.isPlaying
-                    ? Undo.AddComponent<RewardedTicketController>(gameObject)
-                    : gameObject.AddComponent<RewardedTicketController>();
-#else
-                _rewardedTicketController = gameObject.AddComponent<RewardedTicketController>();
-#endif
-            }
-
-            _rewardedTicketController?.EnsureEditableHierarchy();
-        }
-
-        private void EnsurePurchaseTicketButton()
-        {
-            var parent = ResolvePurchaseTicketButtonParent();
+            var parent = ResolveCenterButtonParent();
             if (parent == null)
             {
                 return;
             }
 
-            if (_purchaseTicketButton == null)
+            if (_shopButton == null)
             {
-                var buttonObject = new GameObject("PurchaseTicketButton", typeof(RectTransform), typeof(Image), typeof(Button));
+                var buttonObject = new GameObject("ShopButton", typeof(RectTransform), typeof(Image), typeof(Button));
                 RegisterEditorCreatedObject(buttonObject);
                 var buttonTransform = buttonObject.GetComponent<RectTransform>();
                 buttonTransform.SetParent(parent, false);
-                _purchaseTicketButton = buttonObject.GetComponent<Button>();
-                _purchaseTicketButtonNeedsDefaultLayout = true;
+                _shopButton = buttonObject.GetComponent<Button>();
+                _shopButtonNeedsDefaultLayout = true;
             }
 
-            if (_purchaseTicketButtonLabel == null)
+            if (_shopButtonLabel == null)
             {
-                if (_purchaseTicketButton.transform.Find("PurchaseTicketButtonLabel") is RectTransform labelTransform)
+                if (_shopButton.transform.Find("ShopButtonLabel") is RectTransform labelTransform)
                 {
-                    _purchaseTicketButtonLabel = labelTransform.GetComponent<Text>();
-                    if (_purchaseTicketButtonLabel == null)
+                    _shopButtonLabel = labelTransform.GetComponent<Text>();
+                    if (_shopButtonLabel == null)
                     {
-                        _purchaseTicketButtonLabel = labelTransform.gameObject.AddComponent<Text>();
-                        _purchaseTicketButtonLabelNeedsDefaultLayout = true;
+                        _shopButtonLabel = labelTransform.gameObject.AddComponent<Text>();
+                        _shopButtonLabelNeedsDefaultLayout = true;
                     }
                 }
                 else
                 {
-                    var labelObject = new GameObject("PurchaseTicketButtonLabel", typeof(RectTransform), typeof(Text));
+                    var labelObject = new GameObject("ShopButtonLabel", typeof(RectTransform), typeof(Text));
                     RegisterEditorCreatedObject(labelObject);
                     var labelRect = labelObject.GetComponent<RectTransform>();
-                    labelRect.SetParent(_purchaseTicketButton.transform, false);
-                    _purchaseTicketButtonLabel = labelObject.GetComponent<Text>();
-                    _purchaseTicketButtonLabelNeedsDefaultLayout = true;
+                    labelRect.SetParent(_shopButton.transform, false);
+                    _shopButtonLabel = labelObject.GetComponent<Text>();
+                    _shopButtonLabelNeedsDefaultLayout = true;
                 }
             }
 
-            ApplyPurchaseTicketButtonVisual();
+            ApplyShopButtonVisual();
         }
 
-        private RectTransform ResolvePurchaseTicketButtonParent()
+        private RectTransform ResolveCenterButtonParent()
         {
             if (transform.Find("CenterPanel") is RectTransform centerPanel)
             {
@@ -3717,22 +3599,23 @@ namespace Project333.Runtime.Presentation.Startup
             return transform as RectTransform;
         }
 
-        private void ApplyPurchaseTicketButtonVisual()
+        private void ApplyShopButtonVisual()
         {
-            if (_purchaseTicketButton == null)
+            if (_shopButton == null)
             {
                 return;
             }
 
-            var buttonRect = _purchaseTicketButton.GetComponent<RectTransform>();
-            if (buttonRect != null && _purchaseTicketButtonNeedsDefaultLayout)
+            var applyDefaultButtonVisual = _shopButtonNeedsDefaultLayout;
+            var buttonRect = _shopButton.GetComponent<RectTransform>();
+            if (buttonRect != null && _shopButtonNeedsDefaultLayout)
             {
                 buttonRect.anchorMin = new Vector2(0.5f, 0.5f);
                 buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
                 buttonRect.pivot = new Vector2(0.5f, 0.5f);
-                buttonRect.sizeDelta = _purchaseTicketButtonSize;
-                buttonRect.anchoredPosition = _purchaseTicketButtonPosition;
-                _purchaseTicketButtonNeedsDefaultLayout = false;
+                buttonRect.sizeDelta = _shopButtonSize;
+                buttonRect.anchoredPosition = _shopButtonPosition;
+                _shopButtonNeedsDefaultLayout = false;
             }
 
             if (buttonRect != null)
@@ -3740,52 +3623,66 @@ namespace Project333.Runtime.Presentation.Startup
                 buttonRect.SetAsLastSibling();
             }
 
-            var buttonImage = _purchaseTicketButton.GetComponent<Image>();
+            var buttonImage = _shopButton.GetComponent<Image>();
             if (buttonImage == null)
             {
-                buttonImage = _purchaseTicketButton.gameObject.AddComponent<Image>();
+                buttonImage = _shopButton.gameObject.AddComponent<Image>();
+                applyDefaultButtonVisual = true;
             }
 
-            if (buttonImage != null)
+            if (buttonImage != null && applyDefaultButtonVisual)
             {
-                buttonImage.color = _purchaseTicketButtonColor;
+                buttonImage.color = _shopButtonColor;
                 buttonImage.raycastTarget = true;
-                _purchaseTicketButton.targetGraphic = buttonImage;
             }
 
-            var colors = _purchaseTicketButton.colors;
-            colors.normalColor = Color.white;
-            colors.highlightedColor = new Color(1f, 1f, 1f, 0.92f);
-            colors.pressedColor = new Color(0.78f, 0.92f, 1f, 0.9f);
-            colors.disabledColor = new Color(0.38f, 0.38f, 0.38f, 0.62f);
-            _purchaseTicketButton.colors = colors;
-            _purchaseTicketButton.onClick.RemoveListener(PurchaseTicketFromUi);
-            _purchaseTicketButton.onClick.AddListener(PurchaseTicketFromUi);
+            if (_shopButton.targetGraphic == null && buttonImage != null)
+            {
+                _shopButton.targetGraphic = buttonImage;
+            }
 
-            if (_purchaseTicketButtonLabel == null)
+            if (applyDefaultButtonVisual)
+            {
+                var colors = _shopButton.colors;
+                colors.normalColor = Color.white;
+                colors.highlightedColor = new Color(1f, 1f, 1f, 0.92f);
+                colors.pressedColor = new Color(0.78f, 0.92f, 1f, 0.9f);
+                colors.disabledColor = new Color(0.38f, 0.38f, 0.38f, 0.62f);
+                _shopButton.colors = colors;
+            }
+
+            _shopButton.onClick.RemoveListener(OpenShopSceneFromUi);
+            _shopButton.onClick.AddListener(OpenShopSceneFromUi);
+
+            if (_shopButtonLabel == null)
             {
                 return;
             }
 
-            _purchaseTicketButtonLabel.font = ResolveRuntimeFont();
-            _purchaseTicketButtonLabel.fontSize = _purchaseTicketButtonFontSize;
-            _purchaseTicketButtonLabel.fontStyle = FontStyle.Bold;
-            _purchaseTicketButtonLabel.alignment = TextAnchor.MiddleCenter;
-            _purchaseTicketButtonLabel.color = _purchaseTicketButtonTextColor;
-            _purchaseTicketButtonLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _purchaseTicketButtonLabel.verticalOverflow = VerticalWrapMode.Overflow;
-            _purchaseTicketButtonLabel.supportRichText = false;
-            _purchaseTicketButtonLabel.raycastTarget = false;
-
-            if (_purchaseTicketButtonLabelNeedsDefaultLayout)
+            if (_shopButtonLabelNeedsDefaultLayout)
             {
-                var labelRect = _purchaseTicketButtonLabel.rectTransform;
+                _shopButtonLabel.font = ResolveRuntimeFont();
+                _shopButtonLabel.fontSize = _shopButtonFontSize;
+                _shopButtonLabel.fontStyle = FontStyle.Bold;
+                _shopButtonLabel.alignment = TextAnchor.MiddleCenter;
+                _shopButtonLabel.color = _shopButtonTextColor;
+                _shopButtonLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
+                _shopButtonLabel.verticalOverflow = VerticalWrapMode.Overflow;
+                _shopButtonLabel.supportRichText = false;
+                _shopButtonLabel.raycastTarget = false;
+            }
+
+            if (_shopButtonLabelNeedsDefaultLayout)
+            {
+                var labelRect = _shopButtonLabel.rectTransform;
                 labelRect.anchorMin = Vector2.zero;
                 labelRect.anchorMax = Vector2.one;
                 labelRect.offsetMin = new Vector2(12f, 8f);
                 labelRect.offsetMax = new Vector2(-12f, -8f);
-                _purchaseTicketButtonLabelNeedsDefaultLayout = false;
+                _shopButtonLabelNeedsDefaultLayout = false;
             }
+
+            _shopButtonLabel.text = "상점";
         }
 
         private void ApplyOwnedCardsButtonVisual()
@@ -3795,6 +3692,7 @@ namespace Project333.Runtime.Presentation.Startup
                 return;
             }
 
+            var applyDefaultVisual = _ownedCardsButtonNeedsDefaultLayout;
             var buttonRect = _ownedCardsButton.GetComponent<RectTransform>();
             if (buttonRect != null && (_applyOwnedCardsButtonLayout || _ownedCardsButtonNeedsDefaultLayout))
             {
@@ -3815,21 +3713,29 @@ namespace Project333.Runtime.Presentation.Startup
             if (buttonImage == null)
             {
                 buttonImage = _ownedCardsButton.gameObject.AddComponent<Image>();
+                applyDefaultVisual = true;
             }
 
-            if (buttonImage != null)
+            if (buttonImage != null && applyDefaultVisual)
             {
                 buttonImage.color = _ownedCardsButtonColor;
                 buttonImage.raycastTarget = true;
+            }
+
+            if (_ownedCardsButton.targetGraphic == null)
+            {
                 _ownedCardsButton.targetGraphic = buttonImage;
             }
 
-            var colors = _ownedCardsButton.colors;
-            colors.normalColor = Color.white;
-            colors.highlightedColor = new Color(1f, 1f, 1f, 0.92f);
-            colors.pressedColor = new Color(0.78f, 0.88f, 1f, 0.9f);
-            colors.disabledColor = new Color(0.38f, 0.38f, 0.38f, 0.62f);
-            _ownedCardsButton.colors = colors;
+            if (applyDefaultVisual)
+            {
+                var colors = _ownedCardsButton.colors;
+                colors.normalColor = Color.white;
+                colors.highlightedColor = new Color(1f, 1f, 1f, 0.92f);
+                colors.pressedColor = new Color(0.78f, 0.88f, 1f, 0.9f);
+                colors.disabledColor = new Color(0.38f, 0.38f, 0.38f, 0.62f);
+                _ownedCardsButton.colors = colors;
+            }
             _ownedCardsButton.onClick.RemoveListener(OpenOwnedCardsSceneFromUi);
             _ownedCardsButton.onClick.AddListener(OpenOwnedCardsSceneFromUi);
 
@@ -3838,15 +3744,18 @@ namespace Project333.Runtime.Presentation.Startup
                 return;
             }
 
-            _ownedCardsButtonLabel.font = ResolveRuntimeFont();
-            _ownedCardsButtonLabel.fontSize = _ownedCardsButtonFontSize;
-            _ownedCardsButtonLabel.fontStyle = FontStyle.Bold;
-            _ownedCardsButtonLabel.alignment = TextAnchor.MiddleCenter;
-            _ownedCardsButtonLabel.color = _ownedCardsButtonTextColor;
-            _ownedCardsButtonLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _ownedCardsButtonLabel.verticalOverflow = VerticalWrapMode.Overflow;
-            _ownedCardsButtonLabel.supportRichText = false;
-            _ownedCardsButtonLabel.raycastTarget = false;
+            if (_ownedCardsButtonLabelNeedsDefaultLayout)
+            {
+                _ownedCardsButtonLabel.font = ResolveRuntimeFont();
+                _ownedCardsButtonLabel.fontSize = _ownedCardsButtonFontSize;
+                _ownedCardsButtonLabel.fontStyle = FontStyle.Bold;
+                _ownedCardsButtonLabel.alignment = TextAnchor.MiddleCenter;
+                _ownedCardsButtonLabel.color = _ownedCardsButtonTextColor;
+                _ownedCardsButtonLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
+                _ownedCardsButtonLabel.verticalOverflow = VerticalWrapMode.Overflow;
+                _ownedCardsButtonLabel.supportRichText = false;
+                _ownedCardsButtonLabel.raycastTarget = false;
+            }
             _ownedCardsButtonLabel.text = "보유 카드";
 
             if (_ownedCardsButtonLabelNeedsDefaultLayout)
@@ -3867,6 +3776,7 @@ namespace Project333.Runtime.Presentation.Startup
                 return;
             }
 
+            var applyDefaultButtonVisual = _reconnectPvpButtonNeedsDefaultLayout;
             var buttonRect = _reconnectPvpButton.GetComponent<RectTransform>();
             if (buttonRect != null && (_applyReconnectPvpButtonLayout || _reconnectPvpButtonNeedsDefaultLayout))
             {
@@ -3882,21 +3792,30 @@ namespace Project333.Runtime.Presentation.Startup
             if (buttonImage == null)
             {
                 buttonImage = _reconnectPvpButton.gameObject.AddComponent<Image>();
+                applyDefaultButtonVisual = true;
             }
 
-            if (buttonImage != null)
+            if (buttonImage != null && applyDefaultButtonVisual)
             {
                 buttonImage.color = _reconnectPvpButtonColor;
                 buttonImage.raycastTarget = true;
+            }
+
+            if (_reconnectPvpButton.targetGraphic == null && buttonImage != null)
+            {
                 _reconnectPvpButton.targetGraphic = buttonImage;
             }
 
-            var colors = _reconnectPvpButton.colors;
-            colors.normalColor = Color.white;
-            colors.highlightedColor = new Color(1f, 1f, 1f, 0.94f);
-            colors.pressedColor = new Color(1f, 0.82f, 0.72f, 0.92f);
-            colors.disabledColor = new Color(0.38f, 0.38f, 0.38f, 0.62f);
-            _reconnectPvpButton.colors = colors;
+            if (applyDefaultButtonVisual)
+            {
+                var colors = _reconnectPvpButton.colors;
+                colors.normalColor = Color.white;
+                colors.highlightedColor = new Color(1f, 1f, 1f, 0.94f);
+                colors.pressedColor = new Color(1f, 0.82f, 0.72f, 0.92f);
+                colors.disabledColor = new Color(0.38f, 0.38f, 0.38f, 0.62f);
+                _reconnectPvpButton.colors = colors;
+            }
+
             _reconnectPvpButton.onClick.RemoveListener(ReconnectPvpBattleFromUi);
             _reconnectPvpButton.onClick.AddListener(ReconnectPvpBattleFromUi);
 
@@ -3905,15 +3824,18 @@ namespace Project333.Runtime.Presentation.Startup
                 return;
             }
 
-            _reconnectPvpButtonLabel.font = ResolveRuntimeFont();
-            _reconnectPvpButtonLabel.fontSize = _reconnectPvpButtonFontSize;
-            _reconnectPvpButtonLabel.fontStyle = FontStyle.Bold;
-            _reconnectPvpButtonLabel.alignment = TextAnchor.MiddleCenter;
-            _reconnectPvpButtonLabel.color = _reconnectPvpButtonTextColor;
-            _reconnectPvpButtonLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _reconnectPvpButtonLabel.verticalOverflow = VerticalWrapMode.Overflow;
-            _reconnectPvpButtonLabel.supportRichText = false;
-            _reconnectPvpButtonLabel.raycastTarget = false;
+            if (_reconnectPvpButtonLabelNeedsDefaultLayout)
+            {
+                _reconnectPvpButtonLabel.font = ResolveRuntimeFont();
+                _reconnectPvpButtonLabel.fontSize = _reconnectPvpButtonFontSize;
+                _reconnectPvpButtonLabel.fontStyle = FontStyle.Bold;
+                _reconnectPvpButtonLabel.alignment = TextAnchor.MiddleCenter;
+                _reconnectPvpButtonLabel.color = _reconnectPvpButtonTextColor;
+                _reconnectPvpButtonLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
+                _reconnectPvpButtonLabel.verticalOverflow = VerticalWrapMode.Overflow;
+                _reconnectPvpButtonLabel.supportRichText = false;
+                _reconnectPvpButtonLabel.raycastTarget = false;
+            }
             _reconnectPvpButtonLabel.text = BuildReconnectPvpButtonLabel();
 
             if (_reconnectPvpButtonLabelNeedsDefaultLayout)
@@ -3929,6 +3851,14 @@ namespace Project333.Runtime.Presentation.Startup
 
         private void EnsureBackgroundSprite()
         {
+            if (_backgroundImage != null && _backgroundImage.sprite != null)
+            {
+                // The scene Image is the editable source of truth. Do not replace an
+                // Inspector-assigned background when entering Play Mode.
+                _backgroundSprite = _backgroundImage.sprite;
+                return;
+            }
+
             if (_backgroundSprite != null || string.IsNullOrWhiteSpace(_backgroundResourcePath))
             {
                 return;
@@ -3939,6 +3869,12 @@ namespace Project333.Runtime.Presentation.Startup
 
         private void EnsureStartButtonSprite()
         {
+            if (_startButtonImage != null && _startButtonImage.sprite != null)
+            {
+                _startButtonSprite = _startButtonImage.sprite;
+                return;
+            }
+
             if (_startButtonSprite != null || string.IsNullOrWhiteSpace(_startButtonResourcePath))
             {
                 return;
@@ -3949,7 +3885,9 @@ namespace Project333.Runtime.Presentation.Startup
 
         private void ApplyBackgroundVisual()
         {
-            if (_backgroundImage == null || _backgroundSprite == null)
+            if (_backgroundImage == null ||
+                _backgroundImage.sprite != null ||
+                _backgroundSprite == null)
             {
                 return;
             }
@@ -3962,7 +3900,9 @@ namespace Project333.Runtime.Presentation.Startup
 
         private void ApplyStartButtonVisual()
         {
-            if (_startButtonImage == null || _startButtonSprite == null)
+            if (_startButtonImage == null ||
+                _startButtonImage.sprite != null ||
+                _startButtonSprite == null)
             {
                 return;
             }
@@ -3971,11 +3911,6 @@ namespace Project333.Runtime.Presentation.Startup
             _startButtonImage.color = Color.white;
             _startButtonImage.type = Image.Type.Simple;
             _startButtonImage.preserveAspect = true;
-
-            if (_startGameButtonLabel != null)
-            {
-                _startGameButtonLabel.enabled = false;
-            }
         }
 
         private static Sprite LoadSpriteFromResources(string resourcePath)

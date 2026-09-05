@@ -17,7 +17,7 @@ namespace Project333.Runtime.Domain.Cards
                 throw new ArgumentOutOfRangeException(nameof(duration));
             }
 
-            if (duration == InvincibleDurationType.OwnerTurns)
+            if (HasTurnCount(duration))
             {
                 if (ownerTurnsRemaining <= 0)
                 {
@@ -27,7 +27,7 @@ namespace Project333.Runtime.Domain.Cards
             else if (ownerTurnsRemaining != 0)
             {
                 throw new ArgumentException(
-                    "Only OwnerTurns Invincible effects may have an owner-turn count.",
+                    "Only counted Invincible effects may have a remaining-turn count.",
                     nameof(ownerTurnsRemaining));
             }
 
@@ -55,6 +55,7 @@ namespace Project333.Runtime.Domain.Cards
                 InvincibleDurationType.OpponentTurnOnly => activePlayerId != ownerId,
                 InvincibleDurationType.UntilTurnEnd => true,
                 InvincibleDurationType.OwnerTurns => OwnerTurnsRemaining > 0,
+                InvincibleDurationType.GlobalTurnEnds => OwnerTurnsRemaining > 0,
                 _ => false,
             };
         }
@@ -73,7 +74,19 @@ namespace Project333.Runtime.Domain.Cards
                 return OwnerTurnsRemaining == 0;
             }
 
+            if (Duration == InvincibleDurationType.GlobalTurnEnds)
+            {
+                OwnerTurnsRemaining = Math.Max(0, OwnerTurnsRemaining - 1);
+                return OwnerTurnsRemaining == 0;
+            }
+
             return false;
+        }
+
+        private static bool HasTurnCount(InvincibleDurationType duration)
+        {
+            return duration == InvincibleDurationType.OwnerTurns ||
+                   duration == InvincibleDurationType.GlobalTurnEnds;
         }
 
         public InvincibleEffectState Clone()

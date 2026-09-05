@@ -23,7 +23,8 @@ namespace Project333.Runtime.Presentation.Settings
             "Draft_VSlice",
             "DeckBuilding_VSlice",
             "Battle_VSlice",
-            "OwnedCards_VSlice"
+            "OwnedCards_VSlice",
+            "Shop_VSlice"
         };
 
         [Header("Canvas")]
@@ -236,6 +237,11 @@ namespace Project333.Runtime.Presentation.Settings
                         return;
                     }
 
+                    SceneManager.LoadScene("GameStart_VSlice");
+                    return;
+
+                case "Shop_VSlice":
+                    _isHandlingSceneBackNavigation = true;
                     SceneManager.LoadScene("GameStart_VSlice");
                     return;
 

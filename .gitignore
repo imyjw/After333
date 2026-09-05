@@ -105,3 +105,21 @@ InitTestScene*.unity*
 
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+
+# Server source projects must be versioned; Unity-generated projects stay ignored.
+!/Server/**/*.csproj
+!/Server/**/*.sln
+/Server/**/bin/
+/Server/**/obj/
+/TempBuild/
+/.tmp/
+/Assets/_Recovery/
+/Assets/_Recovery.meta
+
+# Local credentials and signing keys.
+.env
+.env.local
+*.keystore
+*.jks
+*.pfx
+*.p12

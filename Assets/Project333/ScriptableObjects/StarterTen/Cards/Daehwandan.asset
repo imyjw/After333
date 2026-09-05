@@ -17,9 +17,9 @@ MonoBehaviour:
   _rarity: 4
   _cost:
     _mana: 0
-    _qi: 0
+    _qi: 5
     _power: 0
-    _gold: 3
+    _gold: 0
   _affiliation: 0
   _chargeTileFootprint: 0
   _effectText: "\uC0AC\uC6A9 \uC2DC \uB0B4 \uB9C8\uC2A4\uD130\uC758 \uACF5\uACA9\uB825

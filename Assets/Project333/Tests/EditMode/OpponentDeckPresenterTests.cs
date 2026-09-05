@@ -8,7 +8,7 @@ namespace Project333.Tests.EditMode
     public sealed class OpponentDeckPresenterTests
     {
         [Test]
-        public void PresentCount_CreatesTopLeftOpponentDeckStack()
+        public void PresentCount_CreatesTopRightOpponentDeckStackBelowGear()
         {
             var presenterObject = CreatePresenterObject();
 
@@ -20,10 +20,10 @@ namespace Project333.Tests.EditMode
 
                 var deckRoot = FindChildComponent<RectTransform>(presenterObject, "OpponentDeckRoot");
                 Assert.That(deckRoot, Is.Not.Null);
-                Assert.That(deckRoot.anchorMin, Is.EqualTo(new Vector2(0f, 1f)));
-                Assert.That(deckRoot.anchorMax, Is.EqualTo(new Vector2(0f, 1f)));
-                Assert.That(deckRoot.anchoredPosition.x, Is.GreaterThanOrEqualTo(0f));
-                Assert.That(deckRoot.anchoredPosition.y, Is.LessThanOrEqualTo(0f));
+                Assert.That(deckRoot.anchorMin, Is.EqualTo(Vector2.one));
+                Assert.That(deckRoot.anchorMax, Is.EqualTo(Vector2.one));
+                Assert.That(deckRoot.pivot, Is.EqualTo(Vector2.one));
+                Assert.That(deckRoot.anchoredPosition, Is.EqualTo(new Vector2(-24f, -126f)));
                 Assert.That(CountActiveCardBackImages(presenterObject), Is.EqualTo(3));
             }
             finally
@@ -48,6 +48,8 @@ namespace Project333.Tests.EditMode
 
                 Assert.That(presenter.IsTooltipVisible, Is.True);
                 Assert.That(presenter.TooltipMessage, Is.EqualTo("상대방 덱에 카드가 17장 남았습니다."));
+                var tooltip = FindChildComponent<RectTransform>(presenterObject, "DeckCountTooltip");
+                Assert.That(tooltip.pivot, Is.EqualTo(Vector2.one));
             }
             finally
             {

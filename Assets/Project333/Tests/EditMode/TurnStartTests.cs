@@ -26,6 +26,35 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.Player.Hand.Count, Is.EqualTo(startingHandCount + 1));
             Assert.That(battleState.Player.Deck.Count, Is.EqualTo(startingDeckCount - 1));
             Assert.That(battleState.Player.FailedDrawCount, Is.EqualTo(0));
+            Assert.That(battleState.CardDrawEvents, Has.Count.EqualTo(1));
+            Assert.That(battleState.CardDrawEvents[0].OwnerId, Is.EqualTo(PlayerId.Player));
+        }
+
+        [Test]
+        public void ResolveTurnStart_PreservesValueEventsFromThePrecedingTurnEnd()
+        {
+            var battleState = CreateBattleState(PlayerId.Player);
+            var service = new TurnStartService();
+            battleState.ValuePopupEvents.Add(new BattleValuePopupEvent(
+                runtimeId: "red-dragon-target",
+                ownerId: PlayerId.AI,
+                coord: new TileCoord(0, 0),
+                isHealing: false,
+                amount: 33,
+                sourceOwnerId: PlayerId.Player,
+                sourceRuntimeId: "red-dragon-source",
+                sourceCardId: "RedDragon",
+                cause: BattleValueChangeCause.RedDragon,
+                damageType: DamageType.Magic,
+                hpBefore: 50,
+                hpAfter: 17));
+
+            service.ResolveTurnStart(battleState);
+
+            Assert.That(battleState.ValuePopupEvents, Has.Count.EqualTo(1));
+            Assert.That(
+                battleState.ValuePopupEvents[0].Cause,
+                Is.EqualTo(BattleValueChangeCause.RedDragon));
         }
 
         [Test]
@@ -79,6 +108,7 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.Player.Hand.Count, Is.EqualTo(PlayerState.BaseMaxHandSize));
             Assert.That(battleState.Player.Deck.Count, Is.EqualTo(startingDeckCount - 1));
             Assert.That(battleState.Phase, Is.EqualTo(PhaseType.Main));
+            Assert.That(battleState.CardDrawEvents, Is.Empty);
         }
 
         [Test]
@@ -95,6 +125,7 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.Player.FailedDrawCount, Is.EqualTo(1));
             Assert.That(battleState.Phase, Is.EqualTo(PhaseType.Main));
             Assert.That(battleState.IsEnded, Is.False);
+            Assert.That(battleState.CardDrawEvents, Is.Empty);
         }
 
         [Test]

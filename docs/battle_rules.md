@@ -26,6 +26,9 @@ This document is the source of truth for battle setup, tile notation, actions, t
 
 - Each player has a Master Unit.
 - A player loses the battle when their Master Unit HP reaches 0 or below.
+- If both Master Units reach `0` or below during the same resolution, compare their final HP after all damage from that resolution is applied.
+- The Master with the lower final HP loses; if both final HP values are equal, the battle is a draw.
+- A draw does not add a win or a loss to either player's draft run record.
 
 ## Master Unit
 
@@ -113,12 +116,14 @@ Each turn follows this sequence:
 
 1. Resolve early scripted turn-start effects, including Timed Bomb countdown/detonation
 2. Gain base resources and active occupant resources
-3. Resolve power-upkeep payment
-4. Resolve active Robot Factory effects
-5. Resolve Firewall turn-start effects
-6. Resolve the base draw
-7. Main phase
-8. Turn end
+3. Resolve active Power Plant gold-to-power effects
+4. Resolve power-upkeep payment
+5. Resolve active Robot Factory effects
+6. Resolve Firewall and Biochemical Bomb turn-start effects together in cast order
+7. Resolve the base draw
+8. Resolve Sealbound countdown/release
+9. Main phase
+10. Turn end
 
 ## Draw and Resource Gain
 
@@ -154,7 +159,7 @@ Each turn follows this sequence:
 ## Power-Upkeep Payment
 
 - Any unit with `sciencePowerUpkeep > 0`, plus an explicitly defined building such as Robot Factory, requires power payment at turn start.
-- Power payment happens after the turn-start resource gain step and before Robot Factory, Firewall, and the base draw.
+- Power payment happens after the turn-start resource gain and Power Plant steps, and before Robot Factory, Firewall/Biochemical Bomb effects, and the base draw.
 - Payment is attempted automatically in a fixed tile order.
 - The fixed order is:
 
@@ -190,14 +195,14 @@ Erasure (`망각`) may affect Units, Buildings, and Master Units. It lasts until
 
 - Tooltip: `망각: 카드의 효과와 버프·디버프가 무효화됩니다.`
 - The occupant may still attack, counterattack, and move when its printed rules otherwise allow those actions.
-- Its card effects and traits are suppressed, including Berserker, multi-hit, additional attacks, Endure, Guard, LifeSteal, Rush, Replicate-related occupant traits, resource production, Robot Factory, SpellPower, Hiding, Flying, and Invincible.
+- Its card effects and traits are suppressed, including Berserker, multi-hit, additional attacks, Endure, Shielder, LifeSteal, Rush, Replicate-related occupant traits, resource production, Robot Factory, SpellPower, Hiding, Flying, and Invincible.
 - Its science power upkeep is suppressed. Applying Erasure immediately clears Drained, and an Erasure occupant cannot become Drained.
 - Applying Erasure removes every combat-time ATK, max-HP, Physical Defense, and Magic Defense modifier already on the occupant. Robot Fusion bonuses and the Daehwandan ATK bonus are included.
 - The original summon baseline remains: printed stats plus the account upgrade level used at summon. Current HP is never healed when a max-HP bonus is removed and is clamped only when it exceeds the restored maximum.
 - Buffs and debuffs applied after Erasure take effect normally. Reapplying Erasure removes the modifiers that exist at that later application time.
 - Base attack type, damage type, movement permission, tile size, baseline ATK/HP, baseline defenses, and account upgrade stats remain.
 - Robot classification is suppressed for battle searches, so an Erasure Robot cannot be counted or selected by Robot Fusion.
-- Erasure does not set defenses to `0`, multiply incoming damage, or remove front-row blocking. Guard is suppressed and therefore cannot redirect, but an ordinary front-row Erasure occupant still blocks.
+- Erasure does not set defenses to `0`, multiply incoming damage, or remove front-row blocking. Shielder is suppressed and therefore cannot redirect, but an ordinary front-row Erasure occupant still blocks.
 - Sealbound is a separate state and is not removed by Erasure.
 - Reconnect state stores `IsErasure` and the original combat-stat baseline. Legacy snapshots containing `IsDisabled` are migrated to `IsErasure` when restored.
 
@@ -394,9 +399,11 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 
 - Firebolt deals `10 Magic` damage to its selected occupied tile. It may target an occupant on either player's field, including either Master Unit.
 - An upgradeable damage spell gains `+1` base damage per card level, up to level `13`.
-- Red Dragon deals `66 Physical` damage to every enemy tile occupant at the end of its owner's turn.
+- Red Dragon deals `33 Magic` damage to every enemy tile occupant at the end of its owner's turn.
 - Empty-deck draw-failure damage is `Fixed`.
 - The development-only `333` Master damage command is `Fixed`.
+- Endure prevents the first lethal HP-damage packet from any source and leaves its active bearer at `1 HP`. This includes normal attacks, counterattacks, Physical/Magic/Fixed spell damage, persistent or delayed effects, area damage, destruction-trigger damage, and empty-deck damage.
+- Endure is consumed only when it prevents lethal damage. Later lethal damage defeats the occupant normally, and non-damage removal such as fusion-material consumption is not prevented.
 
 ### Gaebang Branch
 
@@ -409,6 +416,50 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 - Gaebang Branch upgrades grant HP `+1` at every level and never grant the normal milestone ATK bonus.
 - Gaebang Branch remains excluded from draft offers and random card rewards until its card art is ready.
 
+### Merchant Caravan
+
+- Merchant Caravan (`MerchantCaravan`, `상단`) is an Uncommon, non-attacking `1x1` Murim building with cost `4 Gold`, ATK `0`, HP `30`, defense `0/0`, and DamageType `None`.
+- It starts triggering on its owner's next turn start after it is summoned; it never triggers immediately on summon.
+- During the active-occupant resource-gain step, each living Merchant Caravan whose effects are not suppressed grants its owner `3 Gold`.
+- Multiple active Merchant Caravans stack and each grants `3 Gold` independently.
+- Drained, Erasure, and Sealbound suppress this effect. It resumes on a later owner turn start after suppression ends.
+- Merchant Caravan upgrades grant HP `+1` at every level and never grant the normal milestone ATK bonus.
+- Merchant Caravan remains excluded from draft offers and random card rewards until its card art is ready.
+
+### Inn
+
+- Inn (`Inn`, `객잔`) is a Common, non-attacking `1x1` Murim building with cost `2 Qi`, ATK `0`, HP `20`, defense `0/0`, and DamageType `None`.
+- It starts triggering on its owner's next turn start after it is summoned; it never triggers immediately on summon.
+- During the active-occupant resource-gain step, each living Inn whose effects are not suppressed grants its owner `1 Gold`.
+- Multiple active Inns stack and each grants `1 Gold` independently.
+- Drained, Erasure, and Sealbound suppress this effect. It resumes on a later owner turn start after suppression ends.
+- Inn upgrades grant HP `+1` at every level and never grant the normal milestone ATK bonus.
+- Inn remains excluded from draft offers and random card rewards until its card art is ready.
+
+### Power Bank
+
+- Power Bank is a Common Science Civilization scripted spell with cost `3 Gold` and no board target.
+- It can be cast only during its owner's main phase by dragging it upward from the hand.
+- Casting first pays the full `3 Gold` cost and moves the card from hand to discard, then immediately grants that player `6 Power`.
+- It creates no persistent effect and cannot use Gold to pay its printed Gold cost through substitution.
+- Power Bank is not upgradeable and remains excluded from draft offers and random card rewards until its card art is ready.
+
+### Mana Stone
+
+- Mana Stone is a Common Fantasy scripted spell with cost `4 Gold` and no board target.
+- It can be cast only during its owner's main phase by dragging it upward from the hand.
+- Casting first pays the full `4 Gold` cost and moves the card from hand to discard, then immediately grants that player `6 Mana`.
+- It creates no persistent effect and cannot use Gold to pay its printed Gold cost through substitution.
+- Mana Stone is not upgradeable and remains excluded from draft offers and random card rewards until its card art is ready.
+
+### Mana Stone Bundle
+
+- Mana Stone Bundle is an Uncommon Fantasy scripted spell with cost `6 Gold` and no board target.
+- It can be cast only during its owner's main phase by dragging it upward from the hand.
+- Casting first pays the full `6 Gold` cost and moves the card from hand to discard, then immediately grants that player `9 Mana`.
+- It creates no persistent effect and cannot use Gold to pay its printed Gold cost through substitution.
+- Mana Stone Bundle is not upgradeable and remains excluded from draft offers and random card rewards until its card art is ready.
+
 ### Firewall
 
 - Firewall is a persistent scripted spell with a base cost of `3 Mana` and base damage of `33 Magic`.
@@ -420,11 +471,28 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 - Each trigger occurs after base resources, occupant resources, power-upkeep payment, and Robot Factory effects, but before the base draw.
 - Each trigger deals its stored Magic damage to every current occupant in the selected row, including allied or enemy units, buildings, and the Master Unit.
 - If Firewall defeats its caster's Master, the opposing player wins.
-- Firewall is an area effect, so Guard does not redirect it. Every occupant in the row resolves defense and drained multiplication independently.
+- Firewall is an area effect, so Shielder does not redirect it. Every occupant in the row resolves defense and drained multiplication independently.
 - All damage from one Firewall instance is applied before defeated units/buildings are removed and Master defeat is checked.
 - An empty-row trigger still consumes one of the two triggers.
 - Multiple Firewall effects may coexist and resolve independently in creation order.
 - The spell card goes to discard when cast; the separate persistent effect expires after its second trigger.
+
+### Biochemical Bomb
+
+- Biochemical Bomb is an Uncommon Science Civilization scripted spell with cost `4 Power + 1 Gold` and base damage `44 Physical`.
+- The caster must select one of two areas on the opponent's field: left `4x2` (`columns 0..3`) or right `4x2` (`columns 1..4`). It cannot target the caster's own field.
+- The selected eight tiles are highlighted red while targeting. The selected start column is fixed when the spell is cast.
+- It does not deal damage immediately. It triggers at each of the next four global turn starts, regardless of whose turn begins, then expires.
+- A normal sequence after Player casts it is: opponent turn start `1`, Player turn start `2`, opponent turn start `3`, Player turn start `4` and expiration.
+- Each trigger evaluates the current occupants in the fixed area, so an occupant summoned or moved into the area after casting is damaged by later triggers.
+- Each trigger deals the stored Physical damage to every current unit, building, or Master in the area. Empty tiles do not prevent a trigger from being consumed.
+- Physical Defense, Invincible, and the Drained damage multiplier resolve independently for every target. Sealbound occupants take no damage.
+- Biochemical Bomb is an area effect, so Shielder does not redirect it and Hiding does not avoid it.
+- All damage from one Biochemical Bomb instance is applied before defeated units/buildings are removed and Master defeat is checked.
+- Firewall and Biochemical Bomb instances share one creation-order pass after Robot Factory and before the base draw, so mixed effects resolve in the order their cards were cast.
+- Multiple Biochemical Bomb effects may coexist. Each keeps its own fixed area, damage, and remaining trigger count.
+- Each upgrade level adds `+1` to every trigger's stored Physical damage; for example, Lv.3 deals `47 Physical`. Physical damage does not receive SpellPower.
+- The spell card goes to discard when cast. Biochemical Bomb remains excluded from draft offers and random card rewards until its art is ready.
 
 ### Timed Bomb
 
@@ -433,7 +501,7 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 - Every global turn start decreases its countdown once, regardless of whose turn begins.
 - If Player casts it and then ends the turn, the first countdown is the opponent's next turn start, the second is Player's following turn start, and it detonates at the opponent's next turn start.
 - On detonation it deals its stored Physical damage to every current occupant on the opposing field, including units, buildings, and the Master Unit.
-- Timed Bomb is an area effect, so Guard does not redirect it and Hiding does not avoid it. Sealbound occupants remain untargetable and take no damage.
+- Timed Bomb is an area effect, so Shielder does not redirect it and Hiding does not avoid it. Sealbound occupants remain untargetable and take no damage.
 - Physical Defense, Invincible, and the Drained damage multiplier resolve independently for every target.
 - All targets take damage before defeated non-Master occupants are removed and Master defeat is checked.
 - Each upgrade level adds `+1` to the stored Physical damage. Physical damage does not receive SpellPower.
@@ -462,6 +530,7 @@ An occupant with `0` ATK cannot counterattack.
 - Both participants deal their damage when the attack resolves.
 - Both participants can be destroyed by the same combat.
 - The melee counterattack still applies even if one side would be destroyed by the same exchange.
+- If both Master Units are defeated by the exchange, the higher final HP wins; equal final HP produces a draw.
 
 ### LifeSteal
 
@@ -501,6 +570,69 @@ An occupant with `0` ATK cannot counterattack.
 - The owner sees the generated card identity in combat history. The opponent sees only that Robot Factory generated one card, while the owner's public hand count increases normally.
 - Robot Factory upgrades grant HP `+1` at every level and never grant the normal milestone ATK bonus.
 
+### Power Plant
+
+- Power Plant is a Common, non-attacking `1x1` Science Civilization building with cost `1 Power`, ATK `0`, HP `30`, defense `0/0`, DamageType `None`, and no power upkeep.
+- It starts triggering on its owner's next turn start after it is summoned; it never triggers immediately on summon.
+- After base and active-occupant resource gain, but before power upkeep, each living Power Plant whose effects are not suppressed automatically pays exactly `1 Gold` and grants `2 Power`.
+- Gold is the effect's explicit payment, not a substitute payment. If `1 Gold` is unavailable, that Power Plant skips its trigger with no partial payment or debt.
+- Multiple active Power Plants resolve independently in fixed tile order `(0,0), (0,1), ... (4,1)`.
+- Drained, Erasure, and Sealbound suppress this effect. It resumes on a later owner turn start after suppression ends.
+- Power Plant upgrades grant HP `+1` at every level and never grant the normal milestone ATK bonus.
+- Power Plant remains excluded from draft offers and random card rewards until its card art is ready.
+
+### Nuclear Power Plant
+
+- Nuclear Power Plant is a Rare, non-attacking `1x1` Science Civilization building with cost `5 Power`, ATK `0`, HP `50`, defense `0/0`, DamageType `None`, and no power upkeep.
+- At its owner's turn-start active-occupant resource step, every living Nuclear Power Plant whose effects are not suppressed grants `5 Power`.
+- When a Nuclear Power Plant is destroyed, it is removed first and then deals `40 Physical` damage to every current occupant on both fields, including Units, Buildings, and both Master Units.
+- Physical Defense, Invincible, Sealbound immunity, and the Drained damage multiplier resolve independently for every target. Shielder does not redirect this area damage.
+- Drained, Erasure, and Sealbound suppress both its turn-start resource effect and its destruction effect.
+- If an explosion destroys another active Nuclear Power Plant, that plant is removed and creates another explosion. Each destroyed plant can trigger only once.
+- All queued Nuclear Power Plant explosions resolve before Master defeat is checked. If both Masters are defeated, the higher final HP wins; equal final HP produces a draw.
+- Nuclear Power Plant upgrades grant HP `+1` at every level and never grant the normal milestone ATK bonus.
+- Nuclear Power Plant remains excluded from draft offers and random card rewards until its card art is ready.
+
+### Gu
+
+- `Gu` (`고독`) is a Unique Murim non-damage Scripted Spell with cost `10 Qi` and `effectId: "gu"`.
+- It targets exactly one living enemy Unit. Master Units, Buildings, Sealbound occupants, and active Hiding units are not legal targets.
+- The caster must have an empty field tile. If no destination exists or the declared target is illegal, the command is rejected before any resource or hand-card consumption.
+- The controlled Unit moves permanently to the first empty caster tile in this fixed order: `(0,0), (0,1), (1,0), (1,1), ... (4,1)`.
+- The same occupant instance and RuntimeId are retained. Current ATK, current/max HP, defenses, attack and damage types, traits, buffs, debuffs, suppression states, Invincible durations, attack counts, and all other occupant state remain attached.
+- Drained, Erasure, and Invincible Units are legal targets and keep those states. Shielder neither redirects nor prevents Gu because Gu deals no damage.
+- After control changes, owner-dependent upkeep, turn-start resource gain, Shielder, SpellPower, Robot classification, and owner-turn duration checks use the new owner.
+- Persistent effects keep their own original owner. An effect attached by target RuntimeId continues to follow the controlled Unit until that effect's normal end condition.
+- Immediately after control changes, the Unit cannot attack during that turn. It becomes normally attack-ready at the start of its new owner's next turn.
+- An active Rush trait is the only exception: a non-suppressed Rush Unit receives its normal attack allowance immediately after control changes. Drained, Erasure, or Sealbound suppression prevents this Rush exception.
+- Movement availability is preserved and continues to follow the Unit's normal movement rules.
+- The transfer is not destruction, defeat, summon, or resurrection. It does not trigger removal/death semantics.
+- StateView and server-restart snapshots serialize the Unit under its new owner and board while preserving its RuntimeId and occupant state.
+- Gu is not redirected by Shielder, gains no SpellPower, cannot be upgraded, and remains excluded from draft offers and random rewards until its card art and presentation are ready.
+
+### HuanShu
+
+- `HuanShu` (`환술`) is an Uncommon Murim non-damage Scripted Spell with cost `3 Qi` and `effectId: "huan_shu"`.
+- It targets exactly one living enemy Unit. Master Units, Buildings, allied occupants, Sealbound occupants, and active enemy Hiding units are not legal declared targets.
+- A successful cast applies HuanShu permanently while that occupant remains on the field. Recasting an already afflicted Unit does not stack or change the status.
+- The duration decreases at the end of each turn belonging to the afflicted Unit's current owner, even if that Unit did not attack or could not act.
+- When the afflicted Unit declares an otherwise legal normal attack, the server replaces the target with one uniformly random legal HuanShu candidate before combat resolves.
+- The original player-selected target must still be legal under ordinary attack rules. HuanShu does not make an illegal attack command legal.
+- The random candidate pool contains every living Unit, Building, and Master Unit on both fields except the afflicted attacker itself.
+- Ownership, front-row blocking, and the originally selected target do not restrict the random candidate pool. The original target remains one possible candidate.
+- Sealbound occupants and active enemy Hiding occupants are excluded. A Hiding occupant allied with the afflicted attacker may be selected.
+- A non-Flying melee afflicted attacker cannot be redirected to an active Flying occupant. Ranged attackers and Flying attackers may be redirected to Flying occupants normally.
+- Invincible occupants remain candidates and take `0` damage under the normal Invincible rule.
+- The server selects once per declared attack. Every hit of a multi-hit attack uses that same resolved target. Each additional attack declaration performs a new random selection.
+- Counterattacks are never redirected by HuanShu. After target replacement, normal damage, Shielder, counterattack, LifeSteal, Endure, Berserker, removal, and victory rules resolve without special exceptions.
+- Drained prevents the afflicted Unit from attacking but does not remove HuanShu. Applying Erasure immediately removes HuanShu; a Unit already under Erasure may receive a newly cast HuanShu.
+- Sealbound does not remove an existing HuanShu. A new HuanShu cast cannot target a Sealbound Unit.
+- Gu preserves HuanShu when ownership changes.
+- Robot Fusion does not transfer HuanShu from absorbed materials. A surviving afflicted Robot keeps its own HuanShu status.
+- Server-authoritative random selection is included in synchronized battle events. StateView and server-restart snapshots preserve the remaining duration and countdown context; reconnect never rerolls a completed attack.
+- Both players see only a small purple HuanShu status icon on the occupant. Long-pressing the occupant shows the permanent HuanShu explanation without a turn counter.
+- HuanShu cannot be upgraded and remains excluded from draft offers and random rewards until its card art is ready.
+
 ### Replicate
 
 - `Replicate` (`hasReplicate: true`, Korean display name `복제`) may be used by units, buildings, and spells.
@@ -516,6 +648,17 @@ An occupant with `0` ATK cannot counterattack.
 - The opponent sees only the resulting hand-count change and never receives the temporary copy's hidden identity.
 - Reconnect snapshots preserve each hand card's runtime identity and temporary-Replicate flag.
 
+### Werewolf Pack Attack
+
+- The card-specific Werewolf rule applies only to occupants whose CardId is exactly `Werewolf`.
+- A living, active Werewolf gains `ATK +10` for each other living allied Werewolf currently on the same field.
+- The receiving Werewolf gains no pack bonus while Drained, under Erasure, or Sealbound.
+- When counting the other Werewolves, Drained and Erasure occupants still count because their CardId remains Werewolf. Sealbound and defeated Werewolves do not count.
+- The bonus is recalculated whenever ATK is read. Summoning, defeat, removal, Sealbound changes, and ownership transfer therefore update every affected Werewolf immediately without storing a permanent ATK modifier.
+- Card-level ATK upgrades remain part of the Werewolf's stored base combat stat. The pack bonus is added afterward and is not copied into reconnect snapshots as a permanent stat.
+- StateView carries both stored `BaseAttack` and final display `Attack`, so the client rebuilds the field from the stored value and applies the live bonus exactly once.
+- Werewolf also has Replicate and follows every normal Replicate rule above.
+
 ### Sealbound
 
 - `Sealbound` uses the card-data field `sealboundOwnerTurnStarts: n` on Unit and Building cards only.
@@ -524,15 +667,28 @@ An occupant with `0` ATK cannot counterattack.
 - A Sealbound occupant continues to occupy its tile. It cannot move, exchange positions with another occupant, attack, or counterattack.
 - A Sealbound occupant cannot activate effects or pay science power upkeep.
 - A Sealbound occupant cannot be selected or affected by attacks, spells, area damage, healing, buffs, or debuffs, and it takes no damage while Sealbound.
-- A Sealbound occupant is excluded from Guard, Robot Fusion material selection, Robot Factory searches, and equivalent occupant-search effects.
+- A Sealbound occupant is excluded from Shielder, Robot Fusion material selection, Robot Factory searches, and equivalent occupant-search effects.
 - A Sealbound occupant does not participate in front-row blocking.
-- Sealbound countdown and release are the final operations of the owner's turn-start sequence, after resources, upkeep, Robot Factory, Firewall, and base draw have resolved.
+- Sealbound countdown and release are the final operations of the owner's turn-start sequence, after resources, upkeep, Robot Factory, Firewall/Biochemical Bomb effects, and base draw have resolved.
 - When the remaining counter reaches `0`, Sealbound ends. Because release occurs last, the released occupant does not contribute resources, pay upkeep, or activate turn-start effects during that same turn start.
 - Unless it has Rush, an occupant released from Sealbound has summoning sickness for the release turn and cannot attack until its owner's following turn. Rush removes only this release-turn attack restriction.
 - Sealbound is independent from Drained and Erasure. A Sealbound occupant is immune to Erasure: applying Erasure while it is Sealbound has no effect and does not remove attached effects. Drained and upkeep evaluation are suspended while Sealbound and resume during the next applicable upkeep step after release.
 - Reconnect snapshots store `IsSealbound`, the remaining owner-turn-start count, and Rush so release-turn attack eligibility survives reconnection.
 - Master Units cannot be Sealbound.
 - Sealbound is implemented. Existing cards remain unaffected while `sealboundOwnerTurnStarts` is omitted or `0`.
+
+### Demon King Return
+
+- `DemonKing` is a movable `1x1` Fantasy Unit with melee Magic damage, base `33 ATK / 33 HP`, and `3 / 3` Physical/Magic Defense.
+- When a living Demon King reaches `0 HP` or is directly destroyed, it remains on the same tile at `0 HP` and enters a dedicated revival Sealbound state instead of being removed.
+- If its effects are suppressed by Drained or Erasure at the moment of death, the return effect does not trigger and the Demon King is removed permanently.
+- The countdown belongs to the player whose turn was active when the Demon King died, not necessarily the Demon King's owner. The death turn itself is never counted.
+- Each of that countdown player's next three turn starts reduces the counter `3 -> 2 -> 1 -> 0`. Revival resolves in the final Sealbound step of the third applicable turn start.
+- On each revival, cumulative `ATK +33` and `Max HP +33` are applied from the account-upgraded original stats, current HP is restored to the new maximum, and the revival count increases by one. The effect can repeat without a fixed limit.
+- Temporary combat buffs, debuffs, Drained, Erasure, Hiding reveal, HuanShu, Invincible effects, and consumed Endure state are cleared on revival. Card identity, account upgrade stats, damage/attack types, defenses, movement, and accumulated revival count remain.
+- A revived Demon King has summoning sickness and no attacks on the release turn. It has no Rush exception.
+- Removal that is explicitly not a death, such as being consumed as Robot Fusion material, does not trigger the return effect.
+- StateView and reconnect snapshots store the pending flag, remaining countdown, countdown player, eligible death turn, and cumulative revival count.
 
 ### Hiding
 
@@ -545,7 +701,7 @@ An occupant with `0` ATK cannot counterattack.
 - After the server accepts a legal normal-attack command, Hiding is removed before the first hit, damage, LifeSteal, and counterattack are resolved. A rejected or illegal attack attempt does not reveal it.
 - A revealed melee attacker receives a legal melee counterattack normally.
 - Multi-hit and additional-attack units reveal before the first hit of their first declared attack. Hiding does not return for later hits or attacks.
-- A hidden Guard does not redirect attacks or effects. Guard becomes active after Hiding is removed if no other state suppresses it.
+- A hidden Shielder does not redirect attacks or effects. Shielder becomes active after Hiding is removed if no other state suppresses it.
 - `HasHiding` and `HidingRevealed` are separate values. Entering Drained or Erasure permanently sets `HidingRevealed`; clearing Drained never restores Hiding, and Erasure itself remains for the occupant's time on the field.
 - If a Unit has both Sealbound and Hiding, Sealbound rules take priority while sealed. It becomes hidden when released unless Hiding was already permanently revealed by a separate legal rule.
 - StateView and reconnect snapshots preserve both the immutable `HasHiding` trait and `HidingRevealed` so the current state survives reconnection and server restoration.
@@ -561,8 +717,8 @@ An occupant with `0` ATK cannot counterattack.
 - A Flying occupant does not participate in front-row blocking.
 - Flying does not protect against single-target spells, area spells, healing, buffs, debuffs, or other non-normal-attack effects.
 - Flying does not change movement range, movement count, destination legality, or position-exchange rules.
-- A Flying Guard cannot redirect a non-Flying melee normal attack. It may redirect ranged normal attacks, normal attacks from Flying attackers, and other Guard-eligible effects.
-- A non-Flying Guard may protect a Flying occupant from any attack or effect that could legally target that Flying occupant.
+- A Flying Shielder cannot redirect a non-Flying melee normal attack. It may redirect ranged normal attacks, normal attacks from Flying attackers, and other Shielder-eligible effects.
+- A non-Flying Shielder may protect a Flying occupant from any attack or effect that could legally target that Flying occupant.
 - Flying is temporarily suppressed by Drained and remains suppressed for the duration of Erasure. While suppressed, a non-Flying melee attacker may target the occupant. Drained prevents front-row blocking through its own rule; an Erasure occupant whose Flying is suppressed participates in front-row blocking.
 - Clearing Drained restores Flying. Erasure does not clear while the occupant remains on the field, so Flying does not reactivate during that occupancy.
 - Active Hiding takes priority over Flying targeting permissions. After Hiding is revealed, the remaining Flying rules apply normally.
@@ -572,6 +728,21 @@ An occupant with `0` ATK cannot counterattack.
 - StateView and reconnect snapshots preserve `HasFlying` for every occupant, including Buildings and Master Units.
 - Flying is implemented. Existing cards remain unaffected while `hasFlying` is omitted or `false`.
 
+### Piercing
+
+- `Piercing` uses the occupant flag `hasPiercing: true`. Units and attack-capable Buildings may define it in card data, and Master Units may receive it from runtime battle setup.
+- Piercing applies to accepted normal attacks whose actual resolved target occupies either row of a field column.
+- After each normal-attack hit resolves, an occupied tile in the opposite row of the same column receives a separate damage packet with the attacker's same per-hit ATK amount and normal-attack DamageType. A front-row target pierces into the rear row, and a rear-row target pierces into the front row.
+- Units, Buildings, and Master Units are valid front and rear occupants for Piercing.
+- The opposite-row packet does not use Shielder redirection and never causes a counterattack. The opposite-row occupant applies its own matching defense, Drained defense loss and triple-damage rule, Invincible, Endure, removal, and victory rules normally.
+- Hiding and Flying do not prevent the opposite-row packet because Piercing does not select that occupant as a new attack target. Sealbound occupants take `0` Piercing damage under the normal Sealbound rule.
+- Multi-hit attacks apply one Piercing packet after every hit. Additional attacks evaluate Piercing independently for each declared attack.
+- LifeSteal includes the opposite-row occupant's actual HP loss after defense and prevention. On the final melee hit, direct and opposite-row damage resolve before the counterattack, then a surviving attacker heals from the combined actual HP loss.
+- When HuanShu redirects an attack, Piercing uses the actual random target's row and column rather than the originally selected target.
+- Drained and Sealbound prevent an occupant from attacking through their normal rules. Erasure suppresses Piercing even if the immutable `HasPiercing` trait remains stored.
+- StateView and server-restart snapshots preserve `HasPiercing` for Units, Buildings, and Master Units.
+- Piercing is implemented. Existing cards remain unaffected while `hasPiercing` is omitted or `false`.
+
 ### SpellPower
 
 - `SpellPower +n` uses the reserved future occupant value `spellPower: n`. Units, Buildings, and Master Units may provide SpellPower; `0` means none and negative values are invalid.
@@ -580,7 +751,7 @@ An occupant with `0` ATK cannot counterattack.
 - Magic normal attacks and Magic-damage effects originating from Units, Buildings, or Master Units do not receive SpellPower.
 - If one Spell produces mixed damage types, only its Magic packets receive the bonus.
 - Sum every living, active allied occupant's SpellPower with no maximum. Drained, Erasure, and Sealbound occupants provide none; Hiding and Flying do not suppress SpellPower.
-- Resolve raw Magic Spell damage as `card-level-adjusted damage + total SpellPower`, then apply Magic Defense, Drained multiplication, Guard, Endure, removal, and victory rules in their normal order.
+- Resolve raw Magic Spell damage as `card-level-adjusted damage + total SpellPower`, then apply Magic Defense, Drained multiplication, Shielder, Endure, removal, and victory rules in their normal order.
 - Area Magic Spell damage receives the full SpellPower bonus separately for every target.
 - Multi-hit Magic Spell damage receives the full SpellPower bonus on every hit.
 - A persistent or delayed Magic-damage Spell captures the caster's total SpellPower when the server accepts the play from hand. Later gains, losses, state changes, or removal of SpellPower sources do not alter that effect.
@@ -597,13 +768,14 @@ An occupant with `0` ATK cannot counterattack.
 - An Invincible occupant remains a legal target. Attacks, counterattacks, spells, persistent effects, and area effects still resolve their target and visual presentation, but damage does not reduce its HP.
 - Invincible prevents Physical, Magic, and Fixed damage. This includes normal attacks, counterattacks, spell damage, persistent and area damage, and empty-deck draw-failure damage.
 - Destroy, remove, sacrifice, fusion-material removal, set-HP, and other non-damage resolution are not prevented by Invincible.
-- Invincible effects use one of these duration conditions: permanent (`Always`), the summon turn (`SummonTurn`), only the owner's turn (`OwnerTurnOnly`), only the opponent's turn (`OpponentTurnOnly`), until the current global turn ends (`UntilTurnEnd`), or the owner's next `n` turns (`OwnerTurns(n)`).
+- Invincible effects use one of these duration conditions: permanent (`Always`), the summon turn (`SummonTurn`), only the owner's turn (`OwnerTurnOnly`), only the opponent's turn (`OpponentTurnOnly`), until the current global turn ends (`UntilTurnEnd`), the owner's next `n` turns (`OwnerTurns(n)`), or the next `n` global turn endings (`GlobalTurnEnds(n)`).
 - Korean card text for `OwnerTurns(n)` must say `내 n턴 동안 무적`. It is counted by the owner's turn endings, not by global turns. `OwnerTurns(2)` remains active until the owner has reached two turn endings after receiving the effect.
+- `GlobalTurnEnds(n)` decreases at every accepted turn end regardless of which player owns the ending turn. The turn in which the effect is granted is included if that turn later ends normally.
 - `SummonTurn` lasts from successful summon resolution through the end of that current global turn.
 - Separate Invincible effects keep separate duration state. The occupant remains Invincible while at least one unsuppressed effect is active.
 - Drained temporarily suppresses Invincible without deleting it. Erasure suppresses Invincible for the remainder of that occupant's time on the field. Invincible duration continues to advance normally.
 - Sealbound immunity takes priority while sealed. Hiding and Flying first determine whether a target is legal; if the target is legal, Invincible then prevents its HP loss.
-- An Invincible Guard resolves incoming damage as `0`, so it produces no overflow damage to the protected occupant and completely blocks that eligible hit.
+- An Invincible Shielder resolves incoming damage as `0`, so it produces no overflow damage to the protected occupant and completely blocks that eligible hit.
 - Because actual HP loss is `0`, LifeSteal heals `0`, damage-based Berserker gains do not trigger, and Endure is not consumed.
 - Every hit of a multi-hit attack still resolves and may play its hit presentation, but each hit deals `0` actual damage while Invincible is active.
 - A legal attack or hit event still occurs. No positive HP-damage event is produced; the client should show `무적` feedback instead of a damage number.
@@ -611,14 +783,26 @@ An occupant with `0` ATK cannot counterattack.
 - StateView and reconnect snapshots preserve every active Invincible effect's duration condition, start context, and remaining owner-turn count.
 - Invincible is implemented. Existing cards remain unaffected while `invincibleDuration` is omitted or `None`.
 
-### Guard Damage Transfer
+### Hero Growth
 
-- Guard still redirects eligible single-target attacks and effects before damage is applied.
-- First, resolve the incoming damage against the Guard using the Guard's matching defense and state.
-- The Guard absorbs up to the HP it had immediately before that hit.
+- `Hero` is a movable `1x1` Fantasy Unit with melee Fixed damage, base `3 ATK / 3 HP`, `0 / 0` Physical/Magic Defense, and a cost of `3 mana`.
+- On summon, Hero gains `GlobalTurnEnds(3)` Invincible. The summon turn's ending changes the count `3 -> 2`; the next opponent turn ending changes it `2 -> 1`; the next turn ending changes it `1 -> 0` and removes Invincible.
+- At every global turn end, each living Hero independently gains either permanent `Base ATK +13` or permanent `Max HP +13` with equal probability.
+- An HP growth also heals `Current HP +13`, so the Hero keeps the same amount of existing damage rather than being fully healed.
+- Hero growth has no stack limit. Multiple Heroes resolve independently in deterministic board order: Player board first, AI board second, then `(0,0), (0,1), (1,0), ... (4,1)` within each board.
+- Drained, Erasure, and Sealbound suppress Hero growth. Suppression does not pause the separate Invincible countdown.
+- Card-level upgrades are applied before battle. Hero gains ATK +1 at Lv.3, Lv.6, and Lv.9, ATK +3 at Lv.13, and HP +1 at every other level.
+- The authoritative server chooses each growth result. StateView and reconnect snapshots preserve the resulting base ATK, maximum/current HP, and remaining Invincible count; reconnect never rerolls completed growth.
+- Hero remains excluded from draft offers and random rewards until its card art is ready.
+
+### Shielder Damage Transfer
+
+- Shielder still redirects eligible single-target attacks and effects before damage is applied.
+- First, resolve the incoming damage against the Shielder using the Shielder's matching defense and state.
+- The Shielder absorbs up to the HP it had immediately before that hit.
 - Only the resolved damage above that pre-hit HP is transferred to the protected occupant.
 - The protected occupant then applies its own matching defense and state to the transferred damage.
-- Area effects are not redirected; the Guard and every other declared area target each resolve their own damage.
+- Area effects are not redirected; the Shielder and every other declared area target each resolve their own damage.
 
 ### Worked Examples
 
@@ -631,6 +815,8 @@ An occupant with `0` ATK cannot counterattack.
 
 - Apply all damage from a single attack or effect before checking for removal.
 - After that single attack or effect finishes resolving, any unit or building with `0` or less HP is removed immediately.
+- Removing a defeated occupant queues its eligible destruction effects. Resolve the queued effects, remove any newly defeated occupants, and queue their eligible destruction effects until no trigger remains.
+- Check Master defeat only after that complete destruction-trigger chain finishes, so simultaneous Master defeat compares the true final HP values.
 - Tiles vacated by removed occupants become empty immediately.
 
 ## Spell Rules

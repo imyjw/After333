@@ -114,7 +114,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Sealbound_BlocksDamageHealingBuffsErasureMovementGuardAndRobotSelection()
+        public void Sealbound_BlocksDamageHealingBuffsErasureMovementShielderAndRobotSelection()
         {
             var battleState = CreateBattleStateInMainPhase();
             var unit = new UnitState(
@@ -128,7 +128,7 @@ namespace Project333.Tests.EditMode
                 canMove: true,
                 isScience: false,
                 sciencePowerUpkeep: 0,
-                hasGuard: true,
+                hasShielder: true,
                 physicalDefense: 2,
                 magicDefense: 3,
                 hasRobot: true);
@@ -164,13 +164,13 @@ namespace Project333.Tests.EditMode
             Assert.That(unit.IsErasure, Is.False, "Sealbound occupants are immune to Erasure.");
             Assert.That(attachedEffect.IsExpired, Is.False,
                 "An Erasure attempt on a Sealbound occupant must not remove attached effects.");
-            Assert.That(unit.HasActiveGuard, Is.False);
+            Assert.That(unit.HasActiveShielder, Is.False);
             Assert.That(unit.HasActiveRobot, Is.False);
             Assert.That(RobotFusionRules.CountLivingRobots(battleState.PlayerBoard), Is.Zero);
             Assert.Throws<InvalidOperationException>(() =>
                 new MoveService().Move(battleState, PlayerId.Player, unit.Position, new TileCoord(1, 0)));
             Assert.Throws<InvalidOperationException>(() =>
-                GuardService.Resolve(battleState.PlayerBoard, unit.Position));
+                ShielderService.Resolve(battleState.PlayerBoard, unit.Position));
         }
 
         [Test]

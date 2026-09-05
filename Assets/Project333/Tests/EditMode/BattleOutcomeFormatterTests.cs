@@ -47,6 +47,17 @@ namespace Project333.Tests.EditMode
             Assert.That(outcome, Is.EqualTo("Defeat"));
         }
 
+        [Test]
+        public void Format_WhenBattleIsDraw_ReturnsDraw()
+        {
+            var battleState = CreateBattleState();
+            battleState.EndBattleAsDraw();
+
+            var outcome = BattleOutcomeFormatter.Format(battleState);
+
+            Assert.That(outcome, Is.EqualTo("Draw"));
+        }
+
         private static BattleState CreateBattleState()
         {
             return new BattleSetupService().CreateInitialState(

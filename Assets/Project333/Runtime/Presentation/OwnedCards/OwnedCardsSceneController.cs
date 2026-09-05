@@ -18,6 +18,9 @@ namespace Project333.Runtime.Presentation.OwnedCards
 {
     public sealed class OwnedCardsSceneController : MonoBehaviour
     {
+        [SerializeField, HideInInspector] private int _collectionVisualVersion;
+        public int CollectionVisualVersion => _collectionVisualVersion;
+
         private const int GridColumnCount = 6;
         private const int GridRowCount = 2;
         private const int CardsPerPage = GridColumnCount * GridRowCount;
@@ -783,6 +786,11 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
             if (_detailMetaText != null)
             {
+                if (_detailMetaText.text != (meta ?? string.Empty) &&
+                    _detailMetaText.GetComponentInParent<ScrollRect>() != null)
+                {
+                    _detailMetaText.rectTransform.anchoredPosition = Vector2.zero;
+                }
                 _detailMetaText.text = meta ?? string.Empty;
             }
         }
@@ -2144,12 +2152,12 @@ namespace Project333.Runtime.Presentation.OwnedCards
             ConfigureText(_backButtonLabel, 24, FontStyle.Bold, TextAnchor.MiddleCenter);
             ConfigureText(_upgradeButtonLabel, 18, FontStyle.Bold, TextAnchor.MiddleCenter);
 
-            if (_titleText != null)
+            if (_titleText != null && _collectionVisualVersion == 0)
             {
                 _titleText.text = "Owned Cards";
             }
 
-            if (_backButtonLabel != null)
+            if (_backButtonLabel != null && _collectionVisualVersion == 0)
             {
                 _backButtonLabel.text = "Back To Start";
             }
@@ -2194,6 +2202,13 @@ namespace Project333.Runtime.Presentation.OwnedCards
         private static void ConfigureText(Text text, int fontSize, FontStyle fontStyle, TextAnchor alignment)
         {
             if (text == null)
+            {
+                return;
+            }
+
+            // The authored collection layout owns typography; refresh only its data.
+            var controller = text.GetComponentInParent<OwnedCardsSceneController>();
+            if (controller != null && controller.CollectionVisualVersion > 0 && text.font != null)
             {
                 return;
             }

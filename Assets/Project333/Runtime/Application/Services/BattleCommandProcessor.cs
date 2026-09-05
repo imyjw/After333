@@ -52,6 +52,8 @@ namespace Project333.Runtime.Application.Services
             }
 
             battleState.ClearValuePopupEvents();
+            battleState.ClearResourceChangeEvents();
+            battleState.ClearAttackResolution();
 
             var handCardCommand = command as IHandCardCommand;
             var actorHand = battleState.GetPlayer(actorId).Hand;

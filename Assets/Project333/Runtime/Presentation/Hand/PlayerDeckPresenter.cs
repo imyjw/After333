@@ -45,8 +45,8 @@ namespace Project333.Runtime.Presentation.Hand
 
         [Header("Deck Layout")]
         [SerializeField] private Vector2 _cardSize = new Vector2(100f, 133f);
-        [SerializeField] private float _leftPadding = 28f;
         [SerializeField] private float _topPadding = 28f;
+        [SerializeField, HideInInspector] private int _opponentCornerLayoutVersion;
         [SerializeField] private float _rightPadding = 28f;
         [SerializeField] private float _bottomPadding = 28f;
         [SerializeField] private Vector2 _stackOffset = new Vector2(5f, 5f);
@@ -313,10 +313,17 @@ namespace Project333.Runtime.Presentation.Hand
 
             if (PresentsOpponentDeck)
             {
-                _deckRoot.anchorMin = new Vector2(0f, 1f);
-                _deckRoot.anchorMax = new Vector2(0f, 1f);
-                _deckRoot.pivot = new Vector2(0f, 1f);
-                _deckRoot.anchoredPosition = new Vector2(_leftPadding, -_topPadding);
+                if (_opponentCornerLayoutVersion < 1)
+                {
+                    // Gear: 24 top margin + 86 height, followed by a 16-unit gap.
+                    _topPadding = 126f;
+                    _rightPadding = 24f;
+                    _opponentCornerLayoutVersion = 1;
+                }
+                _deckRoot.anchorMin = Vector2.one;
+                _deckRoot.anchorMax = Vector2.one;
+                _deckRoot.pivot = Vector2.one;
+                _deckRoot.anchoredPosition = new Vector2(-_rightPadding, -_topPadding);
             }
             else
             {
@@ -374,11 +381,11 @@ namespace Project333.Runtime.Presentation.Hand
                 rectTransform.sizeDelta = _cardSize;
                 if (PresentsOpponentDeck)
                 {
-                    rectTransform.anchorMin = new Vector2(0f, 1f);
-                    rectTransform.anchorMax = new Vector2(0f, 1f);
-                    rectTransform.pivot = new Vector2(0f, 1f);
+                    rectTransform.anchorMin = Vector2.one;
+                    rectTransform.anchorMax = Vector2.one;
+                    rectTransform.pivot = Vector2.one;
                     rectTransform.anchoredPosition = new Vector2(
-                        _stackOffset.x * depth,
+                        -_stackOffset.x * depth,
                         -_stackOffset.y * depth);
                 }
                 else
@@ -466,9 +473,9 @@ namespace Project333.Runtime.Presentation.Hand
             _tooltipPanel.sizeDelta = _tooltipSize;
             if (PresentsOpponentDeck)
             {
-                _tooltipPanel.anchorMin = new Vector2(0f, 0f);
-                _tooltipPanel.anchorMax = new Vector2(0f, 0f);
-                _tooltipPanel.pivot = new Vector2(0f, 1f);
+                _tooltipPanel.anchorMin = new Vector2(1f, 0f);
+                _tooltipPanel.anchorMax = new Vector2(1f, 0f);
+                _tooltipPanel.pivot = Vector2.one;
                 _tooltipPanel.anchoredPosition = new Vector2(
                     _tooltipOffset.x,
                     -Mathf.Abs(_tooltipOffset.y));

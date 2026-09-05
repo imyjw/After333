@@ -66,10 +66,10 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void FormatTileOccupant_WhenOccupantHasGuard_ShowsGuardStatus()
+        public void FormatTileOccupant_WhenOccupantHasShielder_ShowsShielderStatus()
         {
             var occupant = new UnitState(
-                runtimeId: "unit-guard",
+                runtimeId: "unit-shielder",
                 cardId: "shieldbearer",
                 ownerId: PlayerId.Player,
                 position: new TileCoord(0, 0),
@@ -79,12 +79,12 @@ namespace Project333.Tests.EditMode
                 canMove: true,
                 isScience: false,
                 sciencePowerUpkeep: 0,
-                hasGuard: true);
+                hasShielder: true);
 
             var summary = BattleUiFormatter.FormatTileOccupant(occupant);
 
-            Assert.That(summary, Does.Contain("Guard"));
-            Assert.That(summary, Does.Not.Contain("Guard Off"));
+            Assert.That(summary, Does.Contain("Shielder"));
+            Assert.That(summary, Does.Not.Contain("Shielder Off"));
         }
 
         [Test]

@@ -92,7 +92,7 @@ namespace Project333.Runtime.Application.Services
                 hitsPerAttack: definition.HitsPerAttack,
                 hasBerserker: definition.HasBerserker,
                 hasEndure: definition.HasEndure,
-                hasGuard: definition.HasGuard,
+                hasShielder: definition.HasShielder,
                 hasLifeSteal: definition.HasLifeSteal,
                 damageType: definition.DamageType,
                 physicalDefense: definition.PhysicalDefense,
@@ -101,7 +101,8 @@ namespace Project333.Runtime.Application.Services
                 hasRush: definition.HasRush,
                 hasHiding: definition.HasHiding,
                 hasFlying: definition.HasFlying,
-                spellPower: definition.SpellPower);
+                spellPower: definition.SpellPower,
+                hasPiercing: definition.HasPiercing);
 
             playerState.Resources.Spend(definition.Cost);
             if (!playerState.Hand.Remove(definition.CardId, handCardRuntimeId))
@@ -155,7 +156,8 @@ namespace Project333.Runtime.Application.Services
                 magicDefense: definition.MagicDefense,
                 sciencePowerUpkeep: definition.SciencePowerUpkeep,
                 hasFlying: definition.HasFlying,
-                spellPower: definition.SpellPower);
+                spellPower: definition.SpellPower,
+                hasPiercing: definition.HasPiercing);
 
             playerState.Resources.Spend(definition.Cost);
             if (!playerState.Hand.Remove(definition.CardId, handCardRuntimeId))

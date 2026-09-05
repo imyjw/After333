@@ -1123,6 +1123,33 @@ namespace Project333.Runtime.Presentation.Online
             return Mathf.Min(safeMaximumDelay, safeInitialDelay * Mathf.Pow(2f, exponent));
         }
 
+        public static bool IsExpiredPveReconnect(string code, bool reconnecting, bool serverAi, bool matchmaking)
+        {
+            return reconnecting && serverAi && !matchmaking &&
+                   string.Equals(code, "battle_reconnect_expired", StringComparison.Ordinal);
+        }
+
+        private bool IsExpiredPveReconnectError(string code)
+        {
+            return IsExpiredPveReconnect(code, _isAutomaticReconnectActive, _joinUseServerAiOpponent, _joinUseMatchmakingQueue);
+        }
+
+        private void FinishExpiredPveReconnectAsDefeat()
+        {
+            StopPresentationQueue();
+            StopAutomaticReconnect(hideStatus: true);
+            CleanupSender();
+            if (_currentProjectedBattleState != null && !_currentProjectedBattleState.IsEnded)
+            {
+                _currentProjectedBattleState.EndBattle(PlayerId.AI);
+                PresentProjectedStateToBattleScreen();
+            }
+
+            const string message = "PVE 전투 재접속 시간이 만료되어 패배 처리되었습니다.";
+            SetStatus(message);
+            ShowOnlineErrorToast(message);
+        }
+
         private void CompleteAutomaticReconnect(bool battleEnded)
         {
             if (!_isAutomaticReconnectActive)
@@ -1261,6 +1288,12 @@ namespace Project333.Runtime.Presentation.Online
 
                 case OnlineBattleMessageType.Error:
                     var errorCode = envelope.Error?.Code ?? string.Empty;
+                    if (IsExpiredPveReconnectError(errorCode))
+                    {
+                        FinishExpiredPveReconnectAsDefeat();
+                        return 0f;
+                    }
+
                     var userFacingErrorMessage = FormatUserFacingServerError(errorCode, envelope.Error?.Message);
                     var errorMessage = string.IsNullOrWhiteSpace(errorCode)
                         ? userFacingErrorMessage
@@ -1735,10 +1768,12 @@ namespace Project333.Runtime.Presentation.Online
                     SourceCoord = CloneCoord(battleEvent.SourceCoord),
                     TargetOwnerId = ToLocalOwnerId(battleEvent.TargetOwnerId),
                     TargetCoord = CloneCoord(battleEvent.TargetCoord),
+                    TargetCoords = CloneCoords(battleEvent.TargetCoords),
                     RuntimeId = battleEvent.RuntimeId,
                     CardId = battleEvent.CardId,
                     SourceRuntimeId = battleEvent.SourceRuntimeId,
                     SourceCardId = battleEvent.SourceCardId,
+                    EffectId = battleEvent.EffectId,
                     TargetRuntimeId = battleEvent.TargetRuntimeId,
                     TargetCardId = battleEvent.TargetCardId,
                     CardAttack = battleEvent.CardAttack,
@@ -1827,10 +1862,12 @@ namespace Project333.Runtime.Presentation.Online
                 SourceDamagePrevented = entry.SourceDamagePrevented,
                 TargetDamagePrevented = entry.TargetDamagePrevented,
                 HasCounterattack = entry.HasCounterattack,
+                IsDraw = entry.IsDraw,
                 Amount = entry.Amount,
                 AttackBonus = entry.AttackBonus,
                 HpBonus = entry.HpBonus,
                 TurnNumber = entry.TurnNumber,
+                AttackType = entry.AttackType,
                 DamageType = entry.DamageType,
                 ValueCause = entry.ValueCause,
                 ResourceType = entry.ResourceType
@@ -1849,6 +1886,26 @@ namespace Project333.Runtime.Presentation.Online
                 Column = coord.Column,
                 Row = coord.Row
             };
+        }
+
+        private static List<TileCoordDto> CloneCoords(IReadOnlyList<TileCoordDto> coords)
+        {
+            var cloned = new List<TileCoordDto>();
+            if (coords == null)
+            {
+                return cloned;
+            }
+
+            for (var index = 0; index < coords.Count; index++)
+            {
+                var coord = CloneCoord(coords[index]);
+                if (coord != null)
+                {
+                    cloned.Add(coord);
+                }
+            }
+
+            return cloned;
         }
 
         private void PresentProjectedStateToBattleScreen()

@@ -97,7 +97,39 @@ namespace Project333.Runtime.Application.Services
             int damage,
             DamageType damageType)
         {
-            return ApplyDamage(recipient, damage, damageType, allowEndure: false);
+            return ApplyDamage(recipient, damage, damageType, allowEndure: true);
+        }
+
+        public static int ProjectEffectDamageTaken(
+            OccupantState recipient,
+            int damage,
+            DamageType damageType,
+            out int remainingHp,
+            out bool triggeredEndure)
+        {
+            if (recipient == null)
+            {
+                throw new ArgumentNullException(nameof(recipient));
+            }
+
+            if (recipient.IsSealbound || recipient.IsInvincible)
+            {
+                remainingHp = recipient.CurrentHp;
+                triggeredEndure = false;
+                return 0;
+            }
+
+            return ProjectDamageTaken(
+                recipient.CurrentHp,
+                recipient.IsDrained,
+                recipient.PhysicalDefense,
+                recipient.MagicDefense,
+                recipient.CanTriggerEndure,
+                damage,
+                damageType,
+                allowEndure: true,
+                out remainingHp,
+                out triggeredEndure);
         }
 
         public static int ProjectAttackDamageTaken(

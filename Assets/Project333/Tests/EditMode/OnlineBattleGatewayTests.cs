@@ -6,6 +6,7 @@ using Project333.Runtime.Application.Online;
 using Project333.Runtime.Application.Services;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Board;
+using Project333.Runtime.Domain.Cards;
 
 namespace Project333.Tests.EditMode
 {
@@ -42,6 +43,83 @@ namespace Project333.Tests.EditMode
             Assert.That(projected.PendingRobotFusion, Is.Not.Null);
             Assert.That(projected.PendingRobotFusion.OwnerId, Is.EqualTo(PlayerId.Player));
             Assert.That(projected.PendingRobotFusion.CardId, Is.EqualTo(RobotFusionRules.CardId));
+        }
+
+        [Test]
+        public void CreateAndProjectStateView_PreservesTooltipCombatTraits()
+        {
+            var battleState = new BattleSetupService().CreateInitialState(CreateRequest());
+            var unitCoord = new TileCoord(0, 0);
+            var buildingCoord = new TileCoord(1, 0);
+            var unit = new UnitState(
+                "tooltip-unit-runtime",
+                "tooltip-unit",
+                PlayerId.Player,
+                unitCoord,
+                AttackType.Melee,
+                attack: 10,
+                maxHp: 30,
+                canMove: true,
+                isScience: true,
+                sciencePowerUpkeep: 2,
+                maxAttacksPerTurn: 3,
+                hitsPerAttack: 2,
+                hasBerserker: true);
+            unit.RemainingAttacksThisTurn = 1;
+            var building = new BuildingState(
+                "tooltip-building-runtime",
+                "tooltip-building",
+                PlayerId.Player,
+                buildingCoord,
+                canAttack: false,
+                attack: 0,
+                maxHp: 40,
+                sciencePowerUpkeep: 1);
+            battleState.PlayerBoard.Place(unitCoord, unit);
+            battleState.PlayerBoard.Place(buildingCoord, building);
+
+            var view = new BattleStateViewFactory().CreateForPlayer(
+                battleState,
+                "tooltip-traits-match",
+                PlayerId.Player);
+            var unitView = view.Occupants.Find(candidate => candidate.RuntimeId == unit.RuntimeId);
+            var projected = BattleStateViewProjector.CreateLocalPerspectiveState(view);
+            var projectedUnit = (UnitState)projected.PlayerBoard.GetOccupant(unitCoord);
+            var projectedBuilding = (BuildingState)projected.PlayerBoard.GetOccupant(buildingCoord);
+
+            Assert.That(unitView, Is.Not.Null);
+            Assert.That(unitView.HasBerserker, Is.True);
+            Assert.That(unitView.HitsPerAttack, Is.EqualTo(2));
+            Assert.That(unitView.MaxAttacksPerTurn, Is.EqualTo(3));
+            Assert.That(unitView.SciencePowerUpkeep, Is.EqualTo(2));
+            Assert.That(projectedUnit.HasBerserker, Is.True);
+            Assert.That(projectedUnit.HitsPerAttack, Is.EqualTo(2));
+            Assert.That(projectedUnit.MaxAttacksPerTurn, Is.EqualTo(3));
+            Assert.That(projectedUnit.RemainingAttacksThisTurn, Is.EqualTo(1));
+            Assert.That(projectedUnit.SciencePowerUpkeep, Is.EqualTo(2));
+            Assert.That(projectedBuilding.SciencePowerUpkeep, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void StateViewSerialization_WritesHasShielderAndReadsLegacyHasGuard()
+        {
+            var envelope = new OnlineBattleEnvelope
+            {
+                MessageType = OnlineBattleMessageType.StateView,
+                StateView = new BattleStateViewDto()
+            };
+            envelope.StateView.Occupants.Add(new BoardOccupantViewDto
+            {
+                HasShielder = true
+            });
+
+            var currentJson = OnlineBattleMessageSerializer.SerializeEnvelope(envelope);
+            var legacyEnvelope = OnlineBattleMessageSerializer.DeserializeEnvelope(
+                "{\"MessageType\":\"StateView\",\"StateView\":{\"Occupants\":[{\"HasGuard\":true}]}}");
+
+            Assert.That(currentJson, Does.Contain("\"HasShielder\":true"));
+            Assert.That(currentJson, Does.Not.Contain("\"HasGuard\""));
+            Assert.That(legacyEnvelope.StateView.Occupants[0].HasShielder, Is.True);
         }
 
         [Test]
@@ -239,6 +317,45 @@ namespace Project333.Tests.EditMode
             Assert.That(envelope.MessageType, Is.EqualTo(OnlineBattleMessageType.JoinMatch));
             Assert.That(envelope.MatchId, Is.EqualTo("match-1"));
             Assert.That(envelope.PlayerToken, Is.EqualTo("token-a"));
+        }
+
+        [Test]
+        public void SerializeEnvelope_AreaSpellEffectPreservesEffectAndTargetTiles()
+        {
+            var envelope = new OnlineBattleEnvelope
+            {
+                MessageType = OnlineBattleMessageType.BattleEvents,
+                BattleEvents = new List<BattleEventDto>
+                {
+                    new BattleEventDto
+                    {
+                        EventType = BattleEventType.AreaSpellEffectTriggered,
+                        SourceOwnerId = PlayerId.Player,
+                        TargetOwnerId = PlayerId.AI,
+                        CardId = BiochemicalBombRules.CardId,
+                        SourceCardId = BiochemicalBombRules.CardId,
+                        EffectId = BiochemicalBombRules.EffectId,
+                        TargetCoord = new TileCoordDto { Column = 1, Row = 0 },
+                        TargetCoords = new List<TileCoordDto>
+                        {
+                            new TileCoordDto { Column = 1, Row = 0 },
+                            new TileCoordDto { Column = 1, Row = 1 },
+                            new TileCoordDto { Column = 2, Row = 0 },
+                        }
+                    }
+                }
+            };
+
+            var json = OnlineBattleMessageSerializer.SerializeEnvelope(envelope);
+            var roundTripped = OnlineBattleMessageSerializer.DeserializeEnvelope(json);
+            var areaEvent = roundTripped.BattleEvents[0];
+
+            Assert.That(areaEvent.EventType, Is.EqualTo(BattleEventType.AreaSpellEffectTriggered));
+            Assert.That(areaEvent.EffectId, Is.EqualTo(BiochemicalBombRules.EffectId));
+            Assert.That(areaEvent.SourceCardId, Is.EqualTo(BiochemicalBombRules.CardId));
+            Assert.That(areaEvent.TargetCoords, Has.Count.EqualTo(3));
+            Assert.That(areaEvent.TargetCoords[2].Column, Is.EqualTo(2));
+            Assert.That(areaEvent.TargetCoords[2].Row, Is.Zero);
         }
 
         [Test]

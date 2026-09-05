@@ -90,7 +90,8 @@ See [battle_rules.md](./battle_rules.md).
 - Resource Gold is gained through run-end rewards.
 - Resource Gold is used to upgrade cards.
 - Resource Gold is used to buy tickets to start the game.
-- A future shop may also use Resource Gold, but shop rules are not implemented.
+- The first shop product exchanges `3` Resource Gold for `1` game ticket.
+- Ticket purchases are made from the dedicated `Shop_VSlice` scene opened from the Game Start scene.
 
 ## Meta Systems
 
@@ -126,8 +127,8 @@ Confirmed temporary rules:
   - Reaching `Lv.3`, `Lv.6`, `Lv.9`, and `Lv.13` grants `ATK +1` instead of `HP +1`.
 - Therefore, a `Lv.13` card has total bonuses of `ATK +4` and `HP +9`.
 - Unit and Building cards are upgradeable.
-- Firebolt (`firebolt`, 파이어볼) is the currently upgradeable Spell card.
-- Microreactor (`Microreactor`, 초소형 발전기), Cheonra Jimang (`CheonraJimang`, 천라지망), and Daehwandan (`Daehwandan`, 대환단) are not upgradeable.
+- Firebolt (`firebolt`), Firewall (`Firewall`), Timed Bomb (`TimedBomb`), and Biochemical Bomb (`BiochemicalBomb`) are upgradeable Spell cards; each level adds `+1` to their direct or stored damage.
+- Microreactor (`Microreactor`, 초소형 발전기), Cheonra Jimang (`CheonraJimang`, 천라지망), Daehwandan (`Daehwandan`, 대환단), and Ten Thousand Year Snow Ginseng (`TenThousandYearSnowGinseng`, 영약: 만년설삼) are not upgradeable.
 - Cards marked non-upgradeable are excluded from random run card rewards.
 
 ### Ticket

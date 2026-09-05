@@ -63,8 +63,9 @@ namespace Project333.Runtime.Application.Services
                 return;
             }
 
-            battleState.ClearValuePopupEvents();
             battleState.ClearCardGenerationEvents();
+            battleState.ClearResourceChangeEvents();
+            battleState.ClearAreaSpellEffectEvents();
 
             ResolveScriptedTurnStartEffects(battleState);
             if (battleState.IsEnded)
@@ -80,6 +81,11 @@ namespace Project333.Runtime.Application.Services
 
             if (!battleState.IsEnded)
             {
+                ResolvePowerPlantEffects(battleState);
+            }
+
+            if (!battleState.IsEnded)
+            {
                 _scienceUpkeepService.ResolveUpkeep(battleState);
             }
 
@@ -90,7 +96,7 @@ namespace Project333.Runtime.Application.Services
 
             if (!battleState.IsEnded)
             {
-                ResolveFirewallEffects(battleState);
+                ResolveAreaDamageEffects(battleState);
             }
 
             if (!battleState.IsEnded)
@@ -174,21 +180,7 @@ namespace Project333.Runtime.Application.Services
             }
 
             effect.ResolveTrigger();
-
-            foreach (var target in targets)
-            {
-                if (target.Kind != OccupantKind.Master &&
-                    target.CurrentHp <= 0 &&
-                    targetBoard.GetOccupant(target.Position) == target)
-                {
-                    targetBoard.Remove(target.Position);
-                }
-            }
-
-            if (targetPlayer.Master.CurrentHp <= 0)
-            {
-                battleState.EndBattle(effect.OwnerId);
-            }
+            OccupantDestructionService.ResolveDefeatedOccupants(battleState);
         }
 
         private static void ResolveCheonraJimang(BattleState battleState, PersistentEffectState persistentEffect)
@@ -198,7 +190,10 @@ namespace Project333.Runtime.Application.Services
             {
                 if (!playerTarget.IsSealbound)
                 {
-                    battleState.PlayerBoard.Remove(playerTarget.Position);
+                    OccupantDestructionService.DestroyOccupant(
+                        battleState,
+                        PlayerId.Player,
+                        playerTarget);
                 }
             }
             else if (!string.IsNullOrWhiteSpace(persistentEffect.TargetRuntimeId) &&
@@ -206,7 +201,10 @@ namespace Project333.Runtime.Application.Services
             {
                 if (!aiTarget.IsSealbound)
                 {
-                    battleState.AIBoard.Remove(aiTarget.Position);
+                    OccupantDestructionService.DestroyOccupant(
+                        battleState,
+                        PlayerId.AI,
+                        aiTarget);
                 }
             }
 
@@ -228,7 +226,7 @@ namespace Project333.Runtime.Application.Services
             return false;
         }
 
-        private static void ResolveFirewallEffects(BattleState battleState)
+        private static void ResolveAreaDamageEffects(BattleState battleState)
         {
             var effects = new List<PersistentEffectState>(battleState.PersistentEffects);
             foreach (var effect in effects)
@@ -238,15 +236,19 @@ namespace Project333.Runtime.Application.Services
                     return;
                 }
 
-                if (effect == null ||
-                    effect.IsExpired ||
-                    effect.RemainingTriggers <= 0 ||
-                    !string.Equals(effect.EffectId, FirewallEffectId, StringComparison.Ordinal))
+                if (effect == null || effect.IsExpired || effect.RemainingTriggers <= 0)
                 {
                     continue;
                 }
 
-                ResolveFirewallEffect(battleState, effect);
+                if (string.Equals(effect.EffectId, FirewallEffectId, StringComparison.Ordinal))
+                {
+                    ResolveFirewallEffect(battleState, effect);
+                }
+                else if (string.Equals(effect.EffectId, BiochemicalBombRules.EffectId, StringComparison.Ordinal))
+                {
+                    ResolveBiochemicalBombEffect(battleState, effect);
+                }
             }
         }
 
@@ -261,6 +263,19 @@ namespace Project333.Runtime.Application.Services
                 effect.EffectDamageType,
                 effect.CapturedSpellPower);
             var targets = new List<OccupantState>();
+            var targetCoords = new List<TileCoord>(BoardState.ColumnCount);
+            for (var column = 0; column < BoardState.ColumnCount; column++)
+            {
+                targetCoords.Add(new TileCoord(column, effect.TargetRow));
+            }
+
+            battleState.RecordAreaSpellEffect(new BattleAreaSpellEffectEvent(
+                FirewallEffectId,
+                effect.SourceCardId,
+                effect.OwnerId,
+                targetPlayerId,
+                targetCoords));
+
             foreach (var occupant in targetBoard.EnumerateOccupants())
             {
                 if (occupant.Position.Row == effect.TargetRow)
@@ -291,22 +306,70 @@ namespace Project333.Runtime.Application.Services
             }
 
             effect.ResolveTrigger();
+            OccupantDestructionService.ResolveDefeatedOccupants(battleState);
+        }
 
-            foreach (var target in targets)
+        private static void ResolveBiochemicalBombEffect(
+            BattleState battleState,
+            PersistentEffectState effect)
+        {
+            if (effect.TargetStartColumn != BiochemicalBombRules.LeftAreaStartColumn &&
+                effect.TargetStartColumn != BiochemicalBombRules.RightAreaStartColumn)
             {
-                if (target.Kind != OccupantKind.Master &&
-                    target.CurrentHp <= 0 &&
-                    targetBoard.GetOccupant(target.Position) == target)
+                effect.Expire();
+                return;
+            }
+
+            var targetPlayer = battleState.GetOpponent(effect.OwnerId);
+            var targetBoard = battleState.GetBoard(targetPlayer.Id);
+            var targets = new List<OccupantState>();
+            var targetCoords = new List<TileCoord>(BiochemicalBombRules.AreaWidth * BoardState.RowCount);
+            for (var column = effect.TargetStartColumn;
+                 column < effect.TargetStartColumn + BiochemicalBombRules.AreaWidth;
+                 column++)
+            {
+                for (var row = 0; row < BoardState.RowCount; row++)
                 {
-                    targetBoard.Remove(target.Position);
+                    var targetCoord = new TileCoord(column, row);
+                    targetCoords.Add(targetCoord);
+                    var target = targetBoard.GetOccupant(targetCoord);
+                    if (target != null)
+                    {
+                        targets.Add(target);
+                    }
                 }
             }
 
-            var targetMaster = battleState.GetPlayer(targetPlayerId).Master;
-            if (targetMaster.CurrentHp <= 0)
+            battleState.RecordAreaSpellEffect(new BattleAreaSpellEffectEvent(
+                BiochemicalBombRules.EffectId,
+                effect.SourceCardId,
+                effect.OwnerId,
+                targetPlayer.Id,
+                targetCoords));
+
+            foreach (var target in targets)
             {
-                battleState.EndBattle(battleState.GetOpponent(targetPlayerId).Id);
+                if (target.IsSealbound || targetBoard.GetOccupant(target.Position) != target)
+                {
+                    continue;
+                }
+
+                var actualDamage = DamageResolutionRules.ApplyEffectDamage(
+                    target,
+                    effect.EffectDamage,
+                    effect.EffectDamageType);
+                BattleValuePopupRecorder.RecordDamage(
+                    battleState,
+                    target,
+                    actualDamage,
+                    BattleValueChangeCause.BiochemicalBomb,
+                    effect.EffectDamageType,
+                    effect.OwnerId,
+                    sourceCardId: effect.SourceCardId);
             }
+
+            effect.ResolveTrigger();
+            OccupantDestructionService.ResolveDefeatedOccupants(battleState);
         }
 
         private static void RefreshTurnStartState(BattleState battleState)
@@ -330,13 +393,35 @@ namespace Project333.Runtime.Application.Services
 
         private static void ResolveSealboundOwnerTurnStarts(BattleState battleState)
         {
+            ResolveDemonKingRevivalTurnStarts(battleState, battleState.PlayerBoard);
+            ResolveDemonKingRevivalTurnStarts(battleState, battleState.AIBoard);
+
             var activeBoard = battleState.GetBoard(battleState.ActivePlayerId);
             for (var column = 0; column < BoardState.ColumnCount; column++)
             {
                 for (var row = 0; row < BoardState.RowCount; row++)
                 {
                     var occupant = activeBoard.GetOccupant(new TileCoord(column, row));
-                    occupant?.ResolveSealboundOwnerTurnStart();
+                    if (occupant?.IsDemonKingRevivalPending != true)
+                    {
+                        occupant?.ResolveSealboundOwnerTurnStart();
+                    }
+                }
+            }
+        }
+
+        private static void ResolveDemonKingRevivalTurnStarts(
+            BattleState battleState,
+            BoardState board)
+        {
+            for (var column = 0; column < BoardState.ColumnCount; column++)
+            {
+                for (var row = 0; row < BoardState.RowCount; row++)
+                {
+                    var occupant = board.GetOccupant(new TileCoord(column, row));
+                    occupant?.ResolveDemonKingRevivalTurnStart(
+                        battleState.ActivePlayerId,
+                        battleState.TurnNumber);
                 }
             }
         }
@@ -369,7 +454,12 @@ namespace Project333.Runtime.Application.Services
                     continue;
                 }
 
-                activePlayer.Resources.Add(occupant.TurnStartResourceGain.Clone());
+                var resourceGain = occupant.TurnStartResourceGain.Clone();
+                activePlayer.Resources.Add(resourceGain);
+                battleState.RecordResourceChange(new BattleResourceChangeEvent(
+                    activePlayer.Id,
+                    occupant.CardId,
+                    gained: resourceGain));
             }
 
             foreach (var persistentEffect in battleState.PersistentEffects)
@@ -381,10 +471,54 @@ namespace Project333.Runtime.Application.Services
 
                 if (HasAnyResourceGain(persistentEffect.TurnStartResourceGain))
                 {
-                    activePlayer.Resources.Add(persistentEffect.TurnStartResourceGain.Clone());
+                    var resourceGain = persistentEffect.TurnStartResourceGain.Clone();
+                    activePlayer.Resources.Add(resourceGain);
+                    battleState.RecordResourceChange(new BattleResourceChangeEvent(
+                        activePlayer.Id,
+                        persistentEffect.SourceCardId,
+                        gained: resourceGain));
                 }
 
                 persistentEffect.ResolveOwnerTurnStart();
+            }
+        }
+
+        private static void ResolvePowerPlantEffects(BattleState battleState)
+        {
+            var activePlayer = battleState.GetPlayer(battleState.ActivePlayerId);
+            var activeBoard = battleState.GetBoard(battleState.ActivePlayerId);
+            var triggerCost = new ResourceSet(
+                mana: 0,
+                qi: 0,
+                power: 0,
+                gold: PowerPlantRules.TriggerGoldCost);
+
+            for (var column = 0; column < BoardState.ColumnCount; column++)
+            {
+                for (var row = 0; row < BoardState.RowCount; row++)
+                {
+                    var occupant = activeBoard.GetOccupant(new TileCoord(column, row));
+                    if (occupant == null ||
+                        !string.Equals(occupant.CardId, PowerPlantRules.CardId, StringComparison.Ordinal) ||
+                        occupant.EffectsSuppressed ||
+                        !activePlayer.Resources.CanAfford(triggerCost))
+                    {
+                        continue;
+                    }
+
+                    var resourceGain = new ResourceSet(
+                        mana: 0,
+                        qi: 0,
+                        power: PowerPlantRules.PowerGain,
+                        gold: 0);
+                    activePlayer.Resources.Spend(triggerCost);
+                    activePlayer.Resources.Add(resourceGain);
+                    battleState.RecordResourceChange(new BattleResourceChangeEvent(
+                        activePlayer.Id,
+                        occupant.CardId,
+                        gained: resourceGain,
+                        spent: triggerCost));
+                }
             }
         }
 

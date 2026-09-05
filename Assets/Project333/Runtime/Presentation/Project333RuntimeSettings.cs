@@ -39,6 +39,9 @@ namespace Project333.Runtime.Presentation
                 case "OwnedCards_VSlice":
                     ConfigureNamedRoot(scene, "OwnedCardsSceneController");
                     break;
+                case "Shop_VSlice":
+                    ConfigureNamedRoot(scene, "ShopSceneController");
+                    break;
                 case "Battle_VSlice":
                     ConfigureBattleCanvas(scene);
                     break;

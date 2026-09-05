@@ -11,6 +11,11 @@ namespace Project333.Runtime.Presentation.Battle
                 return string.Empty;
             }
 
+            if (battleState.Result.IsDraw)
+            {
+                return "Draw";
+            }
+
             return battleState.Result.Winner == PlayerId.Player
                 ? "Victory"
                 : "Defeat";

@@ -25,7 +25,8 @@ namespace Project333.Runtime.Infrastructure.Data
             bool hasFlying = false,
             int spellPower = 0,
             InvincibleDurationType invincibleDuration = InvincibleDurationType.None,
-            int invincibleOwnerTurns = 0)
+            int invincibleOwnerTurns = 0,
+            bool hasPiercing = false)
             : base(cardId, displayName, CardType.Building, cost, includeInDraft, hasReplicate)
         {
             if (sealboundOwnerTurnStarts < 0)
@@ -54,6 +55,7 @@ namespace Project333.Runtime.Infrastructure.Data
             SpellPower = spellPower;
             InvincibleDuration = invincibleDuration;
             InvincibleOwnerTurns = invincibleOwnerTurns;
+            HasPiercing = hasPiercing;
         }
 
         public bool CanAttack { get; }
@@ -74,6 +76,7 @@ namespace Project333.Runtime.Infrastructure.Data
         public int SpellPower { get; }
         public InvincibleDurationType InvincibleDuration { get; }
         public int InvincibleOwnerTurns { get; }
+        public bool HasPiercing { get; }
 
         private static void ValidateInvincible(
             InvincibleDurationType duration,
@@ -84,15 +87,17 @@ namespace Project333.Runtime.Infrastructure.Data
                 throw new ArgumentOutOfRangeException(nameof(duration));
             }
 
-            if (duration == InvincibleDurationType.OwnerTurns && ownerTurns <= 0)
+            var hasTurnCount = duration == InvincibleDurationType.OwnerTurns ||
+                               duration == InvincibleDurationType.GlobalTurnEnds;
+            if (hasTurnCount && ownerTurns <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(ownerTurns));
             }
 
-            if (duration != InvincibleDurationType.OwnerTurns && ownerTurns != 0)
+            if (!hasTurnCount && ownerTurns != 0)
             {
                 throw new ArgumentException(
-                    "invincibleOwnerTurns must be 0 unless InvincibleDuration is OwnerTurns.",
+                    "invincibleOwnerTurns must be 0 unless InvincibleDuration uses a turn count.",
                     nameof(ownerTurns));
             }
         }

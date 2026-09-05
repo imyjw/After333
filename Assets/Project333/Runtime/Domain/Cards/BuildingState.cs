@@ -21,7 +21,8 @@ namespace Project333.Runtime.Domain.Cards
             int magicDefense = 0,
             int sciencePowerUpkeep = 0,
             bool hasFlying = false,
-            int spellPower = 0)
+            int spellPower = 0,
+            bool hasPiercing = false)
             : base(
                 runtimeId,
                 cardId,
@@ -39,7 +40,8 @@ namespace Project333.Runtime.Domain.Cards
                 physicalDefense: physicalDefense,
                 magicDefense: magicDefense,
                 hasFlying: hasFlying,
-                spellPower: spellPower)
+                spellPower: spellPower,
+                hasPiercing: hasPiercing)
         {
             CanAttackAsBuilding = canAttack;
             SciencePowerUpkeep = sciencePowerUpkeep;

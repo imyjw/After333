@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Project333.Runtime.Domain.Cards;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Project333.Runtime.Infrastructure.Data
 {
@@ -21,7 +22,9 @@ namespace Project333.Runtime.Infrastructure.Data
         [SerializeField] private int _hitsPerAttack = 1;
         [SerializeField] private bool _hasBerserker;
         [SerializeField] private bool _hasEndure;
-        [SerializeField] private bool _hasGuard;
+        [InspectorName("Has Shielder (쉴더)")]
+        [FormerlySerializedAs("_hasGuard")]
+        [SerializeField] private bool _hasShielder;
         [SerializeField] private bool _hasLifeSteal;
         [SerializeField] private bool _hasRobot;
         [Header("Board")]
@@ -33,6 +36,8 @@ namespace Project333.Runtime.Infrastructure.Data
         [SerializeField] private bool _hasHiding;
         [InspectorName("Has Flying (비행)")]
         [SerializeField] private bool _hasFlying;
+        [InspectorName("Has Piercing (관통)")]
+        [SerializeField] private bool _hasPiercing;
         [Min(0)]
         [InspectorName("Spell Power (주문력)")]
         [SerializeField] private int _spellPower;
@@ -98,6 +103,11 @@ namespace Project333.Runtime.Infrastructure.Data
                     lines.Add("비행");
                 }
 
+                if (_hasPiercing && !lines.Exists(ContainsPiercingSpecialEffectText))
+                {
+                    lines.Add("관통");
+                }
+
                 if (_spellPower > 0 && !lines.Exists(ContainsSpellPowerSpecialEffectText))
                 {
                     lines.Add($"주문력 +{_spellPower}");
@@ -131,7 +141,7 @@ namespace Project333.Runtime.Infrastructure.Data
                 hitsPerAttack: _hitsPerAttack,
                 hasBerserker: _hasBerserker,
                 hasEndure: _hasEndure,
-                hasGuard: _hasGuard,
+                hasShielder: _hasShielder,
                 hasLifeSteal: _hasLifeSteal,
                 damageType: _damageType,
                 physicalDefense: _physicalDefense,
@@ -143,7 +153,8 @@ namespace Project333.Runtime.Infrastructure.Data
                 hasFlying: _hasFlying,
                 spellPower: _spellPower,
                 invincibleDuration: _invincibleDuration,
-                invincibleOwnerTurns: _invincibleOwnerTurns);
+                invincibleOwnerTurns: _invincibleOwnerTurns,
+                hasPiercing: _hasPiercing);
         }
 
         public void ConfigureForTests(
@@ -159,7 +170,7 @@ namespace Project333.Runtime.Infrastructure.Data
             int hitsPerAttack = 1,
             bool hasBerserker = false,
             bool hasEndure = false,
-            bool hasGuard = false,
+            bool hasShielder = false,
             bool hasLifeSteal = false,
             DamageType damageType = DamageType.Physical,
             int physicalDefense = 0,
@@ -170,7 +181,8 @@ namespace Project333.Runtime.Infrastructure.Data
             bool hasFlying = false,
             int spellPower = 0,
             InvincibleDurationType invincibleDuration = InvincibleDurationType.None,
-            int invincibleOwnerTurns = 0)
+            int invincibleOwnerTurns = 0,
+            bool hasPiercing = false)
         {
             _attackType = attackType;
             _attack = attack;
@@ -184,7 +196,7 @@ namespace Project333.Runtime.Infrastructure.Data
             _hitsPerAttack = hitsPerAttack < 1 ? 1 : hitsPerAttack;
             _hasBerserker = hasBerserker;
             _hasEndure = hasEndure;
-            _hasGuard = hasGuard;
+            _hasShielder = hasShielder;
             _hasLifeSteal = hasLifeSteal;
             _damageType = damageType;
             _physicalDefense = physicalDefense;
@@ -196,6 +208,7 @@ namespace Project333.Runtime.Infrastructure.Data
             _spellPower = spellPower;
             _invincibleDuration = invincibleDuration;
             _invincibleOwnerTurns = invincibleOwnerTurns;
+            _hasPiercing = hasPiercing;
         }
 
         private string GetSciencePowerUpkeepSpecialEffectText()
@@ -247,6 +260,13 @@ namespace Project333.Runtime.Infrastructure.Data
                     text.Contains("비행"));
         }
 
+        private static bool ContainsPiercingSpecialEffectText(string text)
+        {
+            return !string.IsNullOrWhiteSpace(text) &&
+                   (text.IndexOf("Piercing", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    text.Contains("관통"));
+        }
+
         private static bool ContainsSpellPowerSpecialEffectText(string text)
         {
             return !string.IsNullOrWhiteSpace(text) &&
@@ -272,6 +292,7 @@ namespace Project333.Runtime.Infrastructure.Data
                 InvincibleDurationType.OpponentTurnOnly => "상대 턴에만 무적",
                 InvincibleDurationType.UntilTurnEnd => "턴 종료까지 무적",
                 InvincibleDurationType.OwnerTurns => $"내 {_invincibleOwnerTurns}턴 동안 무적",
+                InvincibleDurationType.GlobalTurnEnds => $"{_invincibleOwnerTurns}번의 턴 종료 동안 무적",
                 _ => string.Empty,
             };
         }

@@ -26,6 +26,8 @@ namespace Project333.Runtime.Infrastructure.Data
         [SerializeField] private int _sealboundOwnerTurnStarts;
         [InspectorName("Has Flying (비행)")]
         [SerializeField] private bool _hasFlying;
+        [InspectorName("Has Piercing (관통)")]
+        [SerializeField] private bool _hasPiercing;
         [Min(0)]
         [InspectorName("Spell Power (주문력)")]
         [SerializeField] private int _spellPower;
@@ -56,6 +58,15 @@ namespace Project333.Runtime.Infrastructure.Data
                     text = string.IsNullOrWhiteSpace(text)
                         ? "비행"
                         : $"{text}{Environment.NewLine}비행";
+                }
+
+                if (_hasPiercing &&
+                    text.IndexOf("Piercing", StringComparison.OrdinalIgnoreCase) < 0 &&
+                    !text.Contains("관통"))
+                {
+                    text = string.IsNullOrWhiteSpace(text)
+                        ? "관통"
+                        : $"{text}{Environment.NewLine}관통";
                 }
 
                 if (_spellPower > 0 &&
@@ -102,7 +113,8 @@ namespace Project333.Runtime.Infrastructure.Data
                 hasFlying: _hasFlying,
                 spellPower: _spellPower,
                 invincibleDuration: _invincibleDuration,
-                invincibleOwnerTurns: _invincibleOwnerTurns);
+                invincibleOwnerTurns: _invincibleOwnerTurns,
+                hasPiercing: _hasPiercing);
         }
 
         public void ConfigureForTests(
@@ -119,7 +131,8 @@ namespace Project333.Runtime.Infrastructure.Data
             bool hasFlying = false,
             int spellPower = 0,
             InvincibleDurationType invincibleDuration = InvincibleDurationType.None,
-            int invincibleOwnerTurns = 0)
+            int invincibleOwnerTurns = 0,
+            bool hasPiercing = false)
         {
             _canAttack = canAttack;
             _attack = attack;
@@ -135,6 +148,7 @@ namespace Project333.Runtime.Infrastructure.Data
             _spellPower = spellPower;
             _invincibleDuration = invincibleDuration;
             _invincibleOwnerTurns = invincibleOwnerTurns;
+            _hasPiercing = hasPiercing;
         }
 
         private string GetInvincibleSpecialEffectText()
@@ -147,6 +161,7 @@ namespace Project333.Runtime.Infrastructure.Data
                 InvincibleDurationType.OpponentTurnOnly => "상대 턴에만 무적",
                 InvincibleDurationType.UntilTurnEnd => "턴 종료까지 무적",
                 InvincibleDurationType.OwnerTurns => $"내 {_invincibleOwnerTurns}턴 동안 무적",
+                InvincibleDurationType.GlobalTurnEnds => $"{_invincibleOwnerTurns}번의 턴 종료 동안 무적",
                 _ => string.Empty,
             };
         }

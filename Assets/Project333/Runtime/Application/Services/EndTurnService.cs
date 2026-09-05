@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Cards;
 
@@ -10,7 +11,18 @@ namespace Project333.Runtime.Application.Services
         private const string BlueDragonCardId = "BlueDragon";
         private const string RedDragonCardId = "RedDragon";
         private const int BlueDragonHealAmount = 33;
-        private const int RedDragonDamageAmount = 66;
+        private const int RedDragonDamageAmount = 33;
+        private readonly Random _random;
+
+        public EndTurnService()
+            : this(CreateRandom())
+        {
+        }
+
+        public EndTurnService(Random random)
+        {
+            _random = random ?? throw new ArgumentNullException(nameof(random));
+        }
 
         public void EndTurn(BattleState battleState)
         {
@@ -37,10 +49,42 @@ namespace Project333.Runtime.Application.Services
                 return;
             }
 
+            ResolveHeroGrowthEffects(battleState);
+
             var endingPlayerId = battleState.ActivePlayerId;
             battleState.ResolveInvincibleTurnEnd(endingPlayerId);
             battleState.SetPhase(PhaseType.TurnEnd);
             battleState.StartNextTurn(GetNextPlayerId(endingPlayerId));
+        }
+
+        private void ResolveHeroGrowthEffects(BattleState battleState)
+        {
+            ResolveHeroGrowthEffects(battleState.PlayerBoard);
+            ResolveHeroGrowthEffects(battleState.AIBoard);
+        }
+
+        private void ResolveHeroGrowthEffects(Project333.Runtime.Domain.Board.BoardState board)
+        {
+            var occupants = new List<OccupantState>(board.EnumerateOccupants());
+            foreach (var occupant in occupants)
+            {
+                if (!HeroRules.IsHero(occupant) ||
+                    !occupant.IsAlive ||
+                    occupant.EffectsSuppressed ||
+                    board.GetOccupant(occupant.Position) != occupant)
+                {
+                    continue;
+                }
+
+                if (_random.Next(2) == 0)
+                {
+                    occupant.IncreaseBaseAttack(HeroRules.GrowthAmount);
+                }
+                else
+                {
+                    occupant.IncreaseMaxHpAndCurrentHp(HeroRules.GrowthAmount);
+                }
+            }
         }
 
         private static void ResolveEndTurnOccupantEffects(BattleState battleState)
@@ -88,7 +132,11 @@ namespace Project333.Runtime.Application.Services
                 return;
             }
 
-            BattleDrawService.DrawCards(owner, battleState, GaebangBranchRules.DrawCount);
+            BattleDrawService.DrawCards(
+                owner,
+                battleState,
+                GaebangBranchRules.DrawCount,
+                GaebangBranchRules.CardId);
         }
 
         private static void ResolveBlueDragonEffect(
@@ -140,33 +188,19 @@ namespace Project333.Runtime.Application.Services
                 var actualDamage = DamageResolutionRules.ApplyEffectDamage(
                     occupant,
                     RedDragonDamageAmount,
-                    DamageType.Physical);
+                    DamageType.Magic);
                 BattleValuePopupRecorder.RecordDamage(
                     battleState,
                     occupant,
                     actualDamage,
                     BattleValueChangeCause.RedDragon,
-                    DamageType.Physical,
+                    DamageType.Magic,
                     ownerId,
                     source?.RuntimeId,
                     RedDragonCardId);
             }
 
-            foreach (var occupant in damagedOccupants)
-            {
-                if (occupant.Kind != OccupantKind.Master &&
-                    occupant.CurrentHp <= 0 &&
-                    enemyBoard.GetOccupant(occupant.Position) == occupant)
-                {
-                    enemyBoard.Remove(occupant.Position);
-                }
-            }
-
-            var enemyMaster = battleState.GetOpponent(ownerId).Master;
-            if (enemyMaster.CurrentHp <= 0)
-            {
-                battleState.EndBattle(ownerId);
-            }
+            OccupantDestructionService.ResolveDefeatedOccupants(battleState);
         }
 
         private static PlayerId GetNextPlayerId(PlayerId currentPlayerId)
@@ -174,6 +208,17 @@ namespace Project333.Runtime.Application.Services
             return currentPlayerId == PlayerId.Player
                 ? PlayerId.AI
                 : PlayerId.Player;
+        }
+
+        private static Random CreateRandom()
+        {
+            var seedBytes = new byte[sizeof(int)];
+            using (var randomNumberGenerator = RandomNumberGenerator.Create())
+            {
+                randomNumberGenerator.GetBytes(seedBytes);
+            }
+
+            return new Random(BitConverter.ToInt32(seedBytes, 0));
         }
     }
 }

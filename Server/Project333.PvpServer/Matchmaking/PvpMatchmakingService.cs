@@ -414,6 +414,59 @@ public sealed class PvpMatchmakingService
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task RecordMatchDrawAsync(
+        string matchId,
+        string endedReason,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(matchId))
+        {
+            return;
+        }
+
+        var normalizedReason = NormalizeEndedReason(endedReason);
+
+        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            with target_match as (
+                select id
+                from pvp_matches
+                where match_id = @match_id
+                limit 1
+            ),
+            update_players as (
+                update pvp_match_players players
+                set player_status = 'draw',
+                    final_result = 'draw',
+                    reconnect_deadline_at = null,
+                    disconnected_at = null,
+                    last_seen_at = now()
+                where players.match_id = (select id from target_match)
+                returning players.match_id
+            ),
+            closed_connections as (
+                update pvp_match_connections connections
+                set connection_status = 'closed',
+                    disconnected_at = coalesce(connections.disconnected_at, now()),
+                    last_seen_at = now()
+                where connections.match_id = (select id from target_match)
+                  and connections.connection_status = 'active'
+                returning connections.id
+            )
+            update pvp_matches matches
+            set match_status = 'completed',
+                winner_account_id = null,
+                ended_reason = @ended_reason,
+                completed_at = coalesce(completed_at, now()),
+                updated_at = now()
+            where matches.id = (select id from target_match);
+            """;
+        command.Parameters.AddWithValue("match_id", matchId.Trim());
+        command.Parameters.AddWithValue("ended_reason", normalizedReason);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private static async Task<Guid> UpsertMatchAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,

@@ -20,5 +20,8 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/OwnedCards_VSlice.unity
     guid: 443b7fa60ed4a234bb99fe732ae5dbf0
+  - enabled: 1
+    path: Assets/Shop_VSlice.unity
+    guid: 07ad696fb8bc0a04495df90af00a6d68
   m_configObjects: {}
   m_UseUCBPForAssetBundles: 0

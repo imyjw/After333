@@ -550,11 +550,12 @@ namespace Project333.Runtime.Presentation.Battle
 
                 if (hoveredTileView != null && CanCardUseOnTile(battleState, cardId, hoveredTileView))
                 {
+                    var resolvedTargetCoord = ResolveCardTargetCoord(cardId, hoveredTileView);
                     _battleBootstrapper.TryUsePlayerCardOnTile(
                         cardId,
                         _draggedHandCardRuntimeId,
                         hoveredTileView.OwnerId,
-                        hoveredTileView.Coord,
+                        resolvedTargetCoord,
                         out var message);
                     _interactionStatus = message;
                     ClearCardSelection();
@@ -696,7 +697,7 @@ namespace Project333.Runtime.Presentation.Battle
                     selectedCardId,
                     _selectedHandCardRuntimeId,
                     tileView.OwnerId,
-                    tileView.Coord,
+                    ResolveCardTargetCoord(selectedCardId, tileView),
                     out var message);
                 _interactionStatus = message;
 
@@ -845,6 +846,18 @@ namespace Project333.Runtime.Presentation.Battle
                         HighlightAllTiles(_boardPresenter.PlayerTileViews, BattleHighlightState.SpellTarget);
                         HighlightAllTiles(_boardPresenter.AITileViews, BattleHighlightState.SpellTarget);
                     }
+                    else if (IsBiochemicalBombDefinition(definition))
+                    {
+                        HighlightAllTiles(_boardPresenter.AITileViews, BattleHighlightState.SpellTarget);
+                    }
+                    else if (IsGuDefinition(definition))
+                    {
+                        HighlightGuTargets(battleState);
+                    }
+                    else if (IsHuanShuDefinition(definition))
+                    {
+                        HighlightHuanShuTargets(battleState);
+                    }
 
                     break;
             }
@@ -854,6 +867,43 @@ namespace Project333.Runtime.Presentation.Battle
         {
             HighlightUnitSpellTargets(_boardPresenter.PlayerTileViews, battleState.PlayerBoard, allowHiding: true);
             HighlightUnitSpellTargets(_boardPresenter.AITileViews, battleState.AIBoard, allowHiding: false);
+        }
+
+        private void HighlightGuTargets(BattleState battleState)
+        {
+            if (!GuRules.TryFindDestination(battleState, PlayerId.Player, out _))
+            {
+                return;
+            }
+
+            foreach (var tileView in _boardPresenter.AITileViews)
+            {
+                if (tileView != null &&
+                    GuRules.IsLegalTarget(
+                        battleState,
+                        PlayerId.Player,
+                        PlayerId.AI,
+                        tileView.Coord))
+                {
+                    tileView.SetHighlight(BattleHighlightState.SpellTarget);
+                }
+            }
+        }
+
+        private void HighlightHuanShuTargets(BattleState battleState)
+        {
+            foreach (var tileView in _boardPresenter.AITileViews)
+            {
+                if (tileView != null &&
+                    HuanShuRules.IsLegalTarget(
+                        battleState,
+                        PlayerId.Player,
+                        PlayerId.AI,
+                        tileView.Coord))
+                {
+                    tileView.SetHighlight(BattleHighlightState.SpellTarget);
+                }
+            }
         }
 
         private static void HighlightUnitSpellTargets(
@@ -926,6 +976,27 @@ namespace Project333.Runtime.Presentation.Battle
             if (string.Equals(scriptedSpellDefinition.EffectId, "firewall", StringComparison.Ordinal))
             {
                 return true;
+            }
+
+            if (string.Equals(scriptedSpellDefinition.EffectId, GuRules.EffectId, StringComparison.Ordinal))
+            {
+                return occupant.OwnerId == PlayerId.AI &&
+                       GuRules.TryFindDestination(battleState, PlayerId.Player, out _) &&
+                       GuRules.IsLegalTarget(
+                           battleState,
+                           PlayerId.Player,
+                           PlayerId.AI,
+                           occupant.Position);
+            }
+
+            if (string.Equals(scriptedSpellDefinition.EffectId, HuanShuRules.EffectId, StringComparison.Ordinal))
+            {
+                return occupant.OwnerId == PlayerId.AI &&
+                       HuanShuRules.IsLegalTarget(
+                           battleState,
+                           PlayerId.Player,
+                           PlayerId.AI,
+                           occupant.Position);
             }
 
             return string.Equals(scriptedSpellDefinition.EffectId, "cheonra_jimang", StringComparison.Ordinal) &&
@@ -1038,6 +1109,24 @@ namespace Project333.Runtime.Presentation.Battle
         {
             if (_dragHoveredTileView == null)
             {
+                return;
+            }
+
+            if (_battleBootstrapper != null &&
+                _battleBootstrapper.TryGetCardDefinition(_draggedCardId, out var definition) &&
+                IsBiochemicalBombDefinition(definition))
+            {
+                var startColumn = BiochemicalBombRules.ResolveStartColumnFromHoveredColumn(
+                    _dragHoveredTileView.Coord.Column);
+                foreach (var tileView in _boardPresenter.AITileViews)
+                {
+                    if (tileView != null &&
+                        BiochemicalBombRules.ContainsColumn(startColumn, tileView.Coord.Column))
+                    {
+                        tileView.SetHighlight(BattleHighlightState.DragHoverTarget);
+                    }
+                }
+
                 return;
             }
 
@@ -1315,6 +1404,29 @@ namespace Project333.Runtime.Presentation.Battle
                         return tileView.OwnerId == PlayerId.Player || tileView.OwnerId == PlayerId.AI;
                     }
 
+                    if (IsBiochemicalBombDefinition(definition))
+                    {
+                        return tileView.OwnerId == PlayerId.AI;
+                    }
+
+                    if (IsGuDefinition(definition))
+                    {
+                        return GuRules.IsLegalTarget(
+                            battleState,
+                            PlayerId.Player,
+                            tileView.OwnerId,
+                            tileView.Coord);
+                    }
+
+                    if (IsHuanShuDefinition(definition))
+                    {
+                        return HuanShuRules.IsLegalTarget(
+                            battleState,
+                            PlayerId.Player,
+                            tileView.OwnerId,
+                            tileView.Coord);
+                    }
+
                     return false;
 
                 default:
@@ -1336,7 +1448,10 @@ namespace Project333.Runtime.Presentation.Battle
 
             if (definition is ScriptedSpellCardDefinition scriptedSpellDefinition &&
                 (string.Equals(scriptedSpellDefinition.EffectId, "cheonra_jimang", StringComparison.Ordinal) ||
-                 string.Equals(scriptedSpellDefinition.EffectId, "firewall", StringComparison.Ordinal)))
+                 string.Equals(scriptedSpellDefinition.EffectId, "firewall", StringComparison.Ordinal) ||
+                 string.Equals(scriptedSpellDefinition.EffectId, BiochemicalBombRules.EffectId, StringComparison.Ordinal) ||
+                 string.Equals(scriptedSpellDefinition.EffectId, GuRules.EffectId, StringComparison.Ordinal) ||
+                 string.Equals(scriptedSpellDefinition.EffectId, HuanShuRules.EffectId, StringComparison.Ordinal)))
             {
                 return false;
             }
@@ -1389,9 +1504,24 @@ namespace Project333.Runtime.Presentation.Battle
 
             if (!IsCardBoardConditionMet(battleState, definition))
             {
-                return IsRobotFusionDefinition(definition)
-                    ? "살아 있는 아군 로봇 유닛이 2기 이상 필요합니다."
-                    : $"Card '{cardId}' cannot be used in the current board state.";
+                if (IsRobotFusionDefinition(definition))
+                {
+                    return "살아 있는 아군 로봇 유닛이 2기 이상 필요합니다.";
+                }
+
+                if (IsGuDefinition(definition))
+                {
+                    return GuRules.TryFindDestination(battleState, PlayerId.Player, out _)
+                        ? "복종시킬 수 있는 상대방 유닛이 없습니다."
+                        : "고독을 사용하려면 내 필드에 빈 타일이 필요합니다.";
+                }
+
+                if (IsHuanShuDefinition(definition))
+                {
+                    return "환술을 부여할 수 있는 상대방 유닛이 없습니다.";
+                }
+
+                return $"Card '{cardId}' cannot be used in the current board state.";
             }
 
             if (dragReleasedUpwardEnough && !CanCardCastWithoutTarget(battleState, cardId))
@@ -1444,8 +1574,19 @@ namespace Project333.Runtime.Presentation.Battle
 
         private static bool IsCardBoardConditionMet(BattleState battleState, CardDefinition definition)
         {
-            return !IsRobotFusionDefinition(definition) ||
-                   RobotFusionRules.CountLivingRobots(battleState?.PlayerBoard) >= RobotFusionRules.MinimumRobotCount;
+            if (IsRobotFusionDefinition(definition))
+            {
+                return RobotFusionRules.CountLivingRobots(battleState?.PlayerBoard) >=
+                       RobotFusionRules.MinimumRobotCount;
+            }
+
+            if (IsGuDefinition(definition))
+            {
+                return GuRules.CanCast(battleState, PlayerId.Player);
+            }
+
+            return !IsHuanShuDefinition(definition) ||
+                   HuanShuRules.CanCast(battleState, PlayerId.Player);
         }
 
         private bool IsRobotFusionCard(BattleState battleState, string cardId)
@@ -1460,6 +1601,42 @@ namespace Project333.Runtime.Presentation.Battle
         {
             return definition is ScriptedSpellCardDefinition scriptedSpell &&
                    string.Equals(scriptedSpell.EffectId, RobotFusionRules.EffectId, StringComparison.Ordinal);
+        }
+
+        private static bool IsGuDefinition(CardDefinition definition)
+        {
+            return definition is ScriptedSpellCardDefinition scriptedSpell &&
+                   string.Equals(scriptedSpell.EffectId, GuRules.EffectId, StringComparison.Ordinal);
+        }
+
+        private static bool IsHuanShuDefinition(CardDefinition definition)
+        {
+            return definition is ScriptedSpellCardDefinition scriptedSpell &&
+                   string.Equals(scriptedSpell.EffectId, HuanShuRules.EffectId, StringComparison.Ordinal);
+        }
+
+        private static bool IsBiochemicalBombDefinition(CardDefinition definition)
+        {
+            return definition is ScriptedSpellCardDefinition scriptedSpell &&
+                   string.Equals(
+                       scriptedSpell.EffectId,
+                       BiochemicalBombRules.EffectId,
+                       StringComparison.Ordinal);
+        }
+
+        private TileCoord ResolveCardTargetCoord(string cardId, TileView tileView)
+        {
+            if (tileView == null ||
+                _battleBootstrapper == null ||
+                !_battleBootstrapper.TryGetCardDefinition(cardId, out var definition) ||
+                !IsBiochemicalBombDefinition(definition))
+            {
+                return tileView?.Coord ?? default;
+            }
+
+            var startColumn = BiochemicalBombRules.ResolveStartColumnFromHoveredColumn(
+                tileView.Coord.Column);
+            return new TileCoord(startColumn, 0);
         }
 
         private void UpdateRobotFusionSelectionUi()

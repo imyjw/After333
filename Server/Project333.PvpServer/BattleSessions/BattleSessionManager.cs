@@ -16,6 +16,36 @@ public sealed class BattleSessionManager
         }
     }
 
+    public bool TryGet(string matchId, out BattleSession? session)
+    {
+        if (string.IsNullOrWhiteSpace(matchId))
+        {
+            session = null;
+            return false;
+        }
+
+        lock (_gate)
+        {
+            return _sessions.TryGetValue(matchId, out session);
+        }
+    }
+
+    public bool HasReconnectableServerAiBattle(string matchId)
+    {
+        return TryGet(matchId, out var session) &&
+               session != null &&
+               session.UseServerAiOpponent &&
+               !session.IsBattleEnded;
+    }
+
+    public BattleSession? FindReconnectableServerAiBattle(string matchId)
+    {
+        return HasReconnectableServerAiBattle(matchId) &&
+               TryGet(matchId, out var session)
+            ? session
+            : null;
+    }
+
     public BattleSession GetOrCreate(string matchId, bool useServerAiOpponent = true)
     {
         if (string.IsNullOrWhiteSpace(matchId))

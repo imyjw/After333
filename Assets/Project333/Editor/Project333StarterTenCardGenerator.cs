@@ -22,7 +22,7 @@ namespace Project333.Editor
 
             var cards = new List<CardDefinitionAsset>
             {
-                CreateIronGuard(),
+                CreateIronShielder(),
                 CreateLongbowScout(),
                 CreateGoldMiner(),
                 CreateManaAcolyte(),
@@ -48,17 +48,17 @@ namespace Project333.Editor
                 "Edit these assets directly in the Inspector to enter your first real card data.");
         }
 
-        private static UnitCardDefinitionAsset CreateIronGuard()
+        private static UnitCardDefinitionAsset CreateIronShielder()
         {
-            var asset = LoadOrCreate<UnitCardDefinitionAsset>($"{CardsRoot}/IronGuard.asset");
-            asset.ConfigureBaseForTests("starter_iron_guard", "Iron Guard", new ResourceSetData(0, 0, 0, 2));
+            var asset = LoadOrCreate<UnitCardDefinitionAsset>($"{CardsRoot}/IronShielder.asset");
+            asset.ConfigureBaseForTests("starter_iron_shielder", "Iron Shielder", new ResourceSetData(0, 0, 0, 2));
             asset.ConfigureMetadataForTests(
                 CardRarity.Common,
                 CardAffiliation.Fantasy,
                 ChargeTileFootprint.OneByOne,
                 "A steady front-line melee unit.",
-                string.Empty);
-            asset.ConfigureForTests(AttackType.Melee, 2, 7, true, false, 0, new ResourceSetData(0, 0, 0, 0), 1, false, hasGuard: true);
+                "Shielder");
+            asset.ConfigureForTests(AttackType.Melee, 2, 7, true, false, 0, new ResourceSetData(0, 0, 0, 0), 1, false, hasShielder: true);
             EditorUtility.SetDirty(asset);
             return asset;
         }

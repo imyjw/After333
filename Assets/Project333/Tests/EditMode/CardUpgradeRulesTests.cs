@@ -1,6 +1,7 @@
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
+using Project333.Runtime.Domain.Cards;
 using Project333.Runtime.Infrastructure.Data;
 using UnityEngine;
 
@@ -11,8 +12,11 @@ namespace Project333.Tests.EditMode
         private static readonly string[] ExpectedUpgradeableCardIds =
         {
             "A-111",
+            "A-301",
+            "BiochemicalBomb",
             "BlueDragon",
             "Cerberus",
+            "DemonKing",
             "ElfLongbowScout",
             "firebolt",
             "Firewall",
@@ -21,22 +25,37 @@ namespace Project333.Tests.EditMode
             "GoldMiner",
             "Golem",
             "Gwangma",
+            "Hero",
+            "Inn",
             "ManaPond",
+            "MerchantCaravan",
             "ManaWeaver",
+            "NuclearPowerPlant",
+            "OrcWarrior",
+            "PowerPlant",
             "RedDragon",
             "RobotFactory",
             "Shaolin_1st_Disciple",
             "Shieldbearer",
+            "Skeleton",
             "TimedBomb",
             "Vampire",
+            "Werewolf",
+            "Zombie",
         };
 
         private static readonly string[] ExpectedNonUpgradeableCardIds =
         {
             "CheonraJimang",
             "Daehwandan",
+            "Gu",
+            "HuanShu",
+            "ManaStone",
+            "ManaStoneBundle",
             "Microreactor",
+            "PowerBank",
             "RobotFusion",
+            "TenThousandYearSnowGinseng",
         };
 
         [Test]
@@ -72,6 +91,20 @@ namespace Project333.Tests.EditMode
             Assert.That(CardUpgradeRules.IsMaxLevel(13), Is.True);
         }
 
+        [TestCase(-1, 10)]
+        [TestCase(0, 10)]
+        [TestCase(13, 23)]
+        [TestCase(14, 10)]
+        [TestCase(99, 10)]
+        public void ApplyDamageBonus_UsesLevelZeroOutsideSupportedRange(
+            int upgradeLevel,
+            int expectedDamage)
+        {
+            Assert.That(
+                CardLevelSpellRules.ApplyDamageBonus(baseDamage: 10, upgradeLevel),
+                Is.EqualTo(expectedDamage));
+        }
+
         [TestCase(0, 0, 0)]
         [TestCase(1, 0, 1)]
         [TestCase(2, 0, 2)]
@@ -102,6 +135,72 @@ namespace Project333.Tests.EditMode
             Assert.That(aboveMaximum.HpBonus, Is.EqualTo(9));
         }
 
+        [TestCase(2, 0, 2)]
+        [TestCase(3, 1, 2)]
+        [TestCase(6, 2, 4)]
+        [TestCase(9, 3, 6)]
+        [TestCase(13, 4, 9)]
+        public void CalculateBonus_A301_UsesStandardUnitMilestones(
+            int upgradeLevel,
+            int expectedAttackBonus,
+            int expectedHpBonus)
+        {
+            var bonus = CardLevelStatRules.CalculateBonus("A-301", upgradeLevel);
+
+            Assert.That(bonus.AttackBonus, Is.EqualTo(expectedAttackBonus));
+            Assert.That(bonus.HpBonus, Is.EqualTo(expectedHpBonus));
+        }
+
+        [TestCase(2, 0, 2)]
+        [TestCase(3, 1, 2)]
+        [TestCase(6, 2, 4)]
+        [TestCase(9, 3, 6)]
+        [TestCase(13, 4, 9)]
+        public void CalculateBonus_Werewolf_UsesStandardUnitMilestones(
+            int upgradeLevel,
+            int expectedAttackBonus,
+            int expectedHpBonus)
+        {
+            var bonus = CardLevelStatRules.CalculateBonus(WerewolfRules.CardId, upgradeLevel);
+
+            Assert.That(bonus.AttackBonus, Is.EqualTo(expectedAttackBonus));
+            Assert.That(bonus.HpBonus, Is.EqualTo(expectedHpBonus));
+        }
+
+        [TestCase(2, 0, 2)]
+        [TestCase(3, 1, 2)]
+        [TestCase(6, 2, 4)]
+        [TestCase(9, 3, 6)]
+        [TestCase(12, 3, 9)]
+        [TestCase(13, 6, 9)]
+        public void CalculateBonus_DemonKing_UsesTripleAttackBonusAtLevelThirteen(
+            int upgradeLevel,
+            int expectedAttackBonus,
+            int expectedHpBonus)
+        {
+            var bonus = CardLevelStatRules.CalculateBonus(DemonKingRules.CardId, upgradeLevel);
+
+            Assert.That(bonus.AttackBonus, Is.EqualTo(expectedAttackBonus));
+            Assert.That(bonus.HpBonus, Is.EqualTo(expectedHpBonus));
+        }
+
+        [TestCase(2, 0, 2)]
+        [TestCase(3, 1, 2)]
+        [TestCase(6, 2, 4)]
+        [TestCase(9, 3, 6)]
+        [TestCase(12, 3, 9)]
+        [TestCase(13, 6, 9)]
+        public void CalculateBonus_Hero_UsesTripleAttackBonusAtLevelThirteen(
+            int upgradeLevel,
+            int expectedAttackBonus,
+            int expectedHpBonus)
+        {
+            var bonus = CardLevelStatRules.CalculateBonus(HeroRules.CardId, upgradeLevel);
+
+            Assert.That(bonus.AttackBonus, Is.EqualTo(expectedAttackBonus));
+            Assert.That(bonus.HpBonus, Is.EqualTo(expectedHpBonus));
+        }
+
         [TestCase(1, 0, 1)]
         [TestCase(3, 0, 3)]
         [TestCase(13, 0, 13)]
@@ -125,6 +224,66 @@ namespace Project333.Tests.EditMode
             int expectedHpBonus)
         {
             var bonus = CardLevelStatRules.CalculateBonus("GaebangBranch", upgradeLevel);
+
+            Assert.That(bonus.AttackBonus, Is.EqualTo(expectedAttackBonus));
+            Assert.That(bonus.HpBonus, Is.EqualTo(expectedHpBonus));
+        }
+
+        [TestCase(1, 0, 1)]
+        [TestCase(3, 0, 3)]
+        [TestCase(13, 0, 13)]
+        public void CalculateBonus_MerchantCaravan_GrantsOnlyHpAtEveryLevel(
+            int upgradeLevel,
+            int expectedAttackBonus,
+            int expectedHpBonus)
+        {
+            var bonus = CardLevelStatRules.CalculateBonus(
+                MerchantCaravanRules.CardId,
+                upgradeLevel);
+
+            Assert.That(bonus.AttackBonus, Is.EqualTo(expectedAttackBonus));
+            Assert.That(bonus.HpBonus, Is.EqualTo(expectedHpBonus));
+        }
+
+        [TestCase(1, 0, 1)]
+        [TestCase(3, 0, 3)]
+        [TestCase(13, 0, 13)]
+        public void CalculateBonus_Inn_GrantsOnlyHpAtEveryLevel(
+            int upgradeLevel,
+            int expectedAttackBonus,
+            int expectedHpBonus)
+        {
+            var bonus = CardLevelStatRules.CalculateBonus(InnRules.CardId, upgradeLevel);
+
+            Assert.That(bonus.AttackBonus, Is.EqualTo(expectedAttackBonus));
+            Assert.That(bonus.HpBonus, Is.EqualTo(expectedHpBonus));
+        }
+
+        [TestCase(1, 0, 1)]
+        [TestCase(3, 0, 3)]
+        [TestCase(13, 0, 13)]
+        public void CalculateBonus_PowerPlant_GrantsOnlyHpAtEveryLevel(
+            int upgradeLevel,
+            int expectedAttackBonus,
+            int expectedHpBonus)
+        {
+            var bonus = CardLevelStatRules.CalculateBonus("PowerPlant", upgradeLevel);
+
+            Assert.That(bonus.AttackBonus, Is.EqualTo(expectedAttackBonus));
+            Assert.That(bonus.HpBonus, Is.EqualTo(expectedHpBonus));
+        }
+
+        [TestCase(1, 0, 1)]
+        [TestCase(3, 0, 3)]
+        [TestCase(13, 0, 13)]
+        public void CalculateBonus_NuclearPowerPlant_GrantsOnlyHpAtEveryLevel(
+            int upgradeLevel,
+            int expectedAttackBonus,
+            int expectedHpBonus)
+        {
+            var bonus = CardLevelStatRules.CalculateBonus(
+                NuclearPowerPlantRules.CardId,
+                upgradeLevel);
 
             Assert.That(bonus.AttackBonus, Is.EqualTo(expectedAttackBonus));
             Assert.That(bonus.HpBonus, Is.EqualTo(expectedHpBonus));

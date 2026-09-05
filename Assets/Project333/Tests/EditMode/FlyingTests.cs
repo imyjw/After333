@@ -118,7 +118,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Attack_FlyingMeleeAgainstGuardedBack_RedirectsAndGuardCounterattacks()
+        public void Attack_FlyingMeleeAgainstShielderProtectedBack_RedirectsAndShielderCounterattacks()
         {
             var battleState = CreateBattleStateInMainPhase();
             var attacker = CreateUnit(
@@ -128,13 +128,13 @@ namespace Project333.Tests.EditMode
                 attack: 10,
                 maxHp: 30,
                 hasFlying: true);
-            var guard = CreateUnit(
-                "guard",
+            var shielder = CreateUnit(
+                "shielder",
                 PlayerId.AI,
                 new TileCoord(0, 0),
                 attack: 4,
                 maxHp: 6,
-                hasGuard: true);
+                hasShielder: true);
             var back = CreateUnit(
                 "back",
                 PlayerId.AI,
@@ -143,7 +143,7 @@ namespace Project333.Tests.EditMode
                 maxHp: 30);
             PrepareAttacker(attacker);
             battleState.PlayerBoard.Place(attacker.Position, attacker);
-            battleState.AIBoard.Place(guard.Position, guard);
+            battleState.AIBoard.Place(shielder.Position, shielder);
             battleState.AIBoard.Place(back.Position, back);
 
             new AttackService().Attack(
@@ -152,66 +152,66 @@ namespace Project333.Tests.EditMode
                 attacker.Position,
                 back.Position);
 
-            Assert.That(battleState.AIBoard.GetOccupant(guard.Position), Is.Null);
+            Assert.That(battleState.AIBoard.GetOccupant(shielder.Position), Is.Null);
             Assert.That(back.CurrentHp, Is.EqualTo(26),
-                "Only damage beyond the Guard's pre-hit HP reaches the protected target.");
+                "Only damage beyond the Shielder's pre-hit HP reaches the protected target.");
             Assert.That(attacker.CurrentHp, Is.EqualTo(26),
-                "The melee Guard is the actual counterattacker.");
+                "The melee Shielder is the actual counterattacker.");
         }
 
         [Test]
-        public void Guard_FlyingGuardRejectsOnlyNonFlyingMeleeNormalAttack()
+        public void Shielder_FlyingShielderRejectsOnlyNonFlyingMeleeNormalAttack()
         {
             var board = new BoardState();
-            var flyingGuard = CreateUnit(
-                "flying-guard",
+            var flyingShielder = CreateUnit(
+                "flying-shielder",
                 PlayerId.AI,
                 new TileCoord(0, 0),
-                hasGuard: true,
+                hasShielder: true,
                 hasFlying: true);
             var back = CreateUnit("back", PlayerId.AI, new TileCoord(0, 1));
-            board.Place(flyingGuard.Position, flyingGuard);
+            board.Place(flyingShielder.Position, flyingShielder);
             board.Place(back.Position, back);
 
             Assert.That(
-                GuardService.ResolveForNormalAttack(
+                ShielderService.ResolveForNormalAttack(
                     board,
                     back.Position,
                     AttackType.Melee,
                     attackerHasActiveFlying: false).IsProtected,
                 Is.False);
             Assert.That(
-                GuardService.ResolveForNormalAttack(
+                ShielderService.ResolveForNormalAttack(
                     board,
                     back.Position,
                     AttackType.Ranged,
                     attackerHasActiveFlying: false).IsProtected,
                 Is.True);
             Assert.That(
-                GuardService.ResolveForNormalAttack(
+                ShielderService.ResolveForNormalAttack(
                     board,
                     back.Position,
                     AttackType.Melee,
                     attackerHasActiveFlying: true).IsProtected,
                 Is.True);
-            Assert.That(GuardService.Resolve(board, back.Position).IsProtected, Is.True,
-                "Guard-eligible spell and effect resolution is not restricted by Flying.");
+            Assert.That(ShielderService.Resolve(board, back.Position).IsProtected, Is.True,
+                "Shielder-eligible spell and effect resolution is not restricted by Flying.");
 
             var secondBoard = new BoardState();
-            var groundGuard = CreateUnit(
-                "ground-guard",
+            var groundShielder = CreateUnit(
+                "ground-shielder",
                 PlayerId.AI,
                 new TileCoord(1, 0),
-                hasGuard: true);
+                hasShielder: true);
             var flyingBack = CreateUnit(
                 "flying-back",
                 PlayerId.AI,
                 new TileCoord(1, 1),
                 hasFlying: true);
-            secondBoard.Place(groundGuard.Position, groundGuard);
+            secondBoard.Place(groundShielder.Position, groundShielder);
             secondBoard.Place(flyingBack.Position, flyingBack);
             Assert.That(
-                GuardService.ResolveForNormalAttack(
+                ShielderService.ResolveForNormalAttack(
                     secondBoard,
                     flyingBack.Position,
                     AttackType.Ranged,
@@ -383,7 +383,7 @@ namespace Project333.Tests.EditMode
             AttackType attackType = AttackType.Melee,
             int attack = 5,
             int maxHp = 20,
-            bool hasGuard = false,
+            bool hasShielder = false,
             bool hasHiding = false,
             bool hasFlying = false)
         {
@@ -398,7 +398,7 @@ namespace Project333.Tests.EditMode
                 canMove: true,
                 isScience: false,
                 sciencePowerUpkeep: 0,
-                hasGuard: hasGuard,
+                hasShielder: hasShielder,
                 hasHiding: hasHiding,
                 hasFlying: hasFlying);
         }

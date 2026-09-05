@@ -15,7 +15,10 @@ namespace Project333.Runtime.Domain.Battle
         BlueDragon = 5,
         RedDragon = 6,
         DeckExhaustion = 7,
-        Firewall = 9
+        Firewall = 9,
+        Piercing = 10,
+        NuclearPowerPlant = 11,
+        BiochemicalBomb = 12
     }
 
     public sealed class BattleValuePopupEvent

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Project333.Runtime.Domain.Board;
 using Project333.Runtime.Domain.Effects;
+using Project333.Runtime.Domain.Resources;
 
 namespace Project333.Runtime.Domain.Battle
 {
@@ -18,7 +19,10 @@ namespace Project333.Runtime.Domain.Battle
             AIBoard = aiBoard;
             PersistentEffects = new List<PersistentEffectState>();
             ValuePopupEvents = new List<BattleValuePopupEvent>();
+            CardDrawEvents = new List<BattleCardDrawEvent>();
             CardGenerationEvents = new List<BattleCardGenerationEvent>();
+            ResourceChangeEvents = new List<BattleResourceChangeEvent>();
+            AreaSpellEffectEvents = new List<BattleAreaSpellEffectEvent>();
             Counters = new BattleCounters();
             Result = new BattleResultState();
             Phase = PhaseType.BattleStart;
@@ -47,13 +51,21 @@ namespace Project333.Runtime.Domain.Battle
 
         public List<BattleValuePopupEvent> ValuePopupEvents { get; }
 
+        public List<BattleCardDrawEvent> CardDrawEvents { get; }
+
         public List<BattleCardGenerationEvent> CardGenerationEvents { get; }
+
+        public List<BattleResourceChangeEvent> ResourceChangeEvents { get; }
+
+        public List<BattleAreaSpellEffectEvent> AreaSpellEffectEvents { get; }
 
         public BattleCounters Counters { get; }
 
         public PendingRobotFusionState PendingRobotFusion { get; private set; }
 
-        public bool IsEnded => Result.HasWinner;
+        public BattleAttackResolution LastAttackResolution { get; private set; }
+
+        public bool IsEnded => Result.HasResult;
 
         public PlayerState GetPlayer(PlayerId playerId)
         {
@@ -115,6 +127,13 @@ namespace Project333.Runtime.Domain.Battle
             Phase = PhaseType.Ended;
         }
 
+        public void EndBattleAsDraw()
+        {
+            PendingRobotFusion = null;
+            Result.SetDraw();
+            Phase = PhaseType.Ended;
+        }
+
         public void BeginRobotFusion(PlayerId ownerId, string cardId)
         {
             if (PendingRobotFusion != null)
@@ -154,9 +173,34 @@ namespace Project333.Runtime.Domain.Battle
             ValuePopupEvents.Clear();
         }
 
+        public void RecordAttackResolution(BattleAttackResolution resolution)
+        {
+            LastAttackResolution = resolution;
+        }
+
+        public void ClearAttackResolution()
+        {
+            LastAttackResolution = null;
+        }
+
         public void ClearCardGenerationEvents()
         {
             CardGenerationEvents.Clear();
+        }
+
+        public void ClearCardDrawEvents()
+        {
+            CardDrawEvents.Clear();
+        }
+
+        public void RecordCardDraw(PlayerId ownerId)
+        {
+            RecordCardDraw(ownerId, string.Empty);
+        }
+
+        public void RecordCardDraw(PlayerId ownerId, string sourceCardId)
+        {
+            CardDrawEvents.Add(new BattleCardDrawEvent(ownerId, sourceCardId));
         }
 
         public void RecordCardGeneration(BattleCardGenerationEvent generationEvent)
@@ -164,6 +208,32 @@ namespace Project333.Runtime.Domain.Battle
             if (generationEvent != null)
             {
                 CardGenerationEvents.Add(generationEvent);
+            }
+        }
+
+        public void ClearResourceChangeEvents()
+        {
+            ResourceChangeEvents.Clear();
+        }
+
+        public void RecordResourceChange(BattleResourceChangeEvent resourceChangeEvent)
+        {
+            if (resourceChangeEvent != null)
+            {
+                ResourceChangeEvents.Add(resourceChangeEvent);
+            }
+        }
+
+        public void ClearAreaSpellEffectEvents()
+        {
+            AreaSpellEffectEvents.Clear();
+        }
+
+        public void RecordAreaSpellEffect(BattleAreaSpellEffectEvent areaSpellEffectEvent)
+        {
+            if (areaSpellEffectEvent != null)
+            {
+                AreaSpellEffectEvents.Add(areaSpellEffectEvent);
             }
         }
 
@@ -188,5 +258,110 @@ namespace Project333.Runtime.Domain.Battle
                 occupant?.ResolveInvincibleTurnEnd(endingPlayerId);
             }
         }
+    }
+
+    public sealed class BattleResourceChangeEvent
+    {
+        public BattleResourceChangeEvent(
+            PlayerId ownerId,
+            string sourceCardId,
+            ResourceSet gained)
+            : this(ownerId, sourceCardId, gained, new ResourceSet())
+        {
+        }
+
+        public BattleResourceChangeEvent(
+            PlayerId ownerId,
+            string sourceCardId,
+            ResourceSet gained,
+            ResourceSet spent)
+        {
+            OwnerId = ownerId;
+            SourceCardId = sourceCardId ?? string.Empty;
+            Gained = gained == null
+                ? throw new System.ArgumentNullException(nameof(gained))
+                : gained.Clone();
+            Spent = spent == null
+                ? throw new System.ArgumentNullException(nameof(spent))
+                : spent.Clone();
+        }
+
+        public PlayerId OwnerId { get; }
+
+        public string SourceCardId { get; }
+
+        public ResourceSet Gained { get; }
+
+        public ResourceSet Spent { get; }
+    }
+
+    public sealed class BattleAreaSpellEffectEvent
+    {
+        public BattleAreaSpellEffectEvent(
+            string effectId,
+            string sourceCardId,
+            PlayerId sourceOwnerId,
+            PlayerId targetOwnerId,
+            IEnumerable<TileCoord> targetCoords)
+        {
+            EffectId = effectId ?? string.Empty;
+            SourceCardId = sourceCardId ?? string.Empty;
+            SourceOwnerId = sourceOwnerId;
+            TargetOwnerId = targetOwnerId;
+            TargetCoords = targetCoords == null
+                ? throw new System.ArgumentNullException(nameof(targetCoords))
+                : new List<TileCoord>(targetCoords);
+        }
+
+        public string EffectId { get; }
+
+        public string SourceCardId { get; }
+
+        public PlayerId SourceOwnerId { get; }
+
+        public PlayerId TargetOwnerId { get; }
+
+        public IReadOnlyList<TileCoord> TargetCoords { get; }
+    }
+
+    public sealed class BattleAttackResolution
+    {
+        public BattleAttackResolution(
+            PlayerId attackerOwnerId,
+            TileCoord attackerCoord,
+            string attackerRuntimeId,
+            string attackerCardId,
+            PlayerId declaredTargetOwnerId,
+            TileCoord declaredTargetCoord,
+            PlayerId resolvedTargetOwnerId,
+            TileCoord resolvedTargetCoord,
+            string resolvedTargetRuntimeId,
+            string resolvedTargetCardId,
+            bool wasHuanShuRedirected)
+        {
+            AttackerOwnerId = attackerOwnerId;
+            AttackerCoord = attackerCoord;
+            AttackerRuntimeId = attackerRuntimeId ?? string.Empty;
+            AttackerCardId = attackerCardId ?? string.Empty;
+            DeclaredTargetOwnerId = declaredTargetOwnerId;
+            DeclaredTargetCoord = declaredTargetCoord;
+            ResolvedTargetOwnerId = resolvedTargetOwnerId;
+            ResolvedTargetCoord = resolvedTargetCoord;
+            ResolvedTargetRuntimeId = resolvedTargetRuntimeId ?? string.Empty;
+            ResolvedTargetCardId = resolvedTargetCardId ?? string.Empty;
+            WasHuanShuRedirected = wasHuanShuRedirected;
+        }
+
+        public PlayerId AttackerOwnerId { get; }
+        public TileCoord AttackerCoord { get; }
+        public string AttackerRuntimeId { get; }
+        public string AttackerCardId { get; }
+        public PlayerId DeclaredTargetOwnerId { get; }
+        public TileCoord DeclaredTargetCoord { get; }
+        public PlayerId ResolvedTargetOwnerId { get; }
+        public TileCoord ResolvedTargetCoord { get; }
+        public string ResolvedTargetRuntimeId { get; }
+        public string ResolvedTargetCardId { get; }
+        public bool WasHuanShuRedirected { get; }
     }
 }

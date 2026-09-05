@@ -48,7 +48,17 @@ namespace Project333.Runtime.Application.Services
                 var upkeepCost = new ResourceSet(mana: 0, qi: 0, power: upkeep, gold: 0);
                 if (activePlayer.Resources.CanAfford(upkeepCost))
                 {
+                    var resourcesBeforePayment = activePlayer.Resources.Clone();
                     activePlayer.Resources.Spend(upkeepCost);
+                    battleState.RecordResourceChange(new BattleResourceChangeEvent(
+                        activePlayer.Id,
+                        occupant.CardId,
+                        gained: new ResourceSet(),
+                        spent: new ResourceSet(
+                            resourcesBeforePayment.Mana - activePlayer.Resources.Mana,
+                            resourcesBeforePayment.Qi - activePlayer.Resources.Qi,
+                            resourcesBeforePayment.Power - activePlayer.Resources.Power,
+                            resourcesBeforePayment.Gold - activePlayer.Resources.Gold)));
                     SetUpkeepState(occupant, isUnpaid: false);
                 }
                 else

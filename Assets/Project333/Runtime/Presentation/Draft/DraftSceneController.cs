@@ -21,6 +21,9 @@ namespace Project333.Runtime.Presentation.Draft
 {
     public sealed class DraftSceneController : MonoBehaviour, IDraftOverlayHost
     {
+        [SerializeField, HideInInspector] private int _draftVisualVersion;
+        public int DraftVisualVersion => _draftVisualVersion;
+
         private const int CompletedRunServerSyncMaxAttempts = 5;
         private const float CompletedRunServerSyncRetryDelaySeconds = 1.25f;
 
@@ -223,6 +226,11 @@ namespace Project333.Runtime.Presentation.Draft
             {
                 MaterializeEditorDraftUi();
             }
+        }
+
+        public void MaterializeDraftUiForEditor()
+        {
+            if (!UnityEngine.Application.isPlaying) MaterializeEditorDraftUi();
         }
 
         private void QueueEditorDraftUiRefresh()
@@ -1522,7 +1530,7 @@ namespace Project333.Runtime.Presentation.Draft
                 rectTransform.anchoredPosition = anchoredPosition;
             }
 
-            if (button.TryGetComponent<Image>(out var image))
+            if (_draftVisualVersion == 0 && button.TryGetComponent<Image>(out var image))
             {
                 image.color = imageColor;
             }
@@ -1533,7 +1541,7 @@ namespace Project333.Runtime.Presentation.Draft
                 return;
             }
 
-            label.fontSize = _battleModeButtonFontSize;
+            if (_draftVisualVersion == 0) label.fontSize = _battleModeButtonFontSize;
             if (label.rectTransform != null && ShouldApplyDraftUiLayoutToSceneObjects())
             {
                 label.rectTransform.offsetMin = _battleModeButtonLabelPadding;
@@ -1767,7 +1775,7 @@ namespace Project333.Runtime.Presentation.Draft
                 _claimRewardsButtonNeedsDefaultLayout = false;
             }
 
-            if (button.TryGetComponent<Image>(out var image))
+            if (_draftVisualVersion == 0 && button.TryGetComponent<Image>(out var image))
             {
                 image.color = _claimRewardsButtonColor;
             }
@@ -1775,7 +1783,7 @@ namespace Project333.Runtime.Presentation.Draft
             var label = ResolveButtonLabel(button);
             if (label != null)
             {
-                label.fontSize = _claimRewardsButtonFontSize;
+                if (_draftVisualVersion == 0) label.fontSize = _claimRewardsButtonFontSize;
                 if (ShouldApplyDraftUiLayoutToSceneObjects() && label.rectTransform != null)
                 {
                     label.rectTransform.offsetMin = _claimRewardsButtonLabelPadding;
@@ -2929,7 +2937,7 @@ namespace Project333.Runtime.Presentation.Draft
                 buttonRect.anchoredPosition = _returnToStartButtonPosition;
             }
 
-            if (button.TryGetComponent<Image>(out var image))
+            if (_draftVisualVersion == 0 && button.TryGetComponent<Image>(out var image))
             {
                 image.color = _returnToStartButtonColor;
             }
@@ -2938,7 +2946,7 @@ namespace Project333.Runtime.Presentation.Draft
             if (label != null)
             {
                 label.text = ResolveReturnButtonLabel();
-                label.fontSize = _returnToStartButtonFontSize;
+                if (_draftVisualVersion == 0) label.fontSize = _returnToStartButtonFontSize;
                 if (ShouldApplyDraftUiLayoutToSceneObjects() && label.rectTransform != null)
                 {
                     label.rectTransform.offsetMin = _returnToStartButtonLabelPadding;
@@ -3102,7 +3110,7 @@ namespace Project333.Runtime.Presentation.Draft
                 }
             }
 
-            if (_serverWalletText != null)
+            if (_serverWalletText != null && _draftVisualVersion == 0)
             {
                 _serverWalletText.font = ResolveRuntimeFont();
                 _serverWalletText.color = _serverWalletTextColor;

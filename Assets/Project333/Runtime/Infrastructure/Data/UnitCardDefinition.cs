@@ -22,7 +22,7 @@ namespace Project333.Runtime.Infrastructure.Data
             int hitsPerAttack = 1,
             bool hasBerserker = false,
             bool hasEndure = false,
-            bool hasGuard = false,
+            bool hasShielder = false,
             bool hasLifeSteal = false,
             DamageType damageType = DamageType.Physical,
             int physicalDefense = 0,
@@ -36,7 +36,8 @@ namespace Project333.Runtime.Infrastructure.Data
             bool hasFlying = false,
             int spellPower = 0,
             InvincibleDurationType invincibleDuration = InvincibleDurationType.None,
-            int invincibleOwnerTurns = 0)
+            int invincibleOwnerTurns = 0,
+            bool hasPiercing = false)
             : base(cardId, displayName, CardType.Unit, cost, includeInDraft, hasReplicate)
         {
             if (sealboundOwnerTurnStarts < 0)
@@ -63,7 +64,7 @@ namespace Project333.Runtime.Infrastructure.Data
             HitsPerAttack = hitsPerAttack < 1 ? 1 : hitsPerAttack;
             HasBerserker = hasBerserker;
             HasEndure = hasEndure;
-            HasGuard = hasGuard;
+            HasShielder = hasShielder;
             HasLifeSteal = hasLifeSteal;
             DamageType = damageType;
             PhysicalDefense = physicalDefense;
@@ -75,6 +76,7 @@ namespace Project333.Runtime.Infrastructure.Data
             SpellPower = spellPower;
             InvincibleDuration = invincibleDuration;
             InvincibleOwnerTurns = invincibleOwnerTurns;
+            HasPiercing = hasPiercing;
         }
 
         public AttackType AttackType { get; }
@@ -90,7 +92,7 @@ namespace Project333.Runtime.Infrastructure.Data
         public int HitsPerAttack { get; }
         public bool HasBerserker { get; }
         public bool HasEndure { get; }
-        public bool HasGuard { get; }
+        public bool HasShielder { get; }
         public bool HasLifeSteal { get; }
         public DamageType DamageType { get; }
         public int PhysicalDefense { get; }
@@ -102,6 +104,7 @@ namespace Project333.Runtime.Infrastructure.Data
         public int SpellPower { get; }
         public InvincibleDurationType InvincibleDuration { get; }
         public int InvincibleOwnerTurns { get; }
+        public bool HasPiercing { get; }
 
         private static void ValidateInvincible(
             InvincibleDurationType duration,
@@ -112,15 +115,17 @@ namespace Project333.Runtime.Infrastructure.Data
                 throw new ArgumentOutOfRangeException(nameof(duration));
             }
 
-            if (duration == InvincibleDurationType.OwnerTurns && ownerTurns <= 0)
+            var hasTurnCount = duration == InvincibleDurationType.OwnerTurns ||
+                               duration == InvincibleDurationType.GlobalTurnEnds;
+            if (hasTurnCount && ownerTurns <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(ownerTurns));
             }
 
-            if (duration != InvincibleDurationType.OwnerTurns && ownerTurns != 0)
+            if (!hasTurnCount && ownerTurns != 0)
             {
                 throw new ArgumentException(
-                    "invincibleOwnerTurns must be 0 unless InvincibleDuration is OwnerTurns.",
+                    "invincibleOwnerTurns must be 0 unless InvincibleDuration uses a turn count.",
                     nameof(ownerTurns));
             }
         }

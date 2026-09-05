@@ -32,18 +32,18 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Guard_WhenDrainedOrErasure_IsInactive()
+        public void Shielder_WhenDrainedOrErasure_IsInactive()
         {
-            var unit = CreateUnit("guard", attack: 0, maxHp: 40, hasGuard: true);
+            var unit = CreateUnit("shielder", attack: 0, maxHp: 40, hasShielder: true);
 
-            Assert.That(unit.HasActiveGuard, Is.True);
+            Assert.That(unit.HasActiveShielder, Is.True);
 
             unit.IsDrained = true;
-            Assert.That(unit.HasActiveGuard, Is.False);
+            Assert.That(unit.HasActiveShielder, Is.False);
 
             unit.IsDrained = false;
             unit.ApplyErasure();
-            Assert.That(unit.HasActiveGuard, Is.False);
+            Assert.That(unit.HasActiveShielder, Is.False);
         }
 
         [Test]
@@ -127,7 +127,7 @@ namespace Project333.Tests.EditMode
             int attack,
             int maxHp,
             bool hasBerserker = false,
-            bool hasGuard = false)
+            bool hasShielder = false)
         {
             return new UnitState(
                 runtimeId: id,
@@ -141,7 +141,7 @@ namespace Project333.Tests.EditMode
                 isScience: false,
                 sciencePowerUpkeep: 0,
                 hasBerserker: hasBerserker,
-                hasGuard: hasGuard);
+                hasShielder: hasShielder);
         }
     }
 }

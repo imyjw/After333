@@ -90,6 +90,9 @@ namespace Project333.Runtime.Infrastructure.Data
 
     public sealed class JsonCardDefinitionRecord
     {
+        private bool _hasShielder;
+        private bool _legacyHasGuard;
+
         public string Id { get; set; } = string.Empty;
 
         public string DisplayName { get; set; } = string.Empty;
@@ -146,7 +149,28 @@ namespace Project333.Runtime.Infrastructure.Data
 
         public bool HasEndure { get; set; }
 
-        public bool HasGuard { get; set; }
+        public bool HasShielder
+        {
+            get => _hasShielder;
+            set => _hasShielder = value || _legacyHasGuard;
+        }
+
+#if UNITY_5_3_OR_NEWER
+        [JsonProperty("hasGuard")]
+#else
+        [JsonPropertyName("hasGuard")]
+#endif
+        public bool LegacyHasGuard
+        {
+            set
+            {
+                _legacyHasGuard = value;
+                if (value)
+                {
+                    _hasShielder = true;
+                }
+            }
+        }
 
         public bool HasLifeSteal { get; set; }
 
@@ -159,6 +183,8 @@ namespace Project333.Runtime.Infrastructure.Data
         public bool HasFlying { get; set; }
 
         public int SpellPower { get; set; }
+
+        public bool HasPiercing { get; set; }
 
         public InvincibleDurationType InvincibleDuration { get; set; } = InvincibleDurationType.None;
 
@@ -199,7 +225,7 @@ namespace Project333.Runtime.Infrastructure.Data
                         HitsPerAttack,
                         HasBerserker,
                         HasEndure,
-                        HasGuard,
+                        HasShielder,
                         HasLifeSteal,
                         DamageType,
                         PhysicalDefense,
@@ -213,7 +239,8 @@ namespace Project333.Runtime.Infrastructure.Data
                         HasFlying,
                         SpellPower,
                         InvincibleDuration,
-                        InvincibleOwnerTurns);
+                        InvincibleOwnerTurns,
+                        HasPiercing);
 
                 case JsonCardDefinitionKind.Building:
                     return new BuildingCardDefinition(
@@ -235,7 +262,8 @@ namespace Project333.Runtime.Infrastructure.Data
                         HasFlying,
                         SpellPower,
                         InvincibleDuration,
-                        InvincibleOwnerTurns);
+                        InvincibleOwnerTurns,
+                        HasPiercing);
 
                 case JsonCardDefinitionKind.DamageSpell:
                     return new DamageSpellCardDefinition(

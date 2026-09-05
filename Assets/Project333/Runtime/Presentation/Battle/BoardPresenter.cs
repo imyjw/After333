@@ -1,6 +1,7 @@
 using System;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Board;
+using TMPro;
 using UnityEngine;
 
 namespace Project333.Runtime.Presentation.Battle
@@ -26,6 +27,10 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private Vector2 _tileGap = new Vector2(8f, 8f);
         [Min(0.1f)]
         [SerializeField] private float _tileAspectRatio = 1f;
+
+        [Header("Occupant Stat Bar")]
+        [Tooltip("All summoned occupant ATK/HP labels use this TMP font. Leave empty to use each tile's existing font.")]
+        [SerializeField] private TMP_FontAsset _occupantStatFont;
 
         private int _lastScreenWidth = -1;
         private int _lastScreenHeight = -1;
@@ -68,8 +73,8 @@ namespace Project333.Runtime.Presentation.Battle
             _playerTileViews = CollectDirectChildTileViews(_playerBoardRoot);
             _aiTileViews = CollectDirectChildTileViews(_aiBoardRoot);
 
-            ConfigureTileViews(_playerTileViews, PlayerId.Player);
-            ConfigureTileViews(_aiTileViews, PlayerId.AI);
+            ConfigureTileViews(_playerTileViews, PlayerId.Player, _occupantStatFont);
+            ConfigureTileViews(_aiTileViews, PlayerId.AI, _occupantStatFont);
         }
 
         [ContextMenu("Apply Responsive Board Layout")]
@@ -186,7 +191,10 @@ namespace Project333.Runtime.Presentation.Battle
             return tileViews;
         }
 
-        private static void ConfigureTileViews(TileView[] tileViews, PlayerId ownerId)
+        private static void ConfigureTileViews(
+            TileView[] tileViews,
+            PlayerId ownerId,
+            TMP_FontAsset occupantStatFont)
         {
             var maxCount = Math.Min(tileViews.Length, BoardPresenterLayout.TilesPerSide);
 
@@ -200,6 +208,7 @@ namespace Project333.Runtime.Presentation.Battle
 
                 var coord = BoardPresenterLayout.GetCoordForIndex(i);
                 tileView.Configure(ownerId, coord.Column, coord.Row);
+                tileView.GetComponent<TileTextView>()?.ConfigureOccupantStatFont(occupantStatFont);
             }
         }
 

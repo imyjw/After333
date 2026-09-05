@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Cards;
 
@@ -22,7 +23,10 @@ namespace Project333.Runtime.Application.Online
         TurnTimerExpired = 14,
         RobotFusionResolved = 15,
         OccupantAbsorbed = 16,
-        InvinciblePrevented = 17
+        InvinciblePrevented = 17,
+        HuanShuRedirected = 18,
+        AreaSpellEffectTriggered = 19,
+        CardDrawn = 20
     }
 
     public sealed class BattleEventDto
@@ -37,6 +41,8 @@ namespace Project333.Runtime.Application.Online
 
         public TileCoordDto TargetCoord { get; set; }
 
+        public List<TileCoordDto> TargetCoords { get; set; } = new List<TileCoordDto>();
+
         public string RuntimeId { get; set; } = string.Empty;
 
         public string CardId { get; set; } = string.Empty;
@@ -44,6 +50,8 @@ namespace Project333.Runtime.Application.Online
         public string SourceRuntimeId { get; set; } = string.Empty;
 
         public string SourceCardId { get; set; } = string.Empty;
+
+        public string EffectId { get; set; } = string.Empty;
 
         public string TargetRuntimeId { get; set; } = string.Empty;
 
@@ -62,6 +70,8 @@ namespace Project333.Runtime.Application.Online
         public int HpBefore { get; set; }
 
         public int HpAfter { get; set; }
+
+        public bool IsDraw { get; set; }
 
         public AttackType AttackType { get; set; }
 

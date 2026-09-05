@@ -24,7 +24,7 @@ namespace Project333.Editor
 
             var cards = new List<CardDefinitionAsset>
             {
-                CreateIronGuard(),
+                CreateIronShielder(),
                 CreateLongbowScout(),
                 CreateGoldMiner(),
                 CreateManaAcolyte(),
@@ -59,11 +59,17 @@ namespace Project333.Editor
                 "These are sample playtest assets, not locked final content.");
         }
 
-        private static UnitCardDefinitionAsset CreateIronGuard()
+        private static UnitCardDefinitionAsset CreateIronShielder()
         {
-            var asset = LoadOrCreate<UnitCardDefinitionAsset>($"{CardsRoot}/SampleIronGuard.asset");
-            asset.ConfigureBaseForTests("sample_iron_guard", "Sample Iron Guard", new ResourceSetData(0, 0, 0, 2));
-            asset.ConfigureForTests(AttackType.Melee, 2, 7, true, false, 0, new ResourceSetData(0, 0, 0, 0), 1, false, hasGuard: true);
+            var asset = LoadOrCreate<UnitCardDefinitionAsset>($"{CardsRoot}/SampleIronShielder.asset");
+            asset.ConfigureBaseForTests("sample_iron_shielder", "Sample Iron Shielder", new ResourceSetData(0, 0, 0, 2));
+            asset.ConfigureMetadataForTests(
+                CardRarity.Common,
+                CardAffiliation.Neutral,
+                ChargeTileFootprint.OneByOne,
+                string.Empty,
+                "Shielder");
+            asset.ConfigureForTests(AttackType.Melee, 2, 7, true, false, 0, new ResourceSetData(0, 0, 0, 0), 1, false, hasShielder: true);
             EditorUtility.SetDirty(asset);
             return asset;
         }

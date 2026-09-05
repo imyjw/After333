@@ -48,6 +48,7 @@ namespace Project333.Runtime.Domain.Board
 
             _tiles[coord.Column, coord.Row] = occupant;
             occupant.Position = coord;
+            occupant.AttachToBoard(this);
         }
 
         public OccupantState Remove(TileCoord coord)
@@ -59,6 +60,7 @@ namespace Project333.Runtime.Domain.Board
 
             var occupant = _tiles[coord.Column, coord.Row];
             _tiles[coord.Column, coord.Row] = null;
+            occupant?.DetachFromBoard(this);
             return occupant;
         }
 

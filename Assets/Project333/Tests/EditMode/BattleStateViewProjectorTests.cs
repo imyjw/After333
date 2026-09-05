@@ -46,6 +46,30 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
+        public void CreateLocalPerspectiveState_WhenServerBattleIsDraw_ProjectsDraw()
+        {
+            var view = new BattleStateViewDto
+            {
+                MatchId = "match-draw",
+                ViewerId = PlayerId.Player,
+                ActivePlayerId = PlayerId.Player,
+                TurnNumber = 1,
+                Phase = PhaseType.Ended,
+                IsEnded = true,
+                HasWinner = false,
+                IsDraw = true,
+                Player = CreatePlayerView(PlayerId.Player),
+                Opponent = CreatePlayerView(PlayerId.AI),
+            };
+
+            var projectedState = BattleStateViewProjector.CreateLocalPerspectiveState(view);
+
+            Assert.That(projectedState.IsEnded, Is.True);
+            Assert.That(projectedState.Result.HasWinner, Is.False);
+            Assert.That(projectedState.Result.IsDraw, Is.True);
+        }
+
+        [Test]
         public void CreateLocalPerspectiveState_PreservesDamageTypeAndDefenses()
         {
             var view = new BattleStateViewDto
@@ -252,6 +276,39 @@ namespace Project333.Tests.EditMode
             Assert.That(effect.EffectDamage, Is.EqualTo(38));
             Assert.That(effect.EffectDamageType, Is.EqualTo(DamageType.Magic));
             Assert.That(effect.TargetsOwnerBoard, Is.True);
+        }
+
+        [Test]
+        public void CreateLocalPerspectiveState_PreservesBiochemicalBombArea()
+        {
+            var view = new BattleStateViewDto
+            {
+                MatchId = "match-biochemical-bomb",
+                ViewerId = PlayerId.Player,
+                ActivePlayerId = PlayerId.AI,
+                TurnNumber = 2,
+                Phase = PhaseType.Main,
+                Player = CreatePlayerView(PlayerId.Player),
+                Opponent = CreatePlayerView(PlayerId.AI),
+            };
+            view.PersistentEffects.Add(new PersistentEffectViewDto
+            {
+                SourceCardId = BiochemicalBombRules.CardId,
+                OwnerId = PlayerId.Player,
+                EffectId = BiochemicalBombRules.EffectId,
+                AppliedTurn = 1,
+                RemainingTriggers = 3,
+                EffectDamage = 47,
+                EffectDamageType = DamageType.Physical,
+                TargetStartColumn = BiochemicalBombRules.RightAreaStartColumn,
+            });
+
+            var projectedState = BattleStateViewProjector.CreateLocalPerspectiveState(view);
+            var effect = projectedState.PersistentEffects[0];
+
+            Assert.That(effect.TargetStartColumn, Is.EqualTo(BiochemicalBombRules.RightAreaStartColumn));
+            Assert.That(effect.RemainingTriggers, Is.EqualTo(3));
+            Assert.That(effect.EffectDamage, Is.EqualTo(47));
         }
 
         private static BattleStateViewDto CreateEndedView(PlayerId viewerId, PlayerId winnerId)

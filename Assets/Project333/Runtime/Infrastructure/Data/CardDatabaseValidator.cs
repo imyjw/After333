@@ -20,7 +20,13 @@ namespace Project333.Runtime.Infrastructure.Data
             "daehwandan",
             "firewall",
             "robot_fusion",
+            BiochemicalBombRules.EffectId,
             TimedBombRules.EffectId,
+            PowerBankRules.EffectId,
+            ManaStoneRules.EffectId,
+            ManaStoneBundleRules.EffectId,
+            GuRules.EffectId,
+            HuanShuRules.EffectId,
         };
 
         public static CardDatabaseValidationResult ValidateJson(string json)
@@ -224,6 +230,20 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError($"Card '{id}' hasFlying can only be used by Unit or Building cards.");
             }
 
+            if (card.HasPiercing &&
+                card.DefinitionType != JsonCardDefinitionKind.Unit &&
+                card.DefinitionType != JsonCardDefinitionKind.Building)
+            {
+                result.AddError($"Card '{id}' hasPiercing can only be used by Unit or Building cards.");
+            }
+
+            if (card.HasPiercing &&
+                card.DefinitionType == JsonCardDefinitionKind.Building &&
+                !card.CanAttack)
+            {
+                result.AddError($"Card '{id}' hasPiercing requires an attack-capable Building.");
+            }
+
             if (card.SpellPower < 0)
             {
                 result.AddError($"Card '{id}' cannot have negative spellPower.");
@@ -249,18 +269,19 @@ namespace Project333.Runtime.Infrastructure.Data
                     $"Card '{id}' invincibleDuration can only be used by Unit or Building cards.");
             }
 
-            if (card.InvincibleDuration == InvincibleDurationType.OwnerTurns &&
-                card.InvincibleOwnerTurns <= 0)
+            var countedInvincible =
+                card.InvincibleDuration == InvincibleDurationType.OwnerTurns ||
+                card.InvincibleDuration == InvincibleDurationType.GlobalTurnEnds;
+            if (countedInvincible && card.InvincibleOwnerTurns <= 0)
             {
                 result.AddError(
-                    $"Card '{id}' OwnerTurns Invincible requires positive invincibleOwnerTurns.");
+                    $"Card '{id}' {card.InvincibleDuration} Invincible requires positive invincibleOwnerTurns.");
             }
 
-            if (card.InvincibleDuration != InvincibleDurationType.OwnerTurns &&
-                card.InvincibleOwnerTurns != 0)
+            if (!countedInvincible && card.InvincibleOwnerTurns != 0)
             {
                 result.AddError(
-                    $"Card '{id}' invincibleOwnerTurns must be 0 unless invincibleDuration is OwnerTurns.");
+                    $"Card '{id}' invincibleOwnerTurns must be 0 unless invincibleDuration uses a turn count.");
             }
 
             if (card.SealboundOwnerTurnStarts < 0)
@@ -315,9 +336,477 @@ namespace Project333.Runtime.Infrastructure.Data
                 ValidateGaebangBranch(card, result);
             }
 
+            if (string.Equals(card.Id, MerchantCaravanRules.CardId, StringComparison.Ordinal))
+            {
+                ValidateMerchantCaravan(card, result);
+            }
+
+            if (string.Equals(card.Id, InnRules.CardId, StringComparison.Ordinal))
+            {
+                ValidateInn(card, result);
+            }
+
+            if (string.Equals(card.Id, PowerPlantRules.CardId, StringComparison.Ordinal))
+            {
+                ValidatePowerPlant(card, result);
+            }
+
+            if (string.Equals(card.Id, NuclearPowerPlantRules.CardId, StringComparison.Ordinal))
+            {
+                ValidateNuclearPowerPlant(card, result);
+            }
+
             if (string.Equals(card.Id, TimedBombRules.CardId, StringComparison.Ordinal))
             {
                 ValidateTimedBomb(card, result);
+            }
+
+            if (string.Equals(card.Id, BiochemicalBombRules.CardId, StringComparison.Ordinal))
+            {
+                ValidateBiochemicalBomb(card, result);
+            }
+
+            if (string.Equals(card.Id, PowerBankRules.CardId, StringComparison.Ordinal))
+            {
+                ValidatePowerBank(card, result);
+            }
+
+            if (string.Equals(card.Id, ManaStoneRules.CardId, StringComparison.Ordinal))
+            {
+                ValidateManaStone(card, result);
+            }
+
+            if (string.Equals(card.Id, ManaStoneBundleRules.CardId, StringComparison.Ordinal))
+            {
+                ValidateManaStoneBundle(card, result);
+            }
+
+            if (string.Equals(
+                    card.Id,
+                    TenThousandYearSnowGinsengRules.CardId,
+                    StringComparison.Ordinal))
+            {
+                ValidateTenThousandYearSnowGinseng(card, result);
+            }
+
+            if (string.Equals(card.Id, GuRules.CardId, StringComparison.Ordinal))
+            {
+                ValidateGu(card, result);
+            }
+
+            if (string.Equals(card.Id, HuanShuRules.CardId, StringComparison.Ordinal))
+            {
+                ValidateHuanShu(card, result);
+            }
+
+            if (string.Equals(card.Id, WerewolfRules.CardId, StringComparison.Ordinal))
+            {
+                ValidateWerewolf(card, result);
+            }
+
+            if (string.Equals(card.Id, DemonKingRules.CardId, StringComparison.Ordinal))
+            {
+                ValidateDemonKing(card, result);
+            }
+
+            if (string.Equals(card.Id, HeroRules.CardId, StringComparison.Ordinal))
+            {
+                ValidateHero(card, result);
+            }
+        }
+
+        private static void ValidateHero(
+            JsonCardDefinitionRecord card,
+            CardDatabaseValidationResult result)
+        {
+            if (card.DefinitionType != JsonCardDefinitionKind.Unit ||
+                card.Rarity != CardRarity.Unique ||
+                card.Affiliation != CardAffiliation.Fantasy ||
+                card.ChargeTileFootprint != ChargeTileFootprint.OneByOne)
+            {
+                result.AddError("Hero must be a Unique 1x1 Fantasy Unit.");
+            }
+
+            if (card.Cost == null ||
+                card.Cost.Mana != HeroRules.ManaCost ||
+                card.Cost.Qi != 0 || card.Cost.Power != 0 || card.Cost.Gold != 0)
+            {
+                result.AddError("Hero must cost exactly 3 mana.");
+            }
+
+            if (card.AttackType != AttackType.Melee ||
+                card.DamageType != DamageType.Fixed ||
+                card.Attack != HeroRules.BaseAttack ||
+                card.Health != HeroRules.BaseHealth ||
+                card.PhysicalDefense != HeroRules.PhysicalDefense ||
+                card.MagicDefense != HeroRules.MagicDefense ||
+                !card.CanMove)
+            {
+                result.AddError("Hero must use melee Fixed ATK 3, HP 3, DEF 0/0, and be movable.");
+            }
+
+            if (card.InvincibleDuration != InvincibleDurationType.GlobalTurnEnds ||
+                card.InvincibleOwnerTurns != HeroRules.InvincibleTurnEnds)
+            {
+                result.AddError("Hero must gain Invincible for exactly three global turn endings when summoned.");
+            }
+
+            if (card.IncludeInDraft || card.IncludeInRewards)
+            {
+                result.AddError("Hero must stay disabled in draft and rewards until its art is ready.");
+            }
+
+            if (string.IsNullOrWhiteSpace(card.EffectText) ||
+                !card.EffectText.Contains(HeroRules.InvincibleTurnEnds.ToString()) ||
+                !card.EffectText.Contains(HeroRules.GrowthAmount.ToString()) ||
+                !card.EffectText.Contains("ATK") ||
+                !card.EffectText.Contains("HP"))
+            {
+                result.AddError("Hero effectText must describe three global turn endings of Invincible and random ATK/HP +13 growth.");
+            }
+        }
+
+        private static void ValidateDemonKing(
+            JsonCardDefinitionRecord card,
+            CardDatabaseValidationResult result)
+        {
+            if (card.DefinitionType != JsonCardDefinitionKind.Unit ||
+                card.Rarity != CardRarity.Legendary ||
+                card.Affiliation != CardAffiliation.Fantasy ||
+                card.ChargeTileFootprint != ChargeTileFootprint.OneByOne)
+            {
+                result.AddError("DemonKing must be a Legendary 1x1 Fantasy Unit.");
+            }
+
+            if (card.Cost == null ||
+                card.Cost.Mana != DemonKingRules.ManaCost ||
+                card.Cost.Gold != DemonKingRules.GoldCost ||
+                card.Cost.Qi != 0 || card.Cost.Power != 0)
+            {
+                result.AddError("DemonKing must cost exactly 3 mana and 3 gold.");
+            }
+
+            if (card.AttackType != AttackType.Melee ||
+                card.DamageType != DamageType.Magic ||
+                card.Attack != DemonKingRules.BaseAttack ||
+                card.Health != DemonKingRules.BaseHealth ||
+                card.PhysicalDefense != DemonKingRules.PhysicalDefense ||
+                card.MagicDefense != DemonKingRules.MagicDefense ||
+                !card.CanMove)
+            {
+                result.AddError("DemonKing must use melee Magic ATK 33, HP 33, DEF 3/3, and be movable.");
+            }
+
+            if (card.IncludeInDraft || card.IncludeInRewards)
+            {
+                result.AddError("DemonKing must stay disabled in draft and rewards until its art is ready.");
+            }
+
+            if (string.IsNullOrWhiteSpace(card.EffectText) ||
+                !card.EffectText.Contains("사망") ||
+                !card.EffectText.Contains("봉인") ||
+                !card.EffectText.Contains(DemonKingRules.RevivalTurnStarts.ToString()) ||
+                !card.EffectText.Contains(DemonKingRules.RevivalStatGain.ToString()))
+            {
+                result.AddError("DemonKing effectText must describe its repeating three-turn sealed revival and +33/+33 growth.");
+            }
+        }
+
+        private static void ValidateWerewolf(
+            JsonCardDefinitionRecord card,
+            CardDatabaseValidationResult result)
+        {
+            if (card.DefinitionType != JsonCardDefinitionKind.Unit ||
+                card.Rarity != CardRarity.Rare ||
+                card.Affiliation != CardAffiliation.Fantasy ||
+                card.ChargeTileFootprint != ChargeTileFootprint.OneByOne)
+            {
+                result.AddError("Werewolf must be a Rare 1x1 Fantasy Unit.");
+            }
+
+            if (card.Cost == null ||
+                card.Cost.Mana != WerewolfRules.ManaCost ||
+                card.Cost.Qi != 0 || card.Cost.Power != 0 || card.Cost.Gold != 0)
+            {
+                result.AddError("Werewolf must cost exactly 3 mana.");
+            }
+
+            if (card.AttackType != AttackType.Melee ||
+                card.DamageType != DamageType.Physical ||
+                card.Attack != WerewolfRules.BaseAttack ||
+                card.Health != WerewolfRules.BaseHealth ||
+                card.PhysicalDefense != 0 || card.MagicDefense != 0 ||
+                !card.CanMove)
+            {
+                result.AddError("Werewolf must use melee Physical ATK 20, HP 30, DEF 0/0, and be movable.");
+            }
+
+            if (!card.HasReplicate)
+            {
+                result.AddError("Werewolf must have Replicate.");
+            }
+
+            if (card.IncludeInDraft || card.IncludeInRewards)
+            {
+                result.AddError("Werewolf must stay disabled in draft and rewards until its art is ready.");
+            }
+
+            if (string.IsNullOrWhiteSpace(card.EffectText) ||
+                !card.EffectText.Contains("웨어울프") ||
+                !card.EffectText.Contains(WerewolfRules.AttackPerOtherWerewolf.ToString()))
+            {
+                result.AddError("Werewolf effectText must describe ATK +10 for each other allied Werewolf.");
+            }
+        }
+
+        private static void ValidateHuanShu(
+            JsonCardDefinitionRecord card,
+            CardDatabaseValidationResult result)
+        {
+            if (card.DefinitionType != JsonCardDefinitionKind.ScriptedSpell ||
+                card.Rarity != CardRarity.Uncommon ||
+                card.Affiliation != CardAffiliation.Murim ||
+                card.ChargeTileFootprint != ChargeTileFootprint.None)
+            {
+                result.AddError("HuanShu must be an Uncommon Murim ScriptedSpell with no footprint.");
+            }
+
+            if (card.Cost == null ||
+                card.Cost.Qi != HuanShuRules.QiCost ||
+                card.Cost.Mana != 0 || card.Cost.Power != 0 || card.Cost.Gold != 0)
+            {
+                result.AddError("HuanShu must cost exactly 3 qi.");
+            }
+
+            if (!string.Equals(card.EffectId, HuanShuRules.EffectId, StringComparison.Ordinal) ||
+                card.Damage != 0 || card.DamageType != DamageType.None)
+            {
+                result.AddError("HuanShu must use the huan_shu non-damage scripted effect.");
+            }
+
+            if (card.IncludeInDraft || card.IncludeInRewards)
+            {
+                result.AddError("HuanShu must stay disabled in draft and rewards until its art is ready.");
+            }
+
+            if (string.IsNullOrWhiteSpace(card.EffectText) ||
+                !card.EffectText.Contains("환술") ||
+                !card.EffectText.Contains("영구") ||
+                !card.EffectText.Contains("무작위"))
+            {
+                result.AddError("HuanShu effectText must describe its permanent random attack targeting effect.");
+            }
+        }
+
+        private static void ValidateTenThousandYearSnowGinseng(
+            JsonCardDefinitionRecord card,
+            CardDatabaseValidationResult result)
+        {
+            if (card.DefinitionType != JsonCardDefinitionKind.PersistentResourceSpell ||
+                card.Rarity != CardRarity.Unique ||
+                card.Affiliation != CardAffiliation.Murim ||
+                card.ChargeTileFootprint != ChargeTileFootprint.None)
+            {
+                result.AddError(
+                    "TenThousandYearSnowGinseng must be a Unique Murim PersistentResourceSpell with no footprint.");
+            }
+
+            if (card.Cost == null ||
+                card.Cost.Gold != TenThousandYearSnowGinsengRules.GoldCost ||
+                card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Power != 0)
+            {
+                result.AddError("TenThousandYearSnowGinseng must cost exactly 4 gold.");
+            }
+
+            if (!string.Equals(
+                    card.EffectId,
+                    TenThousandYearSnowGinsengRules.EffectId,
+                    StringComparison.Ordinal) ||
+                card.Damage != 0 ||
+                card.DamageType != DamageType.None)
+            {
+                result.AddError(
+                    "TenThousandYearSnowGinseng must use its non-damage persistent resource effect.");
+            }
+
+            if (card.TurnStartResourceGain == null ||
+                card.TurnStartResourceGain.Qi != TenThousandYearSnowGinsengRules.TurnStartQiGain ||
+                card.TurnStartResourceGain.Mana != 0 ||
+                card.TurnStartResourceGain.Power != 0 ||
+                card.TurnStartResourceGain.Gold != 0 ||
+                card.OwnerTurnStartsRemaining != TenThousandYearSnowGinsengRules.OwnerTurnStarts)
+            {
+                result.AddError(
+                    "TenThousandYearSnowGinseng must grant exactly 3 qi at the next 3 owner turn starts.");
+            }
+
+            if (card.IncludeInDraft)
+            {
+                result.AddError(
+                    "TenThousandYearSnowGinseng must stay disabled in draft until its art is ready.");
+            }
+
+            if (card.IncludeInRewards)
+            {
+                result.AddError(
+                    "TenThousandYearSnowGinseng is non-upgradeable and must not appear in random rewards.");
+            }
+
+            if (string.IsNullOrWhiteSpace(card.EffectText) ||
+                !card.EffectText.Contains("기") ||
+                !card.EffectText.Contains(TenThousandYearSnowGinsengRules.TurnStartQiGain.ToString()) ||
+                !card.EffectText.Contains(TenThousandYearSnowGinsengRules.OwnerTurnStarts.ToString()))
+            {
+                result.AddError(
+                    "TenThousandYearSnowGinseng effectText must describe qi +3 for the next 3 owner turn starts.");
+            }
+        }
+
+        private static void ValidateGu(
+            JsonCardDefinitionRecord card,
+            CardDatabaseValidationResult result)
+        {
+            if (card.DefinitionType != JsonCardDefinitionKind.ScriptedSpell ||
+                card.Rarity != CardRarity.Unique ||
+                card.Affiliation != CardAffiliation.Murim ||
+                card.ChargeTileFootprint != ChargeTileFootprint.None)
+            {
+                result.AddError("Gu must be a Unique Murim ScriptedSpell with no footprint.");
+            }
+
+            if (card.Cost == null ||
+                card.Cost.Qi != GuRules.QiCost ||
+                card.Cost.Mana != 0 || card.Cost.Power != 0 || card.Cost.Gold != 0)
+            {
+                result.AddError("Gu must cost exactly 10 qi.");
+            }
+
+            if (!string.Equals(card.EffectId, GuRules.EffectId, StringComparison.Ordinal) ||
+                card.Damage != 0 || card.DamageType != DamageType.None)
+            {
+                result.AddError("Gu must use the gu non-damage scripted effect.");
+            }
+
+            if (card.IncludeInDraft || card.IncludeInRewards)
+            {
+                result.AddError("Gu must stay disabled in draft and rewards until its art is ready.");
+            }
+
+            if (string.IsNullOrWhiteSpace(card.EffectText) ||
+                !card.EffectText.Contains("상대방") ||
+                !card.EffectText.Contains("유닛") ||
+                !card.EffectText.Contains("복종"))
+            {
+                result.AddError("Gu effectText must describe controlling one enemy Unit.");
+            }
+        }
+
+        private static void ValidateManaStoneBundle(
+            JsonCardDefinitionRecord card,
+            CardDatabaseValidationResult result)
+        {
+            if (card.DefinitionType != JsonCardDefinitionKind.ScriptedSpell ||
+                card.Rarity != CardRarity.Uncommon ||
+                card.Affiliation != CardAffiliation.Fantasy ||
+                card.ChargeTileFootprint != ChargeTileFootprint.None)
+            {
+                result.AddError("ManaStoneBundle must be an Uncommon Fantasy ScriptedSpell with no footprint.");
+            }
+
+            if (card.Cost == null ||
+                card.Cost.Gold != ManaStoneBundleRules.GoldCost ||
+                card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Power != 0)
+            {
+                result.AddError("ManaStoneBundle must cost exactly 5 gold.");
+            }
+
+            if (!string.Equals(card.EffectId, ManaStoneBundleRules.EffectId, StringComparison.Ordinal) ||
+                card.Damage != 0 || card.DamageType != DamageType.None)
+            {
+                result.AddError("ManaStoneBundle must use the mana_stone_bundle non-damage scripted effect.");
+            }
+
+            if (string.IsNullOrWhiteSpace(card.EffectText) ||
+                !card.EffectText.Contains("마나") ||
+                !card.EffectText.Contains(ManaStoneBundleRules.ManaGain.ToString()))
+            {
+                result.AddError("ManaStoneBundle effectText must describe its immediate mana +9 effect.");
+            }
+        }
+
+        private static void ValidateManaStone(
+            JsonCardDefinitionRecord card,
+            CardDatabaseValidationResult result)
+        {
+            if (card.DefinitionType != JsonCardDefinitionKind.ScriptedSpell ||
+                card.Rarity != CardRarity.Common ||
+                card.Affiliation != CardAffiliation.Fantasy ||
+                card.ChargeTileFootprint != ChargeTileFootprint.None)
+            {
+                result.AddError("ManaStone must be a Common Fantasy ScriptedSpell with no footprint.");
+            }
+
+            if (card.Cost == null ||
+                card.Cost.Gold != ManaStoneRules.GoldCost ||
+                card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Power != 0)
+            {
+                result.AddError("ManaStone must cost exactly 2 gold.");
+            }
+
+            if (!string.Equals(card.EffectId, ManaStoneRules.EffectId, StringComparison.Ordinal) ||
+                card.Damage != 0 || card.DamageType != DamageType.None)
+            {
+                result.AddError("ManaStone must use the mana_stone non-damage scripted effect.");
+            }
+
+            if (card.IncludeInDraft || card.IncludeInRewards)
+            {
+                result.AddError("ManaStone must stay disabled in draft and rewards until its art is ready.");
+            }
+
+            if (string.IsNullOrWhiteSpace(card.EffectText) ||
+                !card.EffectText.Contains("마나") ||
+                !card.EffectText.Contains(ManaStoneRules.ManaGain.ToString()))
+            {
+                result.AddError("ManaStone effectText must describe its immediate mana +3 effect.");
+            }
+        }
+
+        private static void ValidatePowerBank(
+            JsonCardDefinitionRecord card,
+            CardDatabaseValidationResult result)
+        {
+            if (card.DefinitionType != JsonCardDefinitionKind.ScriptedSpell ||
+                card.Rarity != CardRarity.Common ||
+                card.Affiliation != CardAffiliation.ScienceCivilization ||
+                card.ChargeTileFootprint != ChargeTileFootprint.None)
+            {
+                result.AddError("PowerBank must be a Common Science Civilization ScriptedSpell with no footprint.");
+            }
+
+            if (card.Cost == null ||
+                card.Cost.Gold != PowerBankRules.GoldCost ||
+                card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Power != 0)
+            {
+                result.AddError("PowerBank must cost exactly 3 gold.");
+            }
+
+            if (!string.Equals(card.EffectId, PowerBankRules.EffectId, StringComparison.Ordinal) ||
+                card.Damage != 0 || card.DamageType != DamageType.None)
+            {
+                result.AddError("PowerBank must use the power_bank non-damage scripted effect.");
+            }
+
+            if (card.IncludeInDraft || card.IncludeInRewards)
+            {
+                result.AddError("PowerBank must stay disabled in draft and rewards until its art is ready.");
+            }
+
+            if (string.IsNullOrWhiteSpace(card.EffectText) ||
+                !card.EffectText.Contains("전력") ||
+                !card.EffectText.Contains(PowerBankRules.PowerGain.ToString()))
+            {
+                result.AddError("PowerBank effectText must describe its immediate power +6 effect.");
             }
         }
 
@@ -352,6 +841,40 @@ namespace Project333.Runtime.Infrastructure.Data
             if (card.IncludeInDraft || card.IncludeInRewards)
             {
                 result.AddError("TimedBomb must stay disabled in draft and rewards until its art is ready.");
+            }
+        }
+
+        private static void ValidateBiochemicalBomb(
+            JsonCardDefinitionRecord card,
+            CardDatabaseValidationResult result)
+        {
+            if (card.DefinitionType != JsonCardDefinitionKind.ScriptedSpell ||
+                card.Rarity != CardRarity.Uncommon ||
+                card.Affiliation != CardAffiliation.ScienceCivilization ||
+                card.ChargeTileFootprint != ChargeTileFootprint.None)
+            {
+                result.AddError("BiochemicalBomb must be an Uncommon Science Civilization ScriptedSpell with no footprint.");
+            }
+
+            if (card.Cost == null ||
+                card.Cost.Power != BiochemicalBombRules.PowerCost ||
+                card.Cost.Gold != BiochemicalBombRules.GoldCost ||
+                card.Cost.Mana != 0 || card.Cost.Qi != 0)
+            {
+                result.AddError("BiochemicalBomb must cost exactly 4 power and 1 gold.");
+            }
+
+            if (!string.Equals(card.EffectId, BiochemicalBombRules.EffectId, StringComparison.Ordinal) ||
+                card.Damage != BiochemicalBombRules.BaseDamage ||
+                card.DamageType != DamageType.Physical ||
+                card.TriggerCount != BiochemicalBombRules.TriggerCount)
+            {
+                result.AddError("BiochemicalBomb must deal 44 physical damage for 4 global turn starts.");
+            }
+
+            if (card.IncludeInDraft || card.IncludeInRewards)
+            {
+                result.AddError("BiochemicalBomb must stay disabled in draft and rewards until its art is ready.");
             }
         }
 
@@ -393,6 +916,234 @@ namespace Project333.Runtime.Infrastructure.Data
                 !card.EffectText.Contains("2"))
             {
                 result.AddError("GaebangBranch effectText must describe its zero-gold two-card draw effect.");
+            }
+        }
+
+        private static void ValidateMerchantCaravan(
+            JsonCardDefinitionRecord card,
+            CardDatabaseValidationResult result)
+        {
+            if (card.DefinitionType != JsonCardDefinitionKind.Building ||
+                card.Rarity != CardRarity.Uncommon ||
+                card.Affiliation != CardAffiliation.Murim ||
+                card.ChargeTileFootprint != ChargeTileFootprint.OneByOne)
+            {
+                result.AddError("MerchantCaravan must be an Uncommon 1x1 Murim Building.");
+            }
+
+            if (card.Cost == null ||
+                card.Cost.Gold != MerchantCaravanRules.GoldCost ||
+                card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Power != 0)
+            {
+                result.AddError("MerchantCaravan must cost exactly 4 gold.");
+            }
+
+            if (card.Attack != 0 ||
+                card.Health != MerchantCaravanRules.BaseHealth ||
+                card.CanAttack ||
+                card.DamageType != DamageType.None ||
+                card.PhysicalDefense != 0 || card.MagicDefense != 0)
+            {
+                result.AddError("MerchantCaravan must use ATK 0, HP 30, DEF 0/0, no attack, and DamageType None.");
+            }
+
+            if (card.IsScience || card.SciencePowerUpkeep != 0)
+            {
+                result.AddError("MerchantCaravan must not use science power upkeep.");
+            }
+
+            if (card.TurnStartResourceGain == null ||
+                card.TurnStartResourceGain.Gold != MerchantCaravanRules.TurnStartGoldGain ||
+                card.TurnStartResourceGain.Mana != 0 ||
+                card.TurnStartResourceGain.Qi != 0 ||
+                card.TurnStartResourceGain.Power != 0)
+            {
+                result.AddError("MerchantCaravan must grant exactly 3 gold at its owner's turn start.");
+            }
+
+            if (card.IncludeInDraft || card.IncludeInRewards)
+            {
+                result.AddError("MerchantCaravan must stay disabled in draft and rewards until its art is ready.");
+            }
+
+            if (string.IsNullOrWhiteSpace(card.EffectText) ||
+                !card.EffectText.Contains("턴 시작") ||
+                !card.EffectText.Contains("골드") ||
+                !card.EffectText.Contains(MerchantCaravanRules.TurnStartGoldGain.ToString()))
+            {
+                result.AddError("MerchantCaravan effectText must describe its turn-start gold +3 effect.");
+            }
+        }
+
+        private static void ValidateInn(
+            JsonCardDefinitionRecord card,
+            CardDatabaseValidationResult result)
+        {
+            if (card.DefinitionType != JsonCardDefinitionKind.Building ||
+                card.Rarity != CardRarity.Common ||
+                card.Affiliation != CardAffiliation.Murim ||
+                card.ChargeTileFootprint != ChargeTileFootprint.OneByOne)
+            {
+                result.AddError("Inn must be a Common 1x1 Murim Building.");
+            }
+
+            if (card.Cost == null ||
+                card.Cost.Qi != InnRules.QiCost ||
+                card.Cost.Mana != 0 || card.Cost.Power != 0 || card.Cost.Gold != 0)
+            {
+                result.AddError("Inn must cost exactly 2 qi.");
+            }
+
+            if (card.Attack != 0 ||
+                card.Health != InnRules.BaseHealth ||
+                card.CanAttack ||
+                card.DamageType != DamageType.None ||
+                card.PhysicalDefense != 0 || card.MagicDefense != 0)
+            {
+                result.AddError("Inn must use ATK 0, HP 20, DEF 0/0, no attack, and DamageType None.");
+            }
+
+            if (card.IsScience || card.SciencePowerUpkeep != 0)
+            {
+                result.AddError("Inn must not use science power upkeep.");
+            }
+
+            if (card.TurnStartResourceGain == null ||
+                card.TurnStartResourceGain.Gold != InnRules.TurnStartGoldGain ||
+                card.TurnStartResourceGain.Mana != 0 ||
+                card.TurnStartResourceGain.Qi != 0 ||
+                card.TurnStartResourceGain.Power != 0)
+            {
+                result.AddError("Inn must grant exactly 1 gold at its owner's turn start.");
+            }
+
+            if (card.IncludeInDraft || card.IncludeInRewards)
+            {
+                result.AddError("Inn must stay disabled in draft and rewards until its art is ready.");
+            }
+
+            if (string.IsNullOrWhiteSpace(card.EffectText) ||
+                !card.EffectText.Contains("턴 시작") ||
+                !card.EffectText.Contains("골드") ||
+                !card.EffectText.Contains(InnRules.TurnStartGoldGain.ToString()))
+            {
+                result.AddError("Inn effectText must describe its turn-start gold +1 effect.");
+            }
+        }
+
+        private static void ValidatePowerPlant(
+            JsonCardDefinitionRecord card,
+            CardDatabaseValidationResult result)
+        {
+            if (card.DefinitionType != JsonCardDefinitionKind.Building ||
+                card.Rarity != CardRarity.Common ||
+                card.Affiliation != CardAffiliation.ScienceCivilization ||
+                card.ChargeTileFootprint != ChargeTileFootprint.OneByOne)
+            {
+                result.AddError("PowerPlant must be a Common 1x1 Science Civilization building.");
+            }
+
+            if (card.Cost == null ||
+                card.Cost.Power != PowerPlantRules.PlayPowerCost ||
+                card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Gold != 0)
+            {
+                result.AddError("PowerPlant must cost exactly 1 power.");
+            }
+
+            if (card.Attack != 0 ||
+                card.Health != PowerPlantRules.BaseHealth ||
+                card.CanAttack ||
+                card.DamageType != DamageType.None ||
+                card.PhysicalDefense != 0 || card.MagicDefense != 0)
+            {
+                result.AddError("PowerPlant must use ATK 0, HP 30, DEF 0/0, no attack, and DamageType None.");
+            }
+
+            if (card.SciencePowerUpkeep != 0)
+            {
+                result.AddError("PowerPlant must not have science power upkeep.");
+            }
+
+            if (card.TurnStartResourceGain != null &&
+                (card.TurnStartResourceGain.Mana != 0 ||
+                 card.TurnStartResourceGain.Qi != 0 ||
+                 card.TurnStartResourceGain.Power != 0 ||
+                 card.TurnStartResourceGain.Gold != 0))
+            {
+                result.AddError("PowerPlant must use its conditional gold-to-power effect instead of turnStartResourceGain.");
+            }
+
+            if (card.IncludeInDraft || card.IncludeInRewards)
+            {
+                result.AddError("PowerPlant must stay disabled in draft and rewards until its art is ready.");
+            }
+
+            if (string.IsNullOrWhiteSpace(card.EffectText) ||
+                !card.EffectText.Contains("골드") ||
+                !card.EffectText.Contains(PowerPlantRules.TriggerGoldCost.ToString()) ||
+                !card.EffectText.Contains("전력") ||
+                !card.EffectText.Contains(PowerPlantRules.PowerGain.ToString()))
+            {
+                result.AddError("PowerPlant effectText must describe paying 1 gold to gain 2 power at turn start.");
+            }
+        }
+
+        private static void ValidateNuclearPowerPlant(
+            JsonCardDefinitionRecord card,
+            CardDatabaseValidationResult result)
+        {
+            if (card.DefinitionType != JsonCardDefinitionKind.Building ||
+                card.Rarity != CardRarity.Rare ||
+                card.Affiliation != CardAffiliation.ScienceCivilization ||
+                card.ChargeTileFootprint != ChargeTileFootprint.OneByOne)
+            {
+                result.AddError("NuclearPowerPlant must be a Rare 1x1 Science Civilization building.");
+            }
+
+            if (card.Cost == null ||
+                card.Cost.Power != NuclearPowerPlantRules.PowerCost ||
+                card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Gold != 0)
+            {
+                result.AddError("NuclearPowerPlant must cost exactly 5 power.");
+            }
+
+            if (card.Attack != 0 ||
+                card.Health != NuclearPowerPlantRules.BaseHealth ||
+                card.CanAttack ||
+                card.DamageType != DamageType.None ||
+                card.PhysicalDefense != 0 || card.MagicDefense != 0)
+            {
+                result.AddError("NuclearPowerPlant must use ATK 0, HP 30, DEF 0/0, no attack, and DamageType None.");
+            }
+
+            if (!card.IsScience || card.SciencePowerUpkeep != 0)
+            {
+                result.AddError("NuclearPowerPlant must be a science building without power upkeep.");
+            }
+
+            if (card.TurnStartResourceGain == null ||
+                card.TurnStartResourceGain.Power != NuclearPowerPlantRules.TurnStartPowerGain ||
+                card.TurnStartResourceGain.Mana != 0 ||
+                card.TurnStartResourceGain.Qi != 0 ||
+                card.TurnStartResourceGain.Gold != 0)
+            {
+                result.AddError("NuclearPowerPlant must grant exactly 3 power at its owner's turn start.");
+            }
+
+            if (card.IncludeInDraft || card.IncludeInRewards)
+            {
+                result.AddError("NuclearPowerPlant must stay disabled in draft and rewards until its art is ready.");
+            }
+
+            if (string.IsNullOrWhiteSpace(card.EffectText) ||
+                !card.EffectText.Contains("턴 시작") ||
+                !card.EffectText.Contains("전력") ||
+                !card.EffectText.Contains(NuclearPowerPlantRules.TurnStartPowerGain.ToString()) ||
+                !card.EffectText.Contains("파괴") ||
+                !card.EffectText.Contains(NuclearPowerPlantRules.DestructionDamage.ToString()) ||
+                !card.EffectText.Contains("물리"))
+            {
+                result.AddError("NuclearPowerPlant effectText must describe power +3 and its 30 physical destruction damage.");
             }
         }
 
@@ -688,6 +1439,36 @@ namespace Project333.Runtime.Infrastructure.Data
                     result.AddError($"Timed Bomb card '{id}' must use triggerCount {TimedBombRules.TurnStartsUntilDetonation}.");
                 }
             }
+
+            if (string.Equals(card.EffectId, BiochemicalBombRules.EffectId, StringComparison.Ordinal))
+            {
+                if (card.Damage <= 0)
+                {
+                    result.AddError($"Biochemical Bomb card '{id}' must have damage greater than 0.");
+                }
+
+                if (card.DamageType != DamageType.Physical)
+                {
+                    result.AddError($"Biochemical Bomb card '{id}' must use Physical damageType.");
+                }
+
+                if (card.TriggerCount != BiochemicalBombRules.TriggerCount)
+                {
+                    result.AddError($"Biochemical Bomb card '{id}' must use triggerCount {BiochemicalBombRules.TriggerCount}.");
+                }
+            }
+
+            if (string.Equals(card.EffectId, GuRules.EffectId, StringComparison.Ordinal) &&
+                !string.Equals(card.Id, GuRules.CardId, StringComparison.Ordinal))
+            {
+                result.AddError($"Gu effect must use card id '{GuRules.CardId}'.");
+            }
+
+            if (string.Equals(card.EffectId, HuanShuRules.EffectId, StringComparison.Ordinal) &&
+                !string.Equals(card.Id, HuanShuRules.CardId, StringComparison.Ordinal))
+            {
+                result.AddError($"HuanShu effect must use card id '{HuanShuRules.CardId}'.");
+            }
         }
 
         private static void ValidateSpecialEffectText(JsonCardDefinitionRecord card, CardDatabaseValidationResult result, string id)
@@ -695,9 +1476,22 @@ namespace Project333.Runtime.Infrastructure.Data
             var text = card.SpecialEffectText ?? string.Empty;
             var hasRush = card.DefinitionType == JsonCardDefinitionKind.Unit &&
                           (card.HasRush || card.CanAttackOnSummon);
+            var containsShielder = ContainsToken(text, "Shielder") || text.Contains("쉴더");
+            var containsLegacyGuard = ContainsToken(text, "Guard") || text.Contains("가드");
             RequireTextWhenFlagged(card.HasBerserker, text, "Berserker", result, id);
             RequireTextWhenFlagged(card.HasEndure, text, "Endure", result, id);
-            RequireTextWhenFlagged(card.HasGuard, text, "Guard", result, id);
+            if (containsLegacyGuard)
+            {
+                result.AddError(
+                    $"Card '{id}' specialEffectText uses the legacy name Guard/가드. Use Shielder/쉴더 instead.");
+            }
+
+            if (card.HasShielder && !containsShielder && !containsLegacyGuard)
+            {
+                result.AddError(
+                    $"Card '{id}' has Shielder but specialEffectText does not contain 'Shielder' or '쉴더'.");
+            }
+
             if (card.HasLifeSteal &&
                 !ContainsToken(text, "LifeSteal") &&
                 !text.Contains("흡혈"))
@@ -747,9 +1541,9 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError($"Card '{id}' specialEffectText contains Endure but hasEndure is false.");
             }
 
-            if (ContainsToken(text, "Guard") && !card.HasGuard)
+            if (containsShielder && !card.HasShielder)
             {
-                result.AddError($"Card '{id}' specialEffectText contains Guard but hasGuard is false.");
+                result.AddError($"Card '{id}' specialEffectText contains Shielder/쉴더 but hasShielder is false.");
             }
 
             if ((ContainsToken(text, "LifeSteal") || text.Contains("흡혈")) && !card.HasLifeSteal)
@@ -793,6 +1587,19 @@ namespace Project333.Runtime.Infrastructure.Data
             {
                 result.AddError(
                     $"Card '{id}' specialEffectText contains Flying/비행 but hasFlying is false.");
+            }
+
+            var containsPiercing = ContainsToken(text, "Piercing") || text.Contains("관통");
+            if (card.HasPiercing && !containsPiercing)
+            {
+                result.AddError(
+                    $"Card '{id}' has Piercing but specialEffectText does not contain 'Piercing' or '관통'.");
+            }
+
+            if (containsPiercing && !card.HasPiercing)
+            {
+                result.AddError(
+                    $"Card '{id}' specialEffectText contains Piercing/관통 but hasPiercing is false.");
             }
 
             var containsSpellPower = ContainsToken(text, "SpellPower") ||

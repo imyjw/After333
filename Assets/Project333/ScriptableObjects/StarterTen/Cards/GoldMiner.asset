@@ -19,11 +19,12 @@ MonoBehaviour:
     _mana: 0
     _qi: 0
     _power: 0
-    _gold: 3
+    _gold: 2
   _affiliation: 3
   _chargeTileFootprint: 1
-  _effectText: At turn start, gain Gold +1.
-  _specialEffectText: 
+  _effectText: 
+  _specialEffectText: "\uACE8\uB4DC+1"
+  _hasReplicate: 0
   _boardSprite: {fileID: -1637270728, guid: c9ce02b83261f6c4082818d09baeb445, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: da596f900f1adf74d8f8b5f56e4d2d8f, type: 2}
   _attackType: 0
@@ -35,8 +36,17 @@ MonoBehaviour:
   _hitsPerAttack: 1
   _hasBerserker: 0
   _hasEndure: 0
-  _hasGuard: 0
+  _hasShielder: 0
+  _hasLifeSteal: 0
+  _hasRobot: 0
   _canMove: 1
+  _sealboundOwnerTurnStarts: 0
+  _hasHiding: 0
+  _hasFlying: 0
+  _hasPiercing: 0
+  _spellPower: 0
+  _invincibleDuration: 0
+  _invincibleOwnerTurns: 0
   _isScience: 0
   _sciencePowerUpkeep: 0
   _turnStartResourceGain:

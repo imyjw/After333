@@ -157,7 +157,7 @@ Each turn follows this order:
 2. gain base resources and active occupant resources
 3. resolve power-upkeep payment
 4. resolve active Robot Factory effects
-5. resolve Firewall turn-start effects
+5. resolve Firewall and Biochemical Bomb turn-start effects together in cast order
 6. resolve the base draw
 7. main phase
 8. turn end
@@ -253,7 +253,7 @@ No separate global action-point system exists.
 - Fixed damage ignores Physical Defense and Magic Defense.
 - Double Attack and Triple Attack apply defense separately to every hit.
 - LifeSteal heals only the actual HP removed after damage mitigation.
-- Guard applies its own defense first; resolved damage above the Guard's pre-hit HP transfers to the protected target, which then applies its own defense.
+- Shielder applies its own defense first; resolved damage above the Shielder's pre-hit HP transfers to the protected target, which then applies its own defense.
 - Apply all damage from one attack or effect first.
 - After that single attack or effect finishes resolving, remove any unit or building with `0` or less HP immediately.
 - Vacated tiles become empty immediately.
@@ -281,7 +281,7 @@ No separate global action-point system exists.
 ### Power-Upkeep Payment
 
 - Any unit with `sciencePowerUpkeep > 0`, plus an explicitly defined building such as Robot Factory, requires power payment at turn start.
-- Power payment happens after turn-start resource gain and before Robot Factory, Firewall, and the base draw.
+- Power payment happens after turn-start resource gain and before Robot Factory, Firewall/Biochemical Bomb effects, and the base draw.
 - Payment is automatic in this fixed order:
   - `(0,0), (0,1), (1,0), (1,1), (2,0), (2,1), (3,0), (3,1), (4,0), (4,1)`
 - Empty tiles are skipped.
@@ -321,7 +321,7 @@ When affected by Erasure (`망각`), the occupant:
 - immediately clears Drained, pays no science power upkeep, and cannot become Drained
 - keeps baseline attack type, damage type, movement permission, tile size, ATK/HP, defenses, and account upgrade stats
 - accepts buffs and debuffs applied after Erasure normally
-- has Robot classification and effects such as Berserker, multi-hit, extra attacks, Endure, Guard, LifeSteal, Rush, resource production, Robot Factory, SpellPower, Hiding, Flying, and Invincible suppressed
+- has Robot classification and effects such as Berserker, multi-hit, extra attacks, Endure, Shielder, LifeSteal, Rush, resource production, Robot Factory, SpellPower, Hiding, Flying, and Invincible suppressed
 - still occupies its tile, uses baseline defenses, takes normal damage, and participates in front-row blocking
 - remains Erasure until it leaves the field
 - cannot be applied to a Sealbound occupant; a Sealbound target remains unchanged and its attached effects are not removed
@@ -332,7 +332,7 @@ When affected by Erasure (`망각`), the occupant:
 - A value of `1` or greater applies Sealbound immediately on summon. Master Units cannot be Sealbound.
 - The counter decreases only at the final step of each later owner turn start. Release therefore contributes no resources, upkeep, or turn-start effects during that same turn start.
 - Sealbound occupants occupy their tiles but cannot attack, counterattack, move, exchange positions, activate effects, pay upkeep, receive Erasure, or participate in front-row blocking.
-- Sealbound occupants cannot be targeted or affected by attacks, spells, area damage, healing, buffs, or debuffs and are excluded from Guard and Robot searches.
+- Sealbound occupants cannot be targeted or affected by attacks, spells, area damage, healing, buffs, or debuffs and are excluded from Shielder and Robot searches.
 - A released occupant may attack on the release turn only if it has Rush. Otherwise it can attack from its following owner turn.
 - StateView and reconnect snapshots preserve Sealbound, its remaining counter, and Rush.
 
@@ -340,7 +340,7 @@ When affected by Erasure (`망각`), the occupant:
 
 - Only Unit cards may use `hasHiding: true`; Buildings and Master Units cannot have Hiding.
 - A Hiding Unit cannot be targeted by an opponent's normal attack or opponent's single-target spell, but area effects still affect it.
-- A Hiding Unit does not participate in front-row blocking and its Guard is inactive.
+- A Hiding Unit does not participate in front-row blocking and its Shielder is inactive.
 - A legal normal-attack declaration reveals Hiding before the first hit, LifeSteal, and counterattack resolve. Rejected attacks do not reveal it.
 - Entering Drained or Erasure permanently reveals Hiding. Clearing Drained does not restore it.
 - Sealbound takes priority. Erasure cannot reveal a Sealbound Hiding Unit, and it becomes hidden when released unless already revealed.
@@ -353,7 +353,7 @@ When affected by Erasure (`망각`), the occupant:
 - A Flying melee attacker ignores front-row blocking, and an active Flying occupant does not participate in front-row blocking.
 - Normal melee counterattack rules still apply when a Flying melee attacker legally attacks a melee defender.
 - Flying does not prevent spells, effects, healing, buffs, or debuffs and does not change movement rules.
-- A Flying Guard cannot redirect a non-Flying melee normal attack, but other eligible normal attacks and effects may be redirected normally.
+- A Flying Shielder cannot redirect a non-Flying melee normal attack, but other eligible normal attacks and effects may be redirected normally.
 - Drained and Erasure suppress Flying. Clearing Drained restores it; an Erasure occupant remains suppressed and blocks normally.
 - Hiding and Sealbound targeting rules take priority. Robot Fusion never transfers Flying from absorbed materials.
 - StateView and reconnect snapshots preserve `HasFlying` for Units, Buildings, and Master Units.
@@ -363,7 +363,7 @@ When affected by Erasure (`망각`), the occupant:
 - Units and Buildings use `spellPower: n`; Master Units may receive SpellPower through runtime battle setup.
 - Only Magic damage produced by a Spell card receives SpellPower. Physical and Fixed Spell damage, normal attacks, and non-Spell effects do not.
 - Sum every living allied occupant's active SpellPower. Drained, Erasure, and Sealbound suppress it; Hiding and Flying do not.
-- Add SpellPower after card-level damage changes and before defense, Drained multiplication, Guard, Endure, removal, and victory resolution.
+- Add SpellPower after card-level damage changes and before defense, Drained multiplication, Shielder, Endure, removal, and victory resolution.
 - Area Magic Spell damage receives the full bonus per target, and multi-hit Magic Spell damage receives it per hit.
 - Persistent Magic Spell damage captures SpellPower when the card is accepted from hand. StateView and reconnect snapshots preserve `CapturedSpellPower`.
 - Robot Fusion does not transfer SpellPower, and card upgrades do not increase it unless a card-specific rule says otherwise.
@@ -374,7 +374,7 @@ When affected by Erasure (`망각`), the occupant:
 - Supported durations are `Always`, `SummonTurn`, `OwnerTurnOnly`, `OpponentTurnOnly`, `UntilTurnEnd`, and `OwnerTurns`. `OwnerTurns` requires `invincibleOwnerTurns > 0`.
 - Invincible keeps the occupant targetable but reduces Physical, Magic, and Fixed HP damage to `0`. Non-damage removal, sacrifice, fusion-material removal, and set-HP effects are not prevented.
 - Drained temporarily suppresses Invincible, Erasure suppresses it for the occupant's remaining battlefield lifetime, and duration counters continue to advance while suppressed or Sealbound.
-- An Invincible Guard absorbs the eligible hit with no overflow. LifeSteal heals `0`, damage-based Berserker does not trigger, and Endure is not consumed.
+- An Invincible Shielder absorbs the eligible hit with no overflow. LifeSteal heals `0`, damage-based Berserker does not trigger, and Endure is not consumed.
 - Multi-hit attacks resolve each hit for presentation but each hit deals `0`; clients show `무적` feedback instead of a damage number.
 - Robot Fusion does not transfer Invincible. StateView and reconnect snapshots preserve every effect's duration, application context, and remaining owner-turn count.
 
@@ -404,9 +404,10 @@ If a card needs anything outside this list, stop and ask before implementing it.
 - physical, magic, fixed, or none normal-attack damage type
 - physical defense and magic defense
 - LifeSteal based on actual HP removed after defense
-- Guard damage redirection with defense applied to Guard and overflow target in sequence
+- Shielder damage redirection with defense applied to Shielder and overflow target in sequence
 - non-persistent spell single-target damage
 - explicitly defined area damage effects such as Red Dragon
+- Nuclear Power Plant destruction trigger and chained all-field Physical damage
 - Robot Factory card generation from equally weighted draft-enabled Robot unit definitions
 - persistent spell turn-start resource gain `+n` with explicit card-text end condition
 
@@ -421,7 +422,7 @@ If a card needs anything outside this list, stop and ask before implementing it.
 - card generation, copy, discovery, or theft outside an explicitly locked effect such as Robot Factory or Replicate
 - transform
 - resurrection
-- death, attack, hit, summon, or leave triggers
+- death, attack, hit, summon, or leave triggers outside the explicitly locked Nuclear Power Plant destruction rule
 - random effects outside an explicitly locked server-authoritative candidate pool and weighting rule
 - multi-tile cards
 - persistent effects without explicit end condition
@@ -454,13 +455,13 @@ All current-slice implementations must preserve these locked scenarios:
 20. fixed damage ignores both defenses
 21. drained recipients ignore both defenses and take triple damage, including fixed damage
 22. multi-hit attacks apply defense separately per hit
-23. Guard applies defense before overflow and the protected target applies defense again
+23. Shielder applies defense before overflow and the protected target applies defense again
 24. LifeSteal uses actual HP removed after defense
 25. Robot Factory resolves after upkeep and before Firewall/base draw
 26. Robot Factory hides the generated card identity from the opponent
-27. Flying normal-attack targeting, front-row bypass, Guard interaction, and suppression rules
+27. Flying normal-attack targeting, front-row bypass, Shielder interaction, and suppression rules
 28. SpellPower Magic-only application, suppression, persistent capture, and snapshot projection
-29. Invincible damage prevention, duration advancement, suppression, Guard, and snapshot projection
+29. Invincible damage prevention, duration advancement, suppression, Shielder, and snapshot projection
 
 If a code change breaks any of the above, it is not valid for the current slice.
 

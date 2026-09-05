@@ -131,7 +131,7 @@ namespace Project333.Runtime.Application.Services
                         continue;
                     }
 
-                    if (IsProtectedByActiveGuardForNormalAttack(
+                    if (IsProtectedByActiveShielderForNormalAttack(
                             enemyBoard,
                             targetCoord,
                             attacker.AttackType,
@@ -179,7 +179,7 @@ namespace Project333.Runtime.Application.Services
                         continue;
                     }
 
-                    if (IsProtectedByActiveGuard(enemyBoard, targetCoord))
+                    if (IsProtectedByActiveShielder(enemyBoard, targetCoord))
                     {
                         continue;
                     }
@@ -192,12 +192,14 @@ namespace Project333.Runtime.Application.Services
                         PlayerId.AI,
                         cardLevelDamage,
                         damageSpellDefinition.DamageType);
-                    var damage = DamageResolutionRules.ResolveIncomingDamage(
+                    DamageResolutionRules.ProjectEffectDamageTaken(
                         target,
                         rawDamage,
-                        damageSpellDefinition.DamageType);
+                        damageSpellDefinition.DamageType,
+                        out var remainingHp,
+                        out _);
 
-                    if (damage < target.CurrentHp)
+                    if (remainingHp > 0)
                     {
                         continue;
                     }
@@ -240,6 +242,12 @@ namespace Project333.Runtime.Application.Services
                 if (definition is PersistentResourceSpellCardDefinition)
                 {
                     return new CastPersistentResourceSpellCommand(cardId);
+                }
+
+                if (definition is ScriptedSpellCardDefinition scriptedSpellCardDefinition &&
+                    IsImmediateResourceScriptedSpell(scriptedSpellCardDefinition))
+                {
+                    return new CastScriptedSpellCommand(cardId);
                 }
             }
 
@@ -303,10 +311,24 @@ namespace Project333.Runtime.Application.Services
             return definition switch
             {
                 UnitCardDefinition unitCardDefinition => HasAnyResourceGain(unitCardDefinition.TurnStartResourceGain),
-                BuildingCardDefinition buildingCardDefinition => HasAnyResourceGain(buildingCardDefinition.TurnStartResourceGain),
+                BuildingCardDefinition buildingCardDefinition =>
+                    HasAnyResourceGain(buildingCardDefinition.TurnStartResourceGain) ||
+                    string.Equals(
+                        buildingCardDefinition.CardId,
+                        PowerPlantRules.CardId,
+                        StringComparison.Ordinal),
                 PersistentResourceSpellCardDefinition persistentResourceSpellCardDefinition => HasAnyResourceGain(persistentResourceSpellCardDefinition.TurnStartResourceGain),
+                ScriptedSpellCardDefinition scriptedSpellCardDefinition =>
+                    IsImmediateResourceScriptedSpell(scriptedSpellCardDefinition),
                 _ => false,
             };
+        }
+
+        private static bool IsImmediateResourceScriptedSpell(ScriptedSpellCardDefinition definition)
+        {
+            return string.Equals(definition.EffectId, PowerBankRules.EffectId, StringComparison.Ordinal) ||
+                   string.Equals(definition.EffectId, ManaStoneRules.EffectId, StringComparison.Ordinal) ||
+                   string.Equals(definition.EffectId, ManaStoneBundleRules.EffectId, StringComparison.Ordinal);
         }
 
         private static bool HasAnyResourceGain(ResourceSet resourceSet)
@@ -385,7 +407,7 @@ namespace Project333.Runtime.Application.Services
                     }
 
                     if (CanBeTargeted(attackType, attackerHasFlying, backOccupant) &&
-                        !IsProtectedByActiveGuardForNormalAttack(
+                        !IsProtectedByActiveShielderForNormalAttack(
                             enemyBoard,
                             backCoord,
                             attackType,
@@ -410,17 +432,17 @@ namespace Project333.Runtime.Application.Services
             }
         }
 
-        private static bool IsProtectedByActiveGuard(BoardState board, TileCoord targetCoord)
+        private static bool IsProtectedByActiveShielder(BoardState board, TileCoord targetCoord)
         {
             if (board.GetOccupant(targetCoord) == null)
             {
                 return false;
             }
 
-            return GuardService.Resolve(board, targetCoord).IsProtected;
+            return ShielderService.Resolve(board, targetCoord).IsProtected;
         }
 
-        private static bool IsProtectedByActiveGuardForNormalAttack(
+        private static bool IsProtectedByActiveShielderForNormalAttack(
             BoardState board,
             TileCoord targetCoord,
             AttackType attackerAttackType,
@@ -431,7 +453,7 @@ namespace Project333.Runtime.Application.Services
                 return false;
             }
 
-            return GuardService.ResolveForNormalAttack(
+            return ShielderService.ResolveForNormalAttack(
                 board,
                 targetCoord,
                 attackerAttackType,

@@ -10,6 +10,13 @@ namespace Project333.Runtime.Presentation.Draft
         OnlineMatchmaking
     }
 
+    public enum DraftBattleOutcome
+    {
+        Victory,
+        Defeat,
+        Draw
+    }
+
     public static class DraftRunSessionState
     {
         public const int RunWinLimit = 33;
@@ -187,12 +194,23 @@ namespace Project333.Runtime.Presentation.Draft
             if (playerWon)
             {
                 Wins += 1;
-                LastBattleOutcomeText = "Victory";
+                SetLastBattleOutcome(DraftBattleOutcome.Victory);
                 return;
             }
 
             Losses += 1;
-            LastBattleOutcomeText = "Defeat";
+            SetLastBattleOutcome(DraftBattleOutcome.Defeat);
+        }
+
+        public static void RecordBattleDraw()
+        {
+            RestoreCurrentDraftDeckFromCompletedDeckIfNeeded();
+            SetLastBattleOutcome(DraftBattleOutcome.Draw);
+        }
+
+        public static void SetLastBattleOutcome(DraftBattleOutcome outcome)
+        {
+            LastBattleOutcomeText = outcome.ToString();
         }
 
         public static void ApplyServerRunRecord(int wins, int losses)

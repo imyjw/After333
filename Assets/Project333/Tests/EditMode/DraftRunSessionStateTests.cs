@@ -78,6 +78,21 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
+        public void RecordBattleDraw_DoesNotChangeWinsOrLossesAndShowsDraw()
+        {
+            var draftedDeck = CreateDeck(33);
+            DraftRunSessionState.SetDraftDeck(draftedDeck);
+            DraftRunSessionState.ApplyServerRunRecord(2, 1);
+
+            DraftRunSessionState.RecordBattleDraw();
+
+            Assert.That(DraftRunSessionState.Wins, Is.EqualTo(2));
+            Assert.That(DraftRunSessionState.Losses, Is.EqualTo(1));
+            Assert.That(DraftRunSessionState.LastBattleOutcomeText, Is.EqualTo("Draw"));
+            Assert.That(DraftRunSessionState.HasDraftedDeckReady, Is.True);
+        }
+
+        [Test]
         public void TryApplyAuthoritativeServerRunRecord_WhenRunCompleted_OverridesStaleLocalRecord()
         {
             DraftRunSessionState.ApplyServerRunRecord(3, 2);

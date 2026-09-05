@@ -9,5 +9,6 @@ namespace Project333.Runtime.Domain.Cards
         OpponentTurnOnly = 4,
         UntilTurnEnd = 5,
         OwnerTurns = 6,
+        GlobalTurnEnds = 7,
     }
 }

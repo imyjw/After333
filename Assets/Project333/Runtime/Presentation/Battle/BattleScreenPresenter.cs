@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Presentation.Hand;
@@ -39,9 +40,17 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private ResourceBarPresenter _resourceBarPresenter;
         [SerializeField] private BattleMulliganOverlayPresenter _mulliganOverlayPresenter;
         [SerializeField] private Button _endTurnButton;
+        [SerializeField, HideInInspector] private int _endTurnButtonVisualVersion;
         [SerializeField] private Image _backgroundImage;
         [SerializeField] private Sprite _backgroundSprite;
         [SerializeField] private string _backgroundResourcePath = DefaultBackgroundResourcePath;
+
+        [Header("Battle Sound Effects")]
+        [SerializeField] private AudioSource _soundEffectAudioSource;
+        [SerializeField] private AudioClip _cardDrawAudioClip;
+        [SerializeField, Range(0f, 1f)] private float _cardDrawVolume = 1f;
+        [SerializeField, Min(0f)] private float _cardDrawRepeatInterval = 0.1f;
+
         [SerializeField] private GameObject[] _draftHiddenUiObjects = Array.Empty<GameObject>();
         [SerializeField] private SummaryChangedEvent _onSummaryChanged = new SummaryChangedEvent();
         [TextArea(8, 20)]
@@ -49,6 +58,8 @@ namespace Project333.Runtime.Presentation.Battle
 
         private readonly List<ManagedBattleUiObject> _managedBattleUiObjects = new List<ManagedBattleUiObject>();
         private bool _hasBuiltBattleUiCache;
+        private int _queuedCardDrawSoundCount;
+        private Coroutine _cardDrawSoundCoroutine;
         [SerializeField, HideInInspector] private Canvas _runtimeBackgroundCanvas;
 #if UNITY_EDITOR
         private bool _hasQueuedEditorUiMaterialization;
@@ -63,6 +74,8 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void Awake()
         {
+            ApplyEndTurnButtonVisual();
+            EnsureSoundEffectAudioSource();
             EnsureOpponentHandPresenter();
             EnsureOpponentDeckPresenter();
             EnsurePlayerDeckPresenter();
@@ -74,6 +87,8 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void OnEnable()
         {
+            ApplyEndTurnButtonVisual();
+            EnsureSoundEffectAudioSource();
             EnsureOpponentHandPresenter();
             EnsureOpponentDeckPresenter();
             EnsurePlayerDeckPresenter();
@@ -81,6 +96,27 @@ namespace Project333.Runtime.Presentation.Battle
             EnsureBackgroundSprite();
             EnsureBackgroundImage();
             ApplyBackgroundVisual();
+        }
+
+        private void ApplyEndTurnButtonVisual()
+        {
+            if (_endTurnButtonVisualVersion >= 1 || _endTurnButton == null) return;
+            var sprite = Resources.Load<Sprite>("Project333/UI/PixelEndTurnButtonFinal");
+            var image = _endTurnButton.GetComponent<Image>();
+            if (sprite == null || image == null) return;
+
+            image.sprite = sprite;
+            image.overrideSprite = null;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = true;
+            image.color = Color.white;
+            _endTurnButton.targetGraphic = image;
+            // The caption is already baked into the supplied sprite.
+            foreach (var label in _endTurnButton.GetComponentsInChildren<TMPro.TMP_Text>(true))
+                label.enabled = false;
+            foreach (var label in _endTurnButton.GetComponentsInChildren<Text>(true))
+                label.enabled = false;
+            _endTurnButtonVisualVersion = 1;
         }
 
         private void OnValidate()
@@ -117,6 +153,7 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
+            ApplyEndTurnButtonVisual();
             EnsureOpponentHandPresenter(allowCreationInEditMode: true);
             _opponentHandPresenter?.EnsureEditableCardBackSlots();
             EnsureOpponentDeckPresenter(allowCreationInEditMode: true);
@@ -172,6 +209,68 @@ namespace Project333.Runtime.Presentation.Battle
             PresentMulliganControls(battleState);
             _mulliganOverlayPresenter?.Present(battleState);
             _onSummaryChanged.Invoke(_debugSummary);
+        }
+
+        public void QueueCardDrawSounds(int drawCount)
+        {
+            if (drawCount <= 0 || _cardDrawAudioClip == null)
+            {
+                return;
+            }
+
+            EnsureSoundEffectAudioSource();
+            if (_soundEffectAudioSource == null)
+            {
+                return;
+            }
+
+            _queuedCardDrawSoundCount += drawCount;
+            if (_cardDrawSoundCoroutine == null)
+            {
+                _cardDrawSoundCoroutine = StartCoroutine(PlayQueuedCardDrawSounds());
+            }
+        }
+
+        private IEnumerator PlayQueuedCardDrawSounds()
+        {
+            while (_queuedCardDrawSoundCount > 0)
+            {
+                _queuedCardDrawSoundCount--;
+                _soundEffectAudioSource.PlayOneShot(_cardDrawAudioClip, _cardDrawVolume);
+
+                if (_queuedCardDrawSoundCount > 0 && _cardDrawRepeatInterval > 0f)
+                {
+                    yield return new WaitForSecondsRealtime(_cardDrawRepeatInterval);
+                }
+                else
+                {
+                    yield return null;
+                }
+            }
+
+            _cardDrawSoundCoroutine = null;
+        }
+
+        private void EnsureSoundEffectAudioSource()
+        {
+            if (_soundEffectAudioSource == null)
+            {
+                _soundEffectAudioSource = GetComponent<AudioSource>();
+            }
+
+            if (_soundEffectAudioSource == null && UnityEngine.Application.isPlaying)
+            {
+                _soundEffectAudioSource = gameObject.AddComponent<AudioSource>();
+            }
+
+            if (_soundEffectAudioSource == null)
+            {
+                return;
+            }
+
+            _soundEffectAudioSource.playOnAwake = false;
+            _soundEffectAudioSource.loop = false;
+            _soundEffectAudioSource.spatialBlend = 0f;
         }
 
         public void SetBattleUiVisible(bool isVisible)

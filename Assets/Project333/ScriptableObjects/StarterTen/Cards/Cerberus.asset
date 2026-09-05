@@ -23,7 +23,8 @@ MonoBehaviour:
   _affiliation: 1
   _chargeTileFootprint: 1
   _effectText: 
-  _specialEffectText: Triple Attack
+  _specialEffectText: "3\uC5F0\uD0C0"
+  _hasReplicate: 0
   _boardSprite: {fileID: 207813287, guid: 0ec2f550154d717438e5f13c43a960d4, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: 855e6254183e3d34e99d2a4180321673, type: 2}
   _attackType: 0
@@ -35,8 +36,17 @@ MonoBehaviour:
   _hitsPerAttack: 3
   _hasBerserker: 0
   _hasEndure: 0
-  _hasGuard: 0
+  _hasShielder: 0
+  _hasLifeSteal: 0
+  _hasRobot: 0
   _canMove: 1
+  _sealboundOwnerTurnStarts: 0
+  _hasHiding: 0
+  _hasFlying: 0
+  _hasPiercing: 0
+  _spellPower: 0
+  _invincibleDuration: 0
+  _invincibleOwnerTurns: 0
   _isScience: 0
   _sciencePowerUpkeep: 0
   _turnStartResourceGain:

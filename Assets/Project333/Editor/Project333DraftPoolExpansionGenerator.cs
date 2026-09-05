@@ -73,8 +73,8 @@ namespace Project333.Editor
                 CardRarity.Legendary,
                 CardAffiliation.Fantasy,
                 ChargeTileFootprint.OneByOne,
-                "내 턴 종료 시 상대방 타일 전체에 66데미지",
-                string.Empty);
+                "내 턴 종료 시 상대방 타일 전체에 33 마법 피해",
+                "비행");
             asset.ConfigureForTests(
                 attackType: AttackType.Melee,
                 attack: 50,
@@ -126,7 +126,7 @@ namespace Project333.Editor
                 "흡혈: 공격 시 입힌 피해만큼 체력 회복");
             asset.ConfigureForTests(
                 attackType: AttackType.Melee,
-                attack: 20,
+                attack: 15,
                 health: 50,
                 canMove: true,
                 isScience: false,
@@ -157,7 +157,7 @@ namespace Project333.Editor
         private static ScriptedSpellCardDefinitionAsset CreateDaehwandan()
         {
             var asset = LoadOrCreate<ScriptedSpellCardDefinitionAsset>($"{CardsRoot}/Daehwandan.asset");
-            asset.ConfigureBaseForTests("Daehwandan", "대환단", new ResourceSetData(0, 0, 0, 3));
+            asset.ConfigureBaseForTests("Daehwandan", "대환단", new ResourceSetData(0, 5, 0, 0));
             asset.ConfigureMetadataForTests(
                 CardRarity.Legendary,
                 CardAffiliation.Murim,

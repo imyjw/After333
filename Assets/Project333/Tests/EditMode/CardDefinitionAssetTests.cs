@@ -1,12 +1,31 @@
+using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using Project333.Runtime.Domain.Cards;
 using Project333.Runtime.Infrastructure.Data;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Project333.Tests.EditMode
 {
     public sealed class CardDefinitionAssetTests
     {
+        [Test]
+        public void UnitCardDefinitionAsset_HasShielderField_MigratesLegacySerializedName()
+        {
+            var field = typeof(UnitCardDefinitionAsset).GetField(
+                "_hasShielder",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            var formerNames = field
+                ?.GetCustomAttributes(typeof(FormerlySerializedAsAttribute), inherit: false)
+                .Cast<FormerlySerializedAsAttribute>()
+                .Select(attribute => attribute.oldName)
+                .ToArray();
+
+            Assert.That(field, Is.Not.Null);
+            Assert.That(formerNames, Does.Contain("_hasGuard"));
+        }
+
         [Test]
         public void UnitCardDefinitionAsset_ToDefinition_MapsAllFields()
         {
@@ -25,7 +44,7 @@ namespace Project333.Tests.EditMode
                 hitsPerAttack: 3,
                 hasBerserker: true,
                 hasEndure: true,
-                hasGuard: true,
+                hasShielder: true,
                 hasLifeSteal: true,
                 damageType: DamageType.Magic,
                 physicalDefense: 2,
@@ -54,7 +73,7 @@ namespace Project333.Tests.EditMode
             Assert.That(definition.HitsPerAttack, Is.EqualTo(3));
             Assert.That(definition.HasBerserker, Is.True);
             Assert.That(definition.HasEndure, Is.True);
-            Assert.That(definition.HasGuard, Is.True);
+            Assert.That(definition.HasShielder, Is.True);
             Assert.That(definition.HasLifeSteal, Is.True);
             Assert.That(definition.DamageType, Is.EqualTo(DamageType.Magic));
             Assert.That(definition.PhysicalDefense, Is.EqualTo(2));
@@ -90,7 +109,7 @@ namespace Project333.Tests.EditMode
                 CardAffiliation.ScienceCivilization,
                 ChargeTileFootprint.OneByOne,
                 string.Empty,
-                "Guard");
+                "Shielder");
             asset.ConfigureForTests(
                 attackType: AttackType.Melee,
                 attack: 2,
@@ -101,9 +120,9 @@ namespace Project333.Tests.EditMode
                 turnStartResourceGain: new ResourceSetData(0, 0, 0, 0),
                 maxAttacksPerTurn: 1,
                 canAttackOnSummon: false,
-                hasGuard: true);
+                hasShielder: true);
 
-            Assert.That(asset.SpecialEffectText, Is.EqualTo("Guard" + System.Environment.NewLine + "전력 -3"));
+            Assert.That(asset.SpecialEffectText, Is.EqualTo("Shielder" + System.Environment.NewLine + "전력 -3"));
         }
 
         [Test]

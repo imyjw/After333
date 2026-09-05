@@ -52,6 +52,14 @@ namespace Project333.Runtime.Presentation.Battle
                     $"한 번 공격할 때 {occupant.HitsPerAttack}회 타격합니다(반격 제외).");
             }
 
+            if (occupant.HasPiercing)
+            {
+                Add(
+                    entries,
+                    "관통",
+                    "대상을 일반공격 시 같은 열의 반대편 대상에게도 피해를 입힙니다.");
+            }
+
             if (occupant.MaxAttacksPerTurn > 1)
             {
                 var additionalAttacks = occupant.MaxAttacksPerTurn - 1;
@@ -66,14 +74,14 @@ namespace Project333.Runtime.Presentation.Battle
                 Add(
                     entries,
                     "불굴",
-                    "처음 받는 치명적인 일반 공격·반격 피해를 버티고 HP 1로 생존합니다.");
+                    "처음 받는 치명적인 피해를 버티고 HP 1로 생존합니다.");
             }
 
-            if (occupant.HasGuard)
+            if (occupant.HasShielder)
             {
                 Add(
                     entries,
-                    "가드",
+                    "쉴더",
                     "바로 뒤의 아군이 받는 일반 공격과 단일 대상 마법 피해를 대신 받습니다. 초과한 피해는 원래 대상이 받습니다.");
             }
 
@@ -111,13 +119,26 @@ namespace Project333.Runtime.Presentation.Battle
                 Add(entries, "망각", "카드의 효과와 버프·디버프가 무효화됩니다(봉인 제외).");
             }
 
+            if (DemonKingRules.IsDemonKing(occupant))
+            {
+                var revivalDescription =
+                    "사망 시 그 타일에서 봉인됩니다. 사망 당시 턴 플레이어의 다음 세 번째 턴 시작에 ATK/HP +33을 얻고 부활합니다.";
+                if (occupant.IsDemonKingRevivalPending)
+                {
+                    revivalDescription +=
+                        $"\n부활까지 남은 턴 시작: {Math.Max(0, occupant.DemonKingRevivalTurnStartsRemaining)}";
+                }
+
+                Add(entries, "마왕의 귀환", revivalDescription);
+            }
+
             var sealboundTurns = GetSealboundOwnerTurnStarts(definition);
             if (sealboundTurns <= 0 && occupant.IsSealbound)
             {
                 sealboundTurns = occupant.SealboundOwnerTurnStartsRemaining;
             }
 
-            if (sealboundTurns > 0)
+            if (sealboundTurns > 0 && !occupant.IsDemonKingRevivalPending)
             {
                 Add(
                     entries,
@@ -131,6 +152,14 @@ namespace Project333.Runtime.Presentation.Battle
                     entries,
                     "은신",
                     "상대의 일반 공격과 단일 대상 마법의 대상이 되지 않으며 전열을 막지 않습니다. 일반 공격 시 해제됩니다.");
+            }
+
+            if (occupant.IsUnderHuanShu)
+            {
+                Add(
+                    entries,
+                    "환술",
+                    "일반 공격 시 공격 대상이 무작위로 변경됩니다.");
             }
 
             if (occupant.HasFlying)
@@ -149,9 +178,24 @@ namespace Project333.Runtime.Presentation.Battle
                     $"마법 피해를 주는 마법 카드의 피해가 {occupant.SpellPower} 증가합니다. 지속 마법은 사용 시점의 주문력으로 고정됩니다.");
             }
 
+            if (HeroRules.IsHero(occupant))
+            {
+                Add(
+                    entries,
+                    "용사의 성장",
+                    $"매 턴 종료 시 ATK +{HeroRules.GrowthAmount} 또는 HP +{HeroRules.GrowthAmount} 중 하나를 무작위로 얻습니다.");
+            }
+
             if (HasInvincible(definition, occupant))
             {
-                Add(entries, "무적", "물리·마법·고정 피해로 HP가 감소하지 않습니다.");
+                var description = "물리·마법·고정 피해로 HP가 감소하지 않습니다.";
+                var remainingTurnEnds = GetGlobalTurnEndsRemaining(definition, occupant);
+                if (remainingTurnEnds > 0)
+                {
+                    description += $"\n남은 턴 종료: {remainingTurnEnds}";
+                }
+
+                Add(entries, "무적", description);
             }
 
             return entries;
@@ -201,6 +245,30 @@ namespace Project333.Runtime.Presentation.Battle
                 UnitCardDefinition unit => unit.InvincibleDuration != InvincibleDurationType.None,
                 BuildingCardDefinition building => building.InvincibleDuration != InvincibleDurationType.None,
                 _ => false,
+            };
+        }
+
+        private static int GetGlobalTurnEndsRemaining(
+            CardDefinition definition,
+            OccupantState occupant)
+        {
+            foreach (var effect in occupant.InvincibleEffects)
+            {
+                if (effect.Duration == InvincibleDurationType.GlobalTurnEnds)
+                {
+                    return Math.Max(0, effect.OwnerTurnsRemaining);
+                }
+            }
+
+            return definition switch
+            {
+                UnitCardDefinition unit
+                    when unit.InvincibleDuration == InvincibleDurationType.GlobalTurnEnds =>
+                    Math.Max(0, unit.InvincibleOwnerTurns),
+                BuildingCardDefinition building
+                    when building.InvincibleDuration == InvincibleDurationType.GlobalTurnEnds =>
+                    Math.Max(0, building.InvincibleOwnerTurns),
+                _ => 0,
             };
         }
 

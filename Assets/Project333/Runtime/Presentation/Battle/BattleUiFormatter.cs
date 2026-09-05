@@ -65,9 +65,9 @@ namespace Project333.Runtime.Presentation.Battle
                 statusLabels.Add(occupant.IsInvincible ? "Invincible" : "Invincible Off");
             }
 
-            if (occupant.HasGuard)
+            if (occupant.HasShielder)
             {
-                statusLabels.Add(occupant.HasActiveGuard ? "Guard" : "Guard Off");
+                statusLabels.Add(occupant.HasActiveShielder ? "Shielder" : "Shielder Off");
             }
 
             if (occupant.HasEndure)

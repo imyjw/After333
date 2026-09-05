@@ -182,19 +182,19 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Guard_HidingGuardDoesNotRedirectUntilRevealed()
+        public void Shielder_HidingShielderDoesNotRedirectUntilRevealed()
         {
             var board = new BoardState();
-            var hiddenGuard = CreateUnit("hidden-guard", PlayerId.AI, new TileCoord(0, 0), hasHiding: true, hasGuard: true);
+            var hiddenShielder = CreateUnit("hidden-shielder", PlayerId.AI, new TileCoord(0, 0), hasHiding: true, hasShielder: true);
             var back = CreateUnit("back", PlayerId.AI, new TileCoord(0, 1));
-            board.Place(hiddenGuard.Position, hiddenGuard);
+            board.Place(hiddenShielder.Position, hiddenShielder);
             board.Place(back.Position, back);
 
-            Assert.That(GuardService.Resolve(board, back.Position).IsProtected, Is.False);
+            Assert.That(ShielderService.Resolve(board, back.Position).IsProtected, Is.False);
 
-            hiddenGuard.RevealHiding();
+            hiddenShielder.RevealHiding();
 
-            Assert.That(GuardService.Resolve(board, back.Position).IsProtected, Is.True);
+            Assert.That(ShielderService.Resolve(board, back.Position).IsProtected, Is.True);
         }
 
         [Test]
@@ -225,7 +225,7 @@ namespace Project333.Tests.EditMode
             PlayerId ownerId,
             TileCoord coord,
             bool hasHiding = false,
-            bool hasGuard = false)
+            bool hasShielder = false)
         {
             return new UnitState(
                 runtimeId: id,
@@ -238,7 +238,7 @@ namespace Project333.Tests.EditMode
                 canMove: true,
                 isScience: false,
                 sciencePowerUpkeep: 0,
-                hasGuard: hasGuard,
+                hasShielder: hasShielder,
                 hasHiding: hasHiding);
         }
 

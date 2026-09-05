@@ -23,7 +23,7 @@ namespace Project333.Runtime.Domain.Cards
             int hitsPerAttack = 1,
             bool hasBerserker = false,
             bool hasEndure = false,
-            bool hasGuard = false,
+            bool hasShielder = false,
             bool hasLifeSteal = false,
             DamageType damageType = DamageType.Physical,
             int physicalDefense = 0,
@@ -32,7 +32,8 @@ namespace Project333.Runtime.Domain.Cards
             bool hasRush = false,
             bool hasHiding = false,
             bool hasFlying = false,
-            int spellPower = 0)
+            int spellPower = 0,
+            bool hasPiercing = false)
             : base(
                 runtimeId,
                 cardId,
@@ -48,7 +49,7 @@ namespace Project333.Runtime.Domain.Cards
                 hitsPerAttack,
                 hasBerserker,
                 hasEndure,
-                hasGuard,
+                hasShielder,
                 hasLifeSteal,
                 damageType,
                 physicalDefense,
@@ -56,7 +57,8 @@ namespace Project333.Runtime.Domain.Cards
                 hasRush,
                 hasHiding,
                 hasFlying,
-                spellPower)
+                spellPower,
+                hasPiercing)
         {
             IsScience = isScience;
             SciencePowerUpkeep = sciencePowerUpkeep;

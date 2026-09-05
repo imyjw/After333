@@ -1533,9 +1533,21 @@ app.Map("/battle", async (
                     }
                 }
 
-                var targetSession = envelope.UseMatchmakingQueue
+                BattleSession? targetSession = envelope.UseMatchmakingQueue
                     ? sessionManager.GetOrCreate(resolvedMatchId, useServerAiOpponent: false)
-                    : sessionManager.GetOrCreate(resolvedMatchId, envelope.UseServerAiOpponent);
+                    : envelope.IsReconnectAttempt
+                        ? sessionManager.FindReconnectableServerAiBattle(resolvedMatchId)
+                        : sessionManager.GetOrCreate(resolvedMatchId, envelope.UseServerAiOpponent);
+                if (targetSession == null)
+                {
+                    await SendErrorAsync(
+                        socket,
+                        "battle_reconnect_expired",
+                        "The previous PVE battle has already ended.",
+                        jsonOptions,
+                        context.RequestAborted);
+                    continue;
+                }
 
                 if (envelope.UseMatchmakingQueue &&
                     isReconnectJoin &&
@@ -2990,30 +3002,48 @@ static async Task RecordRunResultsIfBattleEndedAsync(
     }
 
     if (session.UseServerAiOpponent ||
-        !session.TryConsumePendingPvpMatchResult(out var winnerSeatId))
+        !session.TryConsumePendingPvpMatchResult(out var winnerSeatId, out var isDraw))
     {
         return;
     }
 
-    if (winnerSeatId != OnlineBattleSeatId.None &&
-        pvpMatchmakingService != null &&
+    if (pvpMatchmakingService != null &&
         pvpMatchmakingService.IsDatabaseConfigured)
     {
         try
         {
-            await pvpMatchmakingService.RecordMatchCompletedAsync(
-                session.MatchId,
-                winnerSeatId.ToString(),
-                pvpEndedReason,
-                CancellationToken.None);
-            Console.WriteLine(
-                $"[match:{session.MatchId}] recorded PvP match result winner={winnerSeatId} reason={pvpEndedReason}");
+            if (isDraw)
+            {
+                await pvpMatchmakingService.RecordMatchDrawAsync(
+                    session.MatchId,
+                    pvpEndedReason,
+                    CancellationToken.None);
+                Console.WriteLine(
+                    $"[match:{session.MatchId}] recorded PvP match result draw reason={pvpEndedReason}");
+            }
+            else
+            {
+                if (winnerSeatId == OnlineBattleSeatId.None)
+                {
+                    return;
+                }
+
+                await pvpMatchmakingService.RecordMatchCompletedAsync(
+                    session.MatchId,
+                    winnerSeatId.ToString(),
+                    pvpEndedReason,
+                    CancellationToken.None);
+                Console.WriteLine(
+                    $"[match:{session.MatchId}] recorded PvP match result winner={winnerSeatId} reason={pvpEndedReason}");
+            }
+
             await auditLogService.LogAsync(
                 "pvp.match_result.recorded",
                 new
                 {
                     session.MatchId,
-                    winnerSeat = winnerSeatId.ToString(),
+                    result = isDraw ? "draw" : "win_loss",
+                    winnerSeat = isDraw ? null : winnerSeatId.ToString(),
                     reason = pvpEndedReason
                 },
                 CancellationToken.None);
@@ -3027,7 +3057,8 @@ static async Task RecordRunResultsIfBattleEndedAsync(
                 new
                 {
                     session.MatchId,
-                    winnerSeat = winnerSeatId.ToString(),
+                    result = isDraw ? "draw" : "win_loss",
+                    winnerSeat = isDraw ? null : winnerSeatId.ToString(),
                     reason = pvpEndedReason,
                     code = "unexpected_error"
                 },

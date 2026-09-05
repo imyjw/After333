@@ -77,6 +77,33 @@ namespace Project333.Tests.EditMode
                 Is.EqualTo(15));
         }
 
+        [TestCase(DamageType.Physical)]
+        [TestCase(DamageType.Magic)]
+        [TestCase(DamageType.Fixed)]
+        public void ApplyEffectDamage_FirstLethalDamageOfAnyTypeTriggersEndure(DamageType damageType)
+        {
+            var target = CreateUnit(
+                "endure-target",
+                PlayerId.Player,
+                new TileCoord(0, 0),
+                AttackType.Melee,
+                attack: 1,
+                maxHp: 5,
+                damageType: DamageType.Physical,
+                hasEndure: true);
+
+            var firstDamage = DamageResolutionRules.ApplyEffectDamage(target, 10, damageType);
+
+            Assert.That(firstDamage, Is.EqualTo(4));
+            Assert.That(target.CurrentHp, Is.EqualTo(1));
+            Assert.That(target.EndureUsed, Is.True);
+
+            var secondDamage = DamageResolutionRules.ApplyEffectDamage(target, 10, damageType);
+
+            Assert.That(secondDamage, Is.EqualTo(1));
+            Assert.That(target.CurrentHp, Is.LessThanOrEqualTo(0));
+        }
+
         [Test]
         public void Attack_MultiHitAppliesDefenseToEveryHit()
         {
@@ -150,7 +177,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Attack_GuardAndProtectedTargetApplyDefenseInSequence()
+        public void Attack_ShielderAndProtectedTargetApplyDefenseInSequence()
         {
             var battleState = CreateBattleState();
             var attacker = CreateUnit(
@@ -161,8 +188,8 @@ namespace Project333.Tests.EditMode
                 attack: 10,
                 maxHp: 20,
                 damageType: DamageType.Physical);
-            var guard = CreateUnit(
-                "guard",
+            var shielder = CreateUnit(
+                "shielder",
                 PlayerId.AI,
                 new TileCoord(0, 0),
                 AttackType.Melee,
@@ -170,7 +197,7 @@ namespace Project333.Tests.EditMode
                 maxHp: 5,
                 damageType: DamageType.Physical,
                 physicalDefense: 3,
-                hasGuard: true);
+                hasShielder: true);
             var protectedTarget = CreateUnit(
                 "protected",
                 PlayerId.AI,
@@ -182,7 +209,7 @@ namespace Project333.Tests.EditMode
                 physicalDefense: 1);
             attacker.HasSummoningSickness = false;
             battleState.PlayerBoard.Place(attacker.Position, attacker);
-            battleState.AIBoard.Place(guard.Position, guard);
+            battleState.AIBoard.Place(shielder.Position, shielder);
             battleState.AIBoard.Place(protectedTarget.Position, protectedTarget);
 
             new AttackService().Attack(
@@ -191,7 +218,7 @@ namespace Project333.Tests.EditMode
                 attacker.Position,
                 protectedTarget.Position);
 
-            Assert.That(battleState.AIBoard.GetOccupant(guard.Position), Is.Null);
+            Assert.That(battleState.AIBoard.GetOccupant(shielder.Position), Is.Null);
             Assert.That(protectedTarget.CurrentHp, Is.EqualTo(9));
         }
 
@@ -269,7 +296,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void EndTurn_RedDragonEffectUsesPhysicalDamageType()
+        public void EndTurn_RedDragonEffectUsesMagicDamageType()
         {
             var battleState = CreateBattleState();
             var redDragon = CreateUnit(
@@ -277,8 +304,8 @@ namespace Project333.Tests.EditMode
                 PlayerId.Player,
                 new TileCoord(0, 0),
                 AttackType.Melee,
-                attack: 66,
-                maxHp: 66,
+                attack: 50,
+                maxHp: 50,
                 damageType: DamageType.Physical);
             var target = CreateUnit(
                 "target",
@@ -288,15 +315,15 @@ namespace Project333.Tests.EditMode
                 attack: 1,
                 maxHp: 100,
                 damageType: DamageType.Physical,
-                physicalDefense: 6,
-                magicDefense: 60);
+                physicalDefense: 60,
+                magicDefense: 6);
             redDragon.HasSummoningSickness = false;
             battleState.PlayerBoard.Place(redDragon.Position, redDragon);
             battleState.AIBoard.Place(target.Position, target);
 
             new EndTurnService().EndTurn(battleState);
 
-            Assert.That(target.CurrentHp, Is.EqualTo(40));
+            Assert.That(target.CurrentHp, Is.EqualTo(73));
         }
 
         [Test]
@@ -353,8 +380,9 @@ namespace Project333.Tests.EditMode
             int physicalDefense = 0,
             int magicDefense = 0,
             int hitsPerAttack = 1,
-            bool hasGuard = false,
-            bool hasLifeSteal = false)
+            bool hasShielder = false,
+            bool hasLifeSteal = false,
+            bool hasEndure = false)
         {
             return new UnitState(
                 runtimeId: id,
@@ -368,7 +396,8 @@ namespace Project333.Tests.EditMode
                 isScience: false,
                 sciencePowerUpkeep: 0,
                 hitsPerAttack: hitsPerAttack,
-                hasGuard: hasGuard,
+                hasEndure: hasEndure,
+                hasShielder: hasShielder,
                 hasLifeSteal: hasLifeSteal,
                 damageType: damageType,
                 physicalDefense: physicalDefense,

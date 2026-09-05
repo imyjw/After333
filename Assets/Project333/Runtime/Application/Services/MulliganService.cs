@@ -44,7 +44,7 @@ namespace Project333.Runtime.Application.Services
             {
                 // Keep the returned copies out of the deck while drawing replacements.
                 // Another copy of the same card type may still be drawn from the deck.
-                DrawExactCards(playerState, selectedCards.Count);
+                DrawExactCards(battleState, playerState, selectedCards.Count);
                 playerState.Deck.AddRangeToTop(selectedCards);
                 deckShuffler.Shuffle(playerState.Deck);
             }
@@ -109,7 +109,10 @@ namespace Project333.Runtime.Application.Services
             battleState.StartNextTurn(battleState.ActivePlayerId);
         }
 
-        private static void DrawExactCards(PlayerState playerState, int drawCount)
+        private static void DrawExactCards(
+            BattleState battleState,
+            PlayerState playerState,
+            int drawCount)
         {
             for (var i = 0; i < drawCount; i++)
             {
@@ -120,6 +123,7 @@ namespace Project333.Runtime.Application.Services
                 }
 
                 playerState.Hand.Add(cardId);
+                battleState.RecordCardDraw(playerState.Id);
             }
         }
     }

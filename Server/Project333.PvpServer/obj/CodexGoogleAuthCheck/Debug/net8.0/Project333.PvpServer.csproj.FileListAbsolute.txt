@@ -1,8 +1,0 @@
-C:\Project_333\Server\Project333.PvpServer\obj\CodexGoogleAuthCheck\Debug\net8.0\Project333.PvpServer.csproj.AssemblyReference.cache
-C:\Project_333\Server\Project333.PvpServer\obj\CodexGoogleAuthCheck\Debug\net8.0\rpswa.dswa.cache.json
-C:\Project_333\Server\Project333.PvpServer\obj\CodexGoogleAuthCheck\Debug\net8.0\Project333.PvpServer.GeneratedMSBuildEditorConfig.editorconfig
-C:\Project_333\Server\Project333.PvpServer\obj\CodexGoogleAuthCheck\Debug\net8.0\Project333.PvpServer.AssemblyInfoInputs.cache
-C:\Project_333\Server\Project333.PvpServer\obj\CodexGoogleAuthCheck\Debug\net8.0\Project333.PvpServer.AssemblyInfo.cs
-C:\Project_333\Server\Project333.PvpServer\obj\CodexGoogleAuthCheck\Debug\net8.0\Project333.PvpServer.csproj.CoreCompileInputs.cache
-C:\Project_333\Server\Project333.PvpServer\obj\CodexGoogleAuthCheck\Debug\net8.0\Project333.PvpServer.MvcApplicationPartsAssemblyInfo.cache
-C:\Project_333\Server\Project333.PvpServer\obj\CodexGoogleAuthCheck\Debug\net8.0\Project333.PvpServer.sourcelink.json

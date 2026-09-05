@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using Project333.Runtime.Application.Services;
 using Project333.Runtime.Domain.Battle;
@@ -66,19 +67,19 @@ namespace Project333.Tests.EditMode
         {
             var battleState = CreateBattleStateInMainPhase(PlayerId.Player);
             var service = new EndTurnService();
-            var redDragon = CreateUnit("red-dragon", "RedDragon", PlayerId.Player, new TileCoord(0, 0), AttackType.Melee, 66, 66);
+            var redDragon = CreateUnit("red-dragon", "RedDragon", PlayerId.Player, new TileCoord(0, 0), AttackType.Melee, 50, 50);
             var frontEnemy = CreateUnit("front-enemy", "front-enemy", PlayerId.AI, new TileCoord(0, 0), AttackType.Melee, 10, 100);
             var backEnemy = CreateUnit("back-enemy", "back-enemy", PlayerId.AI, new TileCoord(0, 1), AttackType.Ranged, 10, 100);
 
             battleState.PlayerBoard.Place(new TileCoord(0, 0), redDragon);
             battleState.AIBoard.Place(new TileCoord(0, 0), frontEnemy);
             battleState.AIBoard.Place(new TileCoord(0, 1), backEnemy);
-            battleState.AI.Master.CurrentHp = 60;
+            battleState.AI.Master.CurrentHp = 30;
 
             service.EndTurn(battleState);
 
-            Assert.That(frontEnemy.CurrentHp, Is.EqualTo(34));
-            Assert.That(backEnemy.CurrentHp, Is.EqualTo(34));
+            Assert.That(frontEnemy.CurrentHp, Is.EqualTo(67));
+            Assert.That(backEnemy.CurrentHp, Is.EqualTo(67));
             Assert.That(battleState.AI.Master.CurrentHp, Is.LessThanOrEqualTo(0));
             Assert.That(battleState.IsEnded, Is.True);
             Assert.That(battleState.Result.Winner, Is.EqualTo(PlayerId.Player));
@@ -90,7 +91,7 @@ namespace Project333.Tests.EditMode
         {
             var battleState = CreateBattleStateInMainPhase(PlayerId.Player);
             var service = new EndTurnService();
-            var redDragon = CreateUnit("red-dragon", "RedDragon", PlayerId.Player, new TileCoord(0, 0), AttackType.Melee, 66, 66);
+            var redDragon = CreateUnit("red-dragon", "RedDragon", PlayerId.Player, new TileCoord(0, 0), AttackType.Melee, 50, 50);
             var enemy = CreateUnit("enemy", "enemy", PlayerId.AI, new TileCoord(0, 0), AttackType.Melee, 10, 100);
 
             redDragon.IsDrained = true;
@@ -161,6 +162,10 @@ namespace Project333.Tests.EditMode
 
             Assert.That(battleState.Player.Hand.Count, Is.EqualTo(handCountBefore + 4));
             Assert.That(battleState.Player.Deck.Count, Is.EqualTo(deckCountBefore - 4));
+            Assert.That(
+                battleState.CardDrawEvents.Count(drawEvent =>
+                    drawEvent.SourceCardId == GaebangBranchRules.CardId),
+                Is.EqualTo(4));
         }
 
         [Test]

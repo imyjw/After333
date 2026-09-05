@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Project333.Runtime.Application.Accounts;
 using Project333.Runtime.Application.Ads;
+using Project333.Runtime.Presentation.Shop;
 using Project333.Runtime.Presentation.Startup;
 using UnityEngine;
 using UnityEngine.UI;
@@ -17,6 +18,9 @@ namespace Project333.Runtime.Presentation.Ads
     public sealed class RewardedTicketController : MonoBehaviour
     {
         private const string ProviderUserIdKey = "After333.LevelPlayProviderUserId";
+        private const string LevelPlayAppKeyPreference = "After333.LevelPlayAppKey";
+        private const string RewardedAdUnitIdPreference = "After333.RewardedAdUnitId";
+        private const string PlacementNamePreference = "After333.RewardedAdPlacement";
 
         [Header("LevelPlay Dashboard")]
         [Tooltip("LevelPlay 대시보드의 Android App Key입니다.")]
@@ -31,6 +35,7 @@ namespace Project333.Runtime.Presentation.Ads
         [SerializeField] private float _verificationPollSeconds = 1f;
 
         [Header("Editable UI")]
+        [SerializeField] private RectTransform _uiParent;
         [SerializeField] private Button _watchAdButton;
         [SerializeField] private Text _watchAdButtonLabel;
         [SerializeField] private Text _rewardedAdStatusText;
@@ -45,6 +50,7 @@ namespace Project333.Runtime.Presentation.Ads
         [SerializeField] private int _statusFontSize = 18;
 
         private GameStartSceneController _startSceneController;
+        private ShopSceneController _shopSceneController;
         private IRewardedAdService _adService;
         private CancellationTokenSource _cancellation;
         private string _providerUserId = string.Empty;
@@ -68,12 +74,32 @@ namespace Project333.Runtime.Presentation.Ads
         private void Awake()
         {
             _startSceneController = GetComponent<GameStartSceneController>();
+            _shopSceneController = GetComponent<ShopSceneController>();
+            if (IsLegacyStartSceneHost())
+            {
+                PersistConfiguration();
+                SetEditableUiActive(false);
+                enabled = false;
+                return;
+            }
+
+            RestorePersistedConfiguration();
             EnsureEditableHierarchy();
         }
 
         private void OnEnable()
         {
             _startSceneController = GetComponent<GameStartSceneController>();
+            _shopSceneController = GetComponent<ShopSceneController>();
+            if (IsLegacyStartSceneHost())
+            {
+                PersistConfiguration();
+                SetEditableUiActive(false);
+                enabled = false;
+                return;
+            }
+
+            RestorePersistedConfiguration();
             EnsureEditableHierarchy();
             CancelOperations();
             _cancellation = new CancellationTokenSource();
@@ -129,6 +155,12 @@ namespace Project333.Runtime.Presentation.Ads
         [ContextMenu("Ensure Editable Rewarded Ad UI")]
         public void EnsureEditableHierarchy()
         {
+            if (IsLegacyStartSceneHost())
+            {
+                SetEditableUiActive(false);
+                return;
+            }
+
             AutoAssignUi();
             var parent = ResolveUiParent();
             if (parent == null)
@@ -204,6 +236,39 @@ namespace Project333.Runtime.Presentation.Ads
             }
         }
 
+        public void ConfigureShopUi(RectTransform parent)
+        {
+            if (parent == null)
+            {
+                return;
+            }
+
+            var needsDefaultLayout = _uiParent != parent ||
+                                     (_watchAdButton != null && _watchAdButton.transform.parent != parent);
+            _uiParent = parent;
+            if (_watchAdButton != null && _watchAdButton.transform.parent != parent)
+            {
+                _watchAdButton.transform.SetParent(parent, false);
+            }
+
+            if (_rewardedAdStatusText != null && _rewardedAdStatusText.transform.parent != parent)
+            {
+                _rewardedAdStatusText.transform.SetParent(parent, false);
+            }
+
+            if (needsDefaultLayout)
+            {
+                _buttonSize = new Vector2(430f, 118f);
+                _buttonPosition = new Vector2(0f, -15f);
+                _statusSize = new Vector2(500f, 96f);
+                _statusPosition = new Vector2(0f, -152f);
+                _buttonNeedsDefaultLayout = true;
+                _statusNeedsDefaultLayout = true;
+            }
+
+            EnsureEditableHierarchy();
+        }
+
         public async void WatchRewardedAdFromUi()
         {
             if (_isRequestingAttempt || _isVerifyingReward || (_adService?.IsShowing ?? false))
@@ -250,7 +315,7 @@ namespace Project333.Runtime.Presentation.Ads
                 if (attempt.ResolvedWallet != null)
                 {
                     AccountSessionState.ApplyRewardedAdWallet(attempt.ResolvedWallet);
-                    _startSceneController?.RefreshUiFromExternalState();
+                    RefreshHostWalletUi();
                 }
 
                 if (!attempt.ResolvedCanShow)
@@ -342,7 +407,7 @@ namespace Project333.Runtime.Presentation.Ads
                     if (string.Equals(status, "granted", StringComparison.OrdinalIgnoreCase))
                     {
                         AccountSessionState.ApplyRewardedAdWallet(attempt.ResolvedWallet);
-                        _startSceneController?.RefreshUiFromExternalState();
+                        RefreshHostWalletUi();
                         SetStatus($"티켓 +{Mathf.Max(1, attempt.ResolvedRewardTicketCount)} 지급 완료!");
                         return;
                     }
@@ -499,13 +564,80 @@ namespace Project333.Runtime.Presentation.Ads
 
         private RectTransform ResolveUiParent()
         {
-            return transform.Find("CenterPanel") as RectTransform ?? transform as RectTransform;
+            return _uiParent ??
+                   transform.Find("RewardedTicketProductPanel") as RectTransform ??
+                   transform.Find("CenterPanel") as RectTransform ??
+                   transform as RectTransform;
+        }
+
+        private bool IsLegacyStartSceneHost()
+        {
+            return _startSceneController != null && _shopSceneController == null;
+        }
+
+        private void SetEditableUiActive(bool active)
+        {
+            AutoAssignUi();
+            if (_watchAdButton != null)
+            {
+                _watchAdButton.gameObject.SetActive(active);
+            }
+
+            if (_rewardedAdStatusText != null)
+            {
+                _rewardedAdStatusText.gameObject.SetActive(active);
+            }
+        }
+
+        private void PersistConfiguration()
+        {
+            if (!string.IsNullOrWhiteSpace(_levelPlayAppKey))
+            {
+                PlayerPrefs.SetString(LevelPlayAppKeyPreference, _levelPlayAppKey);
+            }
+
+            if (!string.IsNullOrWhiteSpace(_rewardedAdUnitId))
+            {
+                PlayerPrefs.SetString(RewardedAdUnitIdPreference, _rewardedAdUnitId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(_placementName))
+            {
+                PlayerPrefs.SetString(PlacementNamePreference, _placementName);
+            }
+
+            PlayerPrefs.Save();
+        }
+
+        private void RestorePersistedConfiguration()
+        {
+            if (string.IsNullOrWhiteSpace(_levelPlayAppKey))
+            {
+                _levelPlayAppKey = PlayerPrefs.GetString(LevelPlayAppKeyPreference, string.Empty);
+            }
+
+            if (string.IsNullOrWhiteSpace(_rewardedAdUnitId))
+            {
+                _rewardedAdUnitId = PlayerPrefs.GetString(RewardedAdUnitIdPreference, string.Empty);
+            }
+
+            if (string.IsNullOrWhiteSpace(_placementName))
+            {
+                _placementName = PlayerPrefs.GetString(PlacementNamePreference, "start_ticket_reward");
+            }
+        }
+
+        private void RefreshHostWalletUi()
+        {
+            _startSceneController?.RefreshUiFromExternalState();
+            _shopSceneController?.RefreshUiFromExternalState();
         }
 
         private void ApplyVisuals()
         {
             if (_watchAdButton != null)
             {
+                var applyDefaultButtonVisual = _buttonNeedsDefaultLayout;
                 var rect = _watchAdButton.GetComponent<RectTransform>();
                 if (rect != null && _buttonNeedsDefaultLayout)
                 {
@@ -513,26 +645,40 @@ namespace Project333.Runtime.Presentation.Ads
                     _buttonNeedsDefaultLayout = false;
                 }
 
-                var image = _watchAdButton.GetComponent<Image>() ?? _watchAdButton.gameObject.AddComponent<Image>();
-                image.color = _buttonColor;
-                image.raycastTarget = true;
-                _watchAdButton.targetGraphic = image;
+                var image = _watchAdButton.GetComponent<Image>();
+                if (image == null)
+                {
+                    image = _watchAdButton.gameObject.AddComponent<Image>();
+                    applyDefaultButtonVisual = true;
+                }
+
+                if (applyDefaultButtonVisual)
+                {
+                    image.color = _buttonColor;
+                    image.raycastTarget = true;
+                }
+
+                if (_watchAdButton.targetGraphic == null)
+                {
+                    _watchAdButton.targetGraphic = image;
+                }
+
                 _watchAdButton.onClick.RemoveListener(WatchRewardedAdFromUi);
                 _watchAdButton.onClick.AddListener(WatchRewardedAdFromUi);
             }
 
             if (_watchAdButtonLabel != null)
             {
-                _watchAdButtonLabel.font = ResolveRuntimeFont();
-                _watchAdButtonLabel.fontSize = _buttonFontSize;
-                _watchAdButtonLabel.fontStyle = FontStyle.Bold;
-                _watchAdButtonLabel.alignment = TextAnchor.MiddleCenter;
-                _watchAdButtonLabel.color = _buttonTextColor;
-                _watchAdButtonLabel.raycastTarget = false;
-                _watchAdButtonLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
-                _watchAdButtonLabel.verticalOverflow = VerticalWrapMode.Overflow;
                 if (_buttonLabelNeedsDefaultLayout)
                 {
+                    _watchAdButtonLabel.font = ResolveRuntimeFont();
+                    _watchAdButtonLabel.fontSize = _buttonFontSize;
+                    _watchAdButtonLabel.fontStyle = FontStyle.Bold;
+                    _watchAdButtonLabel.alignment = TextAnchor.MiddleCenter;
+                    _watchAdButtonLabel.color = _buttonTextColor;
+                    _watchAdButtonLabel.raycastTarget = false;
+                    _watchAdButtonLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
+                    _watchAdButtonLabel.verticalOverflow = VerticalWrapMode.Overflow;
                     var rect = _watchAdButtonLabel.rectTransform;
                     rect.anchorMin = Vector2.zero;
                     rect.anchorMax = Vector2.one;
@@ -544,13 +690,17 @@ namespace Project333.Runtime.Presentation.Ads
 
             if (_rewardedAdStatusText != null)
             {
-                _rewardedAdStatusText.font = ResolveRuntimeFont();
-                _rewardedAdStatusText.fontSize = _statusFontSize;
-                _rewardedAdStatusText.alignment = TextAnchor.UpperCenter;
-                _rewardedAdStatusText.color = _statusTextColor;
-                _rewardedAdStatusText.raycastTarget = false;
-                _rewardedAdStatusText.horizontalOverflow = HorizontalWrapMode.Wrap;
-                _rewardedAdStatusText.verticalOverflow = VerticalWrapMode.Overflow;
+                // Preserve authored typography when restoring an existing shop UI.
+                if (_statusNeedsDefaultLayout || _rewardedAdStatusText.font == null)
+                {
+                    _rewardedAdStatusText.font = ResolveRuntimeFont();
+                    _rewardedAdStatusText.fontSize = _statusFontSize;
+                    _rewardedAdStatusText.alignment = TextAnchor.UpperCenter;
+                    _rewardedAdStatusText.color = _statusTextColor;
+                    _rewardedAdStatusText.raycastTarget = false;
+                    _rewardedAdStatusText.horizontalOverflow = HorizontalWrapMode.Wrap;
+                    _rewardedAdStatusText.verticalOverflow = VerticalWrapMode.Overflow;
+                }
                 if (_statusNeedsDefaultLayout)
                 {
                     SetCenteredLayout(

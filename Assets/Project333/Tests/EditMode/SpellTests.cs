@@ -95,7 +95,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void CastDamageSpell_WhenTargetIsProtectedByGuard_DamagesGuardInsteadOfTarget()
+        public void CastDamageSpell_WhenTargetIsProtectedByShielder_DamagesShielderInsteadOfTarget()
         {
             var battleState = CreateBattleState();
             var spellService = CreateSpellService(new CardDefinition[]
@@ -106,11 +106,11 @@ namespace Project333.Tests.EditMode
                     cost: new ResourceSet(mana: 0, qi: 0, power: 0, gold: 1),
                     damage: 4),
             });
-            var guard = CreateUnit("guard", PlayerId.AI, new TileCoord(0, 0), AttackType.Melee, 0, 6, hasGuard: true);
+            var shielder = CreateUnit("shielder", PlayerId.AI, new TileCoord(0, 0), AttackType.Melee, 0, 6, hasShielder: true);
             var target = CreateUnit("target", PlayerId.AI, new TileCoord(0, 1), AttackType.Melee, 2, 5);
 
             battleState.Player.Hand.Add("spell-damage");
-            battleState.AIBoard.Place(new TileCoord(0, 0), guard);
+            battleState.AIBoard.Place(new TileCoord(0, 0), shielder);
             battleState.AIBoard.Place(new TileCoord(0, 1), target);
 
             spellService.CastDamageSpell(
@@ -120,12 +120,12 @@ namespace Project333.Tests.EditMode
                 PlayerId.AI,
                 new TileCoord(0, 1));
 
-            Assert.That(guard.CurrentHp, Is.EqualTo(2));
+            Assert.That(shielder.CurrentHp, Is.EqualTo(2));
             Assert.That(target.CurrentHp, Is.EqualTo(5));
         }
 
         [Test]
-        public void CastDamageSpell_WhenGuardHpIsInsufficient_SpillsRemainingDamageToProtectedTarget()
+        public void CastDamageSpell_WhenShielderHpIsInsufficient_SpillsRemainingDamageToProtectedTarget()
         {
             var battleState = CreateBattleState();
             var spellService = CreateSpellService(new CardDefinition[]
@@ -136,11 +136,11 @@ namespace Project333.Tests.EditMode
                     cost: new ResourceSet(mana: 0, qi: 0, power: 0, gold: 1),
                     damage: 10),
             });
-            var guard = CreateUnit("guard", PlayerId.AI, new TileCoord(0, 0), AttackType.Melee, 0, 5, hasGuard: true);
+            var shielder = CreateUnit("shielder", PlayerId.AI, new TileCoord(0, 0), AttackType.Melee, 0, 5, hasShielder: true);
             var target = CreateUnit("target", PlayerId.AI, new TileCoord(0, 1), AttackType.Melee, 2, 10);
 
             battleState.Player.Hand.Add("spell-damage");
-            battleState.AIBoard.Place(new TileCoord(0, 0), guard);
+            battleState.AIBoard.Place(new TileCoord(0, 0), shielder);
             battleState.AIBoard.Place(new TileCoord(0, 1), target);
 
             spellService.CastDamageSpell(
@@ -212,7 +212,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void CastDamageSpell_WhenProtectedMasterHasEnoughGuardHealth_DoesNotEndBattle()
+        public void CastDamageSpell_WhenProtectedMasterHasEnoughShielderHealth_DoesNotEndBattle()
         {
             var battleState = CreateBattleState();
             var spellService = CreateSpellService(new CardDefinition[]
@@ -223,10 +223,10 @@ namespace Project333.Tests.EditMode
                     cost: new ResourceSet(mana: 0, qi: 0, power: 0, gold: 1),
                     damage: 4),
             });
-            var guard = CreateUnit("guard", PlayerId.AI, new TileCoord(2, 0), AttackType.Melee, 0, 6, hasGuard: true);
+            var shielder = CreateUnit("shielder", PlayerId.AI, new TileCoord(2, 0), AttackType.Melee, 0, 6, hasShielder: true);
 
             battleState.Player.Hand.Add("spell-damage");
-            battleState.AIBoard.Place(new TileCoord(2, 0), guard);
+            battleState.AIBoard.Place(new TileCoord(2, 0), shielder);
             battleState.AI.Master.CurrentHp = 4;
 
             spellService.CastDamageSpell(
@@ -237,7 +237,7 @@ namespace Project333.Tests.EditMode
                 new TileCoord(2, 1));
 
             Assert.That(battleState.IsEnded, Is.False);
-            Assert.That(guard.CurrentHp, Is.EqualTo(2));
+            Assert.That(shielder.CurrentHp, Is.EqualTo(2));
             Assert.That(battleState.AI.Master.CurrentHp, Is.EqualTo(4));
         }
 
@@ -253,10 +253,10 @@ namespace Project333.Tests.EditMode
                     cost: new ResourceSet(mana: 0, qi: 0, power: 0, gold: 1),
                     damage: 10),
             });
-            var guard = CreateUnit("guard", PlayerId.AI, new TileCoord(2, 0), AttackType.Melee, 0, 5, hasGuard: true);
+            var shielder = CreateUnit("shielder", PlayerId.AI, new TileCoord(2, 0), AttackType.Melee, 0, 5, hasShielder: true);
 
             battleState.Player.Hand.Add("spell-damage");
-            battleState.AIBoard.Place(new TileCoord(2, 0), guard);
+            battleState.AIBoard.Place(new TileCoord(2, 0), shielder);
             battleState.AI.Master.CurrentHp = 4;
 
             spellService.CastDamageSpell(
@@ -436,6 +436,64 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.Player.Resources.Power, Is.EqualTo(2));
         }
 
+        [Test]
+        public void TurnStart_TenThousandYearSnowGinsengGrantsQiAtNextThreeOwnerTurnStarts()
+        {
+            var battleState = CreateBattleState();
+            var spellService = CreateSpellService(new CardDefinition[]
+            {
+                new PersistentResourceSpellCardDefinition(
+                    cardId: TenThousandYearSnowGinsengRules.CardId,
+                    displayName: "영약: 만년설삼",
+                    cost: new ResourceSet(
+                        mana: 0,
+                        qi: 0,
+                        power: 0,
+                        gold: TenThousandYearSnowGinsengRules.GoldCost),
+                    effectId: TenThousandYearSnowGinsengRules.EffectId,
+                    turnStartResourceGain: new ResourceSet(
+                        mana: 0,
+                        qi: TenThousandYearSnowGinsengRules.TurnStartQiGain,
+                        power: 0,
+                        gold: 0),
+                    endConditionText: "다음 3번의 내 턴 시작 후 종료됩니다.",
+                    ownerTurnStartsRemaining: TenThousandYearSnowGinsengRules.OwnerTurnStarts),
+            });
+            var turnStartService = new TurnStartService();
+            battleState.Player.Hand.Add(TenThousandYearSnowGinsengRules.CardId);
+            battleState.Player.Resources.Add(new ResourceSet(mana: 0, qi: 0, power: 0, gold: 1));
+
+            spellService.CastPersistentResourceSpell(
+                battleState,
+                PlayerId.Player,
+                TenThousandYearSnowGinsengRules.CardId);
+
+            Assert.That(battleState.Player.Resources.Gold, Is.Zero);
+
+            for (var ownerTurnStart = 1;
+                 ownerTurnStart <= TenThousandYearSnowGinsengRules.OwnerTurnStarts;
+                 ownerTurnStart += 1)
+            {
+                battleState.StartNextTurn(PlayerId.Player);
+                turnStartService.ResolveTurnStart(battleState);
+
+                Assert.That(
+                    battleState.Player.Resources.Qi,
+                    Is.EqualTo(ownerTurnStart * TenThousandYearSnowGinsengRules.TurnStartQiGain));
+            }
+
+            Assert.That(battleState.PersistentEffects[0].IsExpired, Is.True);
+
+            battleState.StartNextTurn(PlayerId.Player);
+            turnStartService.ResolveTurnStart(battleState);
+
+            Assert.That(
+                battleState.Player.Resources.Qi,
+                Is.EqualTo(
+                    TenThousandYearSnowGinsengRules.OwnerTurnStarts *
+                    TenThousandYearSnowGinsengRules.TurnStartQiGain));
+        }
+
         private static SpellService CreateSpellService(IEnumerable<CardDefinition> definitions)
         {
             return new SpellService(new InMemoryCardDefinitionProvider(definitions));
@@ -448,7 +506,7 @@ namespace Project333.Tests.EditMode
             AttackType attackType,
             int attack,
             int maxHp,
-            bool hasGuard = false)
+            bool hasShielder = false)
         {
             return new UnitState(
                 runtimeId: id,
@@ -461,7 +519,7 @@ namespace Project333.Tests.EditMode
                 canMove: true,
                 isScience: false,
                 sciencePowerUpkeep: 0,
-                hasGuard: hasGuard);
+                hasShielder: hasShielder);
         }
 
         private static BattleState CreateBattleState()

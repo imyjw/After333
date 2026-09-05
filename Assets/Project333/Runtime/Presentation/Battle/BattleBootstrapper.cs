@@ -38,6 +38,10 @@ namespace Project333.Runtime.Presentation.Battle
         private const string MasterCardAssetResourcePath = "Project333/SpecialCards/MasterCard";
         private const string FireboltSpellEffectId = "firebolt";
         private const string FireboltSpellEffectResourcePath = "Project333/SpellEffects/Firebolt-Sheet";
+        private const string FirewallSpellEffectId = "firewall";
+        private const string FirewallSpellEffectResourcePath = "Project333/SpellEffects/Firewall-Sheet";
+        private const string BiochemicalBombSpellEffectId = "biochemical_bomb";
+        private const string BiochemicalBombSpellEffectResourcePath = "Project333/SpellEffects/BiochemicalBomb-Sheet";
         private const int FireboltSpellEffectFrameCount = 7;
         private const float FireboltSpellEffectFramesPerSecond = 14f;
         private const float OnlineErrorToastFadeInSeconds = 0.08f;
@@ -46,6 +50,7 @@ namespace Project333.Runtime.Presentation.Battle
         private const float ServerRunResultSyncTimeoutSeconds = 4f;
         private const int DefaultOpponentPlayedCardSortingOrder = 1000;
         private const int LegacyOpponentPlayedCardSortingOrder = 20005;
+        private const string YourTurnBannerResourcePath = "Project333/BattleUI/YourTurnBanner";
         private static readonly Vector2 FireboltSpellEffectSize = new Vector2(220f, 220f);
         private static readonly string[] KoreanFontCandidates =
         {
@@ -58,6 +63,8 @@ namespace Project333.Runtime.Presentation.Battle
         private static readonly string OnlineClientTokenSuffix = Guid.NewGuid().ToString("N").Substring(0, 8);
 
         private static IReadOnlyList<Sprite> s_fireboltSpellEffectFrames;
+        private static IReadOnlyList<Sprite> s_firewallSpellEffectFrames;
+        private static IReadOnlyList<Sprite> s_biochemicalBombSpellEffectFrames;
 
         [SerializeField] private BattleScreenPresenter _battleScreenPresenter;
         [SerializeField] private CardDefinitionCatalogAsset _cardCatalogAsset;
@@ -92,6 +99,13 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private bool _animateOnlineMoveEvents;
         [SerializeField] private string _onlineErrorToastPrefix = "명령 실패";
         [SerializeField] private string _onlineStatusToastPrefix = "온라인";
+        [Header("Tile Area Spell Effects")]
+        [SerializeField] private Sprite[] _firewallTileEffectFrames = Array.Empty<Sprite>();
+        [SerializeField] [Min(0.01f)] private float _firewallTileEffectFramesPerSecond = 12f;
+        [SerializeField] private Vector2 _firewallTileEffectSize = new Vector2(220f, 220f);
+        [SerializeField] private Sprite[] _biochemicalBombTileEffectFrames = Array.Empty<Sprite>();
+        [SerializeField] [Min(0.01f)] private float _biochemicalBombTileEffectFramesPerSecond = 12f;
+        [SerializeField] private Vector2 _biochemicalBombTileEffectSize = new Vector2(220f, 220f);
         [Header("Online Error Toast")]
         [SerializeField] private Font _onlineErrorToastFont;
         [SerializeField] private Vector2 _onlineErrorToastAnchor = new Vector2(0.5f, 0.86f);
@@ -116,6 +130,14 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private Color _onlineTurnTimerDangerPanelColor = new Color(0.42f, 0.05f, 0.035f, 0.95f);
         [SerializeField] private Color _onlineTurnTimerTextColor = new Color(1f, 0.96f, 0.84f, 1f);
         [SerializeField] private Color _onlineTurnTimerDangerTextColor = new Color(1f, 0.78f, 0.62f, 1f);
+        [Header("Your Turn Banner")]
+        [SerializeField] private Sprite _yourTurnBannerSprite;
+        [SerializeField] private Vector2 _yourTurnBannerSize = new Vector2(760f, 254f);
+        [SerializeField] private Vector2 _yourTurnBannerOffset = Vector2.zero;
+        [SerializeField] [Min(0f)] private float _yourTurnBannerFadeInSeconds = 0.15f;
+        [SerializeField] [Min(0f)] private float _yourTurnBannerVisibleSeconds = 1.4f;
+        [SerializeField] [Min(0f)] private float _yourTurnBannerFadeOutSeconds = 0.2f;
+        [SerializeField] private int _yourTurnBannerSortingOrder = 5500;
         [Header("Opponent Played Card Reveal")]
         [SerializeField] private Vector2 _opponentPlayedCardRevealSize = new Vector2(320f, 440f);
         [SerializeField] [Min(0.1f)] private float _opponentPlayedCardRevealVisualScale = 1.2f;
@@ -178,6 +200,7 @@ namespace Project333.Runtime.Presentation.Battle
         private Coroutine _onlineErrorToastCoroutine;
         private Coroutine _onlineReconnectCountdownCoroutine;
         private Coroutine _onlineTurnTimerCoroutine;
+        private Coroutine _yourTurnBannerCoroutine;
         private bool _hasOpponentReconnectCountdown;
         private bool _isLocalConnectionRecoveryStatusVisible;
         private float _opponentReconnectCountdownEndTime;
@@ -193,6 +216,10 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField, HideInInspector] private Image _onlineTurnTimerPanelImage;
         [SerializeField, HideInInspector] private Text _onlineTurnTimerText;
         [SerializeField, HideInInspector] private bool _onlineTurnTimerUsesSceneLayout;
+        [SerializeField, HideInInspector] private CanvasGroup _yourTurnBannerCanvasGroup;
+        [SerializeField, HideInInspector] private RectTransform _yourTurnBannerRect;
+        [SerializeField, HideInInspector] private Image _yourTurnBannerImage;
+        [SerializeField, HideInInspector] private bool _yourTurnBannerUsesSceneLayout;
         [SerializeField, HideInInspector] private CanvasGroup _opponentPlayedCardRevealCanvasGroup;
         [SerializeField, HideInInspector] private RectTransform _opponentPlayedCardRevealRect;
         [SerializeField, HideInInspector] private Image _opponentPlayedCardRevealImage;
@@ -773,6 +800,105 @@ namespace Project333.Runtime.Presentation.Battle
             }
         }
 
+        private void ShowYourTurnBanner()
+        {
+            EnsureYourTurnBanner();
+            ApplyYourTurnBannerSettings();
+            if (_yourTurnBannerCanvasGroup == null ||
+                _yourTurnBannerImage == null ||
+                _yourTurnBannerImage.sprite == null)
+            {
+                return;
+            }
+
+            if (_yourTurnBannerCoroutine != null)
+            {
+                StopCoroutine(_yourTurnBannerCoroutine);
+            }
+
+            _yourTurnBannerCoroutine = StartCoroutine(YourTurnBannerSequence());
+        }
+
+        private void HideYourTurnBanner()
+        {
+            if (_yourTurnBannerCoroutine != null)
+            {
+                StopCoroutine(_yourTurnBannerCoroutine);
+                _yourTurnBannerCoroutine = null;
+            }
+
+            if (_yourTurnBannerCanvasGroup == null)
+            {
+                return;
+            }
+
+            _yourTurnBannerCanvasGroup.alpha = 0f;
+            _yourTurnBannerCanvasGroup.interactable = false;
+            _yourTurnBannerCanvasGroup.blocksRaycasts = false;
+            _yourTurnBannerCanvasGroup.gameObject.SetActive(false);
+        }
+
+        private IEnumerator YourTurnBannerSequence()
+        {
+            while (_battleScreenPresenter != null && _battleScreenPresenter.IsMulliganPresentationActive)
+            {
+                yield return null;
+            }
+
+            if (_yourTurnBannerCanvasGroup == null)
+            {
+                _yourTurnBannerCoroutine = null;
+                yield break;
+            }
+
+            ApplyYourTurnBannerSettings();
+            _yourTurnBannerCanvasGroup.gameObject.SetActive(true);
+            _yourTurnBannerCanvasGroup.alpha = 0f;
+            _yourTurnBannerCanvasGroup.interactable = false;
+            _yourTurnBannerCanvasGroup.blocksRaycasts = false;
+
+            yield return FadeYourTurnBanner(0f, 1f, _yourTurnBannerFadeInSeconds);
+            if (_yourTurnBannerVisibleSeconds > 0f)
+            {
+                yield return new WaitForSecondsRealtime(_yourTurnBannerVisibleSeconds);
+            }
+
+            yield return FadeYourTurnBanner(1f, 0f, _yourTurnBannerFadeOutSeconds);
+
+            if (_yourTurnBannerCanvasGroup != null)
+            {
+                _yourTurnBannerCanvasGroup.alpha = 0f;
+                _yourTurnBannerCanvasGroup.gameObject.SetActive(false);
+            }
+
+            _yourTurnBannerCoroutine = null;
+        }
+
+        private IEnumerator FadeYourTurnBanner(float fromAlpha, float toAlpha, float durationSeconds)
+        {
+            if (_yourTurnBannerCanvasGroup == null)
+            {
+                yield break;
+            }
+
+            if (durationSeconds <= 0f)
+            {
+                _yourTurnBannerCanvasGroup.alpha = toAlpha;
+                yield break;
+            }
+
+            var elapsed = 0f;
+            while (elapsed < durationSeconds)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                var progress = Mathf.Clamp01(elapsed / durationSeconds);
+                _yourTurnBannerCanvasGroup.alpha = Mathf.Lerp(fromAlpha, toAlpha, progress);
+                yield return null;
+            }
+
+            _yourTurnBannerCanvasGroup.alpha = toAlpha;
+        }
+
         public float PlayOnlineSpellCastAnimation(string cardId, PlayerId targetOwnerId, TileCoord targetCoord, int damageAmount)
         {
             var spellEffectId = ResolveDamageSpellEffectId(cardId);
@@ -1077,6 +1203,30 @@ namespace Project333.Runtime.Presentation.Battle
                 return 0f;
             }
 
+            var cardDrawCount = 0;
+            var startsLocalPlayerTurn = false;
+            for (var eventIndex = 0; eventIndex < battleEvents.Count; eventIndex++)
+            {
+                var battleEvent = battleEvents[eventIndex];
+                if (battleEvent?.EventType == BattleEventType.CardDrawn &&
+                    battleEvent.SourceOwnerId == PlayerId.Player)
+                {
+                    cardDrawCount += Mathf.Max(1, battleEvent.Amount);
+                }
+
+                if (battleEvent?.EventType == BattleEventType.TurnStarted &&
+                    battleEvent.SourceOwnerId == PlayerId.Player)
+                {
+                    startsLocalPlayerTurn = true;
+                }
+            }
+
+            _battleScreenPresenter?.QueueCardDrawSounds(cardDrawCount);
+            if (startsLocalPlayerTurn)
+            {
+                ShowYourTurnBanner();
+            }
+
             QueueOpponentPlayedCardReveals(battleEvents);
 
             var animationGroups = BuildOnlineAnimationGroups(battleEvents);
@@ -1096,6 +1246,17 @@ namespace Project333.Runtime.Presentation.Battle
 
         private float PlayOnlineBattleEventAnimationGroup(IReadOnlyList<BattleEventDto> battleEvents)
         {
+            var areaSpellEffectEvent = FindFirstBattleEvent(
+                battleEvents,
+                BattleEventType.AreaSpellEffectTriggered);
+            if (areaSpellEffectEvent != null)
+            {
+                return PlayOnlineImpactAnimation(
+                    areaSpellEffectEvent.SourceCardId,
+                    areaSpellEffectEvent,
+                    battleEvents);
+            }
+
             var attackEvent = FindFirstBattleEvent(battleEvents, BattleEventType.AttackStarted);
             if (attackEvent != null)
             {
@@ -1156,6 +1317,20 @@ namespace Project333.Runtime.Presentation.Battle
             if (battleEvents == null || battleEvents.Count == 0)
             {
                 return 0f;
+            }
+
+            var areaSpellEffectEvent = FindFirstBattleEvent(
+                battleEvents,
+                BattleEventType.AreaSpellEffectTriggered);
+            if (areaSpellEffectEvent != null)
+            {
+                var request = BuildOnlineImpactAnimationRequest(
+                    areaSpellEffectEvent.SourceCardId,
+                    areaSpellEffectEvent,
+                    battleEvents);
+                return request == null || !HasPresentationImpact(request)
+                    ? 0f
+                    : EstimateImpactAnimationDuration(request);
             }
 
             var attackEvent = FindFirstBattleEvent(battleEvents, BattleEventType.AttackStarted);
@@ -1241,6 +1416,7 @@ namespace Project333.Runtime.Presentation.Battle
         {
             return eventType == BattleEventType.AttackStarted ||
                    eventType == BattleEventType.SpellCast ||
+                   eventType == BattleEventType.AreaSpellEffectTriggered ||
                    eventType == BattleEventType.OccupantMoved;
         }
 
@@ -1248,6 +1424,7 @@ namespace Project333.Runtime.Presentation.Battle
         {
             return eventType == BattleEventType.DamageApplied ||
                    eventType == BattleEventType.HealingApplied ||
+                   eventType == BattleEventType.InvinciblePrevented ||
                    eventType == BattleEventType.OccupantRemoved;
         }
 
@@ -1539,6 +1716,8 @@ namespace Project333.Runtime.Presentation.Battle
 
             EnsureOpponentPlayedCardReveal();
             ApplyOpponentPlayedCardRevealSettings();
+            EnsureYourTurnBanner();
+            ApplyYourTurnBannerSettings();
 
             if (_startOnAwake)
             {
@@ -1588,6 +1767,12 @@ namespace Project333.Runtime.Presentation.Battle
                 Mathf.Max(0f, _onlineTurnTimerTextPadding.y));
             _onlineTurnTimerRevealThresholdSeconds = Mathf.Max(0, _onlineTurnTimerRevealThresholdSeconds);
             _onlineTurnTimerDangerThresholdSeconds = Mathf.Max(0, _onlineTurnTimerDangerThresholdSeconds);
+            _yourTurnBannerSize = new Vector2(
+                Mathf.Max(1f, _yourTurnBannerSize.x),
+                Mathf.Max(1f, _yourTurnBannerSize.y));
+            _yourTurnBannerFadeInSeconds = Mathf.Max(0f, _yourTurnBannerFadeInSeconds);
+            _yourTurnBannerVisibleSeconds = Mathf.Max(0f, _yourTurnBannerVisibleSeconds);
+            _yourTurnBannerFadeOutSeconds = Mathf.Max(0f, _yourTurnBannerFadeOutSeconds);
             _opponentPlayedCardRevealSize = new Vector2(
                 Mathf.Max(1f, _opponentPlayedCardRevealSize.x),
                 Mathf.Max(1f, _opponentPlayedCardRevealSize.y));
@@ -1604,6 +1789,7 @@ namespace Project333.Runtime.Presentation.Battle
             {
                 ApplyOnlineErrorToastSettings();
                 ApplyOnlineTurnTimerSettings();
+                ApplyYourTurnBannerSettings();
                 ApplyOpponentPlayedCardRevealSettings();
             }
 #if UNITY_EDITOR
@@ -1637,6 +1823,7 @@ namespace Project333.Runtime.Presentation.Battle
 
             EnsureOnlineErrorToast();
             EnsureOnlineTurnTimer();
+            EnsureYourTurnBanner();
             EnsureOpponentPlayedCardReveal();
             EnsurePvpMatchmakingOverlay();
 
@@ -1761,6 +1948,58 @@ namespace Project333.Runtime.Presentation.Battle
             if (!UnityEngine.Application.isPlaying)
             {
                 _onlineTurnTimerUsesSceneLayout = true;
+            }
+
+            canvasObject.SetActive(false);
+        }
+
+        private void EnsureYourTurnBanner()
+        {
+            if (_yourTurnBannerCanvasGroup != null &&
+                _yourTurnBannerRect != null &&
+                _yourTurnBannerImage != null)
+            {
+                return;
+            }
+
+            _yourTurnBannerUsesSceneLayout = false;
+
+            var canvasObject = new GameObject(
+                "YourTurnBannerCanvas",
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(CanvasScaler),
+                typeof(CanvasGroup));
+            MoveCreatedObjectToBattleScene(canvasObject);
+            RegisterEditorCreatedObject(canvasObject, "Create Your Turn Banner UI");
+
+            var canvas = canvasObject.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = _yourTurnBannerSortingOrder;
+
+            var canvasScaler = canvasObject.GetComponent<CanvasScaler>();
+            canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            canvasScaler.referenceResolution = new Vector2(1920f, 1080f);
+            canvasScaler.matchWidthOrHeight = 1f;
+
+            _yourTurnBannerCanvasGroup = canvasObject.GetComponent<CanvasGroup>();
+            _yourTurnBannerCanvasGroup.alpha = 0f;
+            _yourTurnBannerCanvasGroup.interactable = false;
+            _yourTurnBannerCanvasGroup.blocksRaycasts = false;
+
+            var imageObject = new GameObject("YourTurnBannerImage", typeof(RectTransform), typeof(Image));
+            imageObject.transform.SetParent(canvasObject.transform, false);
+            _yourTurnBannerRect = imageObject.GetComponent<RectTransform>();
+            _yourTurnBannerImage = imageObject.GetComponent<Image>();
+            _yourTurnBannerImage.preserveAspect = true;
+            _yourTurnBannerImage.raycastTarget = false;
+
+            ApplyYourTurnBannerSettings();
+
+            if (!UnityEngine.Application.isPlaying)
+            {
+                _yourTurnBannerUsesSceneLayout = true;
             }
 
             canvasObject.SetActive(false);
@@ -2071,6 +2310,47 @@ namespace Project333.Runtime.Presentation.Battle
             }
         }
 
+        private void ApplyYourTurnBannerSettings()
+        {
+            if (_yourTurnBannerCanvasGroup != null)
+            {
+                var canvas = _yourTurnBannerCanvasGroup.GetComponent<Canvas>();
+                if (canvas != null)
+                {
+                    canvas.sortingOrder = _yourTurnBannerSortingOrder;
+                }
+
+                _yourTurnBannerCanvasGroup.interactable = false;
+                _yourTurnBannerCanvasGroup.blocksRaycasts = false;
+            }
+
+            if (_yourTurnBannerSprite == null)
+            {
+                _yourTurnBannerSprite = Resources.Load<Sprite>(YourTurnBannerResourcePath);
+            }
+
+            if (_yourTurnBannerImage != null)
+            {
+                _yourTurnBannerImage.sprite = _yourTurnBannerSprite;
+                _yourTurnBannerImage.color = Color.white;
+                _yourTurnBannerImage.preserveAspect = true;
+                _yourTurnBannerImage.raycastTarget = false;
+            }
+
+            if (_yourTurnBannerRect == null || _yourTurnBannerUsesSceneLayout)
+            {
+                return;
+            }
+
+            _yourTurnBannerRect.anchorMin = new Vector2(0.5f, 0.5f);
+            _yourTurnBannerRect.anchorMax = new Vector2(0.5f, 0.5f);
+            _yourTurnBannerRect.pivot = new Vector2(0.5f, 0.5f);
+            _yourTurnBannerRect.anchoredPosition = _yourTurnBannerOffset;
+            _yourTurnBannerRect.sizeDelta = new Vector2(
+                Mathf.Max(1f, _yourTurnBannerSize.x),
+                Mathf.Max(1f, _yourTurnBannerSize.y));
+        }
+
         private int ResolveOpponentPlayedCardSortingOrder()
         {
             return _opponentPlayedCardSortingOrder == LegacyOpponentPlayedCardSortingOrder
@@ -2320,6 +2600,8 @@ namespace Project333.Runtime.Presentation.Battle
 
         public void StartBattle()
         {
+            HideYourTurnBanner();
+
             if (_startWithDraftBeforeBattle && (_runtimePlayerDeckCardIdsOverride == null || _runtimePlayerDeckCardIdsOverride.Count == 0))
             {
                 BeginDraft();
@@ -2599,7 +2881,7 @@ namespace Project333.Runtime.Presentation.Battle
                 var beforeSnapshot = CaptureBattleSnapshot(CurrentBattleState);
                 var attackerIsRanged = IsRangedAttacker(CurrentBattleState, PlayerId.Player, attackerCoord);
                 var attacker = CurrentBattleState.GetBoard(PlayerId.Player).GetOccupant(attackerCoord);
-                var guardInfo = GuardService.ResolveForNormalAttack(
+                var shielderInfo = ShielderService.ResolveForNormalAttack(
                     CurrentBattleState.GetOpponentBoard(PlayerId.Player),
                     targetCoord,
                     attacker);
@@ -2608,11 +2890,11 @@ namespace Project333.Runtime.Presentation.Battle
                     PlayerId.Player,
                     attackerCoord,
                     PlayerId.AI,
-                    guardInfo);
+                    shielderInfo);
                 _battleGateway.ExecuteCommand(PlayerId.Player, attackCommand);
                 var afterSnapshot = CaptureBattleSnapshot(CurrentBattleState);
                 var valuePopupEvents = CloneValuePopupEvents(CurrentBattleState);
-                var animationRequest = BuildAttackAnimationRequest(beforeSnapshot, afterSnapshot, PlayerId.Player, attackerCoord, PlayerId.AI, targetCoord, guardInfo, attackerIsRanged, defenderCounterattacks, valuePopupEvents);
+                var animationRequest = BuildAttackAnimationRequest(beforeSnapshot, afterSnapshot, PlayerId.Player, attackerCoord, PlayerId.AI, targetCoord, shielderInfo, attackerIsRanged, defenderCounterattacks, valuePopupEvents);
 
                 message = $"Attacked from {attackerCoord} to {targetCoord}.";
                 _lastInteractionStatus = message;
@@ -2743,7 +3025,10 @@ namespace Project333.Runtime.Presentation.Battle
                         if (definition is ScriptedSpellCardDefinition scriptedSpellDefinition)
                         {
                             if (string.Equals(scriptedSpellDefinition.EffectId, "cheonra_jimang", StringComparison.Ordinal) ||
-                                string.Equals(scriptedSpellDefinition.EffectId, "firewall", StringComparison.Ordinal))
+                                string.Equals(scriptedSpellDefinition.EffectId, "firewall", StringComparison.Ordinal) ||
+                                string.Equals(scriptedSpellDefinition.EffectId, BiochemicalBombRules.EffectId, StringComparison.Ordinal) ||
+                                string.Equals(scriptedSpellDefinition.EffectId, GuRules.EffectId, StringComparison.Ordinal) ||
+                                string.Equals(scriptedSpellDefinition.EffectId, HuanShuRules.EffectId, StringComparison.Ordinal))
                             {
                                 var castScriptedTargetCommand = new CastScriptedSpellCommand(
                                     cardId,
@@ -2836,7 +3121,10 @@ namespace Project333.Runtime.Presentation.Battle
                 }
                 else if (definition is ScriptedSpellCardDefinition scriptedSpellDefinition &&
                          (string.Equals(scriptedSpellDefinition.EffectId, "daehwandan", StringComparison.Ordinal) ||
-                          string.Equals(scriptedSpellDefinition.EffectId, TimedBombRules.EffectId, StringComparison.Ordinal)))
+                          string.Equals(scriptedSpellDefinition.EffectId, TimedBombRules.EffectId, StringComparison.Ordinal) ||
+                          string.Equals(scriptedSpellDefinition.EffectId, PowerBankRules.EffectId, StringComparison.Ordinal) ||
+                          string.Equals(scriptedSpellDefinition.EffectId, ManaStoneRules.EffectId, StringComparison.Ordinal) ||
+                          string.Equals(scriptedSpellDefinition.EffectId, ManaStoneBundleRules.EffectId, StringComparison.Ordinal)))
                 {
                     var castScriptedCommand = new CastScriptedSpellCommand(
                         cardId,
@@ -3381,7 +3669,9 @@ namespace Project333.Runtime.Presentation.Battle
                 yield break;
             }
 
-            var playerWon = CurrentBattleState.Result.Winner == PlayerId.Player;
+            var isDraw = CurrentBattleState.Result.IsDraw;
+            var playerWon = CurrentBattleState.Result.HasWinner &&
+                            CurrentBattleState.Result.Winner == PlayerId.Player;
             var syncedServerRunRecord = false;
             if (ShouldSyncServerRunRecordBeforeDraftReturn())
             {
@@ -3389,13 +3679,23 @@ namespace Project333.Runtime.Presentation.Battle
                     succeeded => syncedServerRunRecord = succeeded);
             }
 
-            if (!syncedServerRunRecord)
+            if (isDraw)
+            {
+                DraftRunSessionState.RecordBattleDraw();
+            }
+            else if (!syncedServerRunRecord)
             {
                 DraftRunSessionState.RecordBattleResult(playerWon);
             }
+            else
+            {
+                DraftRunSessionState.SetLastBattleOutcome(
+                    playerWon ? DraftBattleOutcome.Victory : DraftBattleOutcome.Defeat);
+            }
 
+            var localResultLabel = isDraw ? "draw" : playerWon ? "win" : "loss";
             Debug.Log(
-                $"[After333 Battle Result] returningToDraft localResult={(playerWon ? "win" : "loss")} serverSynced={syncedServerRunRecord} run={FormatLogValue(AccountSessionState.ActiveRunId)} deck={FormatLogValue(AccountSessionState.ActiveDeckId)} localRecord={DraftRunSessionState.Wins}-{DraftRunSessionState.Losses} serverActiveRecord={AccountSessionState.ActiveRunWins}-{AccountSessionState.ActiveRunLosses} latestRecord={AccountSessionState.LatestRunWins}-{AccountSessionState.LatestRunLosses}");
+                $"[After333 Battle Result] returningToDraft localResult={localResultLabel} serverSynced={syncedServerRunRecord} run={FormatLogValue(AccountSessionState.ActiveRunId)} deck={FormatLogValue(AccountSessionState.ActiveDeckId)} localRecord={DraftRunSessionState.Wins}-{DraftRunSessionState.Losses} serverActiveRecord={AccountSessionState.ActiveRunWins}-{AccountSessionState.ActiveRunLosses} latestRecord={AccountSessionState.LatestRunWins}-{AccountSessionState.LatestRunLosses}");
             SceneManager.LoadScene(DraftRunSessionState.DraftSceneName);
         }
 
@@ -3579,7 +3879,7 @@ namespace Project333.Runtime.Presentation.Battle
                     var beforeSnapshot = CaptureBattleSnapshot(CurrentBattleState);
                     var attackerIsRanged = IsRangedAttacker(CurrentBattleState, PlayerId.AI, attackCommand.AttackerCoord);
                     var attacker = CurrentBattleState.GetBoard(PlayerId.AI).GetOccupant(attackCommand.AttackerCoord);
-                    var guardInfo = GuardService.ResolveForNormalAttack(
+                    var shielderInfo = ShielderService.ResolveForNormalAttack(
                         CurrentBattleState.GetOpponentBoard(PlayerId.AI),
                         attackCommand.TargetCoord,
                         attacker);
@@ -3588,12 +3888,12 @@ namespace Project333.Runtime.Presentation.Battle
                         PlayerId.AI,
                         attackCommand.AttackerCoord,
                         PlayerId.Player,
-                        guardInfo);
+                        shielderInfo);
                     _battleGateway.ExecuteCommand(PlayerId.AI, attackCommand);
                     AddCombatLogEntry(CombatLogFormatter.FormatCommand(PlayerId.AI, attackCommand));
                     var afterSnapshot = CaptureBattleSnapshot(CurrentBattleState);
                     var valuePopupEvents = CloneValuePopupEvents(CurrentBattleState);
-                    var animationRequest = BuildAttackAnimationRequest(beforeSnapshot, afterSnapshot, PlayerId.AI, attackCommand.AttackerCoord, PlayerId.Player, attackCommand.TargetCoord, guardInfo, attackerIsRanged, defenderCounterattacks, valuePopupEvents);
+                    var animationRequest = BuildAttackAnimationRequest(beforeSnapshot, afterSnapshot, PlayerId.AI, attackCommand.AttackerCoord, PlayerId.Player, attackCommand.TargetCoord, shielderInfo, attackerIsRanged, defenderCounterattacks, valuePopupEvents);
                     yield return PlayAttackAnimationSequence(animationRequest);
                     RefreshPresenter();
                     yield return null;
@@ -3740,9 +4040,34 @@ namespace Project333.Runtime.Presentation.Battle
         {
             var request = new ImpactAnimationRequest
             {
-                SpellEffectId = ResolveDamageSpellEffectId(sourceCardId),
+                SpellEffectId = sourceEvent?.EventType == BattleEventType.AreaSpellEffectTriggered
+                    ? ResolveAreaSpellEffectId(sourceEvent.EffectId)
+                    : ResolveDamageSpellEffectId(sourceCardId),
             };
             request.ValuePopupEvents.AddRange(BuildOnlineValuePopupEvents(battleEvents));
+
+            if (sourceEvent?.EventType == BattleEventType.AreaSpellEffectTriggered)
+            {
+                var targetCoords = sourceEvent.TargetCoords;
+                if ((targetCoords == null || targetCoords.Count == 0) && sourceEvent.TargetCoord != null)
+                {
+                    targetCoords = new List<TileCoordDto> { sourceEvent.TargetCoord };
+                }
+
+                if (targetCoords != null)
+                {
+                    for (var targetIndex = 0; targetIndex < targetCoords.Count; targetIndex++)
+                    {
+                        var targetCoord = targetCoords[targetIndex];
+                        if (targetCoord != null)
+                        {
+                            request.SpellEffectTargets.Add(new SpellEffectTarget(
+                                sourceEvent.TargetOwnerId,
+                                targetCoord.ToDomain()));
+                        }
+                    }
+                }
+            }
 
             foreach (var battleEvent in battleEvents)
             {
@@ -4005,17 +4330,22 @@ namespace Project333.Runtime.Presentation.Battle
                 return 0f;
             }
 
-            var spellDuration = string.IsNullOrWhiteSpace(request.SpellEffectId)
-                ? 0f
-                : 0.6f;
+            var spellDuration = GetSpellEffectDuration(request.SpellEffectId);
             var popupDuration = request.ValuePopupEvents.Count > 0
                 ? (request.ValuePopupEvents.Count * Mathf.Max(0f, _valuePopupCascadeDelay)) + Mathf.Max(0f, _valuePopupCascadeDelay)
                 : 0f;
             var deathDuration = HasAnyDeathImpact(request.Impacts)
                 ? Mathf.Max(0f, _deathHoldDuration)
                 : 0f;
+            var reactionDuration = HasAnyDamageImpact(request.Impacts)
+                ? Mathf.Max(0f, _attackReactionDuration)
+                : 0f;
+            var completionPadding = spellDuration > 0f || popupDuration > 0f ||
+                                    reactionDuration > 0f || deathDuration > 0f
+                ? 0.1f
+                : 0f;
 
-            return spellDuration + popupDuration + Mathf.Max(0f, _attackReactionDuration) + deathDuration + 0.1f;
+            return spellDuration + popupDuration + reactionDuration + deathDuration + completionPadding;
         }
 
         private static bool HasAnyDeathImpact(IReadOnlyList<AttackAnimationImpact> impacts)
@@ -4028,6 +4358,24 @@ namespace Project333.Runtime.Presentation.Battle
             foreach (var impact in impacts)
             {
                 if (impact != null && impact.Died)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasAnyDamageImpact(IReadOnlyList<AttackAnimationImpact> impacts)
+        {
+            if (impacts == null)
+            {
+                return false;
+            }
+
+            foreach (var impact in impacts)
+            {
+                if (impact != null && impact.TookDamage)
                 {
                     return true;
                 }
@@ -4228,7 +4576,9 @@ namespace Project333.Runtime.Presentation.Battle
                 }
             }
 
-            var reactionWaitDuration = Mathf.Max(_attackReactionDuration, reactionDuration);
+            var reactionWaitDuration = reactionDuration > 0f
+                ? Mathf.Max(_attackReactionDuration, reactionDuration)
+                : 0f;
             if (reactionWaitDuration > 0f)
             {
                 yield return new WaitForSecondsRealtime(reactionWaitDuration);
@@ -4484,7 +4834,7 @@ namespace Project333.Runtime.Presentation.Battle
             TileCoord attackerCoord,
             PlayerId defenderOwnerId,
             TileCoord declaredTargetCoord,
-            GuardService.GuardInfo guardInfo,
+            ShielderService.ShielderInfo shielderInfo,
             bool attackerIsRanged,
             bool defenderCounterattacks,
             IReadOnlyList<BattleValuePopupEvent> valuePopupEvents)
@@ -4506,8 +4856,8 @@ namespace Project333.Runtime.Presentation.Battle
                 attackerCoord,
                 defenderOwnerId,
                 declaredTargetCoord,
-                guardInfo.IsProtected && guardInfo.GuardCoord.HasValue
-                    ? guardInfo.GuardCoord.Value
+                shielderInfo.IsProtected && shielderInfo.ShielderCoord.HasValue
+                    ? shielderInfo.ShielderCoord.Value
                     : declaredTargetCoord,
                 attackerIsRanged)
             {
@@ -4517,11 +4867,29 @@ namespace Project333.Runtime.Presentation.Battle
             };
             request.ValuePopupEvents.AddRange(valuePopupEvents ?? Array.Empty<BattleValuePopupEvent>());
 
-            AddImpactIfNeeded(request, beforeSnapshot, afterSnapshot, guardInfo.OriginalTarget.OwnerId, guardInfo.OriginalTargetCoord, guardInfo.OriginalTarget.RuntimeId);
+            AddImpactIfNeeded(request, beforeSnapshot, afterSnapshot, shielderInfo.OriginalTarget.OwnerId, shielderInfo.OriginalTargetCoord, shielderInfo.OriginalTarget.RuntimeId);
 
-            if (guardInfo.IsProtected && guardInfo.GuardCoord.HasValue && guardInfo.Guard != null)
+            if (shielderInfo.IsProtected && shielderInfo.ShielderCoord.HasValue && shielderInfo.Shielder != null)
             {
-                AddImpactIfNeeded(request, beforeSnapshot, afterSnapshot, guardInfo.Guard.OwnerId, guardInfo.GuardCoord.Value, guardInfo.Guard.RuntimeId);
+                AddImpactIfNeeded(request, beforeSnapshot, afterSnapshot, shielderInfo.Shielder.OwnerId, shielderInfo.ShielderCoord.Value, shielderInfo.Shielder.RuntimeId);
+            }
+
+            foreach (var valuePopupEvent in valuePopupEvents ?? Array.Empty<BattleValuePopupEvent>())
+            {
+                if (valuePopupEvent == null ||
+                    valuePopupEvent.IsHealing ||
+                    valuePopupEvent.Cause != BattleValueChangeCause.Piercing)
+                {
+                    continue;
+                }
+
+                AddImpactIfNeeded(
+                    request,
+                    beforeSnapshot,
+                    afterSnapshot,
+                    valuePopupEvent.OwnerId,
+                    valuePopupEvent.Coord,
+                    valuePopupEvent.RuntimeId);
             }
 
             return request;
@@ -4604,22 +4972,40 @@ namespace Project333.Runtime.Presentation.Battle
             var effectSize = GetSpellEffectSize(request.SpellEffectId);
             var effectDuration = 0f;
 
-            foreach (var impact in request.Impacts)
+            if (request.SpellEffectTargets.Count > 0)
             {
-                if (!impact.TookDamage && !impact.Died)
+                foreach (var target in request.SpellEffectTargets)
                 {
-                    continue;
-                }
+                    var targetView = FindTileTextView(target.OwnerId, target.Coord);
+                    if (targetView == null)
+                    {
+                        continue;
+                    }
 
-                var impactView = FindTileTextView(impact.OwnerId, impact.Coord);
-                if (impactView == null)
+                    effectDuration = Mathf.Max(
+                        effectDuration,
+                        targetView.PlayTransientSpriteEffect(effectFrames, framesPerSecond, effectSize));
+                }
+            }
+            else
+            {
+                foreach (var impact in request.Impacts)
                 {
-                    continue;
-                }
+                    if (!impact.TookDamage && !impact.Died)
+                    {
+                        continue;
+                    }
 
-                effectDuration = Mathf.Max(
-                    effectDuration,
-                    impactView.PlayTransientSpriteEffect(effectFrames, framesPerSecond, effectSize));
+                    var impactView = FindTileTextView(impact.OwnerId, impact.Coord);
+                    if (impactView == null)
+                    {
+                        continue;
+                    }
+
+                    effectDuration = Mathf.Max(
+                        effectDuration,
+                        impactView.PlayTransientSpriteEffect(effectFrames, framesPerSecond, effectSize));
+                }
             }
 
             if (effectDuration > 0f)
@@ -4640,28 +5026,117 @@ namespace Project333.Runtime.Presentation.Battle
                 : null;
         }
 
-        private static IReadOnlyList<Sprite> GetSpellEffectFrames(string spellEffectId)
+        private static string ResolveAreaSpellEffectId(string effectId)
+        {
+            if (string.Equals(effectId, FirewallSpellEffectId, StringComparison.OrdinalIgnoreCase))
+            {
+                return FirewallSpellEffectId;
+            }
+
+            return string.Equals(effectId, BiochemicalBombSpellEffectId, StringComparison.OrdinalIgnoreCase)
+                ? BiochemicalBombSpellEffectId
+                : null;
+        }
+
+        private IReadOnlyList<Sprite> GetSpellEffectFrames(string spellEffectId)
         {
             if (string.Equals(spellEffectId, FireboltSpellEffectId, StringComparison.Ordinal))
             {
                 return GetFireboltSpellEffectFrames();
             }
 
+            if (string.Equals(spellEffectId, FirewallSpellEffectId, StringComparison.Ordinal))
+            {
+                return HasConfiguredFrames(_firewallTileEffectFrames)
+                    ? _firewallTileEffectFrames
+                    : LoadSortedEffectFrames(
+                        FirewallSpellEffectResourcePath,
+                        ref s_firewallSpellEffectFrames);
+            }
+
+            if (string.Equals(spellEffectId, BiochemicalBombSpellEffectId, StringComparison.Ordinal))
+            {
+                return HasConfiguredFrames(_biochemicalBombTileEffectFrames)
+                    ? _biochemicalBombTileEffectFrames
+                    : LoadSortedEffectFrames(
+                        BiochemicalBombSpellEffectResourcePath,
+                        ref s_biochemicalBombSpellEffectFrames);
+            }
+
             return Array.Empty<Sprite>();
         }
 
-        private static float GetSpellEffectFramesPerSecond(string spellEffectId)
+        private float GetSpellEffectFramesPerSecond(string spellEffectId)
         {
-            return string.Equals(spellEffectId, FireboltSpellEffectId, StringComparison.Ordinal)
-                ? FireboltSpellEffectFramesPerSecond
+            if (string.Equals(spellEffectId, FireboltSpellEffectId, StringComparison.Ordinal))
+            {
+                return FireboltSpellEffectFramesPerSecond;
+            }
+
+            if (string.Equals(spellEffectId, FirewallSpellEffectId, StringComparison.Ordinal))
+            {
+                return Mathf.Max(0.01f, _firewallTileEffectFramesPerSecond);
+            }
+
+            return string.Equals(spellEffectId, BiochemicalBombSpellEffectId, StringComparison.Ordinal)
+                ? Mathf.Max(0.01f, _biochemicalBombTileEffectFramesPerSecond)
                 : 12f;
         }
 
-        private static Vector2 GetSpellEffectSize(string spellEffectId)
+        private Vector2 GetSpellEffectSize(string spellEffectId)
         {
-            return string.Equals(spellEffectId, FireboltSpellEffectId, StringComparison.Ordinal)
-                ? FireboltSpellEffectSize
+            if (string.Equals(spellEffectId, FireboltSpellEffectId, StringComparison.Ordinal))
+            {
+                return FireboltSpellEffectSize;
+            }
+
+            if (string.Equals(spellEffectId, FirewallSpellEffectId, StringComparison.Ordinal))
+            {
+                return _firewallTileEffectSize;
+            }
+
+            return string.Equals(spellEffectId, BiochemicalBombSpellEffectId, StringComparison.Ordinal)
+                ? _biochemicalBombTileEffectSize
                 : new Vector2(180f, 180f);
+        }
+
+        private float GetSpellEffectDuration(string spellEffectId)
+        {
+            if (string.IsNullOrWhiteSpace(spellEffectId))
+            {
+                return 0f;
+            }
+
+            var frames = GetSpellEffectFrames(spellEffectId);
+            return frames == null || frames.Count == 0
+                ? 0f
+                : frames.Count / GetSpellEffectFramesPerSecond(spellEffectId);
+        }
+
+        private static bool HasConfiguredFrames(IReadOnlyList<Sprite> frames)
+        {
+            return frames != null && frames.Count > 0;
+        }
+
+        private static IReadOnlyList<Sprite> LoadSortedEffectFrames(
+            string resourcePath,
+            ref IReadOnlyList<Sprite> cache)
+        {
+            if (cache != null && cache.Count > 0)
+            {
+                return cache;
+            }
+
+            var importedSprites = Resources.LoadAll<Sprite>(resourcePath);
+            if (importedSprites == null || importedSprites.Length == 0)
+            {
+                cache = Array.Empty<Sprite>();
+                return cache;
+            }
+
+            Array.Sort(importedSprites, static (left, right) => string.CompareOrdinal(left.name, right.name));
+            cache = importedSprites;
+            return cache;
         }
 
         private static IReadOnlyList<Sprite> GetFireboltSpellEffectFrames()
@@ -4712,7 +5187,7 @@ namespace Project333.Runtime.Presentation.Battle
             PlayerId attackerOwnerId,
             TileCoord attackerCoord,
             PlayerId defenderOwnerId,
-            GuardService.GuardInfo guardInfo)
+            ShielderService.ShielderInfo shielderInfo)
         {
             if (battleState == null)
             {
@@ -4725,9 +5200,9 @@ namespace Project333.Runtime.Presentation.Battle
                 return false;
             }
 
-            var actualDefenderCoord = guardInfo.IsProtected && guardInfo.GuardCoord.HasValue
-                ? guardInfo.GuardCoord.Value
-                : guardInfo.OriginalTargetCoord;
+            var actualDefenderCoord = shielderInfo.IsProtected && shielderInfo.ShielderCoord.HasValue
+                ? shielderInfo.ShielderCoord.Value
+                : shielderInfo.OriginalTargetCoord;
 
             var defender = battleState.GetBoard(defenderOwnerId)?.GetOccupant(actualDefenderCoord);
             return defender != null &&
@@ -4871,8 +5346,22 @@ namespace Project333.Runtime.Presentation.Battle
         {
             public List<AttackAnimationImpact> Impacts { get; } = new List<AttackAnimationImpact>();
             public List<BattleValuePopupEvent> ValuePopupEvents { get; } = new List<BattleValuePopupEvent>();
+            public List<SpellEffectTarget> SpellEffectTargets { get; } = new List<SpellEffectTarget>();
 
             public string SpellEffectId { get; set; }
+        }
+
+        private sealed class SpellEffectTarget
+        {
+            public SpellEffectTarget(PlayerId ownerId, TileCoord coord)
+            {
+                OwnerId = ownerId;
+                Coord = coord;
+            }
+
+            public PlayerId OwnerId { get; }
+
+            public TileCoord Coord { get; }
         }
 
         private sealed class AttackAnimationImpact

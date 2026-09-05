@@ -16,6 +16,7 @@ namespace Project333.Runtime.Presentation.Battle
     {
         private const string AutoVisualName = "OccupantVisual";
         private const string AutoStatBarName = "OccupantStatBar";
+        private const string AutoHuanShuIconName = "HuanShuStatusIcon";
         private const string AutoSpellEffectName = "SpellEffectVisual";
         private const string AutoSpellEffectOverlayName = "SpellEffectOverlay";
         private const string AutoValuePopupOverlayName = "ValuePopupOverlay";
@@ -32,6 +33,10 @@ namespace Project333.Runtime.Presentation.Battle
         private const string CheonraJimangMarkResourcePath = "Project333/SpellEffects/CheonraJimangMark";
         private static readonly Vector2 DefaultOccupantVisualLiftOffset = new Vector2(0f, 60f);
         private static readonly Vector2 DefaultOccupantVisualReferenceTileSize = new Vector2(80f, 80f);
+        private static readonly Color PhysicalMeleeAttackIconColor = new Color(0.96f, 0.22f, 0.18f, 1f);
+        private static readonly Color MagicAttackIconColor = new Color(0.22f, 0.62f, 1f, 1f);
+        private static readonly Color PhysicalRangedAttackIconColor = new Color(0.96f, 0.83f, 0.46f, 1f);
+        private static readonly Color NeutralAttackIconColor = new Color(0.9f, 0.9f, 0.96f, 1f);
 
         private static RectTransform s_previewOverlayRoot;
         private static Image s_previewBackdropImage;
@@ -45,6 +50,7 @@ namespace Project333.Runtime.Presentation.Battle
         private static Sprite s_heartIconSprite;
         private static Sprite s_swordIconSprite;
         private static Sprite s_bowIconSprite;
+        private static Sprite s_magicStaffIconSprite;
         private static Sprite s_masterIconSprite;
         private static Sprite s_fallbackOccupantSprite;
 
@@ -99,6 +105,12 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private Color _occupantStatErasureTextColor = new Color(0.82f, 0.82f, 0.82f, 1f);
         [FormerlySerializedAs("_occupantStatDisabledIconColor")]
         [SerializeField] private Color _occupantStatErasureIconColor = new Color(0.72f, 0.72f, 0.72f, 1f);
+        [Header("HuanShu Status Icon")]
+        [SerializeField] private bool _showHuanShuStatusIcon = true;
+        [SerializeField] private Vector2 _huanShuStatusIconSize = new Vector2(22f, 22f);
+        [SerializeField] private Vector2 _huanShuStatusIconOffset = new Vector2(52f, 22f);
+        [SerializeField] private Color _huanShuStatusIconColor = new Color(0.45f, 0.12f, 0.72f, 0.96f);
+        [SerializeField] private Color _huanShuStatusGlyphColor = new Color(0.9f, 0.72f, 1f, 1f);
         [Header("Spell Effects")]
         [SerializeField] private Vector2 _spellEffectSize = new Vector2(220f, 220f);
         [SerializeField] private Vector2 _spellEffectOffset = Vector2.zero;
@@ -164,6 +176,11 @@ namespace Project333.Runtime.Presentation.Battle
         private TMP_Text _occupantStatHpText;
         private Image _occupantStatAttackTypeImage;
         private TMP_Text _occupantStatAttackText;
+        private TMP_FontAsset _occupantStatFontOverride;
+        private RectTransform _huanShuStatusIconRoot;
+        private Image _huanShuStatusIconBackground;
+        private Image _huanShuStatusIconGlyph;
+        private Image _huanShuStatusIconCore;
         private RectTransform _spellEffectRoot;
         private Canvas _spellEffectCanvas;
         private Image _spellEffectImage;
@@ -176,6 +193,13 @@ namespace Project333.Runtime.Presentation.Battle
         private Image _interactionSurfaceImage;
 
         public float LongPressPreviewHoldSeconds => Mathf.Max(0.05f, _longPressPreviewHoldSeconds);
+
+        public void ConfigureOccupantStatFont(TMP_FontAsset fontAsset)
+        {
+            _occupantStatFontOverride = fontAsset;
+            ApplyOccupantStatFont(_occupantStatHpText);
+            ApplyOccupantStatFont(_occupantStatAttackText);
+        }
 
         private void Awake()
         {
@@ -766,11 +790,14 @@ namespace Project333.Runtime.Presentation.Battle
             var iconColor = shouldUseSuppressedStatColors
                 ? _occupantStatErasureIconColor
                 : _occupantStatIconColor;
+            var attackIconColor = shouldUseSuppressedStatColors
+                ? _occupantStatErasureIconColor
+                : GetAttackIconColor(occupant.AttackType, occupant.DamageType);
 
             _occupantStatHeartImage.sprite = GetHeartIconSprite();
-            _occupantStatAttackTypeImage.sprite = occupant.AttackType == AttackType.Melee
-                ? GetSwordIconSprite()
-                : GetBowIconSprite();
+            _occupantStatAttackTypeImage.sprite = GetAttackIconSprite(
+                occupant.AttackType,
+                occupant.DamageType);
             _occupantStatHpText.text = Mathf.Max(0, occupant.CurrentHp).ToString();
             _occupantStatAttackText.text = Mathf.Max(0, occupant.Attack).ToString();
             if (_occupantStatBackgroundImage != null)
@@ -779,9 +806,20 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             _occupantStatHeartImage.color = iconColor;
-            _occupantStatAttackTypeImage.color = iconColor;
+            _occupantStatAttackTypeImage.color = attackIconColor;
             _occupantStatHpText.color = textColor;
             _occupantStatAttackText.color = textColor;
+            SetHuanShuStatusIconActive(
+                _showHuanShuStatusIcon && occupant.IsUnderHuanShu);
+        }
+
+        private void SetHuanShuStatusIconActive(bool isActive)
+        {
+            if (_huanShuStatusIconRoot != null &&
+                _huanShuStatusIconRoot.gameObject.activeSelf != isActive)
+            {
+                _huanShuStatusIconRoot.gameObject.SetActive(isActive);
+            }
         }
 
         private void ClearVisual()
@@ -1865,6 +1903,14 @@ namespace Project333.Runtime.Presentation.Battle
                     _occupantStatHpText = statRectTransform.Find("HpText")?.GetComponent<TMP_Text>();
                     _occupantStatAttackTypeImage = statRectTransform.Find("AttackTypeIcon")?.GetComponent<Image>();
                     _occupantStatAttackText = statRectTransform.Find("AttackText")?.GetComponent<TMP_Text>();
+                    var huanShuIcon = statRectTransform.Find(AutoHuanShuIconName) as RectTransform;
+                    if (huanShuIcon != null)
+                    {
+                        _huanShuStatusIconRoot = huanShuIcon;
+                        _huanShuStatusIconBackground = huanShuIcon.GetComponent<Image>();
+                        _huanShuStatusIconGlyph = huanShuIcon.Find("Glyph")?.GetComponent<Image>();
+                        _huanShuStatusIconCore = huanShuIcon.Find("Core")?.GetComponent<Image>();
+                    }
                 }
             }
         }
@@ -1958,23 +2004,46 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void EnsureRuntimeStatObjects()
         {
-            if (_occupantStatRoot != null || !UnityEngine.Application.isPlaying || _occupantVisualRoot == null)
+            if (!UnityEngine.Application.isPlaying || _occupantVisualRoot == null)
             {
                 return;
             }
 
-            var statBarObject = new GameObject(AutoStatBarName, typeof(RectTransform), typeof(Image));
-            statBarObject.transform.SetParent(_occupantVisualRoot, false);
+            if (_occupantStatRoot == null)
+            {
+                var statBarObject = new GameObject(AutoStatBarName, typeof(RectTransform), typeof(Image));
+                statBarObject.transform.SetParent(_occupantVisualRoot, false);
 
-            _occupantStatRoot = statBarObject.GetComponent<RectTransform>();
-            _occupantStatBackgroundImage = statBarObject.GetComponent<Image>();
-            _occupantStatBackgroundImage.raycastTarget = false;
+                _occupantStatRoot = statBarObject.GetComponent<RectTransform>();
+                _occupantStatBackgroundImage = statBarObject.GetComponent<Image>();
+                _occupantStatBackgroundImage.raycastTarget = false;
 
-            _occupantStatHeartImage = CreateStatImage("HeartIcon", _occupantStatRoot);
-            _occupantStatHpText = CreateStatText("HpText", _occupantStatRoot, TextAlignmentOptions.Left);
-            _occupantStatAttackTypeImage = CreateStatImage("AttackTypeIcon", _occupantStatRoot);
-            _occupantStatAttackText = CreateStatText("AttackText", _occupantStatRoot, TextAlignmentOptions.Left);
+                _occupantStatHeartImage = CreateStatImage("HeartIcon", _occupantStatRoot);
+                _occupantStatHpText = CreateStatText("HpText", _occupantStatRoot, TextAlignmentOptions.Left);
+                _occupantStatAttackTypeImage = CreateStatImage("AttackTypeIcon", _occupantStatRoot);
+                _occupantStatAttackText = CreateStatText("AttackText", _occupantStatRoot, TextAlignmentOptions.Left);
+            }
+
+            EnsureRuntimeHuanShuStatusIcon();
             ApplyStatBarLayout();
+        }
+
+        private void EnsureRuntimeHuanShuStatusIcon()
+        {
+            if (_huanShuStatusIconRoot != null || _occupantStatRoot == null)
+            {
+                return;
+            }
+
+            var iconObject = new GameObject(AutoHuanShuIconName, typeof(RectTransform), typeof(Image));
+            iconObject.transform.SetParent(_occupantStatRoot, false);
+            _huanShuStatusIconRoot = iconObject.GetComponent<RectTransform>();
+            _huanShuStatusIconBackground = iconObject.GetComponent<Image>();
+            _huanShuStatusIconBackground.raycastTarget = false;
+
+            _huanShuStatusIconGlyph = CreateStatImage("Glyph", _huanShuStatusIconRoot);
+            _huanShuStatusIconCore = CreateStatImage("Core", _huanShuStatusIconRoot);
+            SetHuanShuStatusIconActive(false);
         }
 
         private void EnsureRuntimeSpellEffectObjects()
@@ -2353,7 +2422,11 @@ namespace Project333.Runtime.Presentation.Battle
             var textObject = new GameObject(objectName, typeof(RectTransform), typeof(TextMeshProUGUI));
             textObject.transform.SetParent(parent, false);
             var runtimeText = textObject.GetComponent<TextMeshProUGUI>();
-            if (_text != null && _text.font != null)
+            if (_occupantStatFontOverride != null)
+            {
+                runtimeText.font = _occupantStatFontOverride;
+            }
+            else if (_text != null && _text.font != null)
             {
                 runtimeText.font = _text.font;
             }
@@ -2541,6 +2614,73 @@ namespace Project333.Runtime.Presentation.Battle
             ApplyStatTextLayout(_occupantStatHpText, new Vector2(-halfWidth + 34f, 0f), new Vector2(34f, 22f));
             ApplyStatIconLayout(_occupantStatAttackTypeImage, new Vector2(8f, 0f));
             ApplyStatTextLayout(_occupantStatAttackText, new Vector2(30f, 0f), new Vector2(34f, 22f));
+            ApplyOccupantStatFont(_occupantStatHpText);
+            ApplyOccupantStatFont(_occupantStatAttackText);
+            ApplyHuanShuStatusIconLayout();
+        }
+
+        private void ApplyOccupantStatFont(TMP_Text textComponent)
+        {
+            if (textComponent != null && _occupantStatFontOverride != null)
+            {
+                textComponent.font = _occupantStatFontOverride;
+            }
+        }
+
+        private void ApplyHuanShuStatusIconLayout()
+        {
+            if (_huanShuStatusIconRoot == null)
+            {
+                return;
+            }
+
+            _huanShuStatusIconRoot.anchorMin = new Vector2(0.5f, 0.5f);
+            _huanShuStatusIconRoot.anchorMax = new Vector2(0.5f, 0.5f);
+            _huanShuStatusIconRoot.pivot = new Vector2(0.5f, 0.5f);
+            _huanShuStatusIconRoot.anchoredPosition = _huanShuStatusIconOffset;
+            _huanShuStatusIconRoot.sizeDelta = _huanShuStatusIconSize;
+            _huanShuStatusIconRoot.localScale = Vector3.one;
+            _huanShuStatusIconRoot.localRotation = Quaternion.identity;
+
+            if (_huanShuStatusIconBackground != null)
+            {
+                _huanShuStatusIconBackground.color = _huanShuStatusIconColor;
+                _huanShuStatusIconBackground.raycastTarget = false;
+            }
+
+            ApplyHuanShuGlyphLayout(
+                _huanShuStatusIconGlyph,
+                0.58f,
+                45f,
+                _huanShuStatusGlyphColor);
+            ApplyHuanShuGlyphLayout(
+                _huanShuStatusIconCore,
+                0.22f,
+                0f,
+                _huanShuStatusIconColor);
+        }
+
+        private static void ApplyHuanShuGlyphLayout(
+            Image image,
+            float sizeRatio,
+            float rotationDegrees,
+            Color color)
+        {
+            if (image == null)
+            {
+                return;
+            }
+
+            var rect = image.rectTransform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = Vector2.zero;
+            rect.localScale = new Vector3(sizeRatio, sizeRatio, 1f);
+            rect.localRotation = Quaternion.Euler(0f, 0f, rotationDegrees);
+            image.color = color;
+            image.raycastTarget = false;
         }
 
         private void ApplyStatIconLayout(Image image, Vector2 anchoredPosition)
@@ -2672,14 +2812,14 @@ namespace Project333.Runtime.Presentation.Battle
                     {
                         "....X....",
                         "...XXX...",
-                        "....X....",
-                        "....X....",
-                        "....X....",
-                        "..XXXXX..",
                         "...XXX...",
-                        "...X.X...",
+                        "...XXX...",
+                        "...XXX...",
+                        "...XXX...",
+                        "XXXXXXXXX", 
+                        "...XXX...",
                     },
-                    new Color(0.9f, 0.9f, 0.96f));
+                    Color.white);
             }
 
             return s_swordIconSprite;
@@ -2693,19 +2833,71 @@ namespace Project333.Runtime.Presentation.Battle
                     "TileBowIcon",
                     new[]
                     {
-                        "..X..X...",
-                        ".X....X..",
-                        "X......XX",
-                        "X......XX",
-                        ".X....X..",
-                        "..X..X...",
-                        "....X....",
+                        "..X......",
+                        "..XXX....",
+                        "..X..XX..",
+                        "..X....XX",
                         "XXXXXXXXX",
+                        "..X..XX..",
+                        "..XXX....",
+                        "..X......",   
                     },
-                    new Color(0.96f, 0.83f, 0.46f));
+                    Color.white);
             }
 
             return s_bowIconSprite;
+        }
+
+        private static Sprite GetMagicStaffIconSprite()
+        {
+            if (s_magicStaffIconSprite == null)
+            {
+                s_magicStaffIconSprite = CreateIconSprite(
+                    "TileMagicStaffIcon",
+                    new[]
+                    {
+                        "...XXX...",
+                        "..XXXXX..",
+                        "...XXX...",
+                        "....X....",
+                        "...XXX...",
+                        "....X....",
+                        "....X....",
+                        "...XXX...",
+                    },
+                    Color.white);
+            }
+
+            return s_magicStaffIconSprite;
+        }
+
+        private static Sprite GetAttackIconSprite(AttackType attackType, DamageType damageType)
+        {
+            if (attackType == AttackType.Ranged && damageType == DamageType.Magic)
+            {
+                return GetMagicStaffIconSprite();
+            }
+
+            return attackType == AttackType.Melee
+                ? GetSwordIconSprite()
+                : GetBowIconSprite();
+        }
+
+        private static Color GetAttackIconColor(AttackType attackType, DamageType damageType)
+        {
+            if (damageType == DamageType.Magic)
+            {
+                return MagicAttackIconColor;
+            }
+
+            if (damageType == DamageType.Physical)
+            {
+                return attackType == AttackType.Melee
+                    ? PhysicalMeleeAttackIconColor
+                    : PhysicalRangedAttackIconColor;
+            }
+
+            return NeutralAttackIconColor;
         }
 
         private static Sprite GetFallbackOccupantSprite(OccupantState occupant)

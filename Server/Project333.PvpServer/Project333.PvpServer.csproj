@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
+    <PackageReference Include="Npgsql" Version="8.0.5" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Domain\**\*.cs" Link="Shared\Domain\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Application\Commands\**\*.cs" Link="Shared\Application\Commands\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Application\Accounts\GameIdRegistrationRules.cs" Link="Shared\Application\Accounts\GameIdRegistrationRules.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Application\Services\**\*.cs" Link="Shared\Application\Services\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Remove="..\..\Assets\Project333\Runtime\Application\Services\Draft*.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Application\Gateways\IBattleGateway.cs" Link="Shared\Application\Gateways\IBattleGateway.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Application\Online\BattleStateViewDto.cs" Link="Shared\Application\Online\BattleStateViewDto.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Application\Online\BattleCombatLogEntryDto.cs" Link="Shared\Application\Online\BattleCombatLogEntryDto.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Application\Online\BattleStateViewFactory.cs" Link="Shared\Application\Online\BattleStateViewFactory.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Application\Online\ClientBattleCommandMessage.cs" Link="Shared\Application\Online\ClientBattleCommandMessage.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Application\Online\IOnlineBattleMessageSender.cs" Link="Shared\Application\Online\IOnlineBattleMessageSender.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Application\Online\OnlineBattleCommandType.cs" Link="Shared\Application\Online\OnlineBattleCommandType.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Application\Online\OnlineBattleSeatId.cs" Link="Shared\Application\Online\OnlineBattleSeatId.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Application\Online\ResourceSetDto.cs" Link="Shared\Application\Online\ResourceSetDto.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Application\Online\TileCoordDto.cs" Link="Shared\Application\Online\TileCoordDto.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\BuildingCardDefinition.cs" Link="Shared\Infrastructure\Data\BuildingCardDefinition.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\CardDatabaseValidationResult.cs" Link="Shared\Infrastructure\Data\CardDatabaseValidationResult.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\CardDatabaseValidator.cs" Link="Shared\Infrastructure\Data\CardDatabaseValidator.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\CardAffiliation.cs" Link="Shared\Infrastructure\Data\CardAffiliation.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\CardDefinition.cs" Link="Shared\Infrastructure\Data\CardDefinition.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\CardLevelStatBonus.cs" Link="Shared\Infrastructure\Data\CardLevelStatBonus.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\CardLevelStatRules.cs" Link="Shared\Infrastructure\Data\CardLevelStatRules.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\CardLevelSpellRules.cs" Link="Shared\Infrastructure\Data\CardLevelSpellRules.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\CardRarity.cs" Link="Shared\Infrastructure\Data\CardRarity.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\CardUpgradeCost.cs" Link="Shared\Infrastructure\Data\CardUpgradeCost.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\CardUpgradeRules.cs" Link="Shared\Infrastructure\Data\CardUpgradeRules.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\ChargeTileFootprint.cs" Link="Shared\Infrastructure\Data\ChargeTileFootprint.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\DamageSpellCardDefinition.cs" Link="Shared\Infrastructure\Data\DamageSpellCardDefinition.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\ICardDefinitionProvider.cs" Link="Shared\Infrastructure\Data\ICardDefinitionProvider.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\InMemoryCardDefinitionProvider.cs" Link="Shared\Infrastructure\Data\InMemoryCardDefinitionProvider.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\JsonCardDefinitionDatabase.cs" Link="Shared\Infrastructure\Data\JsonCardDefinitionDatabase.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\PersistentResourceSpellCardDefinition.cs" Link="Shared\Infrastructure\Data\PersistentResourceSpellCardDefinition.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\ScriptedSpellCardDefinition.cs" Link="Shared\Infrastructure\Data\ScriptedSpellCardDefinition.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\SpellCardDefinition.cs" Link="Shared\Infrastructure\Data\SpellCardDefinition.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\UnitCardDefinition.cs" Link="Shared\Infrastructure\Data\UnitCardDefinition.cs" />
+    <Content Include="..\..\Assets\Project333\Resources\Project333\Data\cards.json" Link="Data\cards.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Persistence\Migrations\*.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

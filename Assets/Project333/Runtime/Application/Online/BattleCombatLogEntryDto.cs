@@ -14,7 +14,9 @@ namespace Project333.Runtime.Application.Online
         OccupantMoved = 5,
         OccupantsSwapped = 6,
         Attack = 7,
-        GuardRedirected = 8,
+        ShielderRedirected = 8,
+        [System.Obsolete("Use ShielderRedirected. This alias only reads pre-migration combat-log snapshots.")]
+        GuardRedirected = ShielderRedirected,
         SpellCast = 9,
         AttackBuffApplied = 10,
         DestructionMarked = 11,
@@ -37,6 +39,15 @@ namespace Project333.Runtime.Application.Online
         SealboundReleased = 28,
         HidingApplied = 29,
         HidingRevealed = 30,
+        OccupantControlled = 31,
+        HuanShuApplied = 32,
+        HuanShuCleared = 33,
+        HuanShuRedirected = 34,
+        ResourceSpent = 35,
+        DemonKingRevivalStarted = 36,
+        DemonKingRevived = 37,
+        HeroGrowth = 38,
+        CardDrawn = 39,
     }
 
     public enum BattleCombatLogResourceType
@@ -84,6 +95,8 @@ namespace Project333.Runtime.Application.Online
 
         public bool HasCounterattack { get; set; }
 
+        public bool IsDraw { get; set; }
+
         public int Amount { get; set; }
 
         public int AttackBonus { get; set; }
@@ -91,6 +104,8 @@ namespace Project333.Runtime.Application.Online
         public int HpBonus { get; set; }
 
         public int TurnNumber { get; set; }
+
+        public AttackType AttackType { get; set; }
 
         public DamageType DamageType { get; set; }
 

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using Project333.Runtime.Application.Services;
 using Project333.Runtime.Domain.Battle;
@@ -124,6 +125,10 @@ namespace Project333.Tests.EditMode
             Assert.That(upkeepUnit.IsDrained, Is.False);
             Assert.That(battleState.Player.Resources.Power, Is.EqualTo(0));
             Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(2));
+            var upkeepPayment = battleState.ResourceChangeEvents.Single(change =>
+                change.SourceCardId == upkeepUnit.CardId);
+            Assert.That(upkeepPayment.Spent.Power, Is.EqualTo(1));
+            Assert.That(upkeepPayment.Spent.Gold, Is.EqualTo(2));
         }
 
         [Test]

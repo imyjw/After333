@@ -9,15 +9,31 @@ namespace Project333.Runtime.Application.Services
     public sealed class AttackService
     {
         private readonly TargetingService _targetingService;
+        private readonly Func<int, int> _randomIndexSelector;
 
         public AttackService()
-            : this(new TargetingService())
+            : this(new TargetingService(), null)
         {
         }
 
         public AttackService(TargetingService targetingService)
+            : this(targetingService, null)
         {
-            _targetingService = targetingService;
+        }
+
+        public AttackService(
+            TargetingService targetingService,
+            Func<int, int> randomIndexSelector)
+        {
+            _targetingService = targetingService ?? throw new ArgumentNullException(nameof(targetingService));
+            if (randomIndexSelector != null)
+            {
+                _randomIndexSelector = randomIndexSelector;
+                return;
+            }
+
+            var random = new Random();
+            _randomIndexSelector = random.Next;
         }
 
         public void Attack(BattleState battleState, PlayerId attackerOwnerId, TileCoord attackerCoord, TileCoord targetCoord)
@@ -38,7 +54,8 @@ namespace Project333.Runtime.Application.Services
             }
 
             var attackerBoard = battleState.GetBoard(attackerOwnerId);
-            var defenderBoard = battleState.GetOpponentBoard(attackerOwnerId);
+            var declaredDefenderOwnerId = battleState.GetOpponent(attackerOwnerId).Id;
+            var declaredDefenderBoard = battleState.GetBoard(declaredDefenderOwnerId);
 
             var attacker = attackerBoard.GetOccupant(attackerCoord);
             if (attacker == null)
@@ -46,8 +63,8 @@ namespace Project333.Runtime.Application.Services
                 throw new InvalidOperationException("Attacker tile is empty.");
             }
 
-            var defender = defenderBoard.GetOccupant(targetCoord);
-            if (defender == null)
+            var declaredDefender = declaredDefenderBoard.GetOccupant(targetCoord);
+            if (declaredDefender == null)
             {
                 throw new InvalidOperationException("Defender tile is empty.");
             }
@@ -59,15 +76,132 @@ namespace Project333.Runtime.Application.Services
                 throw new InvalidOperationException("Target is not legal for this attacker.");
             }
 
+            var resolvedTarget = ResolveAttackTarget(
+                battleState,
+                attacker,
+                declaredDefenderOwnerId,
+                targetCoord,
+                declaredDefender);
+            var defenderBoard = battleState.GetBoard(resolvedTarget.OwnerId);
+            var defender = resolvedTarget.Occupant;
+            battleState.RecordAttackResolution(new BattleAttackResolution(
+                attackerOwnerId,
+                attackerCoord,
+                attacker.RuntimeId,
+                attacker.CardId,
+                declaredDefenderOwnerId,
+                targetCoord,
+                resolvedTarget.OwnerId,
+                resolvedTarget.Coord,
+                defender.RuntimeId,
+                defender.CardId,
+                resolvedTarget.WasHuanShuRedirected));
+
             // A legal attack declaration reveals Hiding before any hit or counterattack resolves.
             attacker.RevealHiding();
-            var combatResult = ResolveCombat(battleState, defenderBoard, targetCoord, attacker, defender);
+            ResolveCombat(
+                battleState,
+                defenderBoard,
+                resolvedTarget.Coord,
+                attacker,
+                defender);
 
             attacker.RemainingAttacksThisTurn -= 1;
+            OccupantDestructionService.ResolveDefeatedOccupants(battleState);
+        }
 
-            ResolveMasterDefeat(battleState, attacker, combatResult.AffectedDefenders);
-            RemoveIfDefeated(attackerBoard, attackerCoord, attacker);
-            RemoveDefeatedOccupants(defenderBoard, combatResult.AffectedDefenders);
+        private ResolvedAttackTarget ResolveAttackTarget(
+            BattleState battleState,
+            OccupantState attacker,
+            PlayerId declaredDefenderOwnerId,
+            TileCoord declaredTargetCoord,
+            OccupantState declaredDefender)
+        {
+            if (!attacker.IsUnderHuanShu)
+            {
+                return new ResolvedAttackTarget(
+                    declaredDefenderOwnerId,
+                    declaredTargetCoord,
+                    declaredDefender,
+                    wasHuanShuRedirected: false);
+            }
+
+            var candidates = new List<ResolvedAttackTarget>();
+            AddHuanShuCandidates(
+                battleState,
+                PlayerId.Player,
+                attacker,
+                declaredDefenderOwnerId,
+                declaredTargetCoord,
+                candidates);
+            AddHuanShuCandidates(
+                battleState,
+                PlayerId.AI,
+                attacker,
+                declaredDefenderOwnerId,
+                declaredTargetCoord,
+                candidates);
+
+            if (candidates.Count == 0)
+            {
+                throw new InvalidOperationException("HuanShu attack has no legal random target.");
+            }
+
+            var selectedIndex = _randomIndexSelector(candidates.Count);
+            if (selectedIndex < 0 || selectedIndex >= candidates.Count)
+            {
+                throw new InvalidOperationException("HuanShu random target selector returned an invalid index.");
+            }
+
+            return candidates[selectedIndex];
+        }
+
+        private static void AddHuanShuCandidates(
+            BattleState battleState,
+            PlayerId boardOwnerId,
+            OccupantState attacker,
+            PlayerId declaredDefenderOwnerId,
+            TileCoord declaredTargetCoord,
+            ICollection<ResolvedAttackTarget> candidates)
+        {
+            var board = battleState.GetBoard(boardOwnerId);
+            foreach (var candidate in board.EnumerateOccupants())
+            {
+                if (!CanBeHuanShuRandomTarget(attacker, candidate))
+                {
+                    continue;
+                }
+
+                var wasRedirected = boardOwnerId != declaredDefenderOwnerId ||
+                                    candidate.Position != declaredTargetCoord;
+                candidates.Add(new ResolvedAttackTarget(
+                    boardOwnerId,
+                    candidate.Position,
+                    candidate,
+                    wasRedirected));
+            }
+        }
+
+        private static bool CanBeHuanShuRandomTarget(
+            OccupantState attacker,
+            OccupantState candidate)
+        {
+            if (candidate == null ||
+                ReferenceEquals(attacker, candidate) ||
+                !candidate.IsAlive ||
+                !candidate.CanBeAffected)
+            {
+                return false;
+            }
+
+            if (candidate.OwnerId != attacker.OwnerId && candidate.IsHiding)
+            {
+                return false;
+            }
+
+            return !candidate.HasActiveFlying ||
+                   attacker.AttackType == AttackType.Ranged ||
+                   attacker.HasActiveFlying;
         }
 
         private static void ValidateAttacker(OccupantState attacker, PlayerId attackerOwnerId)
@@ -114,12 +248,12 @@ namespace Project333.Runtime.Application.Services
             var hitsPerAttack = attacker.EffectiveHitsPerAttack;
             var attackerDamagePerHit = DamageResolutionRules.GetDamageAgainst(attacker, declaredDefender);
             var attackerDamageType = attacker.DamageType;
-            var initialGuardInfo = GuardService.ResolveForNormalAttack(
+            var initialShielderInfo = ShielderService.ResolveForNormalAttack(
                 defenderBoard,
                 declaredTargetCoord,
                 attacker);
-            var counterattacker = initialGuardInfo.IsProtected
-                ? initialGuardInfo.Guard
+            var counterattacker = initialShielderInfo.IsProtected
+                ? initialShielderInfo.Shielder
                 : declaredDefender;
             var defenderCounterDamage = DamageResolutionRules.GetDamageAgainst(counterattacker, attacker);
             var defenderCounterDamageType = counterattacker.DamageType;
@@ -181,26 +315,26 @@ namespace Project333.Runtime.Application.Services
             DamageType attackerDamageType,
             ISet<OccupantState> affectedDefenders)
         {
-            var guardInfo = GuardService.ResolveForNormalAttack(
+            var shielderInfo = ShielderService.ResolveForNormalAttack(
                 defenderBoard,
                 declaredTargetCoord,
                 attacker);
-            if (guardInfo.IsProtected)
+            if (shielderInfo.IsProtected)
             {
-                affectedDefenders.Add(guardInfo.Guard);
-                var guardDamage = attackerDamagePerHit;
-                var guardHpBefore = Math.Max(0, guardInfo.Guard.CurrentHp);
-                var resolvedGuardDamage = DamageResolutionRules.ResolveIncomingDamage(
-                    guardInfo.Guard,
-                    guardDamage,
+                affectedDefenders.Add(shielderInfo.Shielder);
+                var shielderDamage = attackerDamagePerHit;
+                var shielderHpBefore = Math.Max(0, shielderInfo.Shielder.CurrentHp);
+                var resolvedShielderDamage = DamageResolutionRules.ResolveIncomingDamage(
+                    shielderInfo.Shielder,
+                    shielderDamage,
                     attackerDamageType);
                 var absorbedDamage = DamageResolutionRules.ApplyAttackDamage(
-                    guardInfo.Guard,
-                    guardDamage,
+                    shielderInfo.Shielder,
+                    shielderDamage,
                     attackerDamageType);
                 BattleValuePopupRecorder.RecordDamage(
                     battleState,
-                    guardInfo.Guard,
+                    shielderInfo.Shielder,
                     absorbedDamage,
                     BattleValueChangeCause.NormalAttack,
                     attackerDamageType,
@@ -208,17 +342,17 @@ namespace Project333.Runtime.Application.Services
                     attacker.RuntimeId,
                     attacker.CardId);
                 ApplyAttackHitEffects(battleState, attacker, absorbedDamage);
-                var remainingDamage = Math.Max(0, resolvedGuardDamage - guardHpBefore);
+                var remainingDamage = Math.Max(0, resolvedShielderDamage - shielderHpBefore);
                 if (remainingDamage > 0)
                 {
-                    affectedDefenders.Add(guardInfo.OriginalTarget);
+                    affectedDefenders.Add(shielderInfo.OriginalTarget);
                     var overflowDamage = DamageResolutionRules.ApplyAttackDamage(
-                        guardInfo.OriginalTarget,
+                        shielderInfo.OriginalTarget,
                         remainingDamage,
                         attackerDamageType);
                     BattleValuePopupRecorder.RecordDamage(
                         battleState,
-                        guardInfo.OriginalTarget,
+                        shielderInfo.OriginalTarget,
                         overflowDamage,
                         BattleValueChangeCause.NormalAttack,
                         attackerDamageType,
@@ -228,16 +362,35 @@ namespace Project333.Runtime.Application.Services
                     ApplyAttackHitEffects(battleState, attacker, overflowDamage);
                 }
 
+                var piercingDamage = ApplyPiercingDamageWithoutHitEffects(
+                    battleState,
+                    defenderBoard,
+                    declaredTargetCoord,
+                    attacker,
+                    attackerDamagePerHit,
+                    attackerDamageType,
+                    affectedDefenders);
+                ApplyAttackHitEffects(battleState, attacker, piercingDamage);
+
                 return;
             }
 
-            affectedDefenders.Add(guardInfo.OriginalTarget);
+            affectedDefenders.Add(shielderInfo.OriginalTarget);
             ApplyDirectAttackDamageAndEffects(
                 battleState,
-                guardInfo.OriginalTarget,
+                shielderInfo.OriginalTarget,
                 attacker,
                 attackerDamagePerHit,
                 attackerDamageType);
+            var directPiercingDamage = ApplyPiercingDamageWithoutHitEffects(
+                battleState,
+                defenderBoard,
+                declaredTargetCoord,
+                attacker,
+                attackerDamagePerHit,
+                attackerDamageType,
+                affectedDefenders);
+            ApplyAttackHitEffects(battleState, attacker, directPiercingDamage);
         }
 
         private static void ApplyDirectAttackDamageAndEffects(
@@ -283,6 +436,14 @@ namespace Project333.Runtime.Application.Services
                 attackerDamagePerHit,
                 attackerDamageType,
                 affectedDefenders);
+            damageDealtByAttacker += ApplyPiercingDamageWithoutHitEffects(
+                battleState,
+                defenderBoard,
+                declaredTargetCoord,
+                attacker,
+                attackerDamagePerHit,
+                attackerDamageType,
+                affectedDefenders);
             var counterattackDamage = DamageResolutionRules.ApplyAttackDamage(
                 attacker,
                 defenderCounterDamage,
@@ -301,6 +462,49 @@ namespace Project333.Runtime.Application.Services
             ApplyAttackHitEffectsIfAlive(battleState, counterattacker, counterattackDamage);
         }
 
+        private static int ApplyPiercingDamageWithoutHitEffects(
+            BattleState battleState,
+            BoardState defenderBoard,
+            TileCoord resolvedTargetCoord,
+            OccupantState attacker,
+            int attackerDamagePerHit,
+            DamageType attackerDamageType,
+            ISet<OccupantState> affectedDefenders)
+        {
+            if (attacker == null ||
+                !attacker.HasActivePiercing ||
+                defenderBoard == null ||
+                (resolvedTargetCoord.Row != 0 && resolvedTargetCoord.Row != 1))
+            {
+                return 0;
+            }
+
+            var oppositeRowCoord = new TileCoord(
+                resolvedTargetCoord.Column,
+                resolvedTargetCoord.Row == 0 ? 1 : 0);
+            var oppositeRowOccupant = defenderBoard.GetOccupant(oppositeRowCoord);
+            if (oppositeRowOccupant == null || !oppositeRowOccupant.IsAlive)
+            {
+                return 0;
+            }
+
+            affectedDefenders.Add(oppositeRowOccupant);
+            var actualDamage = DamageResolutionRules.ApplyAttackDamage(
+                oppositeRowOccupant,
+                attackerDamagePerHit,
+                attackerDamageType);
+            BattleValuePopupRecorder.RecordDamage(
+                battleState,
+                oppositeRowOccupant,
+                actualDamage,
+                BattleValueChangeCause.Piercing,
+                attackerDamageType,
+                attacker.OwnerId,
+                attacker.RuntimeId,
+                attacker.CardId);
+            return actualDamage;
+        }
+
         private static int ApplyAttackDamageToDeclaredTargetWithoutHitEffects(
             BattleState battleState,
             BoardState defenderBoard,
@@ -310,20 +514,20 @@ namespace Project333.Runtime.Application.Services
             DamageType attackerDamageType,
             ISet<OccupantState> affectedDefenders)
         {
-            var guardInfo = GuardService.ResolveForNormalAttack(
+            var shielderInfo = ShielderService.ResolveForNormalAttack(
                 defenderBoard,
                 declaredTargetCoord,
                 attacker);
-            if (!guardInfo.IsProtected)
+            if (!shielderInfo.IsProtected)
             {
-                affectedDefenders.Add(guardInfo.OriginalTarget);
+                affectedDefenders.Add(shielderInfo.OriginalTarget);
                 var directDamage = DamageResolutionRules.ApplyAttackDamage(
-                    guardInfo.OriginalTarget,
+                    shielderInfo.OriginalTarget,
                     attackerDamagePerHit,
                     attackerDamageType);
                 BattleValuePopupRecorder.RecordDamage(
                     battleState,
-                    guardInfo.OriginalTarget,
+                    shielderInfo.OriginalTarget,
                     directDamage,
                     BattleValueChangeCause.NormalAttack,
                     attackerDamageType,
@@ -333,19 +537,19 @@ namespace Project333.Runtime.Application.Services
                 return directDamage;
             }
 
-            affectedDefenders.Add(guardInfo.Guard);
-            var guardHpBefore = Math.Max(0, guardInfo.Guard.CurrentHp);
-            var resolvedGuardDamage = DamageResolutionRules.ResolveIncomingDamage(
-                guardInfo.Guard,
+            affectedDefenders.Add(shielderInfo.Shielder);
+            var shielderHpBefore = Math.Max(0, shielderInfo.Shielder.CurrentHp);
+            var resolvedShielderDamage = DamageResolutionRules.ResolveIncomingDamage(
+                shielderInfo.Shielder,
                 attackerDamagePerHit,
                 attackerDamageType);
             var absorbedDamage = DamageResolutionRules.ApplyAttackDamage(
-                guardInfo.Guard,
+                shielderInfo.Shielder,
                 attackerDamagePerHit,
                 attackerDamageType);
             BattleValuePopupRecorder.RecordDamage(
                 battleState,
-                guardInfo.Guard,
+                shielderInfo.Shielder,
                 absorbedDamage,
                 BattleValueChangeCause.NormalAttack,
                 attackerDamageType,
@@ -354,20 +558,20 @@ namespace Project333.Runtime.Application.Services
                 attacker.CardId);
 
             var totalDamage = absorbedDamage;
-            var remainingDamage = Math.Max(0, resolvedGuardDamage - guardHpBefore);
+            var remainingDamage = Math.Max(0, resolvedShielderDamage - shielderHpBefore);
             if (remainingDamage <= 0)
             {
                 return totalDamage;
             }
 
-            affectedDefenders.Add(guardInfo.OriginalTarget);
+            affectedDefenders.Add(shielderInfo.OriginalTarget);
             var overflowDamage = DamageResolutionRules.ApplyAttackDamage(
-                guardInfo.OriginalTarget,
+                shielderInfo.OriginalTarget,
                 remainingDamage,
                 attackerDamageType);
             BattleValuePopupRecorder.RecordDamage(
                 battleState,
-                guardInfo.OriginalTarget,
+                shielderInfo.OriginalTarget,
                 overflowDamage,
                 BattleValueChangeCause.NormalAttack,
                 attackerDamageType,
@@ -407,59 +611,24 @@ namespace Project333.Runtime.Application.Services
             }
         }
 
-        private static void RemoveDefeatedOccupants(BoardState board, IEnumerable<OccupantState> occupants)
+        private readonly struct ResolvedAttackTarget
         {
-            foreach (var occupant in occupants)
+            public ResolvedAttackTarget(
+                PlayerId ownerId,
+                TileCoord coord,
+                OccupantState occupant,
+                bool wasHuanShuRedirected)
             {
-                if (occupant == null || occupant.Kind == OccupantKind.Master || occupant.CurrentHp > 0)
-                {
-                    continue;
-                }
-
-                if (board.GetOccupant(occupant.Position) == occupant)
-                {
-                    board.Remove(occupant.Position);
-                }
-            }
-        }
-
-        private static void RemoveIfDefeated(BoardState board, TileCoord coord, OccupantState occupant)
-        {
-            if (occupant.CurrentHp <= 0 && board.GetOccupant(coord) == occupant)
-            {
-                board.Remove(coord);
-            }
-        }
-
-        private static void ResolveMasterDefeat(BattleState battleState, OccupantState attacker, IEnumerable<OccupantState> defenders)
-        {
-            var attackerMasterDefeated = attacker.Kind == OccupantKind.Master && attacker.CurrentHp <= 0;
-            var defenderMasterDefeated = false;
-            foreach (var defender in defenders)
-            {
-                if (defender != null && defender.Kind == OccupantKind.Master && defender.CurrentHp <= 0)
-                {
-                    defenderMasterDefeated = true;
-                    break;
-                }
+                OwnerId = ownerId;
+                Coord = coord;
+                Occupant = occupant;
+                WasHuanShuRedirected = wasHuanShuRedirected;
             }
 
-            if (attackerMasterDefeated && defenderMasterDefeated)
-            {
-                throw new InvalidOperationException(
-                    "Simultaneous Master defeat is not defined by the current rules.");
-            }
-
-            if (defenderMasterDefeated)
-            {
-                battleState.EndBattle(attacker.OwnerId);
-                return;
-            }
-
-            if (attackerMasterDefeated)
-            {
-                battleState.EndBattle(battleState.GetOpponent(attacker.OwnerId).Id);
-            }
+            public PlayerId OwnerId { get; }
+            public TileCoord Coord { get; }
+            public OccupantState Occupant { get; }
+            public bool WasHuanShuRedirected { get; }
         }
 
         private sealed class CombatResolutionResult

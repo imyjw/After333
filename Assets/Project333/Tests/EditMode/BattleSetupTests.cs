@@ -37,6 +37,7 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.AI.Deck.Count, Is.EqualTo(7));
             Assert.That(battleState.Player.HasUsedMulligan, Is.False);
             Assert.That(battleState.AI.HasUsedMulligan, Is.True);
+            Assert.That(battleState.CardDrawEvents, Is.Empty);
         }
 
         [Test]
@@ -149,6 +150,8 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.Player.Hand.Count, Is.EqualTo(3));
             Assert.That(battleState.Player.Hand.Contains(selectedCardId), Is.False);
             Assert.That(battleState.Player.Deck.Count, Is.EqualTo(7));
+            Assert.That(battleState.CardDrawEvents, Has.Count.EqualTo(1));
+            Assert.That(battleState.CardDrawEvents[0].OwnerId, Is.EqualTo(PlayerId.Player));
         }
 
         [Test]

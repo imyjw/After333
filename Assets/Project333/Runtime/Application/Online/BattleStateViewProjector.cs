@@ -67,7 +67,11 @@ namespace Project333.Runtime.Application.Online
                     view.PendingRobotFusionCardId);
             }
 
-            if (view.IsEnded && view.HasWinner)
+            if (view.IsEnded && view.IsDraw)
+            {
+                projectedState.EndBattleAsDraw();
+            }
+            else if (view.IsEnded && view.HasWinner)
             {
                 projectedState.EndBattle(ToLocalOwnerId(view, view.WinnerId));
             }
@@ -142,6 +146,7 @@ namespace Project333.Runtime.Application.Online
             PlayerId localOwnerId)
         {
             var coord = view.Coord.ToDomain();
+            var baseAttack = view.HasBaseAttack ? view.BaseAttack : view.Attack;
             OccupantState occupant;
 
             switch (view.Kind)
@@ -151,12 +156,13 @@ namespace Project333.Runtime.Application.Online
                         string.IsNullOrWhiteSpace(view.RuntimeId) ? $"{localOwnerId}-master" : view.RuntimeId,
                         localOwnerId,
                         coord,
-                        view.Attack,
+                        baseAttack,
                         view.MaxHp,
                         view.PhysicalDefense,
                         view.MagicDefense,
                         view.HasFlying,
-                        view.SpellPower);
+                        view.SpellPower,
+                        view.HasPiercing);
                     break;
 
                 case OccupantKind.Building:
@@ -165,14 +171,19 @@ namespace Project333.Runtime.Application.Online
                         view.CardId,
                         localOwnerId,
                         coord,
-                        canAttack: view.Attack > 0 || view.RemainingAttacksThisTurn > 0,
-                        attack: view.Attack,
+                        canAttack: view.MaxAttacksPerTurn > 0 ||
+                                   view.Attack > 0 ||
+                                   view.RemainingAttacksThisTurn > 0,
+                        attack: baseAttack,
                         maxHp: view.MaxHp,
+                        hitsPerAttack: ResolveHitsPerAttack(view),
                         damageType: view.DamageType,
                         physicalDefense: view.PhysicalDefense,
                         magicDefense: view.MagicDefense,
+                        sciencePowerUpkeep: Math.Max(0, view.SciencePowerUpkeep),
                         hasFlying: view.HasFlying,
-                        spellPower: view.SpellPower);
+                        spellPower: view.SpellPower,
+                        hasPiercing: view.HasPiercing);
                     break;
 
                 default:
@@ -182,14 +193,16 @@ namespace Project333.Runtime.Application.Online
                         localOwnerId,
                         coord,
                         view.AttackType,
-                        view.Attack,
+                        baseAttack,
                         view.MaxHp,
                         view.CanMove,
-                        isScience: false,
-                        sciencePowerUpkeep: 0,
-                        maxAttacksPerTurn: Math.Max(1, view.RemainingAttacksThisTurn),
+                        isScience: view.SciencePowerUpkeep > 0,
+                        sciencePowerUpkeep: Math.Max(0, view.SciencePowerUpkeep),
+                        maxAttacksPerTurn: ResolveMaxAttacksPerTurn(view),
+                        hitsPerAttack: ResolveHitsPerAttack(view),
+                        hasBerserker: view.HasBerserker,
                         hasEndure: view.HasEndure,
-                        hasGuard: view.HasGuard,
+                        hasShielder: view.HasShielder,
                         hasLifeSteal: view.HasLifeSteal,
                         damageType: view.DamageType,
                         physicalDefense: view.PhysicalDefense,
@@ -198,7 +211,8 @@ namespace Project333.Runtime.Application.Online
                         hasRush: view.HasRush,
                         hasHiding: view.HasHiding,
                         hasFlying: view.HasFlying,
-                        spellPower: view.SpellPower);
+                        spellPower: view.SpellPower,
+                        hasPiercing: view.HasPiercing);
                     break;
             }
 
@@ -218,6 +232,15 @@ namespace Project333.Runtime.Application.Online
                 view.IsSealbound,
                 view.SealboundOwnerTurnStartsRemaining,
                 view.HidingRevealed);
+            occupant.RestoreHuanShuState(
+                view.HuanShuOwnerTurnsRemaining,
+                view.HuanShuEligibleAfterTurnNumber);
+            occupant.RestoreDemonKingRevivalState(
+                view.IsDemonKingRevivalPending,
+                view.DemonKingRevivalTurnStartsRemaining,
+                ToLocalOwnerId(stateView, view.DemonKingRevivalCountdownPlayerId),
+                view.DemonKingRevivalEligibleAfterTurnNumber,
+                view.DemonKingRevivalCount);
             var invincibleEffects = new List<InvincibleEffectState>();
             if (view.InvincibleEffects != null)
             {
@@ -242,6 +265,18 @@ namespace Project333.Runtime.Application.Online
             occupant.RemainingAttacksThisTurn = view.RemainingAttacksThisTurn;
             occupant.EndureUsed = view.EndureUsed;
             return occupant;
+        }
+
+        private static int ResolveMaxAttacksPerTurn(BoardOccupantViewDto view)
+        {
+            return view.MaxAttacksPerTurn > 0
+                ? view.MaxAttacksPerTurn
+                : Math.Max(1, view.RemainingAttacksThisTurn);
+        }
+
+        private static int ResolveHitsPerAttack(BoardOccupantViewDto view)
+        {
+            return Math.Max(1, view.HitsPerAttack);
         }
 
         private static void ApplyTurnState(BattleState battleState, BattleStateViewDto view)
@@ -284,7 +319,8 @@ namespace Project333.Runtime.Application.Online
                     effectDamage: effectView.EffectDamage,
                     effectDamageType: effectView.EffectDamageType,
                     targetsOwnerBoard: effectView.TargetsOwnerBoard,
-                    capturedSpellPower: effectView.CapturedSpellPower);
+                    capturedSpellPower: effectView.CapturedSpellPower,
+                    targetStartColumn: effectView.TargetStartColumn);
 
                 if (effectView.IsExpired)
                 {

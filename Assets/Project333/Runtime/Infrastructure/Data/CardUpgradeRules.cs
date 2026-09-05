@@ -26,6 +26,7 @@ namespace Project333.Runtime.Infrastructure.Data
                 case CardType.Spell:
                     return string.Equals(cardDefinition.CardId, FireboltCardId, StringComparison.OrdinalIgnoreCase) ||
                            string.Equals(cardDefinition.CardId, FirewallCardId, StringComparison.OrdinalIgnoreCase) ||
+                           string.Equals(cardDefinition.CardId, BiochemicalBombRules.CardId, StringComparison.OrdinalIgnoreCase) ||
                            string.Equals(cardDefinition.CardId, TimedBombRules.CardId, StringComparison.OrdinalIgnoreCase);
 
                 default:

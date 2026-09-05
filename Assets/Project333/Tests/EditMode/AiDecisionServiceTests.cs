@@ -161,7 +161,46 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void GetNextCommand_WhenBackRowTargetIsProtectedByGuard_SkipsProtectedTarget()
+        public void GetNextCommand_WhenDamageSpellWouldTriggerEndure_DoesNotTreatSpellAsKill()
+        {
+            var battleState = CreateBattleState();
+            battleState.StartNextTurn(PlayerId.AI);
+            battleState.SetPhase(PhaseType.Main);
+            battleState.AI.Master.RemainingAttacksThisTurn = 0;
+            ClearHand(battleState.AI);
+            battleState.AI.Hand.Add("lethal-spell");
+
+            var defender = new UnitState(
+                runtimeId: "player-endure",
+                cardId: "player-endure",
+                ownerId: PlayerId.Player,
+                position: new TileCoord(0, 0),
+                attackType: AttackType.Melee,
+                attack: 1,
+                maxHp: 3,
+                canMove: true,
+                isScience: false,
+                sciencePowerUpkeep: 0,
+                hasEndure: true);
+            battleState.PlayerBoard.Place(defender.Position, defender);
+
+            var provider = new InMemoryCardDefinitionProvider(new CardDefinition[]
+            {
+                new DamageSpellCardDefinition(
+                    "lethal-spell",
+                    "Lethal Spell",
+                    new ResourceSet(),
+                    damage: 3,
+                    damageType: DamageType.Magic),
+            });
+
+            var command = new AiDecisionService(provider).GetNextCommand(battleState);
+
+            Assert.That(command, Is.TypeOf<EndTurnCommand>());
+        }
+
+        [Test]
+        public void GetNextCommand_WhenBackRowTargetIsProtectedByShielder_SkipsProtectedTarget()
         {
             var battleState = CreateBattleState();
             battleState.StartNextTurn(PlayerId.AI);
@@ -182,9 +221,9 @@ namespace Project333.Tests.EditMode
             attacker.HasSummoningSickness = false;
             battleState.AIBoard.Place(new TileCoord(0, 0), attacker);
 
-            var guard = new UnitState(
-                runtimeId: "player-guard",
-                cardId: "player-guard",
+            var shielder = new UnitState(
+                runtimeId: "player-shielder",
+                cardId: "player-shielder",
                 ownerId: PlayerId.Player,
                 position: new TileCoord(2, 0),
                 attackType: AttackType.Melee,
@@ -193,9 +232,9 @@ namespace Project333.Tests.EditMode
                 canMove: true,
                 isScience: false,
                 sciencePowerUpkeep: 0,
-                hasGuard: true);
-            guard.HasSummoningSickness = false;
-            battleState.PlayerBoard.Place(new TileCoord(2, 0), guard);
+                hasShielder: true);
+            shielder.HasSummoningSickness = false;
+            battleState.PlayerBoard.Place(new TileCoord(2, 0), shielder);
             battleState.Player.Master.CurrentHp = 1;
 
             var decisionService = new AiDecisionService(new InMemoryCardDefinitionProvider(new CardDefinition[0]));

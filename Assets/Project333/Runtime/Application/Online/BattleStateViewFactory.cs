@@ -26,6 +26,7 @@ namespace Project333.Runtime.Application.Online
                 Phase = battleState.Phase,
                 IsEnded = battleState.IsEnded,
                 HasWinner = battleState.Result.HasWinner,
+                IsDraw = battleState.Result.IsDraw,
                 WinnerId = battleState.Result.Winner,
                 HasPendingRobotFusion = battleState.PendingRobotFusion != null,
                 PendingRobotFusionOwnerId = battleState.PendingRobotFusion?.OwnerId ?? PlayerId.Player,
@@ -90,7 +91,13 @@ namespace Project333.Runtime.Application.Online
                 AttackType = occupant.AttackType,
                 DamageType = occupant.DamageType,
                 Attack = occupant.Attack,
+                BaseAttack = occupant.BaseAttack,
+                HasBaseAttack = true,
                 OriginalAttack = occupant.OriginalAttack,
+                MaxAttacksPerTurn = occupant.MaxAttacksPerTurn,
+                HitsPerAttack = occupant.HitsPerAttack,
+                HasBerserker = occupant.HasBerserker,
+                SciencePowerUpkeep = GetSciencePowerUpkeep(occupant),
                 PhysicalDefense = occupant.PhysicalDefense,
                 MagicDefense = occupant.MagicDefense,
                 OriginalPhysicalDefense = occupant.OriginalPhysicalDefense,
@@ -104,12 +111,20 @@ namespace Project333.Runtime.Application.Online
                 IsErasure = occupant.IsErasure,
                 IsSealbound = occupant.IsSealbound,
                 SealboundOwnerTurnStartsRemaining = occupant.SealboundOwnerTurnStartsRemaining,
+                IsDemonKingRevivalPending = occupant.IsDemonKingRevivalPending,
+                DemonKingRevivalTurnStartsRemaining = occupant.DemonKingRevivalTurnStartsRemaining,
+                DemonKingRevivalCountdownPlayerId = occupant.DemonKingRevivalCountdownPlayerId,
+                DemonKingRevivalEligibleAfterTurnNumber = occupant.DemonKingRevivalEligibleAfterTurnNumber,
+                DemonKingRevivalCount = occupant.DemonKingRevivalCount,
+                HuanShuOwnerTurnsRemaining = occupant.HuanShuOwnerTurnsRemaining,
+                HuanShuEligibleAfterTurnNumber = occupant.HuanShuEligibleAfterTurnNumber,
                 HasRush = occupant.HasRush,
                 HasHiding = occupant.HasHiding,
                 HidingRevealed = occupant.HidingRevealed,
                 HasFlying = occupant.HasFlying,
+                HasPiercing = occupant.HasPiercing,
                 SpellPower = occupant.SpellPower,
-                HasGuard = occupant.HasGuard,
+                HasShielder = occupant.HasShielder,
                 HasEndure = occupant.HasEndure,
                 HasLifeSteal = occupant.HasLifeSteal,
                 HasRobot = occupant is UnitState unit && unit.HasRobot,
@@ -131,6 +146,16 @@ namespace Project333.Runtime.Application.Online
             }
 
             return view;
+        }
+
+        private static int GetSciencePowerUpkeep(OccupantState occupant)
+        {
+            return occupant switch
+            {
+                UnitState unit => unit.SciencePowerUpkeep,
+                BuildingState building => building.SciencePowerUpkeep,
+                _ => 0,
+            };
         }
 
         private static void AddPersistentEffects(BattleStateViewDto view, BattleState battleState)
@@ -158,6 +183,7 @@ namespace Project333.Runtime.Application.Online
                     EffectDamageType = persistentEffect.EffectDamageType,
                     TargetsOwnerBoard = persistentEffect.TargetsOwnerBoard,
                     CapturedSpellPower = persistentEffect.CapturedSpellPower,
+                    TargetStartColumn = persistentEffect.TargetStartColumn,
                     IsExpired = persistentEffect.IsExpired
                 });
             }

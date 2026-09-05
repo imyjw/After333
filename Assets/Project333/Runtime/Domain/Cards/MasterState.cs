@@ -15,7 +15,8 @@ namespace Project333.Runtime.Domain.Cards
             int physicalDefense = 0,
             int magicDefense = 0,
             bool hasFlying = false,
-            int spellPower = 0)
+            int spellPower = 0,
+            bool hasPiercing = false)
             : base(
                 runtimeId,
                 "master",
@@ -34,7 +35,8 @@ namespace Project333.Runtime.Domain.Cards
                 physicalDefense: physicalDefense,
                 magicDefense: magicDefense,
                 hasFlying: hasFlying,
-                spellPower: spellPower)
+                spellPower: spellPower,
+                hasPiercing: hasPiercing)
         {
             HasSummoningSickness = false;
         }

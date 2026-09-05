@@ -10,6 +10,15 @@ namespace Project333.Runtime.Application.Services
 
         public static void DrawCards(PlayerState playerState, BattleState battleState, int drawCount)
         {
+            DrawCards(playerState, battleState, drawCount, string.Empty);
+        }
+
+        public static void DrawCards(
+            PlayerState playerState,
+            BattleState battleState,
+            int drawCount,
+            string sourceCardId)
+        {
             if (playerState == null)
             {
                 throw new ArgumentNullException(nameof(playerState));
@@ -39,6 +48,7 @@ namespace Project333.Runtime.Application.Services
                 }
 
                 playerState.Hand.Add(cardId);
+                battleState.RecordCardDraw(playerState.Id, sourceCardId);
             }
         }
 

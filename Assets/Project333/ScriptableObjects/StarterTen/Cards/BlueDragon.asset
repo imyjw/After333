@@ -22,9 +22,10 @@ MonoBehaviour:
     _gold: 0
   _affiliation: 1
   _chargeTileFootprint: 1
-  _effectText: "\uB0B4 \uD134 \uC885\uB8CC \uC2DC \uB0B4 \uD0C0\uC77C\uB4E4 \uC704\uC758
-    \uC720\uB2DB\uB4E4\uC758 \uCCB4\uB825\uD68C\uBCF5+33"
+  _effectText: "\uB0B4 \uD134 \uC885\uB8CC \uC2DC \uB0B4 \uC804\uCCB4 \uD0C0\uC77C
+    \uC704 \uC720\uB2DB\uB4E4\uC758 \uCCB4\uB825\uD68C\uBCF5+33"
   _specialEffectText: "\uBE44\uD589"
+  _hasReplicate: 0
   _boardSprite: {fileID: 1856248917, guid: b914b57a16c4e264abacdb7ac6001859, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: b21e4ede7a930084d848f96345173b35, type: 2}
   _attackType: 1
@@ -36,9 +37,17 @@ MonoBehaviour:
   _hitsPerAttack: 1
   _hasBerserker: 0
   _hasEndure: 0
-  _hasGuard: 0
+  _hasShielder: 0
+  _hasLifeSteal: 0
+  _hasRobot: 0
   _canMove: 1
+  _sealboundOwnerTurnStarts: 0
+  _hasHiding: 0
   _hasFlying: 1
+  _hasPiercing: 0
+  _spellPower: 0
+  _invincibleDuration: 0
+  _invincibleOwnerTurns: 0
   _isScience: 0
   _sciencePowerUpkeep: 0
   _turnStartResourceGain:

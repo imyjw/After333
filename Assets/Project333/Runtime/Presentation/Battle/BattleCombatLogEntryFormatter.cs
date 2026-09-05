@@ -48,8 +48,8 @@ namespace Project333.Runtime.Presentation.Battle
                 case BattleCombatLogEntryType.Attack:
                     return FormatAttack(entry, sourceName, targetName);
 
-                case BattleCombatLogEntryType.GuardRedirected:
-                    return $"{FormatPossessiveOwner(entry.SourceOwnerId)} {sourceName}" +
+                case BattleCombatLogEntryType.ShielderRedirected:
+                    return $"쉴더 효과로 {FormatPossessiveOwner(entry.SourceOwnerId)} {sourceName}" +
                            $"({FormatHpHistory(entry.SourceHpHistory, entry.SourceRemoved, entry.SourceDamagePrevented)})가 " +
                            $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName} 대신 피해를 받음";
 
@@ -73,6 +73,10 @@ namespace Project333.Runtime.Presentation.Battle
                 case BattleCombatLogEntryType.ResourceGained:
                     return $"{sourceName} 효과로 {FormatOwner(entry.SourceOwnerId)} " +
                            $"{FormatResource(entry.ResourceType)} +{Math.Max(0, entry.Amount)}";
+
+                case BattleCombatLogEntryType.ResourceSpent:
+                    return $"{sourceName} 효과로 {FormatOwner(entry.SourceOwnerId)} " +
+                           $"{FormatResource(entry.ResourceType)} {Math.Max(0, entry.Amount)} 소모";
 
                 case BattleCombatLogEntryType.DestroyedByMark:
                     return $"{sourceName} 효과로 {FormatPossessiveOwner(entry.TargetOwnerId)} " +
@@ -107,6 +111,11 @@ namespace Project333.Runtime.Presentation.Battle
                            $"{FormatPossessiveOwner(entry.SourceOwnerId)} 턴 시작";
 
                 case BattleCombatLogEntryType.BattleEnded:
+                    if (entry.IsDraw)
+                    {
+                        return "전투 종료: 무승부";
+                    }
+
                     return entry.TargetOwnerId == PlayerId.Player
                         ? "전투 종료: 플레이어 승리"
                         : "전투 종료: 플레이어 패배";
@@ -121,6 +130,10 @@ namespace Project333.Runtime.Presentation.Battle
                         ? "상대방이 로봇 공장으로 카드 1장을 획득"
                         : $"플레이어가 로봇 공장으로 {targetName}을 획득";
 
+                case BattleCombatLogEntryType.CardDrawn:
+                    return $"{sourceName} 효과로 {FormatOwner(entry.SourceOwnerId)} " +
+                           $"카드 {Math.Max(1, entry.Amount)}장 드로우";
+
                 case BattleCombatLogEntryType.SealboundApplied:
                     return $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName} 봉인 " +
                            $"(해제까지 소유자 턴 시작 {Math.Max(1, entry.Amount)}회)";
@@ -128,11 +141,40 @@ namespace Project333.Runtime.Presentation.Battle
                 case BattleCombatLogEntryType.SealboundReleased:
                     return $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName} 봉인 해제";
 
+                case BattleCombatLogEntryType.DemonKingRevivalStarted:
+                    return $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName}이 사망하여 봉인됨 " +
+                           $"(부활까지 {Math.Max(1, entry.Amount)}턴 시작)";
+
+                case BattleCombatLogEntryType.DemonKingRevived:
+                    return $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName}이 " +
+                           $"ATK/HP +{Math.Max(0, entry.AttackBonus)}을 얻고 부활";
+
+                case BattleCombatLogEntryType.HeroGrowth:
+                    return entry.AttackBonus > 0
+                        ? $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName}가 " +
+                          $"ATK +{Math.Max(0, entry.AttackBonus)}을 얻음"
+                        : $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName}가 " +
+                          $"HP +{Math.Max(0, entry.HpBonus)}을 얻음";
+
                 case BattleCombatLogEntryType.HidingApplied:
                     return $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName} 은신";
 
                 case BattleCombatLogEntryType.HidingRevealed:
                     return $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName} 은신 해제";
+
+                case BattleCombatLogEntryType.OccupantControlled:
+                    return $"{FormatActor(entry.SourceOwnerId)} {FormatPossessiveOwner(entry.TargetOwnerId)} " +
+                           $"{AppendObjectParticle(sourceName)} 복종시킴";
+
+                case BattleCombatLogEntryType.HuanShuApplied:
+                    return $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName}에게 환술 부여";
+
+                case BattleCombatLogEntryType.HuanShuCleared:
+                    return $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName} 환술 해제";
+
+                case BattleCombatLogEntryType.HuanShuRedirected:
+                    return $"환술로 {FormatPossessiveOwner(entry.SourceOwnerId)} {sourceName}의 공격 대상이 " +
+                           $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName}(으)로 변경됨";
 
                 default:
                     return string.Empty;
@@ -150,8 +192,23 @@ namespace Project333.Runtime.Presentation.Battle
             var targetHpText = $"({FormatHpHistory(entry.TargetHpHistory, entry.TargetRemoved, entry.TargetDamagePrevented)})";
             var attackerText = $"{FormatPossessiveOwner(entry.SourceOwnerId)} {sourceName}{sourceHpText}";
             var targetText = $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName}{targetHpText}";
-            var counterText = entry.HasCounterattack ? " [반격 발생]" : string.Empty;
-            return $"{AppendSubjectParticle(attackerText)} {targetText}을 공격{counterText}";
+            var attackText = FormatNormalAttack(entry.AttackType, entry.DamageType);
+            var counterText = entry.HasCounterattack ? "[반격함]" : string.Empty;
+            return $"{AppendSubjectParticle(attackerText)} {targetText}을 {attackText}{counterText}";
+        }
+
+        private static string FormatNormalAttack(AttackType attackType, DamageType damageType)
+        {
+            var rangeText = attackType == AttackType.Ranged ? "원거리 " : string.Empty;
+            var damageText = damageType switch
+            {
+                DamageType.Physical => "물리 ",
+                DamageType.Magic => "마법 ",
+                DamageType.Fixed => "고정 ",
+                _ => string.Empty
+            };
+
+            return $"{rangeText}{damageText}공격";
         }
 
         private static string FormatDamage(
@@ -163,6 +220,9 @@ namespace Project333.Runtime.Presentation.Battle
             {
                 BattleValueChangeCause.RedDragon => "레드 드래곤 효과로",
                 BattleValueChangeCause.Firewall => "파이어월 효과로",
+                BattleValueChangeCause.Piercing => "관통 효과로",
+                BattleValueChangeCause.NuclearPowerPlant => "원자력 발전소 폭발로",
+                BattleValueChangeCause.BiochemicalBomb => "생화학폭탄 효과로",
                 BattleValueChangeCause.DeckExhaustion => "덱 고갈로",
                 BattleValueChangeCause.Spell => $"{sourceName} 효과로",
                 _ => "카드 효과로"

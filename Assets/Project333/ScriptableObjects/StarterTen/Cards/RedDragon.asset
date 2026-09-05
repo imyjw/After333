@@ -23,8 +23,9 @@ MonoBehaviour:
   _affiliation: 1
   _chargeTileFootprint: 1
   _effectText: "\uB0B4 \uD134 \uC885\uB8CC \uC2DC \uC0C1\uB300\uBC29 \uD0C0\uC77C
-    \uC804\uCCB4\uC5D0 66 \uBB3C\uB9AC \uD53C\uD574"
+    \uC804\uCCB4\uC5D0 33 \uB9C8\uBC95 \uD53C\uD574"
   _specialEffectText: "\uBE44\uD589"
+  _hasReplicate: 0
   _boardSprite: {fileID: 954118651, guid: 344e1e15725a74e4e8b22f54f47c25cd, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: 96d2d0d396818d24dbc6380f8d565c28, type: 2}
   _attackType: 0
@@ -36,9 +37,17 @@ MonoBehaviour:
   _hitsPerAttack: 1
   _hasBerserker: 0
   _hasEndure: 0
-  _hasGuard: 0
+  _hasShielder: 0
+  _hasLifeSteal: 0
+  _hasRobot: 0
   _canMove: 1
+  _sealboundOwnerTurnStarts: 0
+  _hasHiding: 0
   _hasFlying: 1
+  _hasPiercing: 0
+  _spellPower: 0
+  _invincibleDuration: 0
+  _invincibleOwnerTurns: 0
   _isScience: 0
   _sciencePowerUpkeep: 0
   _turnStartResourceGain:

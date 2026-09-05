@@ -2,11 +2,14 @@
 
 이 문서는 새 카드 1장을 추가하거나 기존 카드를 수정할 때 따르는 표준 작업 순서다.
 
+현재 구현된 전체 카드와 아직 기획에만 남아 있는 카드는 `docs/card_catalog.md`에서 확인한다.
+
 핵심 원칙:
 
 - 전투와 서버가 읽는 카드 데이터의 기준은 `Assets/Project333/Resources/Project333/Data/cards.json`이다.
 - 카드 효과 문장만 추가하면 구현된 것이 아니다. 실제 전투 로직, UI, 서버 동기화, 테스트까지 연결되어야 한다.
 - 새 효과가 기존 규칙에 없으면 먼저 `docs/battle_rules.md`에 규칙을 고정한 뒤 구현한다.
+- 특수효과를 추가할 때는 `OccupantSpecialEffectTooltipCatalog`의 길게 누르기 툴팁과 해당 툴팁 테스트도 반드시 함께 추가한다.
 - 카드 추가 후에는 반드시 `Tools > Project333 > Data > Validate cards.json`를 실행한다.
 
 ## 1. 카드 규칙 먼저 확정
@@ -20,13 +23,25 @@
 - 전력 유지비: `sciencePowerUpkeep`, `specialEffectText: "전력 -n"`
 - 버서커: `hasBerserker: true`, `specialEffectText`에 `Berserker`
 - 엔듀어: `hasEndure: true`, `specialEffectText`에 `Endure`
-- 가드: `hasGuard: true`, `specialEffectText`에 `Guard`
+- 쉴더: `hasShielder: true`, `specialEffectText`에 `쉴더` 또는 `Shielder` (`hasGuard`는 구버전 JSON 읽기 전용 호환 필드)
 - 흡혈: `hasLifeSteal: true`, `specialEffectText`에 `LifeSteal`
 - 로봇: `hasRobot: true`, `specialEffectText`에 `로봇` 또는 `Robot`
 - 속공: `hasRush: true`, `specialEffectText`에 `속공` 또는 `Rush`; 손패에서 소환한 턴의 공격 제한만 해제
 - 복제: `hasReplicate: true`, `specialEffectText`에 `복제` 또는 `Replicate`; 성공적으로 사용하면 그 턴에만 유지되는 원본 비용의 사본 생성
 - 로봇 합체: `definitionType: "ScriptedSpell"`, `effectId: "robot_fusion"`; 같은 CardId도 각각 한 기로 세며 살아 있는 아군 로봇 유닛 2기 이상 필요
 - 로봇 공장: `Building`, `sciencePowerUpkeep: 1`; `hasRobot && includeInDraft`인 유닛 중 하나를 서버가 동일 확률로 생성
+- 발전소: `Building`, CardId `PowerPlant`; 전력 1로 소환, 일반 자원 획득 후 유지비 전에 골드 1을 자동 지불하고 전력 2 획득
+- 원자력 발전소: `Building`, CardId `NuclearPowerPlant`; 턴 시작 전력 +3은 `turnStartResourceGain`, 파괴 시 양쪽 전장 물리 피해 30은 `OccupantDestructionService`에서 처리
+- 보조배터리: `definitionType: "ScriptedSpell"`, `effectId: "power_bank"`; 골드 3 지불 후 즉시 전력 +6
+- 마정석: `definitionType: "ScriptedSpell"`, `effectId: "mana_stone"`; 골드 2 지불 후 즉시 마나 +3
+- 마정석 꾸러미: `definitionType: "ScriptedSpell"`, `effectId: "mana_stone_bundle"`; 골드 5 지불 후 즉시 마나 +9
+- 고독: `definitionType: "ScriptedSpell"`, `effectId: "gu"`; 기 10을 지불하고 합법적인 상대 유닛을 첫 번째 빈 아군 타일로 영구 이전
+- 환술: `definitionType: "ScriptedSpell"`, `effectId: "huan_shu"`; 기 3을 지불하고 상대 유닛의 일반 공격 대상을 영구적으로 서버가 무작위 변경
+- 상단: `Building`, CardId `MerchantCaravan`; 소유자의 턴 시작 자원 획득 단계에 골드 +3
+- 객잔: `Building`, CardId `Inn`; 소유자의 턴 시작 자원 획득 단계에 골드 +1
+- 웨어울프: `Unit`, CardId `Werewolf`; 현재 같은 아군 필드의 다른 살아 있는 웨어울프마다 ATK +10을 실시간 계산하며, 효과를 받는 자신은 방전·망각·봉인 상태가 아니어야 한다. 셀 때는 방전·망각 웨어울프를 포함하고 봉인·사망 웨어울프를 제외한다.
+- 용사: `Unit`, CardId `Hero`; 소환 시 `GlobalTurnEnds(3)` 무적을 얻고, 매 전역 턴 종료마다 서버가 ATK +13 또는 HP +13 중 하나를 같은 확률로 영구 부여한다.
+- 관통: `hasPiercing: true`, `specialEffectText`에 `관통` 또는 `Piercing`; 전열 일반공격의 각 타격 후 같은 열 후열에 별도 피해
 - 더블/트리플 어택: `hitsPerAttack: 2` 또는 `3`, `specialEffectText`에 `Double Attack` 또는 `Triple Attack`
 - 스크립트 마법: `definitionType: "ScriptedSpell"`, 지원 중인 `effectId`만 사용
 
@@ -34,7 +49,7 @@
 
 - 언제 발동하는가
 - 어떤 대상에게 적용되는가
-- 마스터, 건물, 방전(Drained), 망각(Erasure), Guard, Endure와 어떻게 상호작용하는가
+- 마스터, 건물, 방전(Drained), 망각(Erasure), Shielder, Endure와 어떻게 상호작용하는가
 - 서버 PvP에서도 같은 방식으로 처리할 수 있는가
 - 어떤 전투 이벤트와 연출이 필요한가
 
@@ -90,7 +105,7 @@ cardId:
 지속 시간과 종료 조건:
 중첩 가능 여부:
 마스터/유닛/건물 대상 여부:
-Guard/Endure/LifeSteal/Drained/Erasure 상호작용:
+Shielder/Endure/LifeSteal/Drained/Erasure 상호작용:
 다단히트 처리:
 필요한 전투 이벤트:
 필요한 이펙트/애니메이션/효과음:
@@ -104,7 +119,7 @@ Guard/Endure/LifeSteal/Drained/Erasure 상호작용:
 - `속성/Attribute`는 더 이상 사용하지 않는다.
 - `데미지 유형`은 `Physical`, `Magic`, `Fixed`, `None` 중 하나로 적는다.
 - 공격력이 있는 유닛/건물은 `None`을 사용할 수 없다.
-- 물리/마법 방어력은 `0` 이상의 정수이며, 현재 기존 카드들은 모두 `0/0`이다.
+- 물리/마법 방어력은 `0` 이상의 정수다. 기본값은 `0/0`이며, 현재 골렘은 `1/0`을 사용한다.
 - `강화 가능 여부`는 `강화 가능` 또는 `강화 불가능`으로 적는다.
 - `개발 상태`는 `기획 중`, `효과 개발 중`, `기능 검증 중`, `출시 가능`처럼 현재 단계를 적는다.
 - `덱 빌딩 등장`과 `랜덤 보상 등장`은 각각 `On` 또는 `Off`로 적는다.
@@ -163,6 +178,7 @@ Assets/Project333/Resources/Project333/Data/cards.json
   "sealboundOwnerTurnStarts": 0,
   "hasHiding": false,
   "hasFlying": false,
+  "hasPiercing": false,
   "spellPower": 0,
   "invincibleDuration": "None",
   "invincibleOwnerTurns": 0
@@ -174,15 +190,17 @@ Assets/Project333/Resources/Project333/Data/cards.json
 
 복제는 유닛, 건물, 마법 모두 사용할 수 있다. `hasReplicate: true`로 바꾸고 `specialEffectText`에 `복제` 또는 `Replicate`를 반드시 적는다. 총비용이 0인 카드도 허용한다. 복제 사본은 원본 CardDefinition의 비용과 규칙을 다시 사용하므로 손패에서 받은 임시 비용 감소나 임시 ATK/HP 변경을 상속하지 않지만, 계정의 전투 시작 카드 강화 레벨은 정상 적용한다. 사용하지 않은 사본은 소유자의 턴 종료 시 버린 카드 더미로 가지 않고 사라진다.
 
-봉인(`Sealbound`)은 구현되어 있다. 유닛 또는 건물에 `sealboundOwnerTurnStarts: n`을 사용하며, `0` 또는 필드 생략은 봉인 없음이다. `1` 이상이면 소환 즉시 봉인되고 이후 소유자의 턴 시작 마지막 단계마다 `1` 감소한다. `specialEffectText`에는 `봉인` 또는 `Sealbound`를 반드시 적는다. 봉인 중에는 공격·반격·이동·위치 교환·효과·유지비·대상 지정·피해·회복·버프·디버프·Guard·로봇 검색·전열차단에 참여하지 않으며 망각도 받지 않는다. 해제 턴에는 속공이 있을 때만 바로 공격할 수 있다.
+봉인(`Sealbound`)은 구현되어 있다. 유닛 또는 건물에 `sealboundOwnerTurnStarts: n`을 사용하며, `0` 또는 필드 생략은 봉인 없음이다. `1` 이상이면 소환 즉시 봉인되고 이후 소유자의 턴 시작 마지막 단계마다 `1` 감소한다. `specialEffectText`에는 `봉인` 또는 `Sealbound`를 반드시 적는다. 봉인 중에는 공격·반격·이동·위치 교환·효과·유지비·대상 지정·피해·회복·버프·디버프·Shielder·로봇 검색·전열차단에 참여하지 않으며 망각도 받지 않는다. 해제 턴에는 속공이 있을 때만 바로 공격할 수 있다.
 
-은신(`Hiding`)은 구현되어 있다. 유닛 전용 `hasHiding: true`를 사용하고 `specialEffectText`에는 `은신` 또는 `Hiding`을 반드시 적는다. 은신 중에는 상대 일반공격과 상대 단일 대상 마법의 지정을 막고 전열차단과 Guard에 참여하지 않는다. 합법적인 일반공격 선언 또는 Drained/Erasure 진입 시 영구 해제되며, 봉인 중에는 봉인이 우선되어 해제 후 은신 상태로 돌아온다. 건물과 마스터에는 사용할 수 없다.
+은신(`Hiding`)은 구현되어 있다. 유닛 전용 `hasHiding: true`를 사용하고 `specialEffectText`에는 `은신` 또는 `Hiding`을 반드시 적는다. 은신 중에는 상대 일반공격과 상대 단일 대상 마법의 지정을 막고 전열차단과 Shielder에 참여하지 않는다. 합법적인 일반공격 선언 또는 Drained/Erasure 진입 시 영구 해제되며, 봉인 중에는 봉인이 우선되어 해제 후 은신 상태로 돌아온다. 건물과 마스터에는 사용할 수 없다.
 
 비행(`Flying`)은 구현되어 있다. 유닛 또는 건물에 `hasFlying: true`를 사용하고 `specialEffectText`에는 `비행` 또는 `Flying`을 반드시 적는다. 비행 또는 원거리 공격자만 활성 비행 소환물을 일반공격할 수 있고, 비행 근접 공격자는 전열차단을 무시하며, 활성 비행 소환물은 전열차단을 하지 않는다. Drained와 Erasure는 비행을 억제하고, 봉인과 은신이 활성화되어 있으면 해당 상태의 대상 지정 규칙이 먼저 적용된다. 마스터의 비행은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
 
+관통(`Piercing`)은 구현되어 있다. 유닛 또는 공격 가능한 건물에 `hasPiercing: true`를 사용하고 `specialEffectText`에는 `관통` 또는 `Piercing`을 반드시 적는다. 실제 일반공격 대상이 전열이면 각 타격 후 같은 열 후열에 공격자의 동일한 타격 ATK와 데미지 유형으로 별도 피해를 준다. 후열 피해는 Shielder가 대신 받지 않고 반격도 발생하지 않지만, 후열 자신의 방어력·Drained·Invincible·Endure·Sealbound 판정은 정상 적용한다. 다단히트는 매 타격마다 발동하고 실제 후열 HP 감소량도 LifeSteal에 포함한다. HuanShu는 원래 클릭 대상이 아니라 서버가 확정한 실제 대상의 열을 사용한다. Erasure 중에는 관통이 무효화된다. 마스터의 관통은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
+
 주문력(`SpellPower`)은 구현되어 있다. 유닛 또는 건물에 `spellPower: n`을 사용하며 `0` 또는 필드 생략은 주문력 없음이다. `specialEffectText`에는 `주문력` 또는 `SpellPower`를 반드시 적는다. 살아 있고 효과가 활성화된 아군 소환물의 주문력을 합산해 Spell 카드가 만드는 Magic 피해에 더한다. Physical/Fixed 피해, 일반공격, 유닛·건물 효과에는 적용하지 않는다. 광역은 대상마다, 다단히트는 타격마다 전체 보너스를 적용하고, 지속마법은 손패에서 사용한 순간의 주문력을 고정한다. Drained·Erasure·Sealbound 상태에서는 제공하지 않지만 Hiding·Flying은 주문력을 억제하지 않는다. 마스터 주문력은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
 
-무적(`Invincible`)은 구현되어 있다. 유닛 또는 건물에 `invincibleDuration`을 사용하고 `specialEffectText`에는 `무적` 또는 `Invincible`을 반드시 적는다. 지원 값은 `Always`, `SummonTurn`, `OwnerTurnOnly`, `OpponentTurnOnly`, `UntilTurnEnd`, `OwnerTurns`이며, 무적이 없으면 `None` 또는 필드 생략이다. `OwnerTurns`를 사용할 때만 `invincibleOwnerTurns: n`에 `1` 이상의 값을 넣고 카드 문구는 `내 n턴 동안 무적`처럼 작성한다. 다른 지속 방식에서는 `invincibleOwnerTurns`를 `0`으로 둔다. 무적은 물리·마법·고정 피해로 인한 HP 감소를 막지만 대상 지정과 비피해 제거 효과는 막지 않는다. Drained와 Erasure는 무적을 억제하지만 지속 시간은 계속 흐르며, 재접속 시 각 무적 효과의 지속 방식과 남은 횟수가 복원된다. 마스터 무적은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
+무적(`Invincible`)은 구현되어 있다. 유닛 또는 건물에 `invincibleDuration`을 사용하고 `specialEffectText`에는 `무적` 또는 `Invincible`을 반드시 적는다. 지원 값은 `Always`, `SummonTurn`, `OwnerTurnOnly`, `OpponentTurnOnly`, `UntilTurnEnd`, `OwnerTurns`, `GlobalTurnEnds`이며, 무적이 없으면 `None` 또는 필드 생략이다. `OwnerTurns`와 `GlobalTurnEnds`를 사용할 때 `invincibleOwnerTurns: n`에 `1` 이상의 값을 넣는다. `OwnerTurns`는 소유자의 턴 종료 때만 감소하고 카드 문구는 `내 n턴 동안 무적`처럼 작성한다. `GlobalTurnEnds`는 어느 플레이어의 턴이든 끝날 때 감소하며 현재 용사의 소환 후 3회 무적에 사용한다. 다른 지속 방식에서는 `invincibleOwnerTurns`를 `0`으로 둔다. 무적은 물리·마법·고정 피해로 인한 HP 감소를 막지만 대상 지정과 비피해 제거 효과는 막지 않는다. Drained와 Erasure는 무적을 억제하지만 지속 시간은 계속 흐르며, 재접속 시 각 무적 효과의 지속 방식과 남은 횟수가 복원된다. 마스터 무적은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
 
 `hasRobot`은 로봇 유닛만 `true`로 둔다. 로봇 합체와 로봇 공장이 검색하는 분류 태그이며, Drained 중에는 유지되지만 Erasure 중에는 전투 규칙상 무효화된다.
 
@@ -205,6 +223,7 @@ Assets/Project333/Resources/Project333/Data/cards.json
   "health": 20,
   "physicalDefense": 0,
   "magicDefense": 0,
+  "hasPiercing": false,
   "spellPower": 0,
   "invincibleDuration": "None",
   "invincibleOwnerTurns": 0,
@@ -262,6 +281,8 @@ Assets/Project333/Resources/Project333/Data/cards.json
 | cardId | 카드 이름 | 종류 | 강화 가능 여부 | 기준 |
 | --- | --- | --- | --- | --- |
 | A-111 | A-111 | Unit | 강화 가능 | 유닛 |
+| A-301 | A-301 | Unit | 강화 가능 | 3·6·9·13레벨 ATK +1, 나머지 레벨 HP +1, 이미지 준비 전 드래프트·보상 제외 |
+| BiochemicalBomb | 생화학폭탄 | ScriptedSpell | 강화 가능 | 카드 레벨당 4회 지속 물리 피해 +1, 이미지 준비 전 드래프트·보상 제외 |
 | BlueDragon | 블루 드래곤 | Unit | 강화 가능 | 유닛 |
 | Cerberus | 케르베로스 | Unit | 강화 가능 | 유닛 |
 | ElfLongbowScout | 엘프 장궁수 | Unit | 강화 가능 | 유닛 |
@@ -271,6 +292,7 @@ Assets/Project333/Resources/Project333/Data/cards.json
 | GoldMiner | 금광 채굴꾼 | Unit | 강화 가능 | 유닛 |
 | Golem | 골렘 | Unit | 강화 가능 | 유닛 |
 | Gwangma | 광마 | Unit | 강화 가능 | 유닛 |
+| Inn | 객잔 | Building | 강화 가능 | 매 레벨 HP +1, 이미지 준비 전 드래프트·보상 제외 |
 | ManaPond | 마나의 샘 | Building | 강화 가능 | 건물 |
 | ManaWeaver | 마나 위버 | Unit | 강화 가능 | 유닛 |
 | RedDragon | 레드 드래곤 | Unit | 강화 가능 | 유닛 |
@@ -279,7 +301,16 @@ Assets/Project333/Resources/Project333/Data/cards.json
 | Vampire | 뱀파이어 | Unit | 강화 가능 | 유닛 |
 | CheonraJimang | 천라지망 | ScriptedSpell | 강화 불가능 | 강화 불가능 마법 |
 | Daehwandan | 대환단 | ScriptedSpell | 강화 불가능 | 강화 불가능 마법 |
+| TenThousandYearSnowGinseng | 영약: 만년설삼 | PersistentResourceSpell | 강화 불가능 | 다음 3번의 내 턴 시작마다 기 +3, 이미지 준비 전 드래프트 제외·랜덤 보상 제외 |
+| Gu | 고독 | ScriptedSpell | 강화 불가능 | 소유권 이전 마법, 이미지 준비 전 드래프트·보상 제외 |
+| HuanShu | 환술 | ScriptedSpell | 강화 불가능 | 영구적으로 일반 공격 대상 무작위 변경, 이미지 준비 전 드래프트·보상 제외 |
+| ManaStone | 마정석 | ScriptedSpell | 강화 불가능 | 즉시 자원 획득 마법, 이미지 준비 전 드래프트·보상 제외 |
+| ManaStoneBundle | 마정석 꾸러미 | ScriptedSpell | 강화 불가능 | 즉시 자원 획득 마법, 이미지 준비 전 드래프트·보상 제외 |
+| MerchantCaravan | 상단 | Building | 강화 가능 | 매 레벨 HP +1, 이미지 준비 전 드래프트·보상 제외 |
 | Microreactor | 초소형 발전기 | PersistentResourceSpell | 강화 불가능 | 강화 불가능 마법 |
+| PowerBank | 보조배터리 | ScriptedSpell | 강화 불가능 | 즉시 자원 획득 마법, 이미지 준비 전 드래프트·보상 제외 |
+| PowerPlant | 발전소 | Building | 강화 가능 | 매 레벨 HP +1, 이미지 준비 전 드래프트·보상 제외 |
+| NuclearPowerPlant | 원자력 발전소 | Building | 강화 가능 | 매 레벨 HP +1, 파괴 시 양쪽 전장 물리 피해 30, 이미지 준비 전 드래프트·보상 제외 |
 | RobotFusion | 로봇 합체 | ScriptedSpell | 강화 불가능 | 이미지 준비 전 드래프트·보상 제외 |
 | RobotFactory | 로봇 공장 | Building | 강화 가능 | 매 레벨 HP +1, 이미지 준비 전 드래프트·보상 제외 |
 
@@ -345,6 +376,28 @@ Assets/Project333/Resources/Project333/CardArtwork/firebolt.png
 - `CardDefinitionAsset`은 현재 드래프트 UI, 보드 비주얼, 일부 프리뷰 표시에서 여전히 사용된다.
 - 보드 애니메이션은 `cards.json`만으로 자동 생성되지 않는다.
 
+### 8.1. 파이어월·생화학폭탄 타일 이펙트 연결
+
+두 지속 마법은 서버가 발동 범위를 이벤트로 보내고, 각 클라이언트가 범위 안의 모든 타일에서 같은 프레임 애니메이션을 동시에 재생한다. 파이어월은 선택한 `5x1`의 5개 타일, 생화학폭탄은 선택한 `4x2`의 8개 타일에서 재생하며 빈 타일도 포함한다.
+
+`BattleBootstrapper` Inspector의 `Tile Area Spell Effects`에서 다음 값을 설정할 수 있다.
+
+- `Firewall Tile Effect Frames`: 파이어월 프레임을 재생 순서대로 등록
+- `Firewall Tile Effect Frames Per Second`: 파이어월 FPS
+- `Firewall Tile Effect Size`: 타일 하나를 기준으로 한 표시 크기
+- `Biochemical Bomb Tile Effect Frames`: 생화학폭탄 프레임을 재생 순서대로 등록
+- `Biochemical Bomb Tile Effect Frames Per Second`: 생화학폭탄 FPS
+- `Biochemical Bomb Tile Effect Size`: 타일 하나를 기준으로 한 표시 크기
+
+Inspector 배열을 비워 두고 아래 경로에 슬라이스된 스프라이트 시트를 넣어도 자동으로 불러온다.
+
+```text
+Assets/Project333/Resources/Project333/SpellEffects/Firewall-Sheet.png
+Assets/Project333/Resources/Project333/SpellEffects/BiochemicalBomb-Sheet.png
+```
+
+자동 로딩 프레임은 스프라이트 이름순으로 정렬되므로 이름을 `Firewall_00`, `Firewall_01`처럼 두 자리 번호로 짓는다. 에셋이 아직 없으면 연출만 생략하고 서버 피해 판정과 턴 진행은 기다림 없이 정상 처리된다.
+
 ## 9. 드래프트에 나오게 할지 결정
 
 새 카드가 드래프트에 나와야 한다면 다음을 확인한다.
@@ -386,7 +439,7 @@ dotnet build C:\Project_333\Server\Project333.PvpServer\Project333.PvpServer.csp
 - 보드 비주얼과 애니메이션이 맞게 재생되는가
 - 물리/마법/고정 피해가 대상 방어력 및 Drained 상태와 맞게 계산되는가
 - 다단히트라면 방어력이 매 타격마다 적용되는가
-- Guard 초과 피해와 LifeSteal 회복량이 최종 실제 피해를 기준으로 하는가
+- Shielder 초과 피해와 LifeSteal 회복량이 최종 실제 피해를 기준으로 하는가
 - 피해, 회복, 상태 표시, 죽음 처리 등이 의도대로 보이는가
 - PVP 서버 전투에서도 같은 결과가 내려오는가
 
