@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3009c6625a5e04942abb529a14d6fb06, type: 3}
+  m_Name: ManaStone
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.ScriptedSpellCardDefinitionAsset
+  _cardId: ManaStone
+  _displayName: "\uB9C8\uC815\uC11D"
+  _rarity: 0
+  _cost:
+    _mana: 0
+    _qi: 0
+    _power: 0
+    _gold: 2
+  _affiliation: 1
+  _chargeTileFootprint: 0
+  _effectText: "\uB9C8\uB098\uB97C 3 \uC5BB\uB294\uB2E4."
+  _specialEffectText: 
+  _hasReplicate: 0
+  _boardSprite: {fileID: 0}
+  _boardAnimatorController: {fileID: 0}
+  _effectId: mana_stone
+  _damage: 0
+  _damageType: 0
+  _triggerCount: 0

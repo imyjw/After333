@@ -1,0 +1,18 @@
+{
+  "name": "Project333.Runtime",
+  "rootNamespace": "Project333",
+  "references": [
+    "Unity.Newtonsoft.Json",
+    "Unity.TextMeshPro",
+    "UnityEngine.UI"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

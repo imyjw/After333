@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: af1424162e09842478be1b42c237e249, type: 3}
+  m_Name: SamplePowerTurret
+  m_EditorClassIdentifier: Assembly-CSharp::Project333.Runtime.Infrastructure.Data.BuildingCardDefinitionAsset
+  _cardId: sample_power_turret
+  _displayName: Sample Power Turret
+  _cost:
+    _mana: 0
+    _qi: 0
+    _power: 0
+    _gold: 4
+  _canAttack: 1
+  _attack: 2
+  _health: 7
+  _turnStartResourceGain:
+    _mana: 0
+    _qi: 0
+    _power: 1
+    _gold: 0
+  _canAttackOnSummon: 0

@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d156977586279774da74f0d5231a78e4, type: 3}
+  m_Name: Shaolin_1st_Disciple
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.UnitCardDefinitionAsset
+  _cardId: Shaolin_1st_Disciple
+  _displayName: "\uC18C\uB9BC 1\uB300 \uC81C\uC790"
+  _rarity: 0
+  _cost:
+    _mana: 0
+    _qi: 2
+    _power: 0
+    _gold: 0
+  _affiliation: 0
+  _chargeTileFootprint: 1
+  _effectText: 
+  _specialEffectText: "Endure(\uBD88\uAD74)"
+  _boardSprite: {fileID: 789711815, guid: 7f6419ec52e3f2b4b8fec26ea13a3d7c, type: 3}
+  _boardAnimatorController: {fileID: 9100000, guid: fec3ada55846bfd43ac706d0df39a397, type: 2}
+  _attackType: 0
+  _damageType: 1
+  _attack: 13
+  _health: 33
+  _physicalDefense: 0
+  _magicDefense: 0
+  _hitsPerAttack: 1
+  _hasBerserker: 0
+  _hasEndure: 1
+  _hasGuard: 0
+  _canMove: 1
+  _isScience: 0
+  _sciencePowerUpkeep: 0
+  _turnStartResourceGain:
+    _mana: 0
+    _qi: 0
+    _power: 0
+    _gold: 0
+  _maxAttacksPerTurn: 1
+  _canAttackOnSummon: 0

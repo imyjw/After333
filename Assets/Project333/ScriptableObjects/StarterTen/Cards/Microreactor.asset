@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9a3f1ad71d83aed4b8386fecdce840e9, type: 3}
+  m_Name: Microreactor
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.PersistentResourceSpellCardDefinitionAsset
+  _cardId: Microreactor
+  _displayName: "\uCD08\uC18C\uD615 \uBC1C\uC804\uAE30"
+  _rarity: 1
+  _cost:
+    _mana: 0
+    _qi: 0
+    _power: 1
+    _gold: 0
+  _affiliation: 2
+  _chargeTileFootprint: 0
+  _effectText: Gain +1 Power at the start of your next 3 turns.
+  _specialEffectText: 'Persistent Spell : Expires after next three turns. '
+  _effectId: Microreactor_Effect
+  _turnStartResourceGain:
+    _mana: 0
+    _qi: 0
+    _power: 1
+    _gold: 0
+  _ownerTurnStartsRemaining: 3
+  _endConditionText: Expires after next three turns.

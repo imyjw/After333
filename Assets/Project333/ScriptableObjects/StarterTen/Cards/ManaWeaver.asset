@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d156977586279774da74f0d5231a78e4, type: 3}
+  m_Name: ManaWeaver
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.UnitCardDefinitionAsset
+  _cardId: ManaWeaver
+  _displayName: "\uB9C8\uB098 \uC704\uBC84"
+  _rarity: 1
+  _cost:
+    _mana: 2
+    _qi: 0
+    _power: 0
+    _gold: 0
+  _affiliation: 1
+  _chargeTileFootprint: 1
+  _effectText: 
+  _specialEffectText: Mana +1
+  _boardSprite: {fileID: -1189008354, guid: d797ff20d0ca28845bf82b26f7e6396a, type: 3}
+  _boardAnimatorController: {fileID: 9100000, guid: 2e15f1178132d4c4e92eb0581ea0e21a, type: 2}
+  _attackType: 1
+  _damageType: 2
+  _attack: 5
+  _health: 10
+  _physicalDefense: 0
+  _magicDefense: 0
+  _hitsPerAttack: 1
+  _hasBerserker: 0
+  _hasEndure: 0
+  _hasGuard: 0
+  _canMove: 1
+  _isScience: 0
+  _sciencePowerUpkeep: 0
+  _turnStartResourceGain:
+    _mana: 1
+    _qi: 0
+    _power: 0
+    _gold: 0
+  _maxAttacksPerTurn: 1
+  _canAttackOnSummon: 0

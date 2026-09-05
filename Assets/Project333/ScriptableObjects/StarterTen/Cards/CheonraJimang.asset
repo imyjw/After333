@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3009c6625a5e04942abb529a14d6fb06, type: 3}
+  m_Name: CheonraJimang
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.ScriptedSpellCardDefinitionAsset
+  _cardId: CheonraJimang
+  _displayName: "\uCC9C\uB77C\uC9C0\uB9DD"
+  _rarity: 2
+  _cost:
+    _mana: 0
+    _qi: 5
+    _power: 0
+    _gold: 0
+  _affiliation: 0
+  _chargeTileFootprint: 0
+  _effectText: "\uC720\uB2DB\uC744 \uD558\uB098 \uC120\uD0DD\uD558\uACE0, \uB0B4
+    \uB2E4\uC74C\uD134 \uC2DC\uC791 \uC2DC \uADF8 \uC720\uB2DB \uD30C\uAD34"
+  _specialEffectText: 
+  _boardSprite: {fileID: 0}
+  _boardAnimatorController: {fileID: 0}
+  _effectId: cheonra_jimang
