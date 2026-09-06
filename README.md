@@ -145,8 +145,8 @@ docs/                            규칙, 설계, 설정 및 제작 가이드
 Unity Hub에서 **Unity `6000.3.12f1`**을 설치하고, .NET 8 SDK와 PostgreSQL을 준비합니다. Android 빌드에는 같은 Unity 버전의 Android Build Support, SDK/NDK, OpenJDK가 필요합니다.
 
 ```powershell
-git clone https://github.com/imyjw/Project-333.git
-cd Project-333
+git clone https://github.com/imyjw/After333.git
+cd After333
 ```
 
 PostgreSQL에 개발용 데이터베이스 `project333`을 만들고, 해당 DB와 테이블을 생성·수정할 수 있는 로그인 계정을 준비합니다. 아래 예시는 DB 계정 이름도 `project333`인 경우입니다. 다른 계정을 만들었다면 입력 값을 변경하세요.
