@@ -43,6 +43,7 @@
     <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\SpellCardDefinition.cs" Link="Shared\Infrastructure\Data\SpellCardDefinition.cs" />
     <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\UnitCardDefinition.cs" Link="Shared\Infrastructure\Data\UnitCardDefinition.cs" />
     <Content Include="..\..\Assets\Project333\Resources\Project333\Data\cards.json" Link="Data\cards.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Update="Data\pve_ai_decks.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Update="Persistence\Migrations\*.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

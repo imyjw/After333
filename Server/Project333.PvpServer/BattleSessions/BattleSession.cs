@@ -8,6 +8,7 @@ using Project333.Runtime.Domain.Effects;
 using Project333.Runtime.Domain.Resources;
 using Project333.Runtime.Infrastructure.Data;
 using Project333.PvpServer.Messages;
+using Project333.PvpServer.BattleResults;
 using ServerClientBattleCommandMessage = Project333.PvpServer.Messages.ClientBattleCommandMessage;
 using ServerTileCoordDto = Project333.PvpServer.Messages.TileCoordDto;
 using ServerOnlineBattleCommandType = Project333.PvpServer.Messages.OnlineBattleCommandType;
@@ -34,9 +35,14 @@ public sealed class BattleSession
 
     private BattleFlowController? _battleFlowController;
     private ICardDefinitionProvider? _cardDefinitionProvider;
+    private ICardUpgradeLevelProvider _cardDisplayUpgradeLevels = ZeroCardUpgradeLevelProvider.Instance;
     private AiDecisionService? _aiDecisionService;
-    private bool _hasConsumedRunResults;
-    private bool _hasConsumedPvpMatchResult;
+    private bool _aiPlanning;
+    private Guid _resultId = Guid.NewGuid();
+    private string _resultEndedReason = "normal";
+    private BattleResult? _finalResult;
+    private bool _resultQueued;
+    private readonly BattleResultOutbox? _resultOutbox;
     private long _turnTimerVersion;
     private PlayerId _turnTimerPlayerId;
     private DateTimeOffset _turnTimerDeadlineUtc;
@@ -45,11 +51,13 @@ public sealed class BattleSession
     public BattleSession(
         string matchId,
         bool useServerAiOpponent,
-        RandomFirstPlayerSelector? firstPlayerSelector = null)
+        RandomFirstPlayerSelector? firstPlayerSelector = null,
+        BattleResultOutbox? resultOutbox = null)
     {
         MatchId = matchId;
         UseServerAiOpponent = useServerAiOpponent;
         _firstPlayerSelector = firstPlayerSelector ?? new RandomFirstPlayerSelector();
+        _resultOutbox = resultOutbox;
     }
 
     public string MatchId { get; }
@@ -120,7 +128,8 @@ public sealed class BattleSession
                 return false;
             }
 
-            if (_connections.Count < RequiredHumanConnections)
+            if (_connections.Count < RequiredHumanConnections ||
+                _connections.Values.Any(c => c.MatchmakingJoinPending || !c.IsOpen))
             {
                 message = $"Waiting for a player. Connections in room: {_connections.Count}/{RequiredHumanConnections}.";
                 return false;
@@ -128,6 +137,7 @@ public sealed class BattleSession
 
             _cardDefinitionProvider = PrototypeCardDefinitions.LoadCardDefinitionProvider();
             var cardUpgradeLevelProvider = CreateCardUpgradeLevelProvider();
+            _cardDisplayUpgradeLevels = cardUpgradeLevelProvider;
             _aiDecisionService = UseServerAiOpponent
                 ? new AiDecisionService(_cardDefinitionProvider, cardUpgradeLevelProvider)
                 : null;
@@ -135,8 +145,9 @@ public sealed class BattleSession
                 _cardDefinitionProvider,
                 cardUpgradeLevelProvider);
             var playerDeckCardIds = ResolvePlayerDeckCardIds();
+            var selectedAiDeck = UseServerAiOpponent ? PveAiDeckCatalog.Default.SelectDeck() : null;
             var opponentDeckCardIds = UseServerAiOpponent
-                ? CreatePrototypeDeck("ai")
+                ? selectedAiDeck!.CardIds
                 : ResolveOpponentDeckCardIds();
             var firstPlayerId = _firstPlayerSelector.SelectFirstPlayer();
             _battleFlowController.StartBattle(new BattleSetupRequest(
@@ -157,18 +168,24 @@ public sealed class BattleSession
 
             var opponentLabel = UseServerAiOpponent ? "server AI" : "human player";
             var metadataSummary = FormatSeatMetadataSummary();
+            if (selectedAiDeck != null)
+                metadataSummary += $"AI deck: {selectedAiDeck.Id}. ";
             message = $"Battle started in match {MatchId}. Opponent is {opponentLabel}. PlayerA deck cards: {playerDeckCardIds.Count}. Opponent deck cards: {opponentDeckCardIds.Count}. {metadataSummary}Random first player: {FormatRuntimeSeat(firstPlayerId)}.";
             return true;
         }
     }
 
-    public IReadOnlyList<BattleEventDto> RunServerAiActionIfNeeded()
+    public IReadOnlyList<BattleEventDto> RunServerAiActionIfNeeded(bool forceEndTurn = false)
     {
+        BattleState observation;
+        BattleState expectedState;
+        AiDecisionService planner;
+        string expectedPosition;
         lock (_gate)
         {
             var battleEvents = new List<BattleEventDto>();
 
-            if (!UseServerAiOpponent ||
+            if (_aiPlanning || !UseServerAiOpponent ||
                 _battleFlowController?.CurrentBattleState == null ||
                 _battleFlowController.CurrentBattleState.IsEnded ||
                 _battleFlowController.CurrentBattleState.ActivePlayerId != PlayerId.AI)
@@ -204,32 +221,53 @@ public sealed class BattleSession
                 return battleEvents;
             }
 
-            var command = _aiDecisionService.GetNextCommand(battleState) ?? new EndTurnCommand();
+            expectedState = battleState;
+            expectedPosition = AiBattleStateCopy.PositionKey(battleState);
+            observation = AiBattleStateCopy.Create(battleState, hidePrivateZones: true);
+            planner = _aiDecisionService;
+            _aiPlanning = true;
+        }
+
+        // Do not hold the session lock while searching. Disconnects, timers and state reads remain responsive.
+        try
+        {
+            IBattleCommand command;
             try
             {
-                AppendRuntimeCommandEvents(battleEvents, PlayerId.AI, command);
+                command = forceEndTurn ? new EndTurnCommand() : planner.GetNextCommand(observation);
             }
             catch (Exception ex) when (ex is InvalidOperationException || ex is ArgumentException)
             {
-                battleEvents.Clear();
-                AppendAiFallbackEndTurnEvents(battleEvents, ex.Message);
+                Console.WriteLine($"[match:{MatchId}] AI planning failed; ending turn: {ex.Message}");
+                command = new EndTurnCommand();
             }
-
-            AppendCardDrawEvents(battleEvents);
-
-            if (battleEvents.Count == 0)
+            lock (_gate)
             {
-                battleEvents.Add(CreateStateChangedEvent(
-                    PlayerIdDto.AI,
-                    $"Server AI resolved {command.GetType().Name}."));
+                var battleEvents = new List<BattleEventDto>();
+                var current = _battleFlowController?.CurrentBattleState;
+                if (!ReferenceEquals(current, expectedState) || current == null || current.IsEnded ||
+                    current.ActivePlayerId != PlayerId.AI || current.Phase != PhaseType.Main ||
+                    AiBattleStateCopy.PositionKey(current) != expectedPosition) return battleEvents;
+                var combatLogBeforeSnapshot = CaptureBattleSnapshot(current);
+                try
+                {
+                    AppendRuntimeCommandEvents(battleEvents, PlayerId.AI, command);
+                }
+                catch (Exception ex) when (ex is InvalidOperationException || ex is ArgumentException)
+                {
+                    battleEvents.Clear();
+                    AppendAiFallbackEndTurnEvents(battleEvents, ex.Message);
+                }
+                AppendCardDrawEvents(battleEvents);
+                if (battleEvents.Count == 0)
+                    battleEvents.Add(CreateStateChangedEvent(PlayerIdDto.AI, $"Server AI resolved {command.GetType().Name}."));
+                AppendCombatLogEntries(battleEvents, combatLogBeforeSnapshot, CaptureBattleSnapshot(_battleFlowController!.CurrentBattleState));
+                return battleEvents;
             }
-
-            AppendCombatLogEntries(
-                battleEvents,
-                combatLogBeforeSnapshot,
-                CaptureBattleSnapshot(_battleFlowController.CurrentBattleState));
-
-            return battleEvents;
+        }
+        finally
+        {
+            lock (_gate) _aiPlanning = false;
         }
     }
 
@@ -307,6 +345,7 @@ public sealed class BattleSession
 
                 case ServerOnlineBattleCommandType.CastDamageSpell:
                 {
+                    var cardSpellDamage = CaptureCardSpellDamage(command.CardId, ToRuntimePlayerId(command.ActorId));
                     var beforeSnapshot = CaptureBattleSnapshot(_battleFlowController.CurrentBattleState);
                     _battleFlowController.ExecuteCommand(
                         ToRuntimePlayerId(command.ActorId),
@@ -315,7 +354,7 @@ public sealed class BattleSession
                             ToRuntimePlayerId(command.TargetOwnerId),
                             ToTileCoord(command.TargetCoord, "target"),
                             command.HandCardRuntimeId));
-                    battleEvents.Add(CreateSpellCastEvent(command, SumDamageValuePopupEvents()));
+                    battleEvents.Add(CreateSpellCastEvent(command, SumDamageValuePopupEvents(), cardSpellDamage));
                     AppendValuePopupEvents(battleEvents, command.ActorId);
                     AppendRemovedOccupantEvents(battleEvents, beforeSnapshot, CaptureBattleSnapshot(_battleFlowController.CurrentBattleState));
                     AppendBattleEndedEventIfNeeded(battleEvents);
@@ -333,6 +372,7 @@ public sealed class BattleSession
 
                 case ServerOnlineBattleCommandType.CastScriptedSpell:
                 {
+                    var cardSpellDamage = CaptureCardSpellDamage(command.CardId, ToRuntimePlayerId(command.ActorId));
                     var beforeSnapshot = CaptureBattleSnapshot(_battleFlowController.CurrentBattleState);
                     var selectedTargetCoords = ToTileCoords(command.SelectedTargetCoords);
                     var hasMultipleTargets = selectedTargetCoords.Count > 0;
@@ -365,8 +405,8 @@ public sealed class BattleSession
                     else
                     {
                         battleEvents.Add(command.HasTarget
-                            ? CreateSpellCastEvent(command, SumDamageValuePopupEvents())
-                            : CreateSpellCastEvent(command.CardId, command.ActorId));
+                            ? CreateSpellCastEvent(command, SumDamageValuePopupEvents(), cardSpellDamage)
+                            : CreateSpellCastEvent(command.CardId, command.ActorId, cardSpellDamage));
                         AppendMovedOccupantEvents(battleEvents, beforeSnapshot, afterSnapshot);
                     }
 
@@ -427,6 +467,7 @@ public sealed class BattleSession
 
                     var actorId = ToRuntimePlayerId(command.ActorId);
                     var winnerId = battleState.GetOpponent(actorId).Id;
+                    _resultEndedReason = "forfeit";
                     battleState.EndBattle(winnerId);
                     battleEvents.Add(CreateStateChangedEvent(
                         command.ActorId,
@@ -509,18 +550,7 @@ public sealed class BattleSession
                 ApplyTurnTimer(aiView);
             }
 
-            var connections = _connections.Values
-                .Select(connection => new BattleSessionConnectionSnapshot(
-                    connection.ConnectionId,
-                    connection.AccountId,
-                    connection.DisplayName,
-                    connection.AssignedSeatId.ToString(),
-                    connection.AssignedOnlineSeatId.ToString(),
-                    connection.RunId,
-                    connection.DeckId,
-                    connection.HasAssignedSeat,
-                    connection.IsOpen))
-                .ToList();
+            var connections = _connections.Values.Select(CreateConnectionSnapshot).ToList();
 
             return new BattleSessionPersistenceSnapshot(
                 MatchId,
@@ -534,7 +564,13 @@ public sealed class BattleSession
                 playerView,
                 aiView,
                 connections,
-                _combatLogRecords.ToList());
+                _combatLogRecords.ToList(),
+                _seatMetadata.Select(pair => new BattleSessionParticipantSnapshot(
+                    pair.Key.ToString(), ToOnlineSeatId(pair.Key).ToString(),
+                    pair.Value.AccountId, pair.Value.RunId, pair.Value.DeckId,
+                    pair.Value.DeckCardIds.ToArray(),
+                    new Dictionary<string, int>(pair.Value.CardUpgradeLevels))).ToArray(),
+                _resultId, _resultEndedReason);
         }
     }
 
@@ -553,11 +589,20 @@ public sealed class BattleSession
                 return false;
             }
 
+            RestoreSeatMetadata(snapshot);
+            // Legacy active snapshots use a stable server-derived ID on repeated recovery.
+            // Already-ended legacy snapshots have no receipt history; do not replay them.
+            if (snapshot.ResultId == Guid.Empty && snapshot.IsBattleEnded)
+                throw new InvalidOperationException("A legacy ended battle has no safe result replay identity.");
+            _resultId = snapshot.ResultId != Guid.Empty ? snapshot.ResultId : new Guid(
+                System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("legacy-battle:" + MatchId)).AsSpan(0, 16));
+            _resultEndedReason = snapshot.ResultEndedReason;
             _cardDefinitionProvider = PrototypeCardDefinitions.LoadCardDefinitionProvider();
             var cardUpgradeLevelProvider = CreateCardUpgradeLevelProvider();
             _aiDecisionService = UseServerAiOpponent
                 ? new AiDecisionService(_cardDefinitionProvider, cardUpgradeLevelProvider)
                 : null;
+            _cardDisplayUpgradeLevels = cardUpgradeLevelProvider;
             _battleFlowController = PrototypeCardDefinitions.CreateBattleFlowController(
                 _cardDefinitionProvider,
                 cardUpgradeLevelProvider);
@@ -588,7 +633,6 @@ public sealed class BattleSession
                 ? 0
                 : _combatLogRecords.Max(record => record.Sequence);
 
-            RestoreSeatMetadata(snapshot);
             return true;
         }
     }
@@ -610,8 +654,18 @@ public sealed class BattleSession
                 return false;
             }
 
-            var seatId = ParseDtoPlayerId(runtimeSeatId, PlayerIdDto.Player);
-            var parsedOnlineSeatId = ParseOnlineSeatId(onlineSeatId, ToOnlineSeatId(seatId));
+            if (!Enum.TryParse<PlayerIdDto>(runtimeSeatId, out var seatId) || !SeatOrder.Contains(seatId) ||
+                !Enum.TryParse<OnlineBattleSeatId>(onlineSeatId, out var parsedOnlineSeatId))
+            {
+                return false;
+            }
+            if (!_seatMetadata.TryGetValue(seatId, out var participant) ||
+                parsedOnlineSeatId != ToOnlineSeatId(seatId) ||
+                !string.Equals(participant.ReconnectIdentityKey,
+                    string.IsNullOrWhiteSpace(accountId) ? playerToken : accountId.Trim(), StringComparison.Ordinal))
+            {
+                return false;
+            }
             _pendingDisconnectReservations[seatId] = new PendingDisconnectReservation(
                 seatId,
                 string.IsNullOrWhiteSpace(accountId) ? playerToken ?? string.Empty : accountId.Trim(),
@@ -801,7 +855,8 @@ public sealed class BattleSession
     {
         lock (_gate)
         {
-            if (_connections.Count >= MaximumConnections)
+            if (_connections.Count >= MaximumConnections || _connections.Values.Any(c =>
+                string.Equals(GetReconnectIdentityKey(c), GetReconnectIdentityKey(connection), StringComparison.Ordinal)))
             {
                 errorMessage = $"Match {MatchId} is full.";
                 return false;
@@ -864,6 +919,8 @@ public sealed class BattleSession
                 string.IsNullOrWhiteSpace(previousConnectionId) ||
                 !_connections.TryGetValue(previousConnectionId, out var existing) ||
                 !existing.HasAssignedSeat ||
+                !_seatMetadata.TryGetValue(existing.AssignedSeatId, out var participant) ||
+                !string.Equals(participant.ReconnectIdentityKey, reconnectIdentityKey, StringComparison.Ordinal) ||
                 !string.Equals(
                     GetReconnectIdentityKey(existing),
                     reconnectIdentityKey,
@@ -894,6 +951,11 @@ public sealed class BattleSession
     {
         lock (_gate)
         {
+            if (!_connections.TryGetValue(connection.ConnectionId, out var registered) ||
+                !ReferenceEquals(registered, connection))
+            {
+                throw new InvalidOperationException("Only the registered connection may refresh its participant metadata.");
+            }
             RecordConnectionMetadata(connection);
         }
     }
@@ -902,86 +964,85 @@ public sealed class BattleSession
     {
         lock (_gate)
         {
-            return _connections.Remove(connectionId);
+            if (!_connections.Remove(connectionId, out var removed))
+            {
+                return false;
+            }
+            if (_battleFlowController?.CurrentBattleState == null)
+            {
+                _seatMetadata.Remove(removed.AssignedSeatId);
+            }
+            return true;
         }
     }
 
-    public IReadOnlyList<BattleRunResultRecord> ConsumePendingRunResultRecords()
+    public BattleResult? GetFinalResult()
     {
         lock (_gate)
         {
-            var battleState = _battleFlowController?.CurrentBattleState;
-            if (_hasConsumedRunResults ||
-                battleState?.Result == null ||
-                !battleState.Result.HasResult)
-            {
-                return Array.Empty<BattleRunResultRecord>();
-            }
-
-            if (battleState.Result.IsDraw)
-            {
-                _hasConsumedRunResults = true;
-                return Array.Empty<BattleRunResultRecord>();
-            }
-
-            var winnerSeatId = ToDtoPlayerId(battleState.Result.Winner);
+            if (_finalResult != null) return _finalResult;
+            var state = _battleFlowController?.CurrentBattleState;
+            if (state?.Result == null || !state.Result.HasResult) return null;
             var records = new List<BattleRunResultRecord>();
             foreach (var seatId in SeatOrder)
             {
                 if (!_seatMetadata.TryGetValue(seatId, out var metadata) ||
-                    string.IsNullOrWhiteSpace(metadata.RunId) ||
-                    string.IsNullOrWhiteSpace(metadata.DeckId))
-                {
-                    continue;
-                }
-
-                records.Add(new BattleRunResultRecord(
-                    seatId,
-                    ToOnlineSeatId(seatId),
-                    metadata.RunId,
-                    metadata.DeckId,
-                    seatId == winnerSeatId));
+                    string.IsNullOrWhiteSpace(metadata.AccountId) ||
+                    string.IsNullOrWhiteSpace(metadata.RunId) || string.IsNullOrWhiteSpace(metadata.DeckId)) continue;
+                records.Add(new BattleRunResultRecord(seatId, ToOnlineSeatId(seatId), metadata.AccountId,
+                    metadata.RunId, metadata.DeckId, !state.Result.IsDraw && seatId == ToDtoPlayerId(state.Result.Winner)));
             }
-
-            if (records.Count > 0)
-            {
-                _hasConsumedRunResults = true;
-            }
-
-            return records;
+            _finalResult = new BattleResult(_resultId, MatchId, UseServerAiOpponent, state.Result.IsDraw,
+                state.Result.IsDraw ? OnlineBattleSeatId.None : ToOnlineSeatId(state.Result.Winner),
+                _resultEndedReason, records).ValidatedCopy();
+            return _finalResult;
         }
     }
 
-    public bool TryConsumePendingPvpMatchResult(
-        out OnlineBattleSeatId winnerSeatId,
-        out bool isDraw)
+    public void ConfirmMatchmakingJoin(BattleClientConnection connection)
     {
         lock (_gate)
         {
-            winnerSeatId = OnlineBattleSeatId.None;
-            isDraw = false;
-            var battleState = _battleFlowController?.CurrentBattleState;
-            if (UseServerAiOpponent ||
-                _hasConsumedPvpMatchResult ||
-                battleState?.Result == null ||
-                !battleState.Result.HasResult)
-            {
-                return false;
-            }
-
-            if (battleState.Result.IsDraw)
-            {
-                isDraw = true;
-                _hasConsumedPvpMatchResult = true;
-                return true;
-            }
-
-            winnerSeatId = ToOnlineSeatId(battleState.Result.Winner);
-            _hasConsumedPvpMatchResult = true;
-            return winnerSeatId != OnlineBattleSeatId.None &&
-                   winnerSeatId != OnlineBattleSeatId.ServerAI;
+            if (!_connections.TryGetValue(connection.ConnectionId, out var registered) || !ReferenceEquals(registered, connection))
+                throw new InvalidOperationException("Only the registered connection can complete matchmaking.");
+            connection.MatchmakingJoinPending = false;
+            connection.MatchmakingReservationId = null;
         }
     }
+
+    public BattleDisconnect? DetachConnection(BattleClientConnection connection, TimeSpan gracePeriod)
+    {
+        lock (_gate)
+        {
+            if (!_connections.TryGetValue(connection.ConnectionId, out var registered) ||
+                !ReferenceEquals(registered, connection)) return null;
+            var reserved = TryCreateDisconnectReconnectGraceEnvelope(connection, gracePeriod,
+                out var envelope, out var seat, out var identity, out var deadline);
+            // Reservation and removal are atomic with respect to a reconnect/takeover.
+            RemoveConnection(connection.ConnectionId);
+            return new BattleDisconnect(reserved, envelope, seat, identity, deadline);
+        }
+    }
+
+    private void CaptureResultIfEnded()
+    {
+        if (_resultQueued || _resultOutbox == null) return;
+        var result = GetFinalResult();
+        if (result == null) return;
+        _resultOutbox.Capture(result);
+        _resultQueued = true;
+    }
+
+    public Task PersistResultAsync(CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            CaptureResultIfEnded();
+            return _finalResult == null || _resultOutbox == null ? Task.CompletedTask :
+                _resultOutbox.DeliverAsync(_resultId, cancellationToken);
+        }
+    }
+
 
     public bool TryDelayCurrentPlayerTurnTimerForServerAiPresentation(TimeSpan presentationDelay)
     {
@@ -1102,6 +1163,8 @@ public sealed class BattleSession
 
             _pendingDisconnectReservations.Clear();
             _battleFlowController.CurrentBattleState.EndBattle(winnerId);
+            _resultEndedReason = "reconnect_timeout";
+            CaptureResultIfEnded();
 
             envelope = new OnlineBattleEnvelope
             {
@@ -1350,7 +1413,7 @@ public sealed class BattleSession
 
     private bool TryAssignSeat(BattleClientConnection connection)
     {
-        if (connection.HasAssignedSeat)
+        if (connection.HasAssignedSeat && _battleFlowController?.CurrentBattleState == null)
         {
             return true;
         }
@@ -1364,6 +1427,8 @@ public sealed class BattleSession
 
         foreach (var seatId in SeatOrder)
         {
+            if (connection.ReservedOnlineSeatId != OnlineBattleSeatId.None &&
+                ToOnlineSeatId(seatId) != connection.ReservedOnlineSeatId) continue;
             if (_connections.Values.Any(existing => existing.HasAssignedSeat && existing.AssignedSeatId == seatId))
             {
                 continue;
@@ -1391,6 +1456,8 @@ public sealed class BattleSession
             if (!_pendingDisconnectReservations.TryGetValue(seatId, out var reservation) ||
                 reservation.ReconnectDeadlineUtc <= DateTimeOffset.UtcNow ||
                 !string.Equals(reservation.ReconnectIdentityKey, reconnectIdentityKey, StringComparison.Ordinal) ||
+                !_seatMetadata.TryGetValue(seatId, out var participant) ||
+                !string.Equals(participant.ReconnectIdentityKey, reconnectIdentityKey, StringComparison.Ordinal) ||
                 _connections.Values.Any(existing => existing.HasAssignedSeat && existing.AssignedSeatId == seatId))
             {
                 continue;
@@ -1442,6 +1509,7 @@ public sealed class BattleSession
 
             case CastDamageSpellCommand castDamageSpellCommand:
             {
+                var cardSpellDamage = CaptureCardSpellDamage(castDamageSpellCommand.CardId, actorId);
                 var beforeSnapshot = CaptureBattleSnapshot(_battleFlowController.CurrentBattleState);
                 _battleFlowController.ExecuteCommand(actorId, castDamageSpellCommand);
                 battleEvents.Add(CreateSpellCastEvent(
@@ -1449,7 +1517,7 @@ public sealed class BattleSession
                     actorDto,
                     castDamageSpellCommand.TargetOwnerId,
                     castDamageSpellCommand.TargetCoord,
-                    SumDamageValuePopupEvents()));
+                    SumDamageValuePopupEvents(), cardSpellDamage));
                 AppendValuePopupEvents(battleEvents, actorDto);
                 AppendRemovedOccupantEvents(battleEvents, beforeSnapshot, CaptureBattleSnapshot(_battleFlowController.CurrentBattleState));
                 AppendBattleEndedEventIfNeeded(battleEvents);
@@ -1465,6 +1533,7 @@ public sealed class BattleSession
 
             case CastScriptedSpellCommand castScriptedSpellCommand:
             {
+                var cardSpellDamage = CaptureCardSpellDamage(castScriptedSpellCommand.CardId, actorId);
                 var beforeSnapshot = CaptureBattleSnapshot(_battleFlowController.CurrentBattleState);
                 _battleFlowController.ExecuteCommand(actorId, castScriptedSpellCommand);
                 var afterSnapshot = CaptureBattleSnapshot(_battleFlowController.CurrentBattleState);
@@ -1484,13 +1553,13 @@ public sealed class BattleSession
                         actorDto,
                         castScriptedSpellCommand.TargetOwnerId,
                         castScriptedSpellCommand.TargetCoord,
-                        SumDamageValuePopupEvents()));
+                        SumDamageValuePopupEvents(), cardSpellDamage));
                 }
                 else
                 {
                     battleEvents.Add(CreateSpellCastEvent(
                         castScriptedSpellCommand.CardId,
-                        actorDto));
+                        actorDto, cardSpellDamage));
                 }
 
                 if (!castScriptedSpellCommand.HasMultipleTargets)
@@ -1717,14 +1786,27 @@ public sealed class BattleSession
         return result;
     }
 
-    private static BattleEventDto CreateSpellCastEvent(ServerClientBattleCommandMessage command, int damageAmount)
+    private int? CaptureCardSpellDamage(string? cardId, PlayerId ownerId)
+    {
+        if (_cardDefinitionProvider == null || string.IsNullOrWhiteSpace(cardId))
+            return null;
+
+        // Capture before resolution: a spell may remove its caster's SpellPower sources.
+        var definition = _cardDefinitionProvider.GetRequired(cardId);
+        var level = _cardDisplayUpgradeLevels.GetUpgradeLevel(ownerId, cardId);
+        var spellPower = SpellPowerRules.GetTotal(_battleFlowController!.CurrentBattleState, ownerId);
+        return CardStatDisplay.TryGetSpellDamage(definition, level, spellPower, out var damage)
+            ? damage : null;
+    }
+
+    private static BattleEventDto CreateSpellCastEvent(ServerClientBattleCommandMessage command, int damageAmount, int? cardSpellDamage = null)
     {
         return CreateSpellCastEvent(
             command.CardId ?? string.Empty,
             command.ActorId,
             ToRuntimePlayerId(command.TargetOwnerId),
             ToTileCoord(command.TargetCoord, "target"),
-            damageAmount);
+            damageAmount, cardSpellDamage);
     }
 
     private static BattleEventDto CreateSpellCastEvent(
@@ -1732,7 +1814,8 @@ public sealed class BattleSession
         PlayerIdDto sourceOwnerId,
         PlayerId targetOwnerId,
         TileCoord targetCoord,
-        int damageAmount)
+        int damageAmount,
+        int? cardSpellDamage = null)
     {
         return new BattleEventDto
         {
@@ -1743,11 +1826,12 @@ public sealed class BattleSession
             CardId = cardId ?? string.Empty,
             SourceCardId = cardId ?? string.Empty,
             Amount = Math.Max(0, damageAmount),
+            CardSpellDamage = cardSpellDamage,
             Message = $"SpellCast {cardId}"
         };
     }
 
-    private static BattleEventDto CreateSpellCastEvent(string cardId, PlayerIdDto sourceOwnerId)
+    private static BattleEventDto CreateSpellCastEvent(string cardId, PlayerIdDto sourceOwnerId, int? cardSpellDamage = null)
     {
         return new BattleEventDto
         {
@@ -1756,6 +1840,7 @@ public sealed class BattleSession
             TargetOwnerId = sourceOwnerId,
             CardId = cardId ?? string.Empty,
             SourceCardId = cardId ?? string.Empty,
+            CardSpellDamage = cardSpellDamage,
             Message = $"SpellCast {cardId}"
         };
     }
@@ -2205,6 +2290,7 @@ public sealed class BattleSession
         }
 
         _pendingDisconnectReservations.Clear();
+        CaptureResultIfEnded();
         if (battleState.Result.IsDraw)
         {
             battleEvents.Add(new BattleEventDto
@@ -2842,25 +2928,40 @@ public sealed class BattleSession
     private void RestoreSeatMetadata(BattleSessionPersistenceSnapshot snapshot)
     {
         _seatMetadata.Clear();
+        // Participant snapshots survive disconnects, unlike the list of live connections.
+        if (snapshot.Participants != null)
+        {
+            foreach (var participant in snapshot.Participants)
+            {
+                AddRestoredParticipant(participant);
+            }
+            return;
+        }
+
+        // Legacy snapshots may recover only identities actually stored by the server.
+        // Missing disconnected participants must never be reconstructed from a JoinMatch request.
         foreach (var connection in snapshot.Connections ?? Array.Empty<BattleSessionConnectionSnapshot>())
         {
-            var seatId = ParseDtoPlayerId(connection.RuntimeSeatId, PlayerIdDto.Player);
-            if (!_seatMetadata.TryGetValue(seatId, out var metadata))
-            {
-                metadata = new BattleSeatMetadata();
-                _seatMetadata[seatId] = metadata;
-            }
-
-            if (!string.IsNullOrWhiteSpace(connection.RunId))
-            {
-                metadata.RunId = connection.RunId.Trim();
-            }
-
-            if (!string.IsNullOrWhiteSpace(connection.DeckId))
-            {
-                metadata.DeckId = connection.DeckId.Trim();
-            }
+            if (!connection.HasAssignedSeat) continue;
+            AddRestoredParticipant(new BattleSessionParticipantSnapshot(
+                connection.RuntimeSeatId, connection.OnlineSeatId, connection.AccountId,
+                connection.RunId, connection.DeckId, Array.Empty<string>(), new Dictionary<string, int>()));
         }
+    }
+
+    private void AddRestoredParticipant(BattleSessionParticipantSnapshot participant)
+    {
+        if (!Enum.TryParse<PlayerIdDto>(participant.RuntimeSeatId, out var seatId) ||
+            !SeatOrder.Contains(seatId) ||
+            !Enum.TryParse<OnlineBattleSeatId>(participant.OnlineSeatId, out var onlineSeatId) ||
+            onlineSeatId != ToOnlineSeatId(seatId) || _seatMetadata.ContainsKey(seatId))
+        {
+            throw new InvalidOperationException("Invalid or duplicate participant in server battle snapshot.");
+        }
+        _seatMetadata.Add(seatId, new BattleSeatMetadata(
+            participant.AccountId, participant.RunId, participant.DeckId,
+            participant.DeckCardIds ?? Array.Empty<string>(),
+            participant.CardUpgradeLevels ?? new Dictionary<string, int>(), participant.AccountId));
     }
 
     private static ResourceSet RestoreResourceSet(BattleSessionResourceSnapshot? snapshot)
@@ -4166,9 +4267,24 @@ public sealed class BattleSession
 
     private sealed class BattleSeatMetadata
     {
-        public string RunId { get; set; } = string.Empty;
+        public BattleSeatMetadata(string accountId, string runId, string deckId,
+            IEnumerable<string> deckCardIds, IEnumerable<KeyValuePair<string, int>> cardUpgradeLevels, string reconnectIdentityKey)
+        {
+            AccountId = (accountId ?? string.Empty).Trim();
+            RunId = (runId ?? string.Empty).Trim();
+            DeckId = (deckId ?? string.Empty).Trim();
+            ReconnectIdentityKey = reconnectIdentityKey ?? string.Empty;
+            DeckCardIds = Array.AsReadOnly(deckCardIds.ToArray());
+            CardUpgradeLevels = new System.Collections.ObjectModel.ReadOnlyDictionary<string, int>(
+                cardUpgradeLevels.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase));
+        }
 
-        public string DeckId { get; set; } = string.Empty;
+        public string AccountId { get; }
+        public string RunId { get; }
+        public string DeckId { get; }
+        public string ReconnectIdentityKey { get; }
+        public IReadOnlyList<string> DeckCardIds { get; }
+        public IReadOnlyDictionary<string, int> CardUpgradeLevels { get; }
     }
 
     private static IReadOnlyList<string> CreatePrototypeDeck(string ownerPrefix)
@@ -4221,17 +4337,12 @@ public sealed class BattleSession
     private ICardUpgradeLevelProvider CreateCardUpgradeLevelProvider()
     {
         var provider = new InMemoryCardUpgradeLevelProvider();
-        foreach (var connection in _connections.Values)
+        foreach (var pair in _seatMetadata)
         {
-            if (connection == null || !connection.HasAssignedSeat)
+            var ownerId = ToRuntimePlayerId(pair.Key);
+            foreach (var upgrade in pair.Value.CardUpgradeLevels)
             {
-                continue;
-            }
-
-            var ownerId = ToRuntimePlayerId(connection.AssignedSeatId);
-            foreach (var pair in connection.CardUpgradeLevels)
-            {
-                provider.SetUpgradeLevel(ownerId, pair.Key, pair.Value);
+                provider.SetUpgradeLevel(ownerId, upgrade.Key, upgrade.Value);
             }
         }
 
@@ -4240,13 +4351,8 @@ public sealed class BattleSession
 
     private IReadOnlyList<string> ResolveDeckCardIds(PlayerIdDto seatId, string fallbackOwnerPrefix)
     {
-        var connection = _connections.Values.FirstOrDefault(candidate =>
-            candidate.HasAssignedSeat &&
-            candidate.AssignedSeatId == seatId &&
-            candidate.PlayerDeckCardIds.Count > 0);
-
-        return connection != null
-            ? new List<string>(connection.PlayerDeckCardIds)
+        return _seatMetadata.TryGetValue(seatId, out var participant) && participant.DeckCardIds.Count > 0
+            ? participant.DeckCardIds
             : CreatePrototypeDeck(fallbackOwnerPrefix);
     }
 
@@ -4288,21 +4394,37 @@ public sealed class BattleSession
             return;
         }
 
-        if (!_seatMetadata.TryGetValue(connection.AssignedSeatId, out var metadata))
+        if (_battleFlowController?.CurrentBattleState != null)
         {
-            metadata = new BattleSeatMetadata();
-            _seatMetadata[connection.AssignedSeatId] = metadata;
+            if (!_seatMetadata.TryGetValue(connection.AssignedSeatId, out var participant) ||
+                !string.Equals(participant.ReconnectIdentityKey, GetReconnectIdentityKey(connection), StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Battle participant identity cannot change after battle start.");
+            }
+            connection.AccountId = participant.AccountId;
+            connection.RunId = participant.RunId;
+            connection.DeckId = participant.DeckId;
+            connection.PlayerDeckCardIds.Clear();
+            connection.PlayerDeckCardIds.AddRange(participant.DeckCardIds);
+            connection.CardUpgradeLevels.Clear();
+            foreach (var upgrade in participant.CardUpgradeLevels)
+                connection.CardUpgradeLevels[upgrade.Key] = upgrade.Value;
+            return;
         }
 
-        if (!string.IsNullOrWhiteSpace(connection.RunId))
-        {
-            metadata.RunId = connection.RunId.Trim();
-        }
+        _seatMetadata[connection.AssignedSeatId] = new BattleSeatMetadata(
+            connection.AccountId, connection.RunId, connection.DeckId,
+            connection.PlayerDeckCardIds, connection.CardUpgradeLevels, GetReconnectIdentityKey(connection));
+    }
 
-        if (!string.IsNullOrWhiteSpace(connection.DeckId))
-        {
-            metadata.DeckId = connection.DeckId.Trim();
-        }
+    private BattleSessionConnectionSnapshot CreateConnectionSnapshot(BattleClientConnection connection)
+    {
+        _seatMetadata.TryGetValue(connection.AssignedSeatId, out var participant);
+        return new BattleSessionConnectionSnapshot(
+            connection.ConnectionId, participant?.AccountId ?? connection.AccountId, connection.DisplayName,
+            connection.AssignedSeatId.ToString(), connection.AssignedOnlineSeatId.ToString(),
+            participant?.RunId ?? connection.RunId, participant?.DeckId ?? connection.DeckId,
+            connection.HasAssignedSeat, connection.IsOpen);
     }
 
     private string FormatSeatMetadataSummary()
@@ -4329,6 +4451,9 @@ public sealed class BattleSession
     }
 }
 
+public sealed record BattleDisconnect(bool Reserved, OnlineBattleEnvelope? Envelope,
+    PlayerIdDto SeatId, string IdentityKey, DateTimeOffset DeadlineUtc);
+
 public sealed record PendingReconnectStatusSnapshot(
     string MatchId,
     PlayerIdDto SeatId,
@@ -4348,7 +4473,19 @@ public sealed record BattleSessionPersistenceSnapshot(
     BattleStateViewDto? PlayerView,
     BattleStateViewDto? AiView,
     IReadOnlyList<BattleSessionConnectionSnapshot> Connections,
-    IReadOnlyList<BattleCombatLogEntryDto>? CombatLogEntries = null);
+    IReadOnlyList<BattleCombatLogEntryDto>? CombatLogEntries = null,
+    IReadOnlyList<BattleSessionParticipantSnapshot>? Participants = null,
+    Guid ResultId = default,
+    string ResultEndedReason = "normal");
+
+public sealed record BattleSessionParticipantSnapshot(
+    string RuntimeSeatId,
+    string OnlineSeatId,
+    string AccountId,
+    string RunId,
+    string DeckId,
+    IReadOnlyList<string> DeckCardIds,
+    IReadOnlyDictionary<string, int> CardUpgradeLevels);
 
 public sealed record BattleSessionConnectionSnapshot(
     string ConnectionId,

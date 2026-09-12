@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: af1424162e09842478be1b42c237e249, type: 3}
+  m_Name: NuclearPowerPlant
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.BuildingCardDefinitionAsset
+  _cardId: NuclearPowerPlant
+  _displayName: "\uC6D0\uC790\uB825 \uBC1C\uC804\uC18C"
+  _rarity: 2
+  _cost:
+    _mana: 0
+    _qi: 0
+    _power: 5
+    _gold: 0
+  _affiliation: 2
+  _chargeTileFootprint: 1
+  _effectText: "\uD30C\uAD34\uB420 \uB54C \uC591\uCABD \uC804\uC7A5 \uC804\uCCB4\uC5D0
+    30 \uBB3C\uB9AC \uB370\uBBF8\uC9C0."
+  _specialEffectText: "\uC804\uB825+3"
+  _hasReplicate: 0
+  _boardSprite: {fileID: 4723107735738678597, guid: b6f87a07c9a0c1542be31ec7989b3a6b, type: 3}
+  _boardAnimatorController: {fileID: 9100000, guid: 8ff1018efdbda5c4b8e4e37d46c0f8a3, type: 2}
+  _canAttack: 0
+  _damageType: 0
+  _attack: 0
+  _health: 30
+  _physicalDefense: 0
+  _magicDefense: 0
+  _turnStartResourceGain:
+    _mana: 0
+    _qi: 0
+    _power: 3
+    _gold: 0
+  _sciencePowerUpkeep: 0
+  _canAttackOnSummon: 0
+  _sealboundOwnerTurnStarts: 0
+  _hasFlying: 0
+  _hasPiercing: 0
+  _spellPower: 0
+  _invincibleDuration: 0
+  _invincibleOwnerTurns: 0

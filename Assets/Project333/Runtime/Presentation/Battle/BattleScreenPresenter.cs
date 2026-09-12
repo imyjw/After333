@@ -201,7 +201,8 @@ namespace Project333.Runtime.Presentation.Battle
         {
             _debugSummary = BattleStateSummaryFormatter.Format(battleState);
             _boardPresenter?.Present(battleState);
-            _handPresenter?.Present(battleState?.Player.Hand);
+            _handPresenter?.Present(battleState?.Player.Hand,
+                battleState == null ? 0 : Project333.Runtime.Application.Services.SpellPowerRules.GetTotal(battleState, PlayerId.Player));
             _opponentHandPresenter?.Present(battleState?.AI.Hand);
             _opponentDeckPresenter?.Present(battleState?.AI.Deck);
             _playerDeckPresenter?.Present(battleState?.Player.Deck);

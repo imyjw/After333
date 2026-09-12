@@ -30,7 +30,7 @@ MonoBehaviour:
   _damageType: 1
   _attack: 20
   _health: 30
-  _physicalDefense: 0
+  _physicalDefense: 1
   _magicDefense: 0
   _hitsPerAttack: 1
   _hasBerserker: 0

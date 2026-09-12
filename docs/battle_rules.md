@@ -16,7 +16,8 @@ This document is the source of truth for battle setup, tile notation, actions, t
 
 ### Current Account-Backed Implementation Scope
 
-- Battles use a persisted `33`-card run deck created through draft.
+- Human players use a persisted `33`-card run deck created through draft.
+- Online PvE opponents use one of ten fixed 33-card decks, selected uniformly at each new battle and shuffled normally. Each contains Legendary 1, Unique 5, Rare 9, Uncommon 11, Common 7; only draft-enabled cards, at most 3 copies per card. See [pve_ai_decks.md](./pve_ai_decks.md).
 - The same battle rules are resolved by the server for PvE and account-matched 1:1 PvP.
 - PvP clients send intended commands only; the server validates commands, mutates battle state, and publishes `StateView` and `BattleEvents`.
 - Battle results are persisted into the owning account's current run.
@@ -374,7 +375,7 @@ Using the same example above, all of the following are targetable by ranged atta
 
 - Field occupants have `Physical Defense` and `Magic Defense` values.
 - Defense values cannot be negative.
-- All currently defined cards and the Master Unit start with `0 Physical Defense / 0 Magic Defense`.
+- Most current cards and the Master Unit start with `0 Physical Defense / 0 Magic Defense`; Golem starts with `1 / 0` and Demon King with `3 / 3`.
 - Physical damage is reduced by Physical Defense.
 - Magic damage is reduced by Magic Defense.
 - Fixed damage ignores both defenses.
@@ -414,17 +415,17 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 - A full hand removes each excess drawn card immediately. An empty deck causes the normal cumulative Fixed draw-failure damage for each attempted draw.
 - Drained, Erasure, and Sealbound suppress the effect. The effect continues at later eligible turn ends until the building leaves the field.
 - Gaebang Branch upgrades grant HP `+1` at every level and never grant the normal milestone ATK bonus.
-- Gaebang Branch remains excluded from draft offers and random card rewards until its card art is ready.
+- Gaebang Branch is enabled in draft offers and random card rewards.
 
 ### Merchant Caravan
 
-- Merchant Caravan (`MerchantCaravan`, `상단`) is an Uncommon, non-attacking `1x1` Murim building with cost `4 Gold`, ATK `0`, HP `30`, defense `0/0`, and DamageType `None`.
+- Merchant Caravan (`MerchantCaravan`, `상단`) is an Uncommon, non-attacking `1x1` Murim building with cost `4 Gold`, ATK `0`, HP `20`, defense `0/0`, and DamageType `None`.
 - It starts triggering on its owner's next turn start after it is summoned; it never triggers immediately on summon.
 - During the active-occupant resource-gain step, each living Merchant Caravan whose effects are not suppressed grants its owner `3 Gold`.
 - Multiple active Merchant Caravans stack and each grants `3 Gold` independently.
 - Drained, Erasure, and Sealbound suppress this effect. It resumes on a later owner turn start after suppression ends.
 - Merchant Caravan upgrades grant HP `+1` at every level and never grant the normal milestone ATK bonus.
-- Merchant Caravan remains excluded from draft offers and random card rewards until its card art is ready.
+- Merchant Caravan is enabled in draft offers and random card rewards.
 
 ### Inn
 
@@ -442,23 +443,23 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 - It can be cast only during its owner's main phase by dragging it upward from the hand.
 - Casting first pays the full `3 Gold` cost and moves the card from hand to discard, then immediately grants that player `6 Power`.
 - It creates no persistent effect and cannot use Gold to pay its printed Gold cost through substitution.
-- Power Bank is not upgradeable and remains excluded from draft offers and random card rewards until its card art is ready.
+- Power Bank is not upgradeable. It is enabled in draft offers and excluded from random card rewards.
 
 ### Mana Stone
 
-- Mana Stone is a Common Fantasy scripted spell with cost `4 Gold` and no board target.
+- Mana Stone is a Common Fantasy scripted spell with cost `2 Gold` and no board target.
 - It can be cast only during its owner's main phase by dragging it upward from the hand.
-- Casting first pays the full `4 Gold` cost and moves the card from hand to discard, then immediately grants that player `6 Mana`.
+- Casting first pays the full `2 Gold` cost and moves the card from hand to discard, then immediately grants that player `3 Mana`.
 - It creates no persistent effect and cannot use Gold to pay its printed Gold cost through substitution.
-- Mana Stone is not upgradeable and remains excluded from draft offers and random card rewards until its card art is ready.
+- Mana Stone is not upgradeable. It is enabled in draft offers and excluded from random card rewards.
 
 ### Mana Stone Bundle
 
-- Mana Stone Bundle is an Uncommon Fantasy scripted spell with cost `6 Gold` and no board target.
+- Mana Stone Bundle is an Uncommon Fantasy scripted spell with cost `5 Gold` and no board target.
 - It can be cast only during its owner's main phase by dragging it upward from the hand.
-- Casting first pays the full `6 Gold` cost and moves the card from hand to discard, then immediately grants that player `9 Mana`.
+- Casting first pays the full `5 Gold` cost and moves the card from hand to discard, then immediately grants that player `9 Mana`.
 - It creates no persistent effect and cannot use Gold to pay its printed Gold cost through substitution.
-- Mana Stone Bundle is not upgradeable and remains excluded from draft offers and random card rewards until its card art is ready.
+- Mana Stone Bundle is not upgradeable. It is enabled in draft offers and excluded from random card rewards.
 
 ### Firewall
 
@@ -479,24 +480,24 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 
 ### Biochemical Bomb
 
-- Biochemical Bomb is an Uncommon Science Civilization scripted spell with cost `4 Power + 1 Gold` and base damage `44 Physical`.
+- Biochemical Bomb is an Uncommon Science Civilization scripted spell with cost `4 Power + 1 Gold` and base damage `25 Fixed`.
 - The caster must select one of two areas on the opponent's field: left `4x2` (`columns 0..3`) or right `4x2` (`columns 1..4`). It cannot target the caster's own field.
 - The selected eight tiles are highlighted red while targeting. The selected start column is fixed when the spell is cast.
 - It does not deal damage immediately. It triggers at each of the next four global turn starts, regardless of whose turn begins, then expires.
 - A normal sequence after Player casts it is: opponent turn start `1`, Player turn start `2`, opponent turn start `3`, Player turn start `4` and expiration.
 - Each trigger evaluates the current occupants in the fixed area, so an occupant summoned or moved into the area after casting is damaged by later triggers.
-- Each trigger deals the stored Physical damage to every current unit, building, or Master in the area. Empty tiles do not prevent a trigger from being consumed.
-- Physical Defense, Invincible, and the Drained damage multiplier resolve independently for every target. Sealbound occupants take no damage.
+- Each trigger deals the stored Fixed damage to every current unit, building, or Master in the area. Empty tiles do not prevent a trigger from being consumed.
+- Physical and Magic Defense are ignored. Invincible, Endure, and the Drained damage multiplier still resolve independently for every target. Sealbound occupants take no damage.
 - Biochemical Bomb is an area effect, so Shielder does not redirect it and Hiding does not avoid it.
 - All damage from one Biochemical Bomb instance is applied before defeated units/buildings are removed and Master defeat is checked.
 - Firewall and Biochemical Bomb instances share one creation-order pass after Robot Factory and before the base draw, so mixed effects resolve in the order their cards were cast.
 - Multiple Biochemical Bomb effects may coexist. Each keeps its own fixed area, damage, and remaining trigger count.
-- Each upgrade level adds `+1` to every trigger's stored Physical damage; for example, Lv.3 deals `47 Physical`. Physical damage does not receive SpellPower.
-- The spell card goes to discard when cast. Biochemical Bomb remains excluded from draft offers and random card rewards until its art is ready.
+- Each upgrade level adds `+1` to every trigger's stored Fixed damage; for example, Lv.3 deals `28 Fixed`. Fixed damage does not receive SpellPower, whether present at cast time or gained later.
+- The spell card goes to discard when cast. Biochemical Bomb is enabled in draft offers and random card rewards.
 
 ### Timed Bomb
 
-- Timed Bomb is a Common Science Civilization scripted spell with cost `3 Power + 1 Gold`, base damage `33 Physical`, and no board target.
+- Timed Bomb is a Common Science Civilization scripted spell with cost `3 Power`, base damage `33 Physical`, and no board target.
 - It does not deal damage immediately. Casting it creates a separate persistent effect and sends the spell card to discard.
 - Every global turn start decreases its countdown once, regardless of whose turn begins.
 - If Player casts it and then ends the turn, the first countdown is the opponent's next turn start, the second is Player's following turn start, and it detonates at the opponent's next turn start.
@@ -506,7 +507,7 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 - All targets take damage before defeated non-Master occupants are removed and Master defeat is checked.
 - Each upgrade level adds `+1` to the stored Physical damage. Physical damage does not receive SpellPower.
 - Multiple Timed Bomb effects coexist and count down independently in creation order.
-- Timed Bomb remains excluded from draft offers and random card rewards until its card art is ready.
+- Timed Bomb is enabled in draft offers and random card rewards.
 
 ## Attack and Counterattack Resolution
 
@@ -579,19 +580,19 @@ An occupant with `0` ATK cannot counterattack.
 - Multiple active Power Plants resolve independently in fixed tile order `(0,0), (0,1), ... (4,1)`.
 - Drained, Erasure, and Sealbound suppress this effect. It resumes on a later owner turn start after suppression ends.
 - Power Plant upgrades grant HP `+1` at every level and never grant the normal milestone ATK bonus.
-- Power Plant remains excluded from draft offers and random card rewards until its card art is ready.
+- Power Plant is enabled in draft offers and random card rewards.
 
 ### Nuclear Power Plant
 
-- Nuclear Power Plant is a Rare, non-attacking `1x1` Science Civilization building with cost `5 Power`, ATK `0`, HP `50`, defense `0/0`, DamageType `None`, and no power upkeep.
-- At its owner's turn-start active-occupant resource step, every living Nuclear Power Plant whose effects are not suppressed grants `5 Power`.
-- When a Nuclear Power Plant is destroyed, it is removed first and then deals `40 Physical` damage to every current occupant on both fields, including Units, Buildings, and both Master Units.
+- Nuclear Power Plant is a Rare, non-attacking `1x1` Science Civilization building with cost `5 Power`, ATK `0`, HP `30`, defense `0/0`, DamageType `None`, and no power upkeep.
+- At its owner's turn-start active-occupant resource step, every living Nuclear Power Plant whose effects are not suppressed grants `3 Power`.
+- When a Nuclear Power Plant is destroyed, it is removed first and then deals `30 Physical` damage to every current occupant on both fields, including Units, Buildings, and both Master Units.
 - Physical Defense, Invincible, Sealbound immunity, and the Drained damage multiplier resolve independently for every target. Shielder does not redirect this area damage.
 - Drained, Erasure, and Sealbound suppress both its turn-start resource effect and its destruction effect.
 - If an explosion destroys another active Nuclear Power Plant, that plant is removed and creates another explosion. Each destroyed plant can trigger only once.
 - All queued Nuclear Power Plant explosions resolve before Master defeat is checked. If both Masters are defeated, the higher final HP wins; equal final HP produces a draw.
 - Nuclear Power Plant upgrades grant HP `+1` at every level and never grant the normal milestone ATK bonus.
-- Nuclear Power Plant remains excluded from draft offers and random card rewards until its card art is ready.
+- Nuclear Power Plant is enabled in draft offers and random card rewards.
 
 ### Gu
 
@@ -608,20 +609,20 @@ An occupant with `0` ATK cannot counterattack.
 - Movement availability is preserved and continues to follow the Unit's normal movement rules.
 - The transfer is not destruction, defeat, summon, or resurrection. It does not trigger removal/death semantics.
 - StateView and server-restart snapshots serialize the Unit under its new owner and board while preserving its RuntimeId and occupant state.
-- Gu is not redirected by Shielder, gains no SpellPower, cannot be upgraded, and remains excluded from draft offers and random rewards until its card art and presentation are ready.
+- Gu is not redirected by Shielder, gains no SpellPower, and cannot be upgraded. It is enabled in draft offers and excluded from random rewards.
 
 ### HuanShu
 
 - `HuanShu` (`환술`) is an Uncommon Murim non-damage Scripted Spell with cost `3 Qi` and `effectId: "huan_shu"`.
 - It targets exactly one living enemy Unit. Master Units, Buildings, allied occupants, Sealbound occupants, and active enemy Hiding units are not legal declared targets.
 - A successful cast applies HuanShu permanently while that occupant remains on the field. Recasting an already afflicted Unit does not stack or change the status.
-- The duration decreases at the end of each turn belonging to the afflicted Unit's current owner, even if that Unit did not attack or could not act.
+- HuanShu has no turn countdown and does not expire at turn end.
 - When the afflicted Unit declares an otherwise legal normal attack, the server replaces the target with one uniformly random legal HuanShu candidate before combat resolves.
 - The original player-selected target must still be legal under ordinary attack rules. HuanShu does not make an illegal attack command legal.
 - The random candidate pool contains every living Unit, Building, and Master Unit on both fields except the afflicted attacker itself.
 - Ownership, front-row blocking, and the originally selected target do not restrict the random candidate pool. The original target remains one possible candidate.
 - Sealbound occupants and active enemy Hiding occupants are excluded. A Hiding occupant allied with the afflicted attacker may be selected.
-- A non-Flying melee afflicted attacker cannot be redirected to an active Flying occupant. Ranged attackers and Flying attackers may be redirected to Flying occupants normally.
+- HuanShu may redirect a non-Flying melee attacker to an active Flying occupant. That normal attack and its Piercing packets follow the same Flying damage reduction as an ordinary attack.
 - Invincible occupants remain candidates and take `0` damage under the normal Invincible rule.
 - The server selects once per declared attack. Every hit of a multi-hit attack uses that same resolved target. Each additional attack declaration performs a new random selection.
 - Counterattacks are never redirected by HuanShu. After target replacement, normal damage, Shielder, counterattack, LifeSteal, Endure, Berserker, removal, and victory rules resolve without special exceptions.
@@ -629,9 +630,9 @@ An occupant with `0` ATK cannot counterattack.
 - Sealbound does not remove an existing HuanShu. A new HuanShu cast cannot target a Sealbound Unit.
 - Gu preserves HuanShu when ownership changes.
 - Robot Fusion does not transfer HuanShu from absorbed materials. A surviving afflicted Robot keeps its own HuanShu status.
-- Server-authoritative random selection is included in synchronized battle events. StateView and server-restart snapshots preserve the remaining duration and countdown context; reconnect never rerolls a completed attack.
+- Server-authoritative random selection is included in synchronized battle events. StateView and server-restart snapshots preserve the active status through compatibility fields; positive legacy remaining-turn values restore permanent HuanShu. Reconnect never rerolls a completed attack.
 - Both players see only a small purple HuanShu status icon on the occupant. Long-pressing the occupant shows the permanent HuanShu explanation without a turn counter.
-- HuanShu cannot be upgraded and remains excluded from draft offers and random rewards until its card art is ready.
+- HuanShu cannot be upgraded. It is enabled in draft offers and excluded from random rewards.
 
 ### Replicate
 
@@ -710,16 +711,20 @@ An occupant with `0` ATK cannot counterattack.
 ### Flying
 
 - `Flying` uses the occupant flag `hasFlying: true`. Units, Buildings, and Master Units may have Flying.
-- A Flying occupant cannot be selected as the target of a normal attack made by a non-Flying melee attacker.
-- Ranged normal attacks may target Flying occupants normally.
-- A Flying attacker may target another Flying occupant with a normal attack even when the Flying attacker's attack type is Melee.
+- A Flying occupant may be selected by a non-Flying melee normal attacker, subject to the usual Hiding, Sealbound, and front-row rules. Each direct or Piercing hit from that attacker deals half damage after matching defense and damage modifiers, rounded down.
+- This reduction applies to Physical, Magic, and Fixed normal-attack damage. Fixed damage still ignores armor before Flying halves it. Multi-hit attacks apply armor and rounding independently to every hit; damage 1 can become 0.
+- Ranged normal attacks may target Flying occupants and do not receive Flying damage reduction.
+- An active Flying attacker may attack another Flying occupant with full normal damage even when its attack type is Melee.
 - A Flying melee attacker ignores enemy front-row blocking and may target an otherwise legal back-row occupant. If the defender is melee and can counterattack, it counterattacks the Flying attacker normally.
+- Counterattack damage is not halved by Flying. Spells and other effect damage are also unchanged. Endure, Invincible, and LifeSteal use the resulting damage/actual HP loss normally.
 - A Flying occupant does not participate in front-row blocking.
 - Flying does not protect against single-target spells, area spells, healing, buffs, debuffs, or other non-normal-attack effects.
 - Flying does not change movement range, movement count, destination legality, or position-exchange rules.
-- A Flying Shielder cannot redirect a non-Flying melee normal attack. It may redirect ranged normal attacks, normal attacks from Flying attackers, and other Shielder-eligible effects.
+- A Flying Shielder may redirect non-Flying melee normal attacks as well as other eligible hits. For normal attacks and Piercing, calculate the protected target's incoming damage first (matching defense, state, then Flying reduction), then apply the Shielder's own defense/state to that packet. The Shielder's own Flying flag never halves redirected damage.
+- Overflow from this already-mitigated normal-attack packet does not apply the protected target's defense, Drained multiplier, or Flying reduction again. HP-loss prevention and Endure remain effective.
+- Example: ground melee ATK 10 against a Flying protected target with defense 2 gives (10-2)/2 = 4. A Shielder with defense 1 receives 3 damage. If its pre-hit HP was 2, the protected target receives the remaining 1 without another reduction.
 - A non-Flying Shielder may protect a Flying occupant from any attack or effect that could legally target that Flying occupant.
-- Flying is temporarily suppressed by Drained and remains suppressed for the duration of Erasure. While suppressed, a non-Flying melee attacker may target the occupant. Drained prevents front-row blocking through its own rule; an Erasure occupant whose Flying is suppressed participates in front-row blocking.
+- Flying is temporarily suppressed by Drained and remains suppressed for the duration of Erasure. Suppressed Flying provides no damage reduction or blocker bypass. Drained prevents front-row blocking through its own rule; an Erasure occupant whose Flying is suppressed participates in front-row blocking.
 - Clearing Drained restores Flying. Erasure does not clear while the occupant remains on the field, so Flying does not reactivate during that occupancy.
 - Active Hiding takes priority over Flying targeting permissions. After Hiding is revealed, the remaining Flying rules apply normally.
 - Sealbound takes priority while sealed. Flying becomes active again when Sealbound ends, subject to any current Drained or Erasure suppression.
@@ -734,10 +739,11 @@ An occupant with `0` ATK cannot counterattack.
 - Piercing applies to accepted normal attacks whose actual resolved target occupies either row of a field column.
 - After each normal-attack hit resolves, an occupied tile in the opposite row of the same column receives a separate damage packet with the attacker's same per-hit ATK amount and normal-attack DamageType. A front-row target pierces into the rear row, and a rear-row target pierces into the front row.
 - Units, Buildings, and Master Units are valid front and rear occupants for Piercing.
-- The opposite-row packet does not use Shielder redirection and never causes a counterattack. The opposite-row occupant applies its own matching defense, Drained defense loss and triple-damage rule, Invincible, Endure, removal, and victory rules normally.
-- Hiding and Flying do not prevent the opposite-row packet because Piercing does not select that occupant as a new attack target. Sealbound occupants take `0` Piercing damage under the normal Sealbound rule.
+- The opposite-row packet uses normal-attack Shielder redirection but never causes another counterattack or recursively triggers Piercing. Determine damage against that opposite-row target independently: matching defense, Drained modifier, Invincible, and then Flying reduction for a ground melee source. If redirected, apply the Shielder's own defense/state next. Overflow is already mitigated for the original recipient, so do not apply that recipient's defense, Drained modifier, or Flying reduction again; Endure still applies to HP loss.
+- Resolve Shielder eligibility again after the direct hit. A Shielder killed by the direct hit cannot protect against the following Piercing packet. For example, with no defense and sufficient Shielder HP, an ATK `10` attack against either row deals `20` total damage to the front Shielder and `0` to the protected rear occupant.
+- Hiding does not prevent the opposite-row packet because Piercing does not select that occupant as a new attack target. Flying halves that packet from a non-Flying melee source, exactly as it halves a direct hit. Sealbound occupants take `0` Piercing damage under the normal Sealbound rule.
 - Multi-hit attacks apply one Piercing packet after every hit. Additional attacks evaluate Piercing independently for each declared attack.
-- LifeSteal includes the opposite-row occupant's actual HP loss after defense and prevention. On the final melee hit, direct and opposite-row damage resolve before the counterattack, then a surviving attacker heals from the combined actual HP loss.
+- LifeSteal includes actual HP lost to the Piercing packet by its recipients, including a redirecting Shielder and any overflow recipient, after defense and prevention. On the final melee hit, direct and opposite-row damage resolve before the counterattack, then a surviving attacker heals from the combined actual HP loss.
 - When HuanShu redirects an attack, Piercing uses the actual random target's row and column rather than the originally selected target.
 - Drained and Sealbound prevent an occupant from attacking through their normal rules. Erasure suppresses Piercing even if the immutable `HasPiercing` trait remains stored.
 - StateView and server-restart snapshots preserve `HasPiercing` for Units, Buildings, and Master Units.
@@ -774,7 +780,7 @@ An occupant with `0` ATK cannot counterattack.
 - `SummonTurn` lasts from successful summon resolution through the end of that current global turn.
 - Separate Invincible effects keep separate duration state. The occupant remains Invincible while at least one unsuppressed effect is active.
 - Drained temporarily suppresses Invincible without deleting it. Erasure suppresses Invincible for the remainder of that occupant's time on the field. Invincible duration continues to advance normally.
-- Sealbound immunity takes priority while sealed. Hiding and Flying first determine whether a target is legal; if the target is legal, Invincible then prevents its HP loss.
+- Sealbound immunity takes priority while sealed. Hiding and front-row blocking determine target legality; Flying changes blocking and normal-attack damage, not target immunity. Invincible prevents HP loss from any otherwise legal damage.
 - An Invincible Shielder resolves incoming damage as `0`, so it produces no overflow damage to the protected occupant and completely blocks that eligible hit.
 - Because actual HP loss is `0`, LifeSteal heals `0`, damage-based Berserker gains do not trigger, and Endure is not consumed.
 - Every hit of a multi-hit attack still resolves and may play its hit presentation, but each hit deals `0` actual damage while Invincible is active.
@@ -798,10 +804,12 @@ An occupant with `0` ATK cannot counterattack.
 ### Shielder Damage Transfer
 
 - Shielder still redirects eligible single-target attacks and effects before damage is applied.
-- First, resolve the incoming damage against the Shielder using the Shielder's matching defense and state.
+- The separate opposite-row packet from Piercing is also eligible for normal-attack Shielder redirection; it is not treated as an unredirectable area effect.
+- For normal attacks and Piercing, first resolve incoming damage against the protected target using its matching defense/state and any Flying reduction. Then resolve that packet against the Shielder using its own matching defense/state, ignoring the Shielder's Flying flag.
 - The Shielder absorbs up to the HP it had immediately before that hit.
 - Only the resolved damage above that pre-hit HP is transferred to the protected occupant.
-- The protected occupant then applies its own matching defense and state to the transferred damage.
+- For normal attacks and Piercing, the protected occupant does not repeat defense, Drained multiplication, or Flying reduction on overflow; these already affected the packet before redirection. Invincible, Sealbound immunity, and Endure still govern actual HP loss.
+- Single-target damage spells keep their existing transfer order: Shielder defense/state first, then the protected target's defense/state on any overflow. Flying does not modify spell damage.
 - Area effects are not redirected; the Shielder and every other declared area target each resolve their own damage.
 
 ### Worked Examples

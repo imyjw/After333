@@ -21,6 +21,17 @@ If a rule is still marked `TBD`, do not guess.
 
 For the card-authoring workflow, use `docs/card_authoring_checklist.md`.
 
+## New Card Upgrade Contract
+
+User requirement confirmed 2026-09-12:
+
+- For every new card, request its upgrade eligibility and exact stat/effect increments at each level 1 through 13 before implementing that card's upgrade behavior.
+- Do not assign a default schedule based on card type, rarity, attack capability, similarity to another card, or existing shared-code fallback. Unit/building classification does not authorize automatic standard or HP-only growth.
+- The user may supply grouped levels or explicitly select an existing schedule for that card, provided all levels are unambiguous. Reuse an already supplied answer; do not ask for the same confirmation again.
+- If any required level or changed stat is unclear, keep that part unimplemented and ask for the missing information. Unrelated card work can continue.
+- Record the accepted schedule in docs/meta_rules.md and the card documentation; verify per-level gains, Lv.13 totals and actual summoned/spell values. Existing cards change only when the user requests that change.
+- Current explicit corrections: Cerberus gets HP +1 at Lv.1–12 and ATK +1 only at Lv.13; ManaPond gets HP +1 at every level Lv.1–13 and never ATK.
+
 ## Product Naming
 
 - The public game name is `After333`.
@@ -33,7 +44,7 @@ For the card-authoring workflow, use `docs/card_authoring_checklist.md`.
 Implement the current account-backed online PvP foundation:
 
 - server-backed guest account login and session restore
-- first-party Game ID and future social-login ready account schema
+- first-party Game ID, implemented Google login and extensible social-login account schema
 - account-owned tickets, Resource Gold, card collection, and card upgrade state
 - server-verified rewarded video ticket grants
 - draft deck building, draft resume data, and saved run decks
@@ -49,7 +60,7 @@ Do not implement yet unless explicitly requested:
 - ranked matchmaking
 - MMR or seasons
 - paid shop or real-money purchase flows
-- production social OAuth provider integration
+- additional social OAuth providers such as Kakao and Naver
 - production anti-cheat beyond server-side rule validation
 - server restart battle recovery beyond the documented snapshot/command-log plan
 
@@ -57,7 +68,7 @@ Do not implement yet unless explicitly requested:
 
 - Rewarded ads are opt-in and currently appear only on the Game Start scene.
 - One verified completion grants `1` account ticket.
-- Temporary limits are `3` rewards per UTC day and a `60`-second reward cooldown per account.
+- Temporary limits are `10` rewards per UTC day and a `30`-second reward cooldown per account.
 - Unity ad callbacks are presentation signals only and must never mutate the wallet directly.
 - Only a valid provider server-to-server callback may grant the ticket.
 - Provider event IDs and reward attempts must be persisted and idempotent.
@@ -253,7 +264,7 @@ No separate global action-point system exists.
 - Fixed damage ignores Physical Defense and Magic Defense.
 - Double Attack and Triple Attack apply defense separately to every hit.
 - LifeSteal heals only the actual HP removed after damage mitigation.
-- Shielder applies its own defense first; resolved damage above the Shielder's pre-hit HP transfers to the protected target, which then applies its own defense.
+- Normal attacks/Piercing resolve the protected target's mitigation before Shielder mitigation; overflow does not repeat target mitigation. Single-target damage spells retain Shielder-first mitigation followed by target mitigation on overflow.
 - Apply all damage from one attack or effect first.
 - After that single attack or effect finishes resolving, remove any unit or building with `0` or less HP immediately.
 - Vacated tiles become empty immediately.
@@ -349,11 +360,11 @@ When affected by Erasure (`망각`), the occupant:
 ### Flying State
 
 - Unit and Building cards may use `hasFlying: true`; Master Units may receive Flying through runtime battle setup.
-- A non-Flying melee normal attack cannot target an active Flying occupant. Ranged attackers and active Flying attackers may target it.
+- A non-Flying melee normal attack may target an active Flying occupant under ordinary Hiding, Sealbound and front-row rules. Its direct and Piercing damage is halved after defense/state modifiers, rounded down; ranged and active Flying attacks are not reduced.
 - A Flying melee attacker ignores front-row blocking, and an active Flying occupant does not participate in front-row blocking.
 - Normal melee counterattack rules still apply when a Flying melee attacker legally attacks a melee defender.
 - Flying does not prevent spells, effects, healing, buffs, or debuffs and does not change movement rules.
-- A Flying Shielder cannot redirect a non-Flying melee normal attack, but other eligible normal attacks and effects may be redirected normally.
+- A Flying Shielder may redirect a non-Flying melee normal attack. For normal attacks/Piercing, resolve the protected target's defense/state/Flying first, then the Shielder's defense/state; never apply the Shielder's Flying or repeat target mitigation on overflow. Counterattacks and spells do not receive Flying damage reduction.
 - Drained and Erasure suppress Flying. Clearing Drained restores it; an Erasure occupant remains suppressed and blocks normally.
 - Hiding and Sealbound targeting rules take priority. Robot Fusion never transfers Flying from absorbed materials.
 - StateView and reconnect snapshots preserve `HasFlying` for Units, Buildings, and Master Units.
@@ -404,7 +415,7 @@ If a card needs anything outside this list, stop and ask before implementing it.
 - physical, magic, fixed, or none normal-attack damage type
 - physical defense and magic defense
 - LifeSteal based on actual HP removed after defense
-- Shielder damage redirection with defense applied to Shielder and overflow target in sequence
+- Shielder redirection with protected-target-then-Shielder mitigation for normal attacks/Piercing, and Shielder-then-overflow-target mitigation for single-target spells
 - non-persistent spell single-target damage
 - explicitly defined area damage effects such as Red Dragon
 - Nuclear Power Plant destruction trigger and chained all-field Physical damage
@@ -455,7 +466,7 @@ All current-slice implementations must preserve these locked scenarios:
 20. fixed damage ignores both defenses
 21. drained recipients ignore both defenses and take triple damage, including fixed damage
 22. multi-hit attacks apply defense separately per hit
-23. Shielder applies defense before overflow and the protected target applies defense again
+23. Shielder normal-attack/Piercing overflow does not repeat target mitigation; single-target spells retain their separate transfer order
 24. LifeSteal uses actual HP removed after defense
 25. Robot Factory resolves after upkeep and before Firewall/base draw
 26. Robot Factory hides the generated card identity from the opponent
@@ -465,66 +476,18 @@ All current-slice implementations must preserve these locked scenarios:
 
 If a code change breaks any of the above, it is not valid for the current slice.
 
-## AI Minimum Behavior v1
+## AI Behavior
 
-### Core Rules
+The current planner and its evaluation policy are documented in `docs/pve_ai.md`.
 
-- AI acts only inside the current vertical slice.
-- AI performs only legal actions.
-- AI is deterministic.
-- AI recalculates board state after every action.
-
-### Main-Phase Action Order
-
-In the main phase, AI checks and performs one action at a time in this order, then starts again from the top:
-
-1. an available attack
-2. a kill-capable single-target normal damage spell
-3. a resource-producing card
-4. a unit or building that creates an immediate attack this turn
-5. any other playable unit or building
-6. a move that creates an immediate attack
-7. end turn if none of the above is possible
-
-### Placement Tie-Breaker
-
-If multiple legal placement tiles exist, use this coordinate priority:
-
-- `(2,1) -> (2,0) -> (1,1) -> (1,0) -> (3,1) -> (3,0) -> (0,1) -> (0,0) -> (4,1) -> (4,0)`
-
-If the card can attack immediately, prefer the placement that creates the highest-priority attack target first.
-If still tied, use the coordinate priority above.
-
-### Movement Tie-Breaker
-
-- AI only considers moves when no higher-priority main-phase action is available.
-- AI only chooses moves that create an immediate attack.
-- If multiple such moves exist, choose the one whose resulting attack has the highest attack-target priority.
-- If still tied, prefer destination coordinate priority first, then attacker coordinate priority.
-- Coordinate priority is:
-  - `(2,1) -> (2,0) -> (1,1) -> (1,0) -> (3,1) -> (3,0) -> (0,1) -> (0,0) -> (4,1) -> (4,0)`
-
-### Attack Target Priority
-
-If multiple single-action attack targets are legal, use this order:
-
-1. enemy Master if this attack can kill the enemy Master
-2. kill-capable enemy resource-producing building or unit
-3. kill-capable enemy occupant with the highest ATK
-4. enemy Master if the enemy Master can be attacked directly
-5. otherwise the legal target with the lowest current HP
-
-If tied, use this coordinate priority:
-
-- `(2,1) -> (2,0) -> (1,1) -> (1,0) -> (3,1) -> (3,0) -> (0,1) -> (0,0) -> (4,1) -> (4,0)`
-
-For AI evaluation:
-
-- a resource-producing building or unit is any occupant with a turn-start `mana +n`, `qi +n`, `power +n`, or `gold +n` effect
-- kill-capable means the target would reach `0` or less HP from that single attack or single normal damage spell
-- if multiple attackers can perform the same highest-priority attack, prefer the attacker with the higher ATK
-- if still tied, use attacker coordinate priority:
-  - `(2,1) -> (2,0) -> (1,1) -> (1,0) -> (3,1) -> (3,0) -> (0,1) -> (0,0) -> (4,1) -> (4,0)`
+- AI uses only its own hand and public state; opponent hand identities and deck order remain hidden.
+- Generate legal candidates and simulate them in independent copies using the shared battle rules. Never mutate the real battle or consume its RNG during planning.
+- Attacks, spells, summons, protection moves, persistent-hazard escape moves, fusion and ending the turn compete by their resulting value. The old fixed action/target priority ladder is not the current policy.
+- Search is bounded (default depth 3, beam width 5, 1,200 simulations and 80 ms per decision) and performs only the chosen first command, then recalculates.
+- Compare ending now against action outcomes through the next opponent turn start; active opponent Red Dragon effects also inform the existing survival forecast. Destruction chains use shared resolution.
+- Protection moves may move or swap under the actual movement rules. Empty-tile escapes from Biochemical Bomb/Firewall can be considered without a protection bonus when shared turn resolution confirms an actual HP/survival improvement.
+- Moving does not require creating an immediate attack. Preserve movement costs, lost-cover penalties, visited-state protection, and simulation/time budgets; do not add purposeless shuffling.
+- Candidate coordinate order stays `(2,1), (2,0), (1,1), (1,0), (3,1), (3,0), (0,1), (0,0), (4,1), (4,0)`. Tie ordering is stable and must not depend on generated runtime GUIDs.
 
 ## Deferred Rules
 
@@ -535,7 +498,7 @@ The following are intentionally not fixed yet and must not be invented:
 - full civilization roster beyond the confirmed science power-upkeep rule
 - ranked matchmaking rules
 - MMR, season, and ladder rules
-- production OAuth provider setup details for Google, Kakao, and Naver
+- OAuth provider integration details for Kakao and Naver; existing Google integration is documented in docs/google_auth_setup.md
 - exact pack contents and probabilities
 - shop rules
 - crafting rules

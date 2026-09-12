@@ -5,11 +5,31 @@ using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Board;
 using Project333.Runtime.Domain.Cards;
 using Project333.Runtime.Domain.Resources;
+using Project333.Runtime.Infrastructure.Data;
+using UnityEditor;
+using UnityEngine;
 
 namespace Project333.Tests.EditMode
 {
     public sealed class MerchantCaravanTests
     {
+        [TestCase(0, 20)]
+        [TestCase(13, 33)]
+        public void Health_UsesNerfedBaseAndKeepsHpUpgrades(int level, int expectedHp)
+        {
+            var database = JsonCardDefinitionDatabase.FromJson(
+                Resources.Load<TextAsset>("Project333/Data/cards").text);
+            var definition = (BuildingCardDefinition)database.CreateProvider()
+                .GetRequired(MerchantCaravanRules.CardId);
+            var asset = AssetDatabase.LoadAssetAtPath<BuildingCardDefinitionAsset>(
+                "Assets/Project333/ScriptableObjects/StarterTen/Cards/MerchantCaravan.asset");
+            var assetDefinition = (BuildingCardDefinition)asset.ToDefinition();
+            var bonus = CardLevelStatRules.CalculateBonus(MerchantCaravanRules.CardId, level);
+            Assert.That(MerchantCaravanRules.BaseHealth, Is.EqualTo(20));
+            Assert.That(definition.Health + bonus.HpBonus, Is.EqualTo(expectedHp));
+            Assert.That(assetDefinition.Health + bonus.HpBonus, Is.EqualTo(expectedHp));
+        }
+
         [Test]
         public void ResolveTurnStart_EachActiveMerchantCaravanGrantsThreeGold()
         {

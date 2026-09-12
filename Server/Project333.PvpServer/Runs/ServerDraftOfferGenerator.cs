@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
+using Project333.Runtime.Domain.Draft;
 using Project333.Runtime.Infrastructure.Data;
 
 namespace Project333.PvpServer.Runs;
@@ -13,10 +14,10 @@ public sealed class ServerDraftOfferGenerator
 
     private static readonly (CardRarity Rarity, int Weight)[] NonLegendaryWeights =
     {
-        (CardRarity.Common, 40),
-        (CardRarity.Uncommon, 30),
-        (CardRarity.Rare, 20),
-        (CardRarity.Unique, 10)
+        (CardRarity.Common, DraftRarityWeights.Common),
+        (CardRarity.Uncommon, DraftRarityWeights.Uncommon),
+        (CardRarity.Rare, DraftRarityWeights.Rare),
+        (CardRarity.Unique, DraftRarityWeights.Unique)
     };
 
     private readonly IReadOnlyList<JsonCardDefinitionRecord> _draftCards;
@@ -30,7 +31,7 @@ public sealed class ServerDraftOfferGenerator
             .Where(card =>
                 card != null &&
                 !string.IsNullOrWhiteSpace(card.Id) &&
-                card.IncludeInDraft &&
+
                 !string.Equals(card.Id, "Master", StringComparison.OrdinalIgnoreCase))
             .GroupBy(card => card.Id, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
@@ -39,18 +40,27 @@ public sealed class ServerDraftOfferGenerator
             card => card.Id,
             StringComparer.OrdinalIgnoreCase);
 
-        ValidateCatalog();
+        _draftCards = _cardsById.Values.Where(card => card.IncludeInDraft).ToArray();
     }
 
     public IReadOnlyList<string> CreateOffer(
         int draftSeed,
         IReadOnlyList<string> selectedCardIds)
     {
-        var selectedCards = ResolveAndValidateHistory(selectedCardIds, allowComplete: false);
+        return CreateOfferCore(draftSeed, selectedCardIds, preserveAcceptedPicks: false);
+    }
+
+    internal IReadOnlyList<string> CreateOfferFromSavedPicks(int draftSeed, IReadOnlyList<string> selectedCardIds) =>
+        CreateOfferCore(draftSeed, selectedCardIds, preserveAcceptedPicks: true);
+
+    private IReadOnlyList<string> CreateOfferCore(int draftSeed, IReadOnlyList<string> selectedCardIds, bool preserveAcceptedPicks)
+    {
+        var selectedCards = ResolveAndValidateHistory(selectedCardIds, allowComplete: false, preserveAcceptedPicks);
         var random = CreateDeterministicRandom(draftSeed, selectedCards);
 
         if (selectedCards.Count == 0)
         {
+            ValidateCatalog();
             return ChooseUniqueCards(
                 _draftCards.Where(card => card.Rarity == CardRarity.Legendary).ToList(),
                 OfferSize,
@@ -120,7 +130,9 @@ public sealed class ServerDraftOfferGenerator
                 $"Card '{normalizedCardId}' is not part of the current server draft offer.");
         }
 
-        return _cardsById[selectedCardId].Id;
+        if (!_cardsById.TryGetValue(selectedCardId, out var card))
+            throw new RunServiceException("draft_card_not_found", "The saved card ID is missing from the current catalog; the offer was not replaced.");
+        return card.Id;
     }
 
     public IReadOnlyList<string> ValidateCompletedDeck(IReadOnlyList<string> selectedCardIds)
@@ -130,9 +142,12 @@ public sealed class ServerDraftOfferGenerator
             .ToArray();
     }
 
+    internal IReadOnlyList<string> ValidateSavedCompletedDeck(IReadOnlyList<string> ids) =>
+        ResolveAndValidateHistory(ids, allowComplete: true, preserveAcceptedPicks: true).Select(card => card.Id).ToArray();
+
     private IReadOnlyList<JsonCardDefinitionRecord> ResolveAndValidateHistory(
         IReadOnlyList<string>? selectedCardIds,
-        bool allowComplete)
+        bool allowComplete, bool preserveAcceptedPicks = false)
     {
         var cardIds = selectedCardIds ?? Array.Empty<string>();
         var maximumCount = allowComplete ? DeckSize : DeckSize - 1;
@@ -155,21 +170,21 @@ public sealed class ServerDraftOfferGenerator
         for (var index = 0; index < cardIds.Count; index++)
         {
             var cardId = cardIds[index]?.Trim();
-            if (string.IsNullOrWhiteSpace(cardId) || !_cardsById.TryGetValue(cardId, out var card))
+            if (string.IsNullOrWhiteSpace(cardId) || !_cardsById.TryGetValue(cardId, out var card) || (!preserveAcceptedPicks && !card.IncludeInDraft))
             {
                 throw new RunServiceException(
                     "draft_card_not_found",
                     $"Draft card '{cardId}' was not found in the server card database.");
             }
 
-            if (index == 0 && card.Rarity != CardRarity.Legendary)
+            if (!preserveAcceptedPicks && index == 0 && card.Rarity != CardRarity.Legendary)
             {
                 throw new RunServiceException(
                     "invalid_legendary_opening_pick",
                     "The first server draft pick must be Legendary.");
             }
 
-            if (index > 0 && card.Rarity == CardRarity.Legendary)
+            if (!preserveAcceptedPicks && index > 0 && card.Rarity == CardRarity.Legendary)
             {
                 throw new RunServiceException(
                     "legendary_after_opening_pick",
@@ -179,7 +194,7 @@ public sealed class ServerDraftOfferGenerator
             var copyCount = copyCounts.TryGetValue(card.Id, out var existingCount)
                 ? existingCount + 1
                 : 1;
-            var copyLimit = card.Rarity == CardRarity.Legendary ? 1 : 3;
+            var copyLimit = preserveAcceptedPicks ? 3 : card.Rarity == CardRarity.Legendary ? 1 : 3;
             if (copyCount > copyLimit)
             {
                 throw new RunServiceException(

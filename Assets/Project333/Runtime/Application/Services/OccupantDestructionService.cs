@@ -122,17 +122,20 @@ namespace Project333.Runtime.Application.Services
                        battleState.TurnNumber);
         }
 
+        // Shared with AI candidate ordering. Destruction resolution calls this after removal,
+        // so current HP and board membership must not be part of this predicate.
+        public static bool HasActiveDestructionEffect(OccupantState occupant)
+        {
+            return occupant != null && !occupant.EffectsSuppressed &&
+                string.Equals(occupant.CardId, NuclearPowerPlantRules.CardId, StringComparison.Ordinal);
+        }
+
         private static void QueueNuclearExplosion(
             OccupantState occupant,
             Queue<NuclearExplosionSource> pendingExplosions,
             ISet<OccupantState> queuedSources)
         {
-            if (occupant == null ||
-                occupant.EffectsSuppressed ||
-                !string.Equals(
-                    occupant.CardId,
-                    NuclearPowerPlantRules.CardId,
-                    StringComparison.Ordinal) ||
+            if (!HasActiveDestructionEffect(occupant) ||
                 !queuedSources.Add(occupant))
             {
                 return;

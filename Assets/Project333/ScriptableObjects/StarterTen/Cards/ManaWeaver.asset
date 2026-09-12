@@ -23,7 +23,8 @@ MonoBehaviour:
   _affiliation: 1
   _chargeTileFootprint: 1
   _effectText: 
-  _specialEffectText: Mana +1
+  _specialEffectText: "\uB9C8\uB098 +1"
+  _hasReplicate: 0
   _boardSprite: {fileID: -1189008354, guid: d797ff20d0ca28845bf82b26f7e6396a, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: 2e15f1178132d4c4e92eb0581ea0e21a, type: 2}
   _attackType: 1
@@ -35,8 +36,17 @@ MonoBehaviour:
   _hitsPerAttack: 1
   _hasBerserker: 0
   _hasEndure: 0
-  _hasGuard: 0
+  _hasShielder: 0
+  _hasLifeSteal: 0
+  _hasRobot: 0
   _canMove: 1
+  _sealboundOwnerTurnStarts: 0
+  _hasHiding: 0
+  _hasFlying: 0
+  _hasPiercing: 0
+  _spellPower: 0
+  _invincibleDuration: 0
+  _invincibleOwnerTurns: 0
   _isScience: 0
   _sciencePowerUpkeep: 0
   _turnStartResourceGain:

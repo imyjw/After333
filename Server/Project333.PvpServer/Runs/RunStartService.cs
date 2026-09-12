@@ -28,11 +28,13 @@ public sealed class RunStartService
     public RunStartService(
         DbConnectionFactory connectionFactory,
         IConfiguration configuration)
+        : this(connectionFactory, configuration, PrototypeCardDefinitions.LoadCardDefinitionDatabase()) { }
+
+    public RunStartService(DbConnectionFactory connectionFactory, IConfiguration configuration, JsonCardDefinitionDatabase database)
     {
         _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-        _draftOfferGenerator = new ServerDraftOfferGenerator(
-            PrototypeCardDefinitions.LoadCardDefinitionDatabase());
+        _draftOfferGenerator = new ServerDraftOfferGenerator(database);
     }
 
     public bool IsDatabaseConfigured => _connectionFactory.IsConfigured;
@@ -55,7 +57,11 @@ public sealed class RunStartService
             Array.Empty<string>());
 
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken);
+
+        // Serialize starts for this account before reading any active run. The next
+        // READ COMMITTED statement sees the preceding starter's committed run.
+        await LockRunStartWalletAsync(connection, transaction, account.Account.Id, cancellationToken);
 
         await EnsureCanStartNewDraftRunAsync(
             connection,
@@ -69,14 +75,18 @@ public sealed class RunStartService
             account.Account.Id,
             ticketCost,
             cancellationToken);
-        var run = await InsertDraftRunAsync(
-            connection,
-            transaction,
-            account.Account.Id,
-            mode,
-            draftSeed,
-            ticketCost,
-            cancellationToken);
+        RunSummaryDto run;
+        try
+        {
+            run = await InsertDraftRunAsync(connection, transaction, account.Account.Id,
+                mode, draftSeed, ticketCost, cancellationToken);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation &&
+                                           ex.ConstraintName == "draft_runs_one_active_per_account_idx")
+        {
+            // The transaction (including its ticket debit) rolls back on disposal.
+            throw new RunServiceException("active_run_exists", "A draft run is already active. Resume it before starting a new run.");
+        }
         await UpdateDraftRunCurrentOfferAsync(
             connection,
             transaction,
@@ -246,16 +256,7 @@ public sealed class RunStartService
             transaction,
             runId,
             cancellationToken);
-        var currentOfferCardIds = _draftOfferGenerator.CreateOffer(
-            lockedRun.DraftSeed,
-            selectedCardIds);
-
-        await UpdateDraftRunCurrentOfferAsync(
-            connection,
-            transaction,
-            runId,
-            currentOfferCardIds,
-            cancellationToken);
+        var currentOfferCardIds = await GetOrCreateSavedOfferAsync(connection, transaction, runId, lockedRun, selectedCardIds, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         return new DraftStateResponse(
@@ -303,9 +304,7 @@ public sealed class RunStartService
                 $"Draft pick request expected index {request.PickIndex}, but the server is at index {selectedCardIds.Count}.");
         }
 
-        var authoritativeOfferCardIds = _draftOfferGenerator.CreateOffer(
-            lockedRun.DraftSeed,
-            selectedCardIds);
+        var authoritativeOfferCardIds = await GetOrCreateSavedOfferAsync(connection, transaction, runId, lockedRun, selectedCardIds, cancellationToken);
         var selectedCardId = _draftOfferGenerator.ResolveSelectedCard(
             authoritativeOfferCardIds,
             request.CardId);
@@ -322,7 +321,7 @@ public sealed class RunStartService
 
         if (selectedCardIds.Count == DraftDeckSize)
         {
-            var completedCardIds = _draftOfferGenerator.ValidateCompletedDeck(selectedCardIds);
+            var completedCardIds = _draftOfferGenerator.ValidateSavedCompletedDeck(selectedCardIds);
             var deck = await InsertCompletedDeckAsync(
                 connection,
                 transaction,
@@ -360,7 +359,7 @@ public sealed class RunStartService
                 deck);
         }
 
-        var nextOfferCardIds = _draftOfferGenerator.CreateOffer(
+        var nextOfferCardIds = _draftOfferGenerator.CreateOfferFromSavedPicks(
             lockedRun.DraftSeed,
             selectedCardIds);
         await UpdateDraftRunCurrentOfferAsync(
@@ -692,172 +691,6 @@ public sealed class RunStartService
         }
 
         return cardIds;
-    }
-
-    public async Task<RunSummaryDto> RecordBattleResultAsync(
-        string? runId,
-        string? deckId,
-        bool won,
-        CancellationToken cancellationToken)
-    {
-        var parsedRunId = ParseRunId(runId);
-        var parsedDeckId = ParseDeckId(deckId);
-        var winDelta = won ? 1 : 0;
-        var lossDelta = won ? 0 : 1;
-
-        const string sql = """
-            update draft_runs
-            set
-                wins = least(33, wins + @winDelta),
-                losses = least(3, losses + @lossDelta),
-                status = case
-                    when least(33, wins + @winDelta) >= 33 then 'completed'
-                    when least(3, losses + @lossDelta) >= 3 then 'completed'
-                    else 'in_progress'
-                end,
-                ended_reason = case
-                    when least(33, wins + @winDelta) >= 33 then 'wins_33'
-                    when least(3, losses + @lossDelta) >= 3 then 'losses_3'
-                    else null
-                end,
-                completed_at = case
-                    when least(33, wins + @winDelta) >= 33 or least(3, losses + @lossDelta) >= 3
-                        then coalesce(completed_at, now())
-                    else completed_at
-                end,
-                updated_at = now()
-            where id = @runId
-              and completed_deck_id = @deckId
-              and status in ('ready', 'in_progress')
-            returning id, status, mode, wins, losses, ticket_cost_paid, started_at, reward_claimed_at;
-            """;
-
-        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue("runId", parsedRunId);
-        command.Parameters.AddWithValue("deckId", parsedDeckId);
-        command.Parameters.AddWithValue("winDelta", winDelta);
-        command.Parameters.AddWithValue("lossDelta", lossDelta);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
-        {
-            throw new RunServiceException(
-                "run_result_not_recorded",
-                "Draft run battle result was not recorded. The run may be missing, completed, or linked to a different deck.");
-        }
-
-        return ReadRunSummary(reader);
-    }
-
-    public async Task<RunSummaryDto> SyncLocalPveRunRecordAsync(
-        AuthenticatedAccount account,
-        SyncLocalRunRecordRequest? request,
-        CancellationToken cancellationToken)
-    {
-        if (account == null)
-        {
-            throw new ArgumentNullException(nameof(account));
-        }
-
-        var parsedRunId = ParseRunId(request?.RunId);
-        var parsedDeckId = ParseDeckId(request?.DeckId);
-        var wins = Math.Clamp(request?.Wins ?? 0, 0, 33);
-        var losses = Math.Clamp(request?.Losses ?? 0, 0, 3);
-        if (wins < 33 && losses < 3)
-        {
-            throw new RunServiceException(
-                "run_not_completed",
-                "Only completed local PVE run records can be synced.");
-        }
-
-        const string sql = """
-            update draft_runs
-            set
-                wins = greatest(wins, @wins),
-                losses = greatest(losses, @losses),
-                status = case
-                    when greatest(wins, @wins) >= 33 then 'completed'
-                    when greatest(losses, @losses) >= 3 then 'completed'
-                    when status = 'ready' then 'in_progress'
-                    else status
-                end,
-                ended_reason = case
-                    when greatest(wins, @wins) >= 33 then 'wins_33'
-                    when greatest(losses, @losses) >= 3 then 'losses_3'
-                    else ended_reason
-                end,
-                completed_at = case
-                    when greatest(wins, @wins) >= 33 or greatest(losses, @losses) >= 3
-                        then coalesce(completed_at, now())
-                    else completed_at
-                end,
-                updated_at = now()
-            where id = @runId
-              and account_id = @accountId
-              and completed_deck_id is not null
-              and mode = 'pve'
-              and status in ('ready', 'in_progress')
-            returning id, status, mode, wins, losses, ticket_cost_paid, started_at, reward_claimed_at;
-            """;
-
-        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue("runId", parsedRunId);
-        command.Parameters.AddWithValue("deckId", parsedDeckId);
-        command.Parameters.AddWithValue("accountId", account.Account.Id);
-        command.Parameters.AddWithValue("wins", wins);
-        command.Parameters.AddWithValue("losses", losses);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
-        {
-            await reader.CloseAsync();
-            var existingCompletedRun = await LoadExistingCompletedPveRunAsync(
-                connection,
-                account.Account.Id,
-                parsedRunId,
-                parsedDeckId,
-                cancellationToken);
-            if (existingCompletedRun != null)
-            {
-                return existingCompletedRun;
-            }
-
-            throw new RunServiceException(
-                "run_record_sync_failed",
-                "The completed local PVE run could not be synced. The run may be missing, PvP, claimed, or linked to a different deck.");
-        }
-
-        return ReadRunSummary(reader);
-    }
-
-    private static async Task<RunSummaryDto?> LoadExistingCompletedPveRunAsync(
-        NpgsqlConnection connection,
-        Guid accountId,
-        Guid runId,
-        Guid deckId,
-        CancellationToken cancellationToken)
-    {
-        const string sql = """
-            select id, status, mode, wins, losses, ticket_cost_paid, started_at, reward_claimed_at
-            from draft_runs
-            where id = @runId
-              and account_id = @accountId
-              and completed_deck_id is not null
-              and mode = 'pve'
-              and status = 'completed';
-            """;
-
-        await using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue("runId", runId);
-        command.Parameters.AddWithValue("accountId", accountId);
-        command.Parameters.AddWithValue("deckId", deckId);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
-        {
-            return null;
-        }
-
-        return ReadRunSummary(reader);
     }
 
     private static async Task<RunSummaryDto> LoadCompletedRunForRewardClaimAsync(
@@ -1446,6 +1279,15 @@ public sealed class RunStartService
             reader.GetInt32(1));
     }
 
+    private static async Task LockRunStartWalletAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, Guid accountId, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "select account_id from user_wallets where account_id = @accountId for update;", connection, transaction);
+        command.Parameters.AddWithValue("accountId", accountId);
+        if (await command.ExecuteScalarAsync(cancellationToken) == null)
+            throw new RunServiceException("insufficient_tickets", "The account wallet is unavailable.");
+    }
     private static async Task EnsureCanStartNewDraftRunAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
@@ -1456,7 +1298,10 @@ public sealed class RunStartService
             select id, status, wins, losses, reward_claimed_at
             from draft_runs
             where account_id = @accountId
-            order by started_at desc
+              and (status in ('drafting', 'ready', 'in_progress')
+                   or (status = 'completed' and reward_claimed_at is null))
+            order by case when status in ('drafting', 'ready', 'in_progress') then 0 else 1 end,
+                     started_at desc, id
             limit 1;
             """;
 
@@ -1570,6 +1415,25 @@ public sealed class RunStartService
         }
     }
 
+    private async Task<IReadOnlyList<string>> GetOrCreateSavedOfferAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, Guid runId,
+        LockedAuthoritativeDraftRun run, IReadOnlyList<string> picks, CancellationToken ct)
+    {
+        List<string>? saved;
+        try { saved = string.IsNullOrWhiteSpace(run.SavedOfferJson) ? null : JsonSerializer.Deserialize<List<string>>(run.SavedOfferJson); }
+        catch (JsonException) { throw new RunServiceException("invalid_server_draft_offer", "Saved server offer is malformed; it was not replaced."); }
+        if (saved is { Count: > 0 })
+        {
+            if (saved.Count != ServerDraftOfferGenerator.OfferSize || saved.Any(string.IsNullOrWhiteSpace) ||
+                saved.Distinct(StringComparer.OrdinalIgnoreCase).Count() != saved.Count)
+                throw new RunServiceException("invalid_server_draft_offer", "Saved server offer must contain 3 distinct card IDs.");
+            return saved; // Preserve identity and order, never regenerate an already issued offer.
+        }
+        // Compatibility for old runs with no saved offer. The run row is already locked.
+        var generated = _draftOfferGenerator.CreateOfferFromSavedPicks(run.DraftSeed, picks);
+        await UpdateDraftRunCurrentOfferAsync(connection, transaction, runId, generated, ct);
+        return generated;
+    }
     private static async Task<LockedAuthoritativeDraftRun> LoadAuthoritativeDraftRunForUpdateAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
@@ -1587,7 +1451,8 @@ public sealed class RunStartService
                 ticket_cost_paid,
                 started_at,
                 reward_claimed_at,
-                draft_seed
+                draft_seed,
+                current_offer_card_ids::text
             from draft_runs
             where id = @runId
               and account_id = @accountId
@@ -1596,6 +1461,7 @@ public sealed class RunStartService
 
         RunSummaryDto run;
         int? draftSeed;
+        string? savedOfferJson;
         await using (var command = new NpgsqlCommand(sql, connection, transaction))
         {
             command.Parameters.AddWithValue("runId", runId);
@@ -1608,6 +1474,7 @@ public sealed class RunStartService
 
             run = ReadRunSummary(reader);
             draftSeed = reader.IsDBNull(8) ? null : reader.GetInt32(8);
+            savedOfferJson = reader.IsDBNull(9) ? null : reader.GetString(9);
         }
 
         if (!string.Equals(run.Status, "drafting", StringComparison.OrdinalIgnoreCase))
@@ -1632,7 +1499,7 @@ public sealed class RunStartService
             await updateSeedCommand.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        return new LockedAuthoritativeDraftRun(run, draftSeed.Value);
+        return new LockedAuthoritativeDraftRun(run, draftSeed.Value, savedOfferJson);
     }
 
     private static async Task<IReadOnlyList<string>> LoadDraftRunPickCardIdsAsync(
@@ -2166,5 +2033,6 @@ public sealed class RunStartService
 
     private sealed record LockedAuthoritativeDraftRun(
         RunSummaryDto Run,
-        int DraftSeed);
+        int DraftSeed,
+        string? SavedOfferJson);
 }

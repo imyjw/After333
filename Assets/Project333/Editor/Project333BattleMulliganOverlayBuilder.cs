@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Project333.Runtime.Presentation.Battle;
+using Project333.Runtime.Presentation.Hand;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -217,11 +218,11 @@ namespace Project333.Editor
             var attackValueText = CreateStatValueText(
                 "AttackValueText",
                 cardRect,
-                new Vector2(0.07f, 0.09f));
+                HandCardStatOverlayLayout.DefaultAttackPosition);
             var hpValueText = CreateStatValueText(
                 "HpValueText",
                 cardRect,
-                new Vector2(0.92f, 0.09f));
+                HandCardStatOverlayLayout.DefaultHpPosition);
 
             selectionOverlay.gameObject.SetActive(false);
 

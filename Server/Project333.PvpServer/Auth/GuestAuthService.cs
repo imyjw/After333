@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Npgsql;
+using Project333.PvpServer.AccountOperations;
 using Project333.Runtime.Application.Accounts;
 using Project333.PvpServer.Persistence.Db;
 
@@ -655,6 +656,7 @@ public sealed class GuestAuthService
             throw new ArgumentNullException(nameof(account));
         }
 
+        var requestId = AccountOperationReceipt.ParseRequestId(request?.RequestId);
         var ticketCount = request?.TicketCount ?? 1;
         if (ticketCount <= 0 || ticketCount > 100)
         {
@@ -669,7 +671,17 @@ public sealed class GuestAuthService
 
         var resourceGoldCost = checked(unitGoldCost * ticketCount);
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken);
+
+        var currentWallet = await AccountOperationReceipt.LockWalletAsync(connection, transaction, account.Account.Id, cancellationToken);
+        var fingerprint = ticketCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var previous = await AccountOperationReceipt.FindAsync<PurchaseTicketResponse>(connection, transaction,
+            account.Account.Id, requestId, "ticket_purchase", fingerprint, cancellationToken);
+        if (previous != null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return previous with { Account = account.Account, Wallet = currentWallet, Replayed = true };
+        }
 
         var wallet = await PurchaseTicketsWithResourceGoldAsync(
             connection,
@@ -686,13 +698,11 @@ public sealed class GuestAuthService
             resourceGoldCost,
             cancellationToken);
 
+        var response = new PurchaseTicketResponse(account.Account, wallet, ticketCount, resourceGoldCost, requestId.ToString("D"));
+        await AccountOperationReceipt.SaveAsync(connection, transaction, account.Account.Id, requestId,
+            "ticket_purchase", fingerprint, response, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-
-        return new PurchaseTicketResponse(
-            account.Account,
-            wallet,
-            ticketCount,
-            resourceGoldCost);
+        return response;
     }
 
     private static async Task<RefreshTokenRow?> FindRefreshTokenForUpdateAsync(

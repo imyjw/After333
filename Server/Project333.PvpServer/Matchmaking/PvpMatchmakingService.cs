@@ -3,7 +3,7 @@ using Project333.PvpServer.Persistence.Db;
 
 namespace Project333.PvpServer.Matchmaking;
 
-public sealed class PvpMatchmakingService
+public sealed partial class PvpMatchmakingService
 {
     private readonly DbConnectionFactory _connectionFactory;
 
@@ -143,90 +143,6 @@ public sealed class PvpMatchmakingService
                 reconnectDeadlineUtc);
     }
 
-    public async Task<PvpMatchmakingMatchAssignment> ResolveMatchForQueueAsync(
-        PvpMatchmakingQueueRequest request,
-        CancellationToken cancellationToken)
-    {
-        if (request == null)
-        {
-            throw new ArgumentNullException(nameof(request));
-        }
-
-        var accountId = ParseRequiredGuid(request.AccountId, nameof(request.AccountId));
-        var runId = ParseOptionalGuid(request.RunId);
-        var deckId = ParseOptionalGuid(request.DeckId);
-
-        await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-
-        var existingMatch = await FindWaitingMatchForAccountAsync(
-            connection,
-            transaction,
-            accountId,
-            cancellationToken);
-        if (existingMatch != null)
-        {
-            await transaction.CommitAsync(cancellationToken);
-            return existingMatch;
-        }
-
-        await UpsertQueuedRequestAsync(
-            connection,
-            transaction,
-            accountId,
-            runId,
-            deckId,
-            request.ClientVersion,
-            cancellationToken);
-
-        var opponentMatch = await FindWaitingOpponentMatchAsync(
-            connection,
-            transaction,
-            accountId,
-            cancellationToken);
-        if (opponentMatch != null)
-        {
-            await MarkQueueMatchedAsync(
-                connection,
-                transaction,
-                accountId,
-                runId,
-                deckId,
-                opponentMatch.MatchDbId,
-                request.ClientVersion,
-                cancellationToken);
-
-            await transaction.CommitAsync(cancellationToken);
-            return new PvpMatchmakingMatchAssignment(
-                opponentMatch.MatchId,
-                CreatedMatch: false,
-                MatchedOpponent: true);
-        }
-
-        var newMatchId = CreateMatchId();
-        var newMatchDbId = await UpsertMatchAsync(
-            connection,
-            transaction,
-            newMatchId,
-            request.ClientVersion,
-            cancellationToken);
-        await MarkQueueMatchedAsync(
-            connection,
-            transaction,
-            accountId,
-            runId,
-            deckId,
-            newMatchDbId,
-            request.ClientVersion,
-            cancellationToken);
-
-        await transaction.CommitAsync(cancellationToken);
-        return new PvpMatchmakingMatchAssignment(
-            newMatchId,
-            CreatedMatch: true,
-            MatchedOpponent: false);
-    }
-
     public async Task RecordConnectionJoinedAsync(
         PvpMatchmakingConnectionRecord record,
         CancellationToken cancellationToken)
@@ -242,6 +158,7 @@ public sealed class PvpMatchmakingService
 
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await LockMatchmakingAsync(connection, transaction, cancellationToken);
 
         var matchDbId = await UpsertMatchAsync(
             connection,
@@ -249,6 +166,7 @@ public sealed class PvpMatchmakingService
             record.MatchId,
             record.ClientVersion,
             cancellationToken);
+        await ValidateAndConsumeReservationAsync(connection, transaction, matchDbId, accountId, record, cancellationToken);
         await MarkQueueMatchedAsync(
             connection,
             transaction,
@@ -323,6 +241,7 @@ public sealed class PvpMatchmakingService
 
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await LockMatchmakingAsync(connection, transaction, cancellationToken);
         var matchDbId = await FindMatchDbIdAsync(
             connection,
             transaction,
@@ -334,7 +253,14 @@ public sealed class PvpMatchmakingService
             return;
         }
 
-        await CloseConnectionAsync(
+        // Join/upsert holds this same match-row lock. Serialize disconnect against
+        // reconnect so an old socket cannot mark a newer connection disconnected.
+        await using (var matchLock = new NpgsqlCommand("select id from pvp_matches where id=@id for update;", connection, transaction))
+        {
+            matchLock.Parameters.AddWithValue("id", matchDbId.Value);
+            await matchLock.ExecuteScalarAsync(cancellationToken);
+        }
+        var closedCurrentConnection = await CloseConnectionAsync(
             connection,
             transaction,
             matchDbId.Value,
@@ -342,7 +268,9 @@ public sealed class PvpMatchmakingService
             record.ConnectionId,
             cancellationToken);
 
-        if (record.ReconnectDeadlineUtc.HasValue)
+        if (closedCurrentConnection)
+            await ReleaseWaitingPlayerAsync(connection, transaction, matchDbId.Value, accountId, cancellationToken);
+        if (closedCurrentConnection && record.ReconnectDeadlineUtc.HasValue)
         {
             await MarkPlayerDisconnectedAsync(
                 connection,
@@ -492,45 +420,6 @@ public sealed class PvpMatchmakingService
             : throw new InvalidOperationException("Could not resolve PvP match id.");
     }
 
-    private static async Task<PvpMatchmakingMatchAssignment?> FindWaitingMatchForAccountAsync(
-        NpgsqlConnection connection,
-        NpgsqlTransaction transaction,
-        Guid accountId,
-        CancellationToken cancellationToken)
-    {
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            select matches.match_id,
-                   (
-                       select count(*)
-                       from pvp_match_players players
-                       where players.match_id = matches.id
-                   ) as player_count
-            from pvp_matches matches
-            join pvp_match_players own_player on own_player.match_id = matches.id
-            where own_player.account_id = @account_id
-              and matches.match_status = 'waiting'
-            order by matches.created_at desc
-            for update of matches skip locked
-            limit 1;
-            """;
-        command.Parameters.AddWithValue("account_id", accountId);
-
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
-        {
-            return null;
-        }
-
-        var matchId = reader.GetString(0);
-        var playerCount = reader.GetInt64(1);
-        return new PvpMatchmakingMatchAssignment(
-            matchId,
-            CreatedMatch: false,
-            MatchedOpponent: playerCount >= 2);
-    }
-
     private static async Task UpsertQueuedRequestAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
@@ -572,52 +461,6 @@ public sealed class PvpMatchmakingService
         command.Parameters.AddWithValue("deck_id", ToDbGuid(deckId));
         command.Parameters.AddWithValue("client_version", ToDbText(clientVersion));
         await command.ExecuteNonQueryAsync(cancellationToken);
-    }
-
-    private static async Task<PvpMatchmakingWaitingMatch?> FindWaitingOpponentMatchAsync(
-        NpgsqlConnection connection,
-        NpgsqlTransaction transaction,
-        Guid accountId,
-        CancellationToken cancellationToken)
-    {
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            select matches.id, matches.match_id
-            from pvp_matches matches
-            where matches.match_status = 'waiting'
-              and exists (
-                  select 1
-                  from pvp_match_players players
-                  where players.match_id = matches.id
-                    and players.account_id <> @account_id
-              )
-              and not exists (
-                  select 1
-                  from pvp_match_players players
-                  where players.match_id = matches.id
-                    and players.account_id = @account_id
-              )
-              and (
-                  select count(*)
-                  from pvp_match_players players
-                  where players.match_id = matches.id
-              ) = 1
-            order by matches.created_at
-            for update of matches skip locked
-            limit 1;
-            """;
-        command.Parameters.AddWithValue("account_id", accountId);
-
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
-        {
-            return null;
-        }
-
-        return new PvpMatchmakingWaitingMatch(
-            reader.GetGuid(0),
-            reader.GetString(1));
     }
 
     private static async Task<Guid?> FindMatchDbIdAsync(
@@ -736,7 +579,14 @@ public sealed class PvpMatchmakingService
                 session_version = pvp_match_players.session_version + case
                     when pvp_match_players.player_status = 'disconnected' then 1
                     else 0
-                end;
+                end
+            where not exists (
+                    select 1 from pvp_matches m
+                    where m.id = pvp_match_players.match_id and m.started_at is not null)
+               or (pvp_match_players.account_id = excluded.account_id
+                   and pvp_match_players.run_id is not distinct from excluded.run_id
+                   and pvp_match_players.deck_id is not distinct from excluded.deck_id
+                   and pvp_match_players.runtime_player_id = excluded.runtime_player_id);
             """;
         command.Parameters.AddWithValue("match_id", matchDbId);
         command.Parameters.AddWithValue("seat", NormalizeSeat(seat));
@@ -744,7 +594,10 @@ public sealed class PvpMatchmakingService
         command.Parameters.AddWithValue("run_id", ToDbGuid(runId));
         command.Parameters.AddWithValue("deck_id", ToDbGuid(deckId));
         command.Parameters.AddWithValue("runtime_player_id", NormalizeRuntimePlayerId(runtimePlayerId));
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+        {
+            throw new InvalidOperationException("A started match cannot change its account, run, deck or runtime seat.");
+        }
     }
 
     private static async Task InsertConnectionAsync(
@@ -824,7 +677,7 @@ public sealed class PvpMatchmakingService
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private static async Task CloseConnectionAsync(
+    private static async Task<bool> CloseConnectionAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         Guid matchDbId,
@@ -847,7 +700,7 @@ public sealed class PvpMatchmakingService
         command.Parameters.AddWithValue("match_id", matchDbId);
         command.Parameters.AddWithValue("account_id", accountId);
         command.Parameters.AddWithValue("connection_id", NormalizeRequiredText(connectionId, nameof(connectionId)));
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 
     private static async Task MarkPlayerDisconnectedAsync(
@@ -960,7 +813,8 @@ public sealed record PvpMatchmakingQueueRequest(
     string AccountId,
     string RunId,
     string DeckId,
-    string ClientVersion);
+    string ClientVersion,
+    string ConnectionId);
 
 public sealed record PvpMatchmakingStartupRecoveryResult(
     long MatchCount,
@@ -977,11 +831,9 @@ public sealed record PvpMatchmakingReconnectStatus(
 public sealed record PvpMatchmakingMatchAssignment(
     string MatchId,
     bool CreatedMatch,
-    bool MatchedOpponent);
-
-internal sealed record PvpMatchmakingWaitingMatch(
-    Guid MatchDbId,
-    string MatchId);
+    bool MatchedOpponent,
+    string Seat,
+    Guid? ReservationId = null);
 
 public sealed record PvpMatchmakingConnectionRecord(
     string MatchId,
@@ -993,7 +845,8 @@ public sealed record PvpMatchmakingConnectionRecord(
     string DeckId,
     string ClientVersion,
     string RemoteEndpoint,
-    string UserAgent);
+    string UserAgent,
+    Guid? ReservationId = null);
 
 public sealed record PvpMatchmakingDisconnectRecord(
     string MatchId,

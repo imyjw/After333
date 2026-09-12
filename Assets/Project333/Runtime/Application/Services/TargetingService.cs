@@ -119,9 +119,7 @@ namespace Project333.Runtime.Application.Services
                 return false;
             }
 
-            return !occupant.HasActiveFlying ||
-                   attackerAttackType == AttackType.Ranged ||
-                   attackerHasActiveFlying;
+            return true;
         }
     }
 }

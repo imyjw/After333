@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3009c6625a5e04942abb529a14d6fb06, type: 3}
+  m_Name: HuanShu
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.ScriptedSpellCardDefinitionAsset
+  _cardId: HuanShu
+  _displayName: "\uD658\uC220"
+  _rarity: 1
+  _cost:
+    _mana: 0
+    _qi: 3
+    _power: 0
+    _gold: 0
+  _affiliation: 0
+  _chargeTileFootprint: 0
+  _effectText: "\uC0C1\uB300\uBC29\uC758 \uC720\uB2DB \uD558\uB098\uB97C \uC120\uD0DD\uD55C\uB2E4.
+    \uADF8 \uC720\uB2DB\uC740 \uC77C\uBC18 \uACF5\uACA9 \uC2DC, \uBB34\uC791\uC704
+    \uB300\uC0C1\uC744 \uACF5\uACA9\uD55C\uB2E4."
+  _specialEffectText: 
+  _hasReplicate: 0
+  _boardSprite: {fileID: 0}
+  _boardAnimatorController: {fileID: 0}
+  _effectId: huan_shu
+  _damage: 0
+  _damageType: 0
+  _triggerCount: 0

@@ -5,10 +5,13 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Project333.Runtime.Application.Online;
+using Project333.Runtime.Application.Services;
 using Project333.PvpServer.Ads;
+using Project333.PvpServer.AccountOperations;
 using Project333.PvpServer.Auth;
 using Project333.PvpServer.BattlePersistence;
 using Project333.PvpServer.BattleSessions;
+using Project333.PvpServer.BattleResults;
 using Project333.PvpServer.Cards;
 using Project333.PvpServer.Matchmaking;
 using Project333.PvpServer.Messages;
@@ -27,6 +30,8 @@ var disconnectReconnectGracePeriod = TimeSpan.FromSeconds(60);
 var clientHeartbeatTimeout = TimeSpan.FromSeconds(12);
 var clientHeartbeatPollInterval = TimeSpan.FromSeconds(2);
 var rateLimitSettings = Project333RateLimitSettings.FromConfiguration(builder.Configuration);
+var battleLimits = BattleConnectionLimitSettings.FromConfiguration(builder.Configuration);
+var battleAccounts = new BattleAccountConnections(battleLimits.MaxConnectionsPerAccount);
 builder.Services.AddSingleton<DbConnectionFactory>();
 builder.Services.AddSingleton<AuthTokenService>();
 builder.Services.AddSingleton<GoogleIdentityTokenValidator>();
@@ -42,6 +47,9 @@ builder.Services.AddSingleton<BattleCardUpgradeLevelService>();
 builder.Services.AddSingleton<PvpMatchmakingService>();
 builder.Services.AddSingleton<PvpBattlePersistenceService>();
 builder.Services.AddSingleton<AuditLogService>();
+builder.Services.AddSingleton<IBattleResultStore, BattleResultStore>();
+builder.Services.AddSingleton<BattleResultOutbox>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<BattleResultOutbox>());
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -62,6 +70,7 @@ builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Information);
 await DbMigrationRunner.RunFromConfigurationAsync(builder.Configuration, builder.Environment, CancellationToken.None);
 _ = PrototypeCardDefinitions.LoadCardDefinitionProvider();
 Console.WriteLine("[cards] cards.json validation passed.");
+Console.WriteLine($"[pve-ai] {PveAiDeckCatalog.Default.Decks.Count} fixed decks validated (33 cards; L1/U4/R9/UC11/C8).");
 
 var app = builder.Build();
 var guestAuthService = app.Services.GetRequiredService<GuestAuthService>();
@@ -69,7 +78,7 @@ var runStartService = app.Services.GetRequiredService<RunStartService>();
 var battleCardUpgradeLevelService = app.Services.GetRequiredService<BattleCardUpgradeLevelService>();
 var pvpMatchmakingService = app.Services.GetRequiredService<PvpMatchmakingService>();
 var pvpBattlePersistenceService = app.Services.GetRequiredService<PvpBattlePersistenceService>();
-var sessionManager = new BattleSessionManager();
+var sessionManager = new BattleSessionManager(app.Services.GetRequiredService<BattleResultOutbox>());
 var jsonOptions = new JsonSerializerOptions
 {
     PropertyNameCaseInsensitive = true,
@@ -714,6 +723,25 @@ app.MapGet("/me", async (
     }
 });
 
+
+app.MapPost("/account/operations/resolve", async (HttpContext context, GuestAuthService auth, DbConnectionFactory db) =>
+{
+    if (!db.IsConfigured)
+        return AuthErrorResult("db_not_configured", "Account APIs require PostgreSQL.", StatusCodes.Status503ServiceUnavailable);
+    try
+    {
+        var account = await auth.GetCurrentAccountAsync(context.Request.Headers.Authorization.ToString(), context.RequestAborted);
+        var request = await JsonSerializer.DeserializeAsync<ResolveAccountOperationRequest>(
+            context.Request.Body, jsonOptions, context.RequestAborted);
+        await using var connection = await db.OpenConnectionAsync(context.RequestAborted);
+        return Results.Json(await AccountOperationReceipt.ResolveAsync(connection, account.Account.Id,
+            request?.RequestId, context.RequestAborted), jsonOptions);
+    }
+    catch (JsonException) { return AuthErrorResult("invalid_json", "Invalid JSON.", StatusCodes.Status400BadRequest); }
+    catch (AuthServiceException ex) { return AuthErrorResult(ex.Code, ex.Message, StatusCodes.Status401Unauthorized); }
+    catch (AccountOperationException ex) { return AuthErrorResult(ex.Code, ex.Message, StatusCodes.Status400BadRequest); }
+});
+
 app.MapPost("/wallet/purchase-ticket", async (
     HttpContext context,
     GuestAuthService guestAuthService) =>
@@ -727,7 +755,7 @@ app.MapPost("/wallet/purchase-ticket", async (
     }
 
     PurchaseTicketRequest? request = null;
-    if (context.Request.ContentLength is > 0)
+    if (context.Request.ContentLength != 0)
     {
         try
         {
@@ -752,6 +780,11 @@ app.MapPost("/wallet/purchase-ticket", async (
             request,
             context.RequestAborted);
         return Results.Json(response, jsonOptions);
+    }
+    catch (AccountOperationException ex)
+    {
+        return AuthErrorResult(ex.Code, ex.Message, ex.Code == "request_id_conflict"
+            ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
     }
     catch (AuthServiceException ex)
     {
@@ -932,7 +965,7 @@ app.MapPost("/cards/upgrade", async (
     }
 
     UpgradeCardRequest? request = null;
-    if (context.Request.ContentLength is > 0)
+    if (context.Request.ContentLength != 0)
     {
         try
         {
@@ -957,6 +990,11 @@ app.MapPost("/cards/upgrade", async (
             request,
             context.RequestAborted);
         return Results.Json(response, jsonOptions);
+    }
+    catch (AccountOperationException ex)
+    {
+        return AuthErrorResult(ex.Code, ex.Message, ex.Code == "request_id_conflict"
+            ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
     }
     catch (AuthServiceException ex)
     {
@@ -1145,58 +1183,12 @@ app.MapPost("/runs/complete-draft", () =>
         "This endpoint is no longer supported. The server completes a deck after the 33rd authoritative pick.",
         StatusCodes.Status410Gone));
 
-app.MapPost("/runs/sync-local-record", async (
-    HttpContext context,
-    GuestAuthService guestAuthService,
-    RunStartService runStartService) =>
-{
-    if (!guestAuthService.IsDatabaseConfigured || !runStartService.IsDatabaseConfigured)
-    {
-        return AuthErrorResult(
-            "db_not_configured",
-            "PROJECT333_DB_CONNECTION is not set. Account APIs require PostgreSQL.",
-            StatusCodes.Status503ServiceUnavailable);
-    }
-
-    SyncLocalRunRecordRequest? request = null;
-    if (context.Request.ContentLength is > 0)
-    {
-        try
-        {
-            request = await JsonSerializer.DeserializeAsync<SyncLocalRunRecordRequest>(
-                context.Request.Body,
-                jsonOptions,
-                context.RequestAborted);
-        }
-        catch (JsonException ex)
-        {
-            return AuthErrorResult("invalid_json", ex.Message, StatusCodes.Status400BadRequest);
-        }
-    }
-
-    try
-    {
-        var account = await guestAuthService.GetCurrentAccountAsync(
-            context.Request.Headers.Authorization.ToString(),
-            context.RequestAborted);
-        var run = await runStartService.SyncLocalPveRunRecordAsync(
-            account,
-            request,
-            context.RequestAborted);
-        return Results.Json(new SyncLocalRunRecordResponse(
-            account.Account,
-            account.Wallet,
-            run), jsonOptions);
-    }
-    catch (AuthServiceException ex)
-    {
-        return AuthErrorResult(ex.Code, ex.Message, StatusCodes.Status401Unauthorized);
-    }
-    catch (RunServiceException ex)
-    {
-        return AuthErrorResult(ex.Code, ex.Message, StatusCodes.Status400BadRequest);
-    }
-});
+// Keep an explicit tombstone for older clients; never accept client-authored run results.
+app.MapPost("/runs/sync-local-record", () =>
+    AuthErrorResult(
+        "client_authoritative_run_result_removed",
+        "Local run results are no longer accepted. Only server-resolved battles count toward run progress and rewards. Refresh /me for the server record.",
+        StatusCodes.Status410Gone));
 
 app.MapPost("/runs/claim-rewards", async (
     HttpContext context,
@@ -1303,7 +1295,10 @@ app.Map("/battle", async (
 
     using var socket = await context.WebSockets.AcceptWebSocketAsync();
     var connection = new BattleClientConnection(Guid.NewGuid().ToString("N"), socket);
-    using var heartbeatCancellation = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+    using var connectionLifetime = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+    using var guard = new BattleConnectionGuard(battleLimits, battleAccounts);
+    using var heartbeatCancellation = CancellationTokenSource.CreateLinkedTokenSource(connectionLifetime.Token);
+    var authenticationTask = MonitorAuthenticationDeadlineAsync(connection, guard, battleLimits, connectionLifetime, heartbeatCancellation.Token);
     var heartbeatTask = MonitorClientHeartbeatAsync(
         connection,
         clientHeartbeatTimeout,
@@ -1313,7 +1308,9 @@ app.Map("/battle", async (
     var connectionId = connection.ConnectionId;
     Console.WriteLine($"[{connectionId}] connected");
 
-    await SendEnvelopeAsync(socket, new OnlineBattleEnvelope
+    try
+    {
+    await SendEnvelopeAsync(connection, new OnlineBattleEnvelope
     {
         MessageType = OnlineBattleMessageType.KeepAlive,
         MatchId = string.Empty,
@@ -1325,18 +1322,18 @@ app.Map("/battle", async (
                 Message = "Connected to After333 PvP test server."
             }
         }
-    }, jsonOptions, context.RequestAborted);
+    }, jsonOptions, connectionLifetime.Token);
 
-    try
-    {
-        while (socket.State == WebSocketState.Open && !context.RequestAborted.IsCancellationRequested)
+        while (connection.IsOpen && !connectionLifetime.Token.IsCancellationRequested)
         {
-            var json = await ReceiveTextMessageAsync(socket, context.RequestAborted);
+            var json = await BattleMessageReader.ReadTextAsync(connection, connectionLifetime.Token);
             if (json == null)
             {
                 break;
             }
 
+            if (!guard.TryAcceptMessage())
+                throw new BattleMessageException(WebSocketCloseStatus.PolicyViolation, "message_rate_limited");
             connection.MarkClientMessageReceived();
 
             if (ShouldLogVerboseTransport())
@@ -1351,7 +1348,7 @@ app.Map("/battle", async (
             }
             catch (JsonException ex)
             {
-                await SendErrorAsync(socket, "invalid_json", ex.Message, jsonOptions, context.RequestAborted);
+                await SendErrorAsync(connection, "invalid_json", ex.Message, jsonOptions, connectionLifetime.Token);
                 continue;
             }
 
@@ -1367,9 +1364,15 @@ app.Map("/battle", async (
 
             if (envelope?.MessageType == OnlineBattleMessageType.JoinMatch)
             {
+                if (!guard.TryAcceptJoin())
+                    throw new BattleMessageException(WebSocketCloseStatus.PolicyViolation, "join_rate_limited");
+                Guid? pendingReservationId = null;
+                connection.ReservedOnlineSeatId = OnlineBattleSeatId.None;
+                try
+                {
                 if (!envelope.UseMatchmakingQueue && string.IsNullOrWhiteSpace(envelope.MatchId))
                 {
-                    await SendErrorAsync(socket, "missing_match_id", "JoinMatch requires a MatchId.", jsonOptions, context.RequestAborted);
+                    await SendErrorAsync(connection, "missing_match_id", "JoinMatch requires a MatchId.", jsonOptions, connectionLifetime.Token);
                     continue;
                 }
 
@@ -1379,12 +1382,17 @@ app.Map("/battle", async (
                     var requiredClientVersion = ResolveRequiredClientVersion(builder.Configuration);
                     Console.WriteLine(
                         $"[online-join] rejected client version actual={FormatConfigValue(clientVersion)} required={FormatConfigValue(requiredClientVersion)}");
-                    await SendErrorAsync(
-                        socket,
+                    await SendErrorAsync(connection,
                         "client_version_mismatch",
                         BuildClientVersionMismatchMessage(requiredClientVersion, clientVersion),
                         jsonOptions,
-                        context.RequestAborted);
+                        connectionLifetime.Token);
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(envelope.SessionToken))
+                {
+                    await SendErrorAsync(connection, "missing_session_token", "JoinMatch requires a valid login session.", jsonOptions, connectionLifetime.Token);
                     continue;
                 }
 
@@ -1393,7 +1401,7 @@ app.Map("/battle", async (
                 {
                     if (!guestAuthService.IsDatabaseConfigured)
                     {
-                        await SendErrorAsync(socket, "db_not_configured", "PVP matchmaking requires PROJECT333_DB_CONNECTION for account authentication.", jsonOptions, context.RequestAborted);
+                        await SendErrorAsync(connection, "db_not_configured", "PVP matchmaking requires PROJECT333_DB_CONNECTION for account authentication.", jsonOptions, connectionLifetime.Token);
                         continue;
                     }
 
@@ -1401,20 +1409,38 @@ app.Map("/battle", async (
                     {
                         authenticatedAccount = await guestAuthService.GetCurrentAccountAsync(
                             ToBearerAuthorizationHeader(envelope.SessionToken),
-                            context.RequestAborted);
+                            connectionLifetime.Token);
                     }
                     catch (AuthServiceException ex)
                     {
-                        await SendErrorAsync(socket, ex.Code, ex.Message, jsonOptions, context.RequestAborted);
+                        await SendErrorAsync(connection, ex.Code, ex.Message, jsonOptions, connectionLifetime.Token);
                         continue;
                     }
                 }
 
+                if (!connection.IsOpen) break;
+                var admission = guard.Authenticate(authenticatedAccount!.Account.Id);
+                if (admission == BattleAuthenticationAdmission.IdentityMismatch)
+                {
+                    await SendErrorAsync(connection, "battle_participant_mismatch",
+                        "An authenticated connection cannot change its account.", jsonOptions, connectionLifetime.Token);
+                    continue;
+                }
+                if (admission != BattleAuthenticationAdmission.Accepted)
+                    throw new BattleMessageException(WebSocketCloseStatus.PolicyViolation,
+                        admission == BattleAuthenticationAdmission.ConnectionLimit ? "account_connection_limit" : "authentication_timeout");
                 var accountId = authenticatedAccount?.Account.Id.ToString("D") ??
                                 (envelope.AccountId ?? string.Empty).Trim();
+                if (connection.HasAssignedSeat &&
+                    !string.Equals(connection.AccountId, accountId, StringComparison.Ordinal))
+                {
+                    await SendErrorAsync(connection, "battle_participant_mismatch",
+                        "An existing battle connection cannot change its authenticated account.", jsonOptions, connectionLifetime.Token);
+                    continue;
+                }
                 if (envelope.UseMatchmakingQueue && string.IsNullOrWhiteSpace(accountId))
                 {
-                    await SendErrorAsync(socket, "account_required", "PVP matchmaking requires an authenticated account.", jsonOptions, context.RequestAborted);
+                    await SendErrorAsync(connection, "account_required", "PVP matchmaking requires an authenticated account.", jsonOptions, connectionLifetime.Token);
                     continue;
                 }
 
@@ -1422,7 +1448,7 @@ app.Map("/battle", async (
                     ? sessionManager.FindReconnectStatus(accountId)
                     : null;
                 var dbReconnectStatus = envelope.UseMatchmakingQueue && pvpMatchmakingService.IsDatabaseConfigured
-                    ? await pvpMatchmakingService.GetReconnectStatusForAccountAsync(accountId, context.RequestAborted)
+                    ? await pvpMatchmakingService.GetReconnectStatusForAccountAsync(accountId, connectionLifetime.Token)
                     : null;
                 var isReconnectJoin = memoryReconnectStatus != null || dbReconnectStatus != null;
                 var connectedPvpSession = envelope.UseMatchmakingQueue
@@ -1433,16 +1459,23 @@ app.Map("/battle", async (
                                            connectedPvpSession.CanReplaceConnectionForReconnect(
                                                accountId,
                                                envelope.PreviousConnectionId);
-                var isResumingExistingBattle = isReconnectJoin || isConnectionTakeover;
+                var isRejoiningCurrentBattle = session?.IsBattleStarted == true &&
+                    string.Equals(session.MatchId,
+                        envelope.UseMatchmakingQueue ? connectedPvpSession?.MatchId : envelope.MatchId,
+                        StringComparison.Ordinal);
+                var isExistingCustomBattle = !envelope.UseMatchmakingQueue &&
+                    sessionManager.TryGet(envelope.MatchId ?? string.Empty, out var existingCustomBattle) &&
+                    existingCustomBattle?.IsBattleStarted == true;
+                var isResumingExistingBattle = isReconnectJoin || isConnectionTakeover ||
+                    isRejoiningCurrentBattle || isExistingCustomBattle;
                 if (connectedPvpSession != null && !isConnectionTakeover &&
                     (session == null || !string.Equals(session.MatchId, connectedPvpSession.MatchId, StringComparison.Ordinal)))
                 {
-                    await SendErrorAsync(
-                        socket,
+                    await SendErrorAsync(connection,
                         "already_in_pvp_match",
                         $"This account is already connected to PvP match {connectedPvpSession.MatchId}. Close the existing connection or wait for reconnect grace.",
                         jsonOptions,
-                        context.RequestAborted);
+                        connectionLifetime.Token);
                     continue;
                 }
 
@@ -1450,7 +1483,7 @@ app.Map("/battle", async (
                     !isResumingExistingBattle &&
                     (string.IsNullOrWhiteSpace(envelope.RunId) || string.IsNullOrWhiteSpace(envelope.DeckId)))
                 {
-                    await SendErrorAsync(socket, "battle_deck_required", "PVP matchmaking requires a saved draft run and deck.", jsonOptions, context.RequestAborted);
+                    await SendErrorAsync(connection, "battle_deck_required", "PVP matchmaking requires a saved draft run and deck.", jsonOptions, connectionLifetime.Token);
                     continue;
                 }
 
@@ -1466,11 +1499,11 @@ app.Map("/battle", async (
                             authenticatedAccount,
                             envelope.RunId,
                             envelope.DeckId,
-                            context.RequestAborted);
+                            connectionLifetime.Token);
                     }
                     catch (RunServiceException ex)
                     {
-                        await SendErrorAsync(socket, ex.Code, ex.Message, jsonOptions, context.RequestAborted);
+                        await SendErrorAsync(connection, ex.Code, ex.Message, jsonOptions, connectionLifetime.Token);
                         continue;
                     }
 
@@ -1496,7 +1529,11 @@ app.Map("/battle", async (
                 var resolvedMatchId = envelope.MatchId ?? string.Empty;
                 if (envelope.UseMatchmakingQueue)
                 {
-                    if (isConnectionTakeover)
+                    if (isRejoiningCurrentBattle)
+                    {
+                        resolvedMatchId = session!.MatchId;
+                    }
+                    else if (isConnectionTakeover)
                     {
                         resolvedMatchId = connectedPvpSession!.MatchId;
                     }
@@ -1513,39 +1550,44 @@ app.Map("/battle", async (
                                     accountId,
                                     envelope.RunId,
                                     envelope.DeckId,
-                                    clientVersion),
-                                context.RequestAborted);
+                                    clientVersion,
+                                    connection.ConnectionId),
+                                connectionLifetime.Token);
                             resolvedMatchId = matchmakingAssignment.MatchId;
+                            pendingReservationId = matchmakingAssignment.ReservationId;
+                            connection.MatchmakingReservationId = pendingReservationId;
+                            connection.ReservedOnlineSeatId = Enum.Parse<OnlineBattleSeatId>(matchmakingAssignment.Seat);
                             Console.WriteLine(
                                 $"[matchmaking] account={accountId} assigned match={resolvedMatchId} created={matchmakingAssignment.CreatedMatch} matchedOpponent={matchmakingAssignment.MatchedOpponent}");
                         }
                         catch (Exception ex)
                         {
                             Console.WriteLine($"[matchmaking] failed to assign match for account={accountId}: {ex.Message}");
-                            await SendErrorAsync(
-                                socket,
+                            await SendErrorAsync(connection,
                                 "matchmaking_failed",
                                 "PVP matchmaking failed. Please try again.",
                                 jsonOptions,
-                                context.RequestAborted);
+                                connectionLifetime.Token);
                             continue;
                         }
                     }
                 }
 
+                using var joinSessionLease = envelope.UseMatchmakingQueue
+                    ? sessionManager.AcquireForJoin(resolvedMatchId, useServerAiOpponent: false)
+                    : null;
                 BattleSession? targetSession = envelope.UseMatchmakingQueue
-                    ? sessionManager.GetOrCreate(resolvedMatchId, useServerAiOpponent: false)
+                    ? joinSessionLease!.Session
                     : envelope.IsReconnectAttempt
                         ? sessionManager.FindReconnectableServerAiBattle(resolvedMatchId)
                         : sessionManager.GetOrCreate(resolvedMatchId, envelope.UseServerAiOpponent);
                 if (targetSession == null)
                 {
-                    await SendErrorAsync(
-                        socket,
+                    await SendErrorAsync(connection,
                         "battle_reconnect_expired",
                         "The previous PVE battle has already ended.",
                         jsonOptions,
-                        context.RequestAborted);
+                        connectionLifetime.Token);
                     continue;
                 }
 
@@ -1562,15 +1604,14 @@ app.Map("/battle", async (
                             playerToken,
                             pvpBattlePersistenceService,
                             jsonOptions,
-                            context.RequestAborted);
+                            connectionLifetime.Token);
                         if (!restored)
                         {
-                            await SendErrorAsync(
-                                socket,
+                            await SendErrorAsync(connection,
                                 "battle_restore_failed",
                                 "The previous PVP battle could not be restored. Please try again later.",
                                 jsonOptions,
-                                context.RequestAborted);
+                                connectionLifetime.Token);
                             sessionManager.RemoveIfEmpty(targetSession);
                             continue;
                         }
@@ -1583,12 +1624,11 @@ app.Map("/battle", async (
                                  playerToken,
                                  dbReconnectStatus.ReconnectDeadlineUtc))
                     {
-                        await SendErrorAsync(
-                            socket,
+                        await SendErrorAsync(connection,
                             "battle_reconnect_reservation_failed",
                             "The previous PVP battle was restored, but this seat could not be reserved for reconnection.",
                             jsonOptions,
-                            context.RequestAborted);
+                            connectionLifetime.Token);
                         continue;
                     }
                 }
@@ -1598,23 +1638,29 @@ app.Map("/battle", async (
                 {
                     if (session != null)
                     {
-                        session.RemoveConnection(connectionId);
+                        await DisconnectBattleConnectionAsync(session, connection, sessionManager,
+                            runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService,
+                            disconnectReconnectGracePeriod, jsonOptions);
                         sessionManager.RemoveIfEmpty(session);
                     }
 
                     connection.MatchId = targetSession.MatchId;
                     connection.PlayerToken = playerToken;
                     ApplyAuthenticatedAccount(connection, authenticatedAccount, accountId);
-                    CopyPlayerDeckCardIds(connection, joinDeckCardIds);
-                    CopyRunDeckMetadata(connection, envelope.RunId, envelope.DeckId);
-                    await RefreshConnectionCardUpgradeLevelsAsync(
-                        connection,
-                        battleCardUpgradeLevelService,
-                        context.RequestAborted);
+                    if (!targetSession.IsBattleStarted)
+                    {
+                        CopyPlayerDeckCardIds(connection, joinDeckCardIds);
+                        CopyRunDeckMetadata(connection, envelope.RunId, envelope.DeckId);
+                        await RefreshConnectionCardUpgradeLevelsAsync(
+                            connection,
+                            battleCardUpgradeLevelService,
+                            connectionLifetime.Token);
+                    }
                     session = targetSession;
                     connection.AssignedSeatId = default;
                     connection.AssignedOnlineSeatId = OnlineBattleSeatId.None;
                     connection.HasAssignedSeat = false;
+                    connection.MatchmakingJoinPending = envelope.UseMatchmakingQueue;
 
                     var reconnectIdentityKey = string.IsNullOrWhiteSpace(connection.AccountId)
                         ? connection.PlayerToken
@@ -1640,7 +1686,7 @@ app.Map("/battle", async (
 
                     if (!connectionAdded)
                     {
-                        await SendErrorAsync(socket, "match_full", joinError, jsonOptions, context.RequestAborted);
+                        await SendErrorAsync(connection, "match_full", joinError, jsonOptions, connectionLifetime.Token);
                         sessionManager.RemoveIfEmpty(session);
                         session = null;
                         continue;
@@ -1654,12 +1700,15 @@ app.Map("/battle", async (
                 {
                     connection.PlayerToken = playerToken;
                     ApplyAuthenticatedAccount(connection, authenticatedAccount, accountId);
-                    CopyPlayerDeckCardIds(connection, joinDeckCardIds);
-                    CopyRunDeckMetadata(connection, envelope.RunId, envelope.DeckId);
-                    await RefreshConnectionCardUpgradeLevelsAsync(
-                        connection,
-                        battleCardUpgradeLevelService,
-                        context.RequestAborted);
+                    if (!session.IsBattleStarted)
+                    {
+                        CopyPlayerDeckCardIds(connection, joinDeckCardIds);
+                        CopyRunDeckMetadata(connection, envelope.RunId, envelope.DeckId);
+                        await RefreshConnectionCardUpgradeLevelsAsync(
+                            connection,
+                            battleCardUpgradeLevelService,
+                            connectionLifetime.Token);
+                    }
                     session.RefreshConnectionMetadata(connection);
                     Console.WriteLine($"[match:{session.MatchId}] refreshed metadata connection={connectionId} {FormatJoinMetadata(connection)}");
                 }
@@ -1674,20 +1723,22 @@ app.Map("/battle", async (
                             envelope,
                             pvpMatchmakingService,
                             context,
-                            context.RequestAborted);
+                            connectionLifetime.Token);
+                        session.ConfirmMatchmakingJoin(connection);
                     }
                     catch (Exception ex)
                     {
                         Console.WriteLine($"[match:{session.MatchId}] PvP matchmaking persistence failed on join: {ex.Message}");
-                        session.RemoveConnection(connectionId);
+                        await DisconnectBattleConnectionAsync(session, connection, sessionManager,
+                            runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService,
+                            disconnectReconnectGracePeriod, jsonOptions);
                         sessionManager.RemoveIfEmpty(session);
                         session = null;
-                        await SendErrorAsync(
-                            socket,
+                        await SendErrorAsync(connection,
                             "matchmaking_persistence_failed",
                             "PVP matchmaking state could not be saved. Please try again.",
                             jsonOptions,
-                            context.RequestAborted);
+                            connectionLifetime.Token);
                         continue;
                     }
                 }
@@ -1696,95 +1747,83 @@ app.Map("/battle", async (
                 {
                     Console.WriteLine(
                         $"[match:{session.MatchId}] replaced stale connection={replacedConnection.ConnectionId} with connection={connection.ConnectionId} for seat={connection.AssignedOnlineSeatId}");
-                    replacedConnection.Socket.Abort();
+                    replacedConnection.TerminateTransport();
                 }
 
-                await BroadcastEnvelopeAsync(session, session.CreateConnectedEnvelope(connection), jsonOptions, context.RequestAborted);
+                await BroadcastEnvelopeAsync(session, session.CreateConnectedEnvelope(connection), jsonOptions, connectionLifetime.Token);
 
                 if (session.TryStartBattleIfReady(out var battleStartMessage))
                 {
                     await RecordPvpBattleStartedIfNeededAsync(
                         session,
                         pvpMatchmakingService,
-                        context.RequestAborted);
+                        connectionLifetime.Token);
                     await RecordPvpBattleSnapshotAsync(
                         session,
                         pvpBattlePersistenceService,
                         "battle_started",
                         jsonOptions,
-                        context.RequestAborted);
+                        connectionLifetime.Token);
                     Console.WriteLine($"[match:{session.MatchId}] {battleStartMessage}");
-                    await BroadcastEnvelopeAsync(session, session.CreateBattleStartedEnvelope(battleStartMessage), jsonOptions, context.RequestAborted);
-                    await BroadcastStateViewsAsync(session, jsonOptions, context.RequestAborted);
-                    await BroadcastServerAiTurnIfNeededAsync(session, runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService, jsonOptions, context.RequestAborted);
+                    await BroadcastEnvelopeAsync(session, session.CreateBattleStartedEnvelope(battleStartMessage), jsonOptions, connectionLifetime.Token);
+                    await BroadcastStateViewsAsync(session, jsonOptions, connectionLifetime.Token);
+                    await BroadcastServerAiTurnIfNeededAsync(session, runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService, jsonOptions, connectionLifetime.Token);
                     ScheduleTurnTimeoutIfNeeded(session, sessionManager, runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService, jsonOptions);
                 }
                 else if (session.IsBattleStarted)
                 {
                     if (connection.ReconnectedToPendingSeat)
                     {
-                        await BroadcastStateViewsAsync(session, jsonOptions, context.RequestAborted);
+                        await BroadcastStateViewsAsync(session, jsonOptions, connectionLifetime.Token);
                         await RecordPvpBattleSnapshotAsync(
                             session,
                             pvpBattlePersistenceService,
                             "reconnect_join",
                             jsonOptions,
-                            context.RequestAborted);
+                            connectionLifetime.Token);
                     }
                     else
                     {
-                        await SendStateViewAsync(session, connection, jsonOptions, context.RequestAborted);
+                        await SendStateViewAsync(session, connection, jsonOptions, connectionLifetime.Token);
                     }
 
                     ScheduleTurnTimeoutIfNeeded(session, sessionManager, runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService, jsonOptions);
                 }
 
                 continue;
+                }
+                finally
+                {
+                    if (pendingReservationId.HasValue)
+                    {
+                        try { await pvpMatchmakingService.ReleaseReservationAsync(pendingReservationId.Value, connection.ConnectionId, CancellationToken.None); }
+                        catch (Exception ex) { Console.WriteLine($"[{connectionId}] reservation cleanup failed: {ex.GetType().Name}"); }
+                    }
+                    connection.MatchmakingReservationId = null;
+                    connection.ReservedOnlineSeatId = OnlineBattleSeatId.None;
+                }
             }
 
             if (envelope?.MessageType != OnlineBattleMessageType.ClientCommand || envelope.ClientCommand == null)
             {
-                await SendErrorAsync(socket, "unsupported_message", "Only JoinMatch and ClientCommand messages are supported by the test server.", jsonOptions, context.RequestAborted);
+                await SendErrorAsync(connection, "unsupported_message", "Only JoinMatch and ClientCommand messages are supported by the test server.", jsonOptions, connectionLifetime.Token);
                 continue;
             }
 
             var command = envelope.ClientCommand;
             if (session == null || !string.Equals(session.MatchId, command.MatchId, StringComparison.Ordinal))
             {
-                if (session != null)
-                {
-                    session.RemoveConnection(connectionId);
-                    sessionManager.RemoveIfEmpty(session);
-                }
-
-                connection.MatchId = command.MatchId;
-                connection.PlayerToken = command.PlayerToken;
-                connection.AccountId = command.AccountId ?? string.Empty;
-                session = sessionManager.GetOrCreate(command.MatchId);
-                connection.AssignedSeatId = default;
-                connection.AssignedOnlineSeatId = OnlineBattleSeatId.None;
-                connection.HasAssignedSeat = false;
-
-                if (!session.TryAddConnection(connection, out var joinError))
-                {
-                    await SendErrorAsync(socket, "match_full", joinError, jsonOptions, context.RequestAborted);
-                    sessionManager.RemoveIfEmpty(session);
-                    session = null;
-                    continue;
-                }
-
-                Console.WriteLine($"[match:{session.MatchId}] joined connection={connectionId} seat={connection.AssignedOnlineSeatId} runtimeSeat={connection.AssignedSeatId} token={connection.PlayerToken} connections={session.ConnectionCount}");
-                await BroadcastEnvelopeAsync(session, session.CreateConnectedEnvelope(connection), jsonOptions, context.RequestAborted);
+                await SendErrorAsync(connection, "join_required", "Join this match with a valid login session before sending battle commands.", jsonOptions, connectionLifetime.Token);
+                continue;
             }
 
             if (!connection.HasAssignedSeat || command.ActorId != connection.AssignedSeatId)
             {
-                await SendErrorAsync(
-                    socket,
+                await SendErrorAsync(connection,
                     "actor_mismatch",
                     $"Command actor {session.FormatSeatForLog(command.ActorId)} does not match assigned seat {connection.AssignedOnlineSeatId}.",
                     jsonOptions,
-                    context.RequestAborted);
+                    connectionLifetime.Token);
                 continue;
             }
 
@@ -1792,24 +1831,22 @@ app.Map("/battle", async (
             {
                 if (session.UseServerAiOpponent)
                 {
-                    await SendErrorAsync(
-                        socket,
+                    await SendErrorAsync(connection,
                         "ai_seat_server_controlled",
                         "The ServerAI seat is controlled by the server in this prototype.",
                         jsonOptions,
-                        context.RequestAborted);
+                        connectionLifetime.Token);
                     continue;
                 }
             }
 
             if (!string.Equals(command.PlayerToken, connection.PlayerToken, StringComparison.Ordinal))
             {
-                await SendErrorAsync(
-                    socket,
+                await SendErrorAsync(connection,
                     "player_token_mismatch",
                     "Command player token does not match this connection.",
                     jsonOptions,
-                    context.RequestAborted);
+                    connectionLifetime.Token);
                 continue;
             }
 
@@ -1817,18 +1854,17 @@ app.Map("/battle", async (
                 !string.IsNullOrWhiteSpace(command.AccountId) &&
                 !string.Equals(command.AccountId, connection.AccountId, StringComparison.OrdinalIgnoreCase))
             {
-                await SendErrorAsync(
-                    socket,
+                await SendErrorAsync(connection,
                     "account_mismatch",
                     "Command account id does not match this authenticated connection.",
                     jsonOptions,
-                    context.RequestAborted);
+                    connectionLifetime.Token);
                 continue;
             }
 
             if (!session.IsBattleStarted)
             {
-                await SendErrorAsync(socket, "battle_not_started", "Battle commands cannot resolve until all required players have joined and the battle has started.", jsonOptions, context.RequestAborted);
+                await SendErrorAsync(connection, "battle_not_started", "Battle commands cannot resolve until all required players have joined and the battle has started.", jsonOptions, connectionLifetime.Token);
                 continue;
             }
 
@@ -1850,8 +1886,8 @@ app.Map("/battle", async (
                     rejectionMessage: ex.Message,
                     pvpBattlePersistenceService,
                     jsonOptions,
-                    context.RequestAborted);
-                await SendErrorAsync(socket, "command_rejected", ex.Message, jsonOptions, context.RequestAborted);
+                    connectionLifetime.Token);
+                await SendErrorAsync(connection, "command_rejected", ex.Message, jsonOptions, connectionLifetime.Token);
                 continue;
             }
 
@@ -1865,31 +1901,31 @@ app.Map("/battle", async (
                 rejectionMessage: string.Empty,
                 pvpBattlePersistenceService,
                 jsonOptions,
-                context.RequestAborted);
+                connectionLifetime.Token);
             await RecordPvpBattleSnapshotAsync(
                 session,
                 pvpBattlePersistenceService,
                 "client_command",
                 jsonOptions,
-                context.RequestAborted);
-            await BroadcastEnvelopeAsync(session, session.CreateAckEnvelope(connection, command, commandEvents), jsonOptions, context.RequestAborted);
-            var battleEndReason = command.CommandType ==
-                                  Project333.PvpServer.Messages.OnlineBattleCommandType.Surrender
-                ? "forfeit"
-                : "normal";
-            await RecordRunResultsIfBattleEndedAsync(
-                session,
-                runStartService,
-                pvpMatchmakingService,
-                auditLogService,
-                battleEndReason);
-            await BroadcastStateViewsAsync(session, jsonOptions, context.RequestAborted);
-            await BroadcastServerAiTurnIfNeededAsync(session, runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService, jsonOptions, context.RequestAborted);
+                connectionLifetime.Token);
+            await BroadcastEnvelopeAsync(session, session.CreateAckEnvelope(connection, command, commandEvents), jsonOptions, connectionLifetime.Token);
+            await RecordRunResultsIfBattleEndedAsync(session);
+            await BroadcastStateViewsAsync(session, jsonOptions, connectionLifetime.Token);
+            await BroadcastServerAiTurnIfNeededAsync(session, runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService, jsonOptions, connectionLifetime.Token);
             ScheduleTurnTimeoutIfNeeded(session, sessionManager, runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService, jsonOptions);
         }
     }
     catch (OperationCanceledException)
     {
+    }
+    catch (BattleMessageException ex)
+    {
+        Console.WriteLine($"[{connectionId}] rejected WebSocket input: {(int)ex.CloseStatus}");
+        try { await connection.CloseTransportAsync(ex.CloseStatus, ex.Message, CancellationToken.None, waitForPeerClose: true); }
+        catch (Exception closeError) when (closeError is WebSocketException or OperationCanceledException)
+        {
+            Console.WriteLine($"[{connectionId}] input rejection close failed: {closeError.GetType().Name}");
+        }
     }
     catch (WebSocketException ex)
     {
@@ -1897,65 +1933,21 @@ app.Map("/battle", async (
     }
     finally
     {
+        guard.Dispose(); // Release capacity before potentially slow DB disconnect cleanup.
         heartbeatCancellation.Cancel();
         try
         {
-            await heartbeatTask;
+            await Task.WhenAll(heartbeatTask, authenticationTask);
         }
         catch (OperationCanceledException)
         {
         }
 
+        connection.TerminateTransport();
         if (session != null)
-        {
-            try
-            {
-                var shouldStartReconnectTimer = session.TryCreateDisconnectReconnectGraceEnvelope(
-                    connection,
-                    disconnectReconnectGracePeriod,
-                    out var disconnectGraceEnvelope,
-                    out var disconnectedSeatId,
-                    out var disconnectedReconnectIdentityKey,
-                    out var reconnectDeadlineUtc);
-
-                await RecordPvpConnectionDisconnectedIfNeededAsync(
-                    session,
-                    connection,
-                    shouldStartReconnectTimer ? reconnectDeadlineUtc : null,
-                    pvpMatchmakingService,
-                    CancellationToken.None);
-
-                session.RemoveConnection(connectionId);
-
-                if (shouldStartReconnectTimer && disconnectGraceEnvelope != null)
-                {
-                    var opponentMode = session.UseServerAiOpponent ? "PVE" : "PVP";
-                    Console.WriteLine($"[match:{session.MatchId}] {connectionId} disconnected during {opponentMode} battle. Waiting {disconnectReconnectGracePeriod.TotalSeconds:0} seconds for reconnect.");
-                    await BroadcastEnvelopeAsync(session, disconnectGraceEnvelope, jsonOptions, CancellationToken.None);
-                    _ = ResolveDisconnectForfeitAfterGraceAsync(
-                        session,
-                        sessionManager,
-                        disconnectedSeatId,
-                        disconnectedReconnectIdentityKey,
-                        reconnectDeadlineUtc,
-                        runStartService,
-                        pvpMatchmakingService,
-                        pvpBattlePersistenceService,
-                        auditLogService,
-                        jsonOptions);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[{connectionId}] disconnect handling failed: {ex.Message}");
-                session.RemoveConnection(connectionId);
-            }
-            finally
-            {
-                sessionManager.RemoveIfEmpty(session);
-            }
-        }
-
+            await DisconnectBattleConnectionAsync(session, connection, sessionManager,
+                runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService,
+                disconnectReconnectGracePeriod, jsonOptions);
         Console.WriteLine($"[{connectionId}] disconnected");
     }
 });
@@ -1963,6 +1955,48 @@ app.Map("/battle", async (
 Console.WriteLine($"After333 PvP test server listening on {listenUrl}");
 await app.RunAsync();
 
+static async Task DisconnectBattleConnectionAsync(
+    BattleSession session, BattleClientConnection connection, BattleSessionManager sessionManager,
+    RunStartService runStartService, PvpMatchmakingService matchmaking,
+    PvpBattlePersistenceService persistence, AuditLogService audit,
+    TimeSpan gracePeriod, JsonSerializerOptions options)
+{
+    var detached = session.DetachConnection(connection, gracePeriod);
+    if (detached == null) return; // Already cleaned up, or replaced by another socket.
+    try
+    {
+        // Schedule before any DB/network await: neither failure can suppress forfeiture.
+        if (detached.Reserved)
+            _ = ResolveDisconnectForfeitAfterGraceAsync(session, sessionManager, detached.SeatId,
+                detached.IdentityKey, detached.DeadlineUtc, runStartService, matchmaking, persistence, audit, options);
+        await RecordPvpConnectionDisconnectedIfNeededAsync(session, connection,
+            detached.Reserved ? detached.DeadlineUtc : null, matchmaking, CancellationToken.None);
+        await RecordPvpBattleSnapshotAsync(session, persistence, "disconnect", options, CancellationToken.None);
+        if (detached.Envelope != null && session.CanReconnectIdentityKey(detached.IdentityKey))
+            await BroadcastEnvelopeAsync(session, detached.Envelope, options, CancellationToken.None);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{connection.ConnectionId}] disconnect persistence/notification failed: {ex.Message}");
+    }
+    finally { sessionManager.RemoveIfEmpty(session); }
+}
+static async Task MonitorAuthenticationDeadlineAsync(
+    BattleClientConnection connection, BattleConnectionGuard guard, BattleConnectionLimitSettings settings,
+    CancellationTokenSource lifetime, CancellationToken cancellationToken)
+{
+    try
+    {
+        await Task.Delay(TimeSpan.FromSeconds(settings.AuthenticationTimeoutSeconds), cancellationToken);
+        if (!guard.ExpireAuthenticationIfDue()) return;
+        Console.WriteLine($"[{connection.ConnectionId}] authentication deadline expired.");
+        try { await connection.CloseTransportAsync(WebSocketCloseStatus.PolicyViolation, "authentication_timeout", CancellationToken.None, waitForPeerClose: true, readerActive: true); }
+        catch (Exception ex) when (ex is WebSocketException or OperationCanceledException)
+        { Console.WriteLine($"[{connection.ConnectionId}] authentication close failed: {ex.GetType().Name}"); }
+        finally { lifetime.Cancel(); }
+    }
+    catch (OperationCanceledException) { }
+}
 static async Task MonitorClientHeartbeatAsync(
     BattleClientConnection connection,
     TimeSpan heartbeatTimeout,
@@ -1993,43 +2027,12 @@ static async Task MonitorClientHeartbeatAsync(
 
             Console.WriteLine(
                 $"[{connection.ConnectionId}] client heartbeat timed out after {safeTimeout.TotalSeconds:0} seconds; closing stale WebSocket.");
-            connection.Socket.Abort();
+            connection.TerminateTransport();
             return;
         }
     }
     catch (OperationCanceledException)
     {
-    }
-}
-
-static async Task<string?> ReceiveTextMessageAsync(WebSocket socket, CancellationToken cancellationToken)
-{
-    var buffer = new byte[8192];
-    using var stream = new MemoryStream();
-
-    while (true)
-    {
-        var result = await socket.ReceiveAsync(buffer, cancellationToken);
-        if (result.MessageType == WebSocketMessageType.Close)
-        {
-            if (socket.State == WebSocketState.CloseReceived)
-            {
-                await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", cancellationToken);
-            }
-
-            return null;
-        }
-
-        if (result.MessageType != WebSocketMessageType.Text)
-        {
-            continue;
-        }
-
-        stream.Write(buffer, 0, result.Count);
-        if (result.EndOfMessage)
-        {
-            return Encoding.UTF8.GetString(stream.ToArray());
-        }
     }
 }
 
@@ -2042,7 +2045,7 @@ static async Task BroadcastStateViewsAsync(
     Console.WriteLine($"[match:{session.MatchId}] StateView -> {connections.Count} client(s)");
     foreach (var connection in connections)
     {
-        await SendStateViewAsync(session, connection, jsonOptions, cancellationToken);
+        await SendStateViewAsync(session, connection, jsonOptions, CancellationToken.None);
     }
 }
 
@@ -2070,7 +2073,7 @@ static async Task BroadcastServerAiTurnIfNeededAsync(
         IReadOnlyList<BattleEventDto> aiEvents;
         try
         {
-            aiEvents = session.RunServerAiActionIfNeeded();
+            aiEvents = session.RunServerAiActionIfNeeded(forceEndTurn: actionIndex == 63);
         }
         catch (Exception ex) when (ex is InvalidOperationException || ex is ArgumentException)
         {
@@ -2101,11 +2104,11 @@ static async Task BroadcastServerAiTurnIfNeededAsync(
             "server_ai_action",
             jsonOptions,
             cancellationToken);
-        await RecordRunResultsIfBattleEndedAsync(session, runStartService, pvpMatchmakingService, auditLogService);
+        await RecordRunResultsIfBattleEndedAsync(session);
         await BroadcastStateViewsAsync(session, jsonOptions, cancellationToken);
     }
 
-    Console.WriteLine($"[match:{session.MatchId}] server AI stopped after 64 actions to avoid an infinite turn.");
+    Console.WriteLine($"[match:{session.MatchId}] server AI reached its action limit; safe end-turn was requested.");
 }
 
 static TimeSpan EstimateServerAiPresentationDelay(IReadOnlyList<BattleEventDto> battleEvents)
@@ -2121,6 +2124,8 @@ static TimeSpan EstimateServerAiPresentationDelay(IReadOnlyList<BattleEventDto> 
     var hasImpact = false;
     var hasRemoval = false;
     var hasCardPlayed = false;
+    var hasAiAction = false;
+    var hasTerminalEvent = false;
 
     foreach (var battleEvent in battleEvents)
     {
@@ -2129,6 +2134,11 @@ static TimeSpan EstimateServerAiPresentationDelay(IReadOnlyList<BattleEventDto> 
             continue;
         }
 
+        hasTerminalEvent |= battleEvent.EventType == BattleEventType.TurnEnded || battleEvent.EventType == BattleEventType.BattleEnded;
+        hasAiAction |= battleEvent.SourceOwnerId == PlayerIdDto.AI &&
+            (battleEvent.EventType == BattleEventType.AttackStarted || battleEvent.EventType == BattleEventType.OccupantMoved ||
+             battleEvent.EventType == BattleEventType.CardPlayed || battleEvent.EventType == BattleEventType.SpellCast ||
+             battleEvent.EventType == BattleEventType.RobotFusionResolved);
         switch (battleEvent.EventType)
         {
             case BattleEventType.AttackStarted:
@@ -2187,9 +2197,9 @@ static TimeSpan EstimateServerAiPresentationDelay(IReadOnlyList<BattleEventDto> 
     }
 
     var estimatedSeconds = Math.Min(seconds, 2.0);
-    if (hasCardPlayed || hasSpell)
+    if (hasAiAction && !hasTerminalEvent)
     {
-        estimatedSeconds = Math.Max(estimatedSeconds, 3.0);
+        estimatedSeconds += AiActionTiming.CalculatePostActionPauseSeconds(hasCardPlayed || hasSpell, estimatedSeconds);
     }
 
     return TimeSpan.FromSeconds(estimatedSeconds);
@@ -2262,7 +2272,7 @@ static async Task ResolveTurnTimeoutAsync(
                 isMulliganTimeout ? "mulligan_timeout" : "turn_timeout",
                 jsonOptions,
                 CancellationToken.None);
-            await RecordRunResultsIfBattleEndedAsync(session, runStartService, pvpMatchmakingService, auditLogService);
+            await RecordRunResultsIfBattleEndedAsync(session);
             await BroadcastStateViewsAsync(session, jsonOptions, CancellationToken.None);
             await BroadcastServerAiTurnIfNeededAsync(session, runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService, jsonOptions, CancellationToken.None);
             ScheduleTurnTimeoutIfNeeded(session, sessionManager, runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService, jsonOptions);
@@ -2343,14 +2353,13 @@ static async Task SendStateViewAsync(
 {
     if (!connection.IsOpen)
     {
-        session.RemoveConnection(connection.ConnectionId);
+        connection.TerminateTransport();
         return;
     }
 
     try
     {
-        var envelope = session.CreateStateViewEnvelope(connection);
-        await SendEnvelopeAsync(connection.Socket, envelope, jsonOptions, cancellationToken);
+        await connection.SendEnvelopeAsync(() => session.CreateStateViewEnvelope(connection), jsonOptions, cancellationToken);
         if (ShouldLogVerboseTransport())
         {
             Console.WriteLine($"[{connection.ConnectionId}] sent StateView viewer={connection.AssignedOnlineSeatId} runtimeViewer={connection.AssignedSeatId}");
@@ -2359,7 +2368,7 @@ static async Task SendStateViewAsync(
     catch (Exception ex)
     {
         Console.WriteLine($"[{connection.ConnectionId}] state view send failed: {ex.Message}");
-        session.RemoveConnection(connection.ConnectionId);
+        connection.TerminateTransport();
     }
 }
 
@@ -2398,7 +2407,7 @@ static async Task ResolveDisconnectForfeitAfterGraceAsync(
                 "disconnect_forfeit",
                 jsonOptions,
                 CancellationToken.None);
-            await RecordRunResultsIfBattleEndedAsync(session, runStartService, pvpMatchmakingService, auditLogService, "reconnect_timeout");
+            await RecordRunResultsIfBattleEndedAsync(session);
             await BroadcastStateViewsAsync(session, jsonOptions, CancellationToken.None);
         }
     }
@@ -2413,13 +2422,13 @@ static async Task ResolveDisconnectForfeitAfterGraceAsync(
 }
 
 static Task SendErrorAsync(
-    WebSocket socket,
+    BattleClientConnection connection,
     string code,
     string message,
     JsonSerializerOptions jsonOptions,
     CancellationToken cancellationToken)
 {
-    return SendEnvelopeAsync(socket, new OnlineBattleEnvelope
+    return SendEnvelopeAsync(connection, new OnlineBattleEnvelope
     {
         MessageType = OnlineBattleMessageType.Error,
         Error = new OnlineBattleErrorDto
@@ -2802,7 +2811,8 @@ static async Task RecordPvpMatchmakingJoinAsync(
             connection.DeckId,
             ResolveClientVersion(context),
             ResolveRemoteEndpoint(context),
-            ResolveUserAgent(context)),
+            ResolveUserAgent(context),
+            connection.MatchmakingReservationId),
         cancellationToken);
 }
 
@@ -2924,147 +2934,9 @@ static string ResolveUserAgent(HttpContext context)
     return context?.Request.Headers["User-Agent"].ToString() ?? string.Empty;
 }
 
-static async Task RecordRunResultsIfBattleEndedAsync(
-    BattleSession session,
-    RunStartService runStartService,
-    PvpMatchmakingService pvpMatchmakingService,
-    AuditLogService auditLogService,
-    string pvpEndedReason = "normal")
+static Task RecordRunResultsIfBattleEndedAsync(BattleSession session)
 {
-    if (session == null)
-    {
-        return;
-    }
-
-    IReadOnlyList<BattleRunResultRecord> records = Array.Empty<BattleRunResultRecord>();
-    if (runStartService != null && runStartService.IsDatabaseConfigured)
-    {
-        records = session.ConsumePendingRunResultRecords();
-        foreach (var record in records)
-        {
-            try
-            {
-                var updatedRun = await runStartService.RecordBattleResultAsync(
-                    record.RunId,
-                    record.DeckId,
-                    record.Won,
-                    CancellationToken.None);
-                var resultLabel = record.Won ? "win" : "loss";
-                Console.WriteLine(
-                    $"[match:{session.MatchId}] recorded draft run result seat={record.OnlineSeatId} result={resultLabel} run={updatedRun.Id} status={updatedRun.Status} wins={updatedRun.Wins} losses={updatedRun.Losses}");
-                await auditLogService.LogAsync(
-                    "battle.run_result.recorded",
-                    new
-                    {
-                        session.MatchId,
-                        seat = record.OnlineSeatId.ToString(),
-                        result = resultLabel,
-                        runId = updatedRun.Id,
-                        updatedRun.Status,
-                        updatedRun.Wins,
-                        updatedRun.Losses
-                    },
-                    CancellationToken.None);
-            }
-            catch (RunServiceException ex)
-            {
-                Console.WriteLine(
-                    $"[match:{session.MatchId}] draft run result was not recorded for seat={record.OnlineSeatId} run={record.RunId} deck={record.DeckId}: {ex.Code} {ex.Message}");
-                await auditLogService.LogAsync(
-                    "battle.run_result.failed",
-                    new
-                    {
-                        session.MatchId,
-                        seat = record.OnlineSeatId.ToString(),
-                        runId = record.RunId,
-                        deckId = record.DeckId,
-                        ex.Code
-                    },
-                    CancellationToken.None);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(
-                    $"[match:{session.MatchId}] draft run result failed for seat={record.OnlineSeatId} run={record.RunId} deck={record.DeckId}: {ex.Message}");
-                await auditLogService.LogAsync(
-                    "battle.run_result.failed",
-                    new
-                    {
-                        session.MatchId,
-                        seat = record.OnlineSeatId.ToString(),
-                        runId = record.RunId,
-                        deckId = record.DeckId,
-                        code = "unexpected_error"
-                    },
-                    CancellationToken.None);
-            }
-        }
-    }
-
-    if (session.UseServerAiOpponent ||
-        !session.TryConsumePendingPvpMatchResult(out var winnerSeatId, out var isDraw))
-    {
-        return;
-    }
-
-    if (pvpMatchmakingService != null &&
-        pvpMatchmakingService.IsDatabaseConfigured)
-    {
-        try
-        {
-            if (isDraw)
-            {
-                await pvpMatchmakingService.RecordMatchDrawAsync(
-                    session.MatchId,
-                    pvpEndedReason,
-                    CancellationToken.None);
-                Console.WriteLine(
-                    $"[match:{session.MatchId}] recorded PvP match result draw reason={pvpEndedReason}");
-            }
-            else
-            {
-                if (winnerSeatId == OnlineBattleSeatId.None)
-                {
-                    return;
-                }
-
-                await pvpMatchmakingService.RecordMatchCompletedAsync(
-                    session.MatchId,
-                    winnerSeatId.ToString(),
-                    pvpEndedReason,
-                    CancellationToken.None);
-                Console.WriteLine(
-                    $"[match:{session.MatchId}] recorded PvP match result winner={winnerSeatId} reason={pvpEndedReason}");
-            }
-
-            await auditLogService.LogAsync(
-                "pvp.match_result.recorded",
-                new
-                {
-                    session.MatchId,
-                    result = isDraw ? "draw" : "win_loss",
-                    winnerSeat = isDraw ? null : winnerSeatId.ToString(),
-                    reason = pvpEndedReason
-                },
-                CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(
-                $"[match:{session.MatchId}] PvP match result persistence failed: {ex.Message}");
-            await auditLogService.LogAsync(
-                "pvp.match_result.failed",
-                new
-                {
-                    session.MatchId,
-                    result = isDraw ? "draw" : "win_loss",
-                    winnerSeat = isDraw ? null : winnerSeatId.ToString(),
-                    reason = pvpEndedReason,
-                    code = "unexpected_error"
-                },
-                CancellationToken.None);
-        }
-    }
+    return session.PersistResultAsync(CancellationToken.None);
 }
 
 static async Task BroadcastEnvelopeAsync(
@@ -3083,13 +2955,13 @@ static async Task BroadcastEnvelopeAsync(
     {
         if (!connection.IsOpen)
         {
-            session.RemoveConnection(connection.ConnectionId);
+            connection.TerminateTransport();
             continue;
         }
 
         try
         {
-            await SendEnvelopeAsync(connection.Socket, envelope, jsonOptions, cancellationToken);
+            await SendEnvelopeAsync(connection, envelope, jsonOptions, CancellationToken.None);
             if (ShouldLogVerboseTransport())
             {
                 Console.WriteLine($"[{connection.ConnectionId}] sent {envelope.MessageType}");
@@ -3098,24 +2970,19 @@ static async Task BroadcastEnvelopeAsync(
         catch (Exception ex)
         {
             Console.WriteLine($"[{connection.ConnectionId}] send failed: {ex.Message}");
-            session.RemoveConnection(connection.ConnectionId);
+            connection.TerminateTransport();
         }
     }
 }
 
-static async Task SendEnvelopeAsync(
-    WebSocket socket,
+static Task SendEnvelopeAsync(
+    BattleClientConnection connection,
     OnlineBattleEnvelope envelope,
     JsonSerializerOptions jsonOptions,
     CancellationToken cancellationToken)
 {
-    var json = JsonSerializer.Serialize(envelope, jsonOptions);
-    var bytes = Encoding.UTF8.GetBytes(json);
-    using var sendTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-    sendTimeout.CancelAfter(TimeSpan.FromSeconds(5));
-    await socket.SendAsync(bytes, WebSocketMessageType.Text, true, sendTimeout.Token);
+    return connection.SendEnvelopeAsync(() => envelope, jsonOptions, cancellationToken);
 }
-
 static bool ShouldLogVerboseTransport()
 {
     var value = Environment.GetEnvironmentVariable("PROJECT333_VERBOSE_TRANSPORT_LOGS");

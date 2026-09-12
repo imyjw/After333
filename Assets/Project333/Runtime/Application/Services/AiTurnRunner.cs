@@ -51,6 +51,7 @@ namespace Project333.Runtime.Application.Services
             Action<PlayerId, IBattleCommand> executeCommand,
             Action<string> logEntryCallback)
         {
+            var actionCount = 0;
             while (true)
             {
                 var battleState = getBattleState();
@@ -76,7 +77,7 @@ namespace Project333.Runtime.Application.Services
                     return;
                 }
 
-                var command = _aiDecisionService.GetNextCommand(battleState);
+                var command = ++actionCount >= 64 ? new EndTurnCommand() : _aiDecisionService.GetNextCommand(battleState);
                 if (command is EndTurnCommand)
                 {
                     logEntryCallback?.Invoke(CombatLogFormatter.FormatEndTurn(PlayerId.AI));

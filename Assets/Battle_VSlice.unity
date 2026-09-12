@@ -586,7 +586,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -624,6 +624,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -1010,11 +1016,11 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 120464554}
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
     m_FontSize: 34
     m_FontStyle: 1
     m_BestFit: 0
-    m_MinSize: 10
+    m_MinSize: 2
     m_MaxSize: 40
     m_Alignment: 4
     m_AlignByGeometry: 0
@@ -1234,8 +1240,8 @@ MonoBehaviour:
   _opponentPlayedCardFadeOutSeconds: 0.15
   _opponentPlayedCardSortingOrder: 1000
   _showOpponentPlayedCardStats: 1
-  _opponentPlayedCardAttackStatNormalizedPosition: {x: 0.07, y: 0.09}
-  _opponentPlayedCardHpStatNormalizedPosition: {x: 0.92, y: 0.09}
+  _opponentPlayedCardAttackStatNormalizedPosition: {x: 0.09, y: 0.055}
+  _opponentPlayedCardHpStatNormalizedPosition: {x: 0.92, y: 0.055}
   _opponentPlayedCardStatTextSize: {x: 72, y: 54}
   _opponentPlayedCardStatFontSize: 34
   _opponentPlayedCardStatTextColor: {r: 1, g: 1, b: 1, a: 1}
@@ -2530,12 +2536,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -3056,12 +3062,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -3167,36 +3173,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: -218}
   m_SizeDelta: {x: 576, y: 52}
   m_Pivot: {x: 0.5, y: 1}
---- !u!128 &120464554
-Font:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Malgun Gothic
-  serializedVersion: 5
-  m_LineSpacing: 42.5625
-  m_DefaultMaterial: {fileID: 497952221}
-  m_FontSize: 32
-  m_Texture: {fileID: 1047881595}
-  m_AsciiStartOffset: 0
-  m_Tracking: 1
-  m_CharacterSpacing: 0
-  m_CharacterPadding: 1
-  m_ConvertCase: -2
-  m_CharacterRects: []
-  m_KerningValues: []
-  m_PixelScale: 0.1
-  m_FontData: 
-  m_Ascent: 34.828125
-  m_Descent: 0
-  m_DefaultStyle: 0
-  m_FontNames:
-  - Malgun Gothic
-  m_FallbackFonts: []
-  m_FontRenderingMode: 0
-  m_UseLegacyBoundsCalculation: 0
-  m_ShouldRoundAdvanceValue: 1
 --- !u!1 &121631794
 GameObject:
   m_ObjectHideFlags: 0
@@ -4100,7 +4076,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -4138,6 +4114,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -4310,11 +4292,11 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 1814333915}
-    m_FontSize: 34
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
+    m_MinSize: 2
     m_MaxSize: 40
     m_Alignment: 4
     m_AlignByGeometry: 0
@@ -4714,12 +4696,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -4872,12 +4854,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -4991,12 +4973,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -5070,12 +5052,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -5569,12 +5551,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -6328,7 +6310,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -6366,6 +6348,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -6527,11 +6515,11 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 1814333915}
-    m_FontSize: 34
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
+    m_MinSize: 2
     m_MaxSize: 40
     m_Alignment: 4
     m_AlignByGeometry: 0
@@ -6606,12 +6594,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -6868,6 +6856,52 @@ Texture2D:
     offset: 0
     size: 0
     path: 
+--- !u!28 &279438288
+Texture2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Malgun Gothic
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 4
+  m_Width: 0
+  m_Height: 0
+  m_CompleteImageSize: 0
+  m_MipsStripped: 0
+  m_TextureFormat: 4
+  m_MipCount: 1
+  m_IsReadable: 1
+  m_IsPreProcessed: 0
+  m_IgnoreMipmapLimit: 0
+  m_MipmapLimitGroupName: 
+  m_StreamingMipmaps: 0
+  m_StreamingMipmapsPriority: 0
+  m_VTOnly: 0
+  m_AlphaIsTransparency: 0
+  m_ImageCount: 1
+  m_TextureDimension: 2
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 0
+    m_WrapV: 0
+    m_WrapW: 0
+  m_LightmapFormat: 0
+  m_ColorSpace: 0
+  m_PlatformBlob: 
+  image data: 0
+  _typelessdata: 
+  m_StreamData:
+    serializedVersion: 2
+    offset: 0
+    size: 0
+    path: 
 --- !u!1 &282416744
 GameObject:
   m_ObjectHideFlags: 0
@@ -6926,12 +6960,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -7450,12 +7484,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -7806,12 +7840,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -8476,12 +8510,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -9548,7 +9582,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 1831504149}
+    m_Font: {fileID: 2025973935}
     m_FontSize: 24
     m_FontStyle: 1
     m_BestFit: 0
@@ -10192,12 +10226,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -10933,12 +10967,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -11460,8 +11494,8 @@ MonoBehaviour:
   _runtimeStatOverlayBackgroundColor: {r: 0.03, g: 0.025, b: 0.02, a: 0.92}
   _runtimeStatOverlayTextColor: {r: 1, g: 0.9, b: 0.58, a: 1}
   _runtimeStatOverlayFontSize: 22
-  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.07}
-  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.07}
+  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.055}
   _runtimeStatReferenceCardHeight: 250
   _runtimeHandRoot: {fileID: 2070307970}
   _runtimeCardRect: {fileID: 473656913}
@@ -11574,12 +11608,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -11595,39 +11629,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 496631123}
   m_CullTransparentMesh: 1
---- !u!21 &497952221
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Malgun Gothic
-  m_Shader: {fileID: 10101, guid: 0000000000000000e000000000000000, type: 0}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _MainTex:
-        m_Texture: {fileID: 1047881595}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats: []
-    m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!21 &501030616
 Material:
   serializedVersion: 8
@@ -12000,12 +12001,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -12178,11 +12179,11 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 120464554}
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
     m_FontSize: 34
     m_FontStyle: 1
     m_BestFit: 0
-    m_MinSize: 10
+    m_MinSize: 2
     m_MaxSize: 40
     m_Alignment: 4
     m_AlignByGeometry: 0
@@ -13054,11 +13055,11 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 120464554}
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
     m_FontSize: 34
     m_FontStyle: 1
     m_BestFit: 0
-    m_MinSize: 10
+    m_MinSize: 2
     m_MaxSize: 40
     m_Alignment: 4
     m_AlignByGeometry: 0
@@ -13390,12 +13391,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -13842,12 +13843,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -13921,12 +13922,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -14426,12 +14427,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -16082,12 +16083,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -16236,12 +16237,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -16888,12 +16889,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -16997,8 +16998,8 @@ MonoBehaviour:
   _runtimeStatOverlayBackgroundColor: {r: 0.03, g: 0.025, b: 0.02, a: 0.92}
   _runtimeStatOverlayTextColor: {r: 1, g: 0.9, b: 0.58, a: 1}
   _runtimeStatOverlayFontSize: 22
-  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.07}
-  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.07}
+  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.055}
   _runtimeStatReferenceCardHeight: 250
   _runtimeHandRoot: {fileID: 2070307970}
   _runtimeCardRect: {fileID: 1662889177}
@@ -17280,7 +17281,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -17318,6 +17319,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -17567,12 +17574,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -18221,12 +18228,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -18757,7 +18764,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -18795,6 +18802,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -19605,39 +19618,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!21 &920172142
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Malgun Gothic
-  m_Shader: {fileID: 10101, guid: 0000000000000000e000000000000000, type: 0}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _MainTex:
-        m_Texture: {fileID: 936547669}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats: []
-    m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &920890181
 GameObject:
   m_ObjectHideFlags: 0
@@ -20057,52 +20037,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 90, y: 48}
   m_Pivot: {x: 0, y: 0.5}
---- !u!28 &936547669
-Texture2D:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Malgun Gothic
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 4
-  m_Width: 0
-  m_Height: 0
-  m_CompleteImageSize: 0
-  m_MipsStripped: 0
-  m_TextureFormat: 4
-  m_MipCount: 1
-  m_IsReadable: 1
-  m_IsPreProcessed: 0
-  m_IgnoreMipmapLimit: 0
-  m_MipmapLimitGroupName: 
-  m_StreamingMipmaps: 0
-  m_StreamingMipmapsPriority: 0
-  m_VTOnly: 0
-  m_AlphaIsTransparency: 0
-  m_ImageCount: 1
-  m_TextureDimension: 2
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 0
-    m_WrapV: 0
-    m_WrapW: 0
-  m_LightmapFormat: 0
-  m_ColorSpace: 0
-  m_PlatformBlob: 
-  image data: 0
-  _typelessdata: 
-  m_StreamData:
-    serializedVersion: 2
-    offset: 0
-    size: 0
-    path: 
 --- !u!21 &937779777
 Material:
   serializedVersion: 8
@@ -20604,8 +20538,8 @@ MonoBehaviour:
   _runtimeStatOverlayBackgroundColor: {r: 0.03, g: 0.025, b: 0.02, a: 0.92}
   _runtimeStatOverlayTextColor: {r: 1, g: 0.9, b: 0.58, a: 1}
   _runtimeStatOverlayFontSize: 22
-  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.07}
-  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.07}
+  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.055}
   _runtimeStatReferenceCardHeight: 250
   _runtimeHandRoot: {fileID: 2070307970}
   _runtimeCardRect: {fileID: 1990498692}
@@ -21169,12 +21103,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -21998,7 +21932,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -22036,6 +21970,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -22186,12 +22126,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -22330,8 +22270,8 @@ MonoBehaviour:
   _runtimeStatOverlayBackgroundColor: {r: 0.03, g: 0.025, b: 0.02, a: 0.92}
   _runtimeStatOverlayTextColor: {r: 1, g: 0.9, b: 0.58, a: 1}
   _runtimeStatOverlayFontSize: 22
-  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.07}
-  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.07}
+  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.055}
   _runtimeStatReferenceCardHeight: 250
   _runtimeHandRoot: {fileID: 2070307970}
   _runtimeCardRect: {fileID: 1184913098}
@@ -22409,12 +22349,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -22890,7 +22830,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -22928,6 +22868,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -23040,12 +22986,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -23364,52 +23310,6 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
---- !u!28 &1047881595
-Texture2D:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Malgun Gothic
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 4
-  m_Width: 0
-  m_Height: 0
-  m_CompleteImageSize: 0
-  m_MipsStripped: 0
-  m_TextureFormat: 4
-  m_MipCount: 1
-  m_IsReadable: 1
-  m_IsPreProcessed: 0
-  m_IgnoreMipmapLimit: 0
-  m_MipmapLimitGroupName: 
-  m_StreamingMipmaps: 0
-  m_StreamingMipmapsPriority: 0
-  m_VTOnly: 0
-  m_AlphaIsTransparency: 0
-  m_ImageCount: 1
-  m_TextureDimension: 2
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 0
-    m_WrapV: 0
-    m_WrapW: 0
-  m_LightmapFormat: 0
-  m_ColorSpace: 0
-  m_PlatformBlob: 
-  image data: 0
-  _typelessdata: 
-  m_StreamData:
-    serializedVersion: 2
-    offset: 0
-    size: 0
-    path: 
 --- !u!1 &1058393667
 GameObject:
   m_ObjectHideFlags: 0
@@ -23795,7 +23695,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -23833,6 +23733,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -23983,12 +23889,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -25273,12 +25179,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -25574,12 +25480,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -25837,8 +25743,8 @@ MonoBehaviour:
   _runtimeStatOverlayBackgroundColor: {r: 0.03, g: 0.025, b: 0.02, a: 0.92}
   _runtimeStatOverlayTextColor: {r: 1, g: 0.9, b: 0.58, a: 1}
   _runtimeStatOverlayFontSize: 22
-  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.07}
-  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.07}
+  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.055}
   _runtimeStatReferenceCardHeight: 250
   _runtimeHandRoot: {fileID: 2070307970}
   _runtimeCardRect: {fileID: 1925649079}
@@ -26414,8 +26320,8 @@ MonoBehaviour:
   _canvasSortingOrder: 6000
   _resultDisplaySeconds: 3
   _showCardStats: 1
-  _attackStatNormalizedPosition: {x: 0.07, y: 0.09}
-  _hpStatNormalizedPosition: {x: 0.92, y: 0.09}
+  _attackStatNormalizedPosition: {x: 0.09, y: 0.055}
+  _hpStatNormalizedPosition: {x: 0.92, y: 0.055}
   _statTextSize: {x: 72, y: 54}
   _statFontSize: 34
   _statTextColor: {r: 1, g: 1, b: 1, a: 1}
@@ -26766,7 +26672,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -26804,6 +26710,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -27015,11 +26927,11 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 120464554}
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
     m_FontSize: 34
     m_FontStyle: 1
     m_BestFit: 0
-    m_MinSize: 10
+    m_MinSize: 2
     m_MaxSize: 40
     m_Alignment: 4
     m_AlignByGeometry: 0
@@ -27256,12 +27168,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -27596,12 +27508,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -27896,7 +27808,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -27934,6 +27846,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -28648,12 +28566,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -29342,8 +29260,8 @@ MonoBehaviour:
   _runtimeStatOverlayBackgroundColor: {r: 0.03, g: 0.025, b: 0.02, a: 0.92}
   _runtimeStatOverlayTextColor: {r: 1, g: 0.9, b: 0.58, a: 1}
   _runtimeStatOverlayFontSize: 22
-  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.07}
-  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.07}
+  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.055}
   _runtimeStatReferenceCardHeight: 250
   _runtimeHandRoot: {fileID: 2070307970}
   _runtimeCardRect: {fileID: 1696999059}
@@ -30455,12 +30373,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -31412,12 +31330,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -32086,12 +32004,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -32518,12 +32436,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -32981,7 +32899,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -33019,6 +32937,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -34576,7 +34500,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -34614,6 +34538,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -34803,12 +34733,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -34959,12 +34889,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -35542,7 +35472,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -35580,6 +35510,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -35703,7 +35639,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -35741,6 +35677,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -36213,12 +36155,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -37640,12 +37582,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -37914,12 +37856,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -38658,7 +38600,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -38696,6 +38638,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -39216,7 +39164,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 1831504149}
+    m_Font: {fileID: 2025973935}
     m_FontSize: 30
     m_FontStyle: 1
     m_BestFit: 0
@@ -39588,12 +39536,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -39667,12 +39615,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -40197,40 +40145,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 150, y: 200}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!128 &1831504149
-Font:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Malgun Gothic
-  serializedVersion: 5
-  m_LineSpacing: 42.5625
-  m_DefaultMaterial: {fileID: 920172142}
-  m_FontSize: 32
-  m_Texture: {fileID: 936547669}
-  m_AsciiStartOffset: 0
-  m_Tracking: 1
-  m_CharacterSpacing: 0
-  m_CharacterPadding: 1
-  m_ConvertCase: -2
-  m_CharacterRects: []
-  m_KerningValues: []
-  m_PixelScale: 0.1
-  m_FontData: 
-  m_Ascent: 34.828125
-  m_Descent: 0
-  m_DefaultStyle: 0
-  m_FontNames:
-  - Malgun Gothic
-  - "\uB9D1\uC740 \uACE0\uB515"
-  - Arial Unicode MS
-  - Noto Sans CJK KR
-  - Noto Sans KR
-  m_FallbackFonts: []
-  m_FontRenderingMode: 0
-  m_UseLegacyBoundsCalculation: 0
-  m_ShouldRoundAdvanceValue: 1
 --- !u!1 &1834997114
 GameObject:
   m_ObjectHideFlags: 0
@@ -40725,11 +40639,11 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 120464554}
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
     m_FontSize: 34
     m_FontStyle: 1
     m_BestFit: 0
-    m_MinSize: 10
+    m_MinSize: 2
     m_MaxSize: 40
     m_Alignment: 4
     m_AlignByGeometry: 0
@@ -41090,8 +41004,8 @@ MonoBehaviour:
   _runtimeStatOverlayBackgroundColor: {r: 0.03, g: 0.025, b: 0.02, a: 0.92}
   _runtimeStatOverlayTextColor: {r: 1, g: 0.9, b: 0.58, a: 1}
   _runtimeStatOverlayFontSize: 22
-  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.07}
-  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.07}
+  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.055}
   _runtimeStatReferenceCardHeight: 250
   _runtimeHandRoot: {fileID: 2070307970}
   _runtimeCardRect: {fileID: 208163542}
@@ -41307,12 +41221,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -41589,6 +41503,39 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
+--- !u!21 &1908732822
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Malgun Gothic
+  m_Shader: {fileID: 10101, guid: 0000000000000000e000000000000000, type: 0}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 279438288}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats: []
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!21 &1915207365
 Material:
   serializedVersion: 8
@@ -42682,12 +42629,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -43133,8 +43080,8 @@ MonoBehaviour:
   _runtimeStatOverlayBackgroundColor: {r: 0.03, g: 0.025, b: 0.02, a: 0.92}
   _runtimeStatOverlayTextColor: {r: 1, g: 0.9, b: 0.58, a: 1}
   _runtimeStatOverlayFontSize: 22
-  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.07}
-  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.07}
+  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.055}
   _runtimeStatReferenceCardHeight: 250
   _runtimeHandRoot: {fileID: 2070307970}
   _runtimeCardRect: {fileID: 1693965550}
@@ -43517,12 +43464,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -43611,7 +43558,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -43649,6 +43596,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -43855,7 +43808,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -43893,6 +43846,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -44005,12 +43964,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -44606,11 +44565,11 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 120464554}
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
     m_FontSize: 34
     m_FontStyle: 1
     m_BestFit: 0
-    m_MinSize: 10
+    m_MinSize: 2
     m_MaxSize: 40
     m_Alignment: 4
     m_AlignByGeometry: 0
@@ -45222,7 +45181,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -45260,6 +45219,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -45347,6 +45312,40 @@ Material:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
+--- !u!128 &2025973935
+Font:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Malgun Gothic
+  serializedVersion: 5
+  m_LineSpacing: 42.5625
+  m_DefaultMaterial: {fileID: 1908732822}
+  m_FontSize: 32
+  m_Texture: {fileID: 279438288}
+  m_AsciiStartOffset: 0
+  m_Tracking: 1
+  m_CharacterSpacing: 0
+  m_CharacterPadding: 1
+  m_ConvertCase: -2
+  m_CharacterRects: []
+  m_KerningValues: []
+  m_PixelScale: 0.1
+  m_FontData: 
+  m_Ascent: 34.828125
+  m_Descent: 0
+  m_DefaultStyle: 0
+  m_FontNames:
+  - Malgun Gothic
+  - "\uB9D1\uC740 \uACE0\uB515"
+  - Arial Unicode MS
+  - Noto Sans CJK KR
+  - Noto Sans KR
+  m_FallbackFonts: []
+  m_FontRenderingMode: 0
+  m_UseLegacyBoundsCalculation: 0
+  m_ShouldRoundAdvanceValue: 1
 --- !u!28 &2036775710
 Texture2D:
   m_ObjectHideFlags: 0
@@ -45481,8 +45480,8 @@ MonoBehaviour:
   _runtimeStatOverlayBackgroundColor: {r: 0.03, g: 0.025, b: 0.02, a: 0.92}
   _runtimeStatOverlayTextColor: {r: 1, g: 0.9, b: 0.58, a: 1}
   _runtimeStatOverlayFontSize: 22
-  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.07}
-  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.07}
+  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.055}
   _runtimeStatReferenceCardHeight: 250
   _runtimeHandRoot: {fileID: 2070307970}
   _runtimeCardRect: {fileID: 2006095435}
@@ -45619,11 +45618,11 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 120464554}
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
     m_FontSize: 34
     m_FontStyle: 1
     m_BestFit: 0
-    m_MinSize: 10
+    m_MinSize: 2
     m_MaxSize: 40
     m_Alignment: 4
     m_AlignByGeometry: 0
@@ -46180,12 +46179,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -46274,7 +46273,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -46312,6 +46311,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -47093,12 +47098,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 22
-    m_FontStyle: 1
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
+    m_FontSize: 33
+    m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 22
+    m_MinSize: 2
+    m_MaxSize: 33
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 0
@@ -47431,8 +47436,8 @@ MonoBehaviour:
   _runtimeStatOverlayBackgroundColor: {r: 0.03, g: 0.025, b: 0.02, a: 0.92}
   _runtimeStatOverlayTextColor: {r: 1, g: 0.9, b: 0.58, a: 1}
   _runtimeStatOverlayFontSize: 22
-  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.07}
-  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.07}
+  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.055}
   _runtimeStatReferenceCardHeight: 250
   _runtimeHandRoot: {fileID: 2070307970}
   _runtimeCardRect: {fileID: 57848199}
@@ -47872,8 +47877,8 @@ MonoBehaviour:
   _runtimeStatOverlayBackgroundColor: {r: 0.03, g: 0.025, b: 0.02, a: 0.92}
   _runtimeStatOverlayTextColor: {r: 1, g: 0.9, b: 0.58, a: 1}
   _runtimeStatOverlayFontSize: 22
-  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.07}
-  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.07}
+  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.055}
   _runtimeStatReferenceCardHeight: 250
   _runtimeHandRoot: {fileID: 2070307970}
   _runtimeCardRect: {fileID: 1934831701}
@@ -48313,8 +48318,8 @@ MonoBehaviour:
   _runtimeStatOverlayBackgroundColor: {r: 0.03, g: 0.025, b: 0.02, a: 0.92}
   _runtimeStatOverlayTextColor: {r: 1, g: 0.9, b: 0.58, a: 1}
   _runtimeStatOverlayFontSize: 22
-  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.07}
-  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.07}
+  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.055}
   _runtimeStatReferenceCardHeight: 250
   _runtimeHandRoot: {fileID: 2070307970}
   _runtimeCardRect: {fileID: 399771012}
@@ -48754,8 +48759,8 @@ MonoBehaviour:
   _runtimeStatOverlayBackgroundColor: {r: 0.03, g: 0.025, b: 0.02, a: 0.92}
   _runtimeStatOverlayTextColor: {r: 1, g: 0.9, b: 0.58, a: 1}
   _runtimeStatOverlayFontSize: 22
-  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.07}
-  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.07}
+  _runtimeStatAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _runtimeStatHpNormalizedPosition: {x: 0.92, y: 0.055}
   _runtimeStatReferenceCardHeight: 250
   _runtimeHandRoot: {fileID: 2070307970}
   _runtimeCardRect: {fileID: 2057432344}
@@ -49497,7 +49502,7 @@ MonoBehaviour:
   _showOccupantVisual: 1
   _occupantVisualSize: {x: 96, y: 96}
   _occupantVisualAnchoredPosition: {x: 0, y: 0}
-  _occupantVisualFineOffset: {x: 0, y: -10}
+  _occupantVisualFineOffset: {x: 0, y: -20}
   _occupantVisualScaleMultiplier: 1.35
   _occupantVisualReferenceTileSize: {x: 80, y: 80}
   _overrideOccupantVisualSorting: 1
@@ -49535,6 +49540,12 @@ MonoBehaviour:
   _cardPreviewSize: {x: 440, y: 620}
   _cardPreviewBackdropColor: {r: 0, g: 0, b: 0, a: 0.74}
   _cardPreviewSortingOrder: 5000
+  _cardPreviewStatFont: {fileID: 11400000, guid: 02e98047168311f428aa08d2eb7fb5a9, type: 2}
+  _cardPreviewAttackNormalizedPosition: {x: 0.09, y: 0.055}
+  _cardPreviewHpNormalizedPosition: {x: 0.92, y: 0.055}
+  _cardPreviewStatTextSize: {x: 96, y: 72}
+  _cardPreviewStatFontSize: 55
+  _cardPreviewStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _cardPreviewTooltipFont: {fileID: 11400000, guid: 75d5cc677aaa90a4a9b8ceaa7dcd1d40, type: 2}
   _cardPreviewTooltipSize: {x: 340, y: 116}
   _cardPreviewTooltipSideGap: 28
@@ -50047,11 +50058,11 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 120464554}
+    m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
     m_FontSize: 34
     m_FontStyle: 1
     m_BestFit: 0
-    m_MinSize: 10
+    m_MinSize: 2
     m_MaxSize: 40
     m_Alignment: 4
     m_AlignByGeometry: 0

@@ -1,9 +1,35 @@
+using Project333.PvpServer.BattleResults;
+
 namespace Project333.PvpServer.BattleSessions;
 
 public sealed class BattleSessionManager
 {
+    private readonly BattleResultOutbox? _resultOutbox;
+    public BattleSessionManager(BattleResultOutbox? resultOutbox = null) => _resultOutbox = resultOutbox;
     private readonly object _gate = new();
     private readonly Dictionary<string, BattleSession> _sessions = new(StringComparer.Ordinal);
+    private readonly Dictionary<BattleSession, int> _pendingJoins = new();
+
+    public BattleSessionJoinLease AcquireForJoin(string matchId, bool useServerAiOpponent)
+    {
+        lock (_gate)
+        {
+            var session = GetOrCreate(matchId, useServerAiOpponent);
+            _pendingJoins.TryGetValue(session, out var count);
+            _pendingJoins[session] = count + 1;
+            return new BattleSessionJoinLease(session, () => ReleaseJoin(session));
+        }
+    }
+
+    private void ReleaseJoin(BattleSession session)
+    {
+        lock (_gate)
+        {
+            if (_pendingJoins[session] == 1) _pendingJoins.Remove(session);
+            else _pendingJoins[session]--;
+            RemoveIfEmpty(session);
+        }
+    }
 
     public IReadOnlyList<BattleSessionSummary> SnapshotSessions()
     {
@@ -60,7 +86,7 @@ public sealed class BattleSessionManager
                 return session;
             }
 
-            session = new BattleSession(matchId, useServerAiOpponent);
+            session = new BattleSession(matchId, useServerAiOpponent, resultOutbox: _resultOutbox);
             _sessions.Add(matchId, session);
             return session;
         }
@@ -96,7 +122,7 @@ public sealed class BattleSessionManager
 
             var suffix = Guid.NewGuid().ToString("N").Substring(0, 8);
             var matchId = $"pvp-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{suffix}";
-            var session = new BattleSession(matchId, useServerAiOpponent: false);
+            var session = new BattleSession(matchId, useServerAiOpponent: false, resultOutbox: _resultOutbox);
             _sessions.Add(matchId, session);
             return session;
         }
@@ -149,7 +175,9 @@ public sealed class BattleSessionManager
 
         lock (_gate)
         {
-            if (session.ConnectionCount == 0 && !session.HasPendingReconnectReservations)
+            if (session.ConnectionCount == 0 && !session.HasPendingReconnectReservations &&
+                !_pendingJoins.ContainsKey(session) &&
+                _sessions.TryGetValue(session.MatchId, out var current) && ReferenceEquals(current, session))
             {
                 _sessions.Remove(session.MatchId);
             }
@@ -158,3 +186,11 @@ public sealed class BattleSessionManager
 }
 
 public sealed record BattleSessionSummary(string MatchId, int ConnectionCount, bool IsBattleStarted);
+
+public sealed class BattleSessionJoinLease : IDisposable
+{
+    private Action? _release;
+    internal BattleSessionJoinLease(BattleSession session, Action release) { Session = session; _release = release; }
+    public BattleSession Session { get; }
+    public void Dispose() => Interlocked.Exchange(ref _release, null)?.Invoke();
+}

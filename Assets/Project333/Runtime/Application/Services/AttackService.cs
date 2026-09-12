@@ -199,9 +199,7 @@ namespace Project333.Runtime.Application.Services
                 return false;
             }
 
-            return !candidate.HasActiveFlying ||
-                   attacker.AttackType == AttackType.Ranged ||
-                   attacker.HasActiveFlying;
+            return true;
         }
 
         private static void ValidateAttacker(OccupantState attacker, PlayerId attackerOwnerId)
@@ -322,7 +320,8 @@ namespace Project333.Runtime.Application.Services
             if (shielderInfo.IsProtected)
             {
                 affectedDefenders.Add(shielderInfo.Shielder);
-                var shielderDamage = attackerDamagePerHit;
+                var shielderDamage = ResolveDeclaredTargetDamage(
+                    attacker, shielderInfo.OriginalTarget, attackerDamagePerHit, attackerDamageType);
                 var shielderHpBefore = Math.Max(0, shielderInfo.Shielder.CurrentHp);
                 var resolvedShielderDamage = DamageResolutionRules.ResolveIncomingDamage(
                     shielderInfo.Shielder,
@@ -346,10 +345,9 @@ namespace Project333.Runtime.Application.Services
                 if (remainingDamage > 0)
                 {
                     affectedDefenders.Add(shielderInfo.OriginalTarget);
-                    var overflowDamage = DamageResolutionRules.ApplyAttackDamage(
+                    var overflowDamage = DamageResolutionRules.ApplyResolvedAttackDamage(
                         shielderInfo.OriginalTarget,
-                        remainingDamage,
-                        attackerDamageType);
+                        remainingDamage);
                     BattleValuePopupRecorder.RecordDamage(
                         battleState,
                         shielderInfo.OriginalTarget,
@@ -403,7 +401,8 @@ namespace Project333.Runtime.Application.Services
             var actualDamage = DamageResolutionRules.ApplyAttackDamage(
                 defender,
                 attackerDamagePerHit,
-                attackerDamageType);
+                attackerDamageType,
+                DamageResolutionRules.ShouldHalveForFlying(attacker, defender));
             BattleValuePopupRecorder.RecordDamage(
                 battleState,
                 defender,
@@ -428,7 +427,7 @@ namespace Project333.Runtime.Application.Services
             DamageType defenderCounterDamageType,
             ISet<OccupantState> affectedDefenders)
         {
-            var damageDealtByAttacker = ApplyAttackDamageToDeclaredTargetWithoutHitEffects(
+            var damageDealtByAttacker = ApplyAttackDamagePacketWithoutHitEffects(
                 battleState,
                 defenderBoard,
                 declaredTargetCoord,
@@ -483,36 +482,32 @@ namespace Project333.Runtime.Application.Services
                 resolvedTargetCoord.Column,
                 resolvedTargetCoord.Row == 0 ? 1 : 0);
             var oppositeRowOccupant = defenderBoard.GetOccupant(oppositeRowCoord);
-            if (oppositeRowOccupant == null || !oppositeRowOccupant.IsAlive)
+            if (oppositeRowOccupant == null || !oppositeRowOccupant.IsAlive || oppositeRowOccupant.IsSealbound)
             {
                 return 0;
             }
 
-            affectedDefenders.Add(oppositeRowOccupant);
-            var actualDamage = DamageResolutionRules.ApplyAttackDamage(
-                oppositeRowOccupant,
-                attackerDamagePerHit,
-                attackerDamageType);
-            BattleValuePopupRecorder.RecordDamage(
+            // Reuse attack redirection without declaring another attack or triggering another counterattack.
+            return ApplyAttackDamagePacketWithoutHitEffects(
                 battleState,
-                oppositeRowOccupant,
-                actualDamage,
-                BattleValueChangeCause.Piercing,
+                defenderBoard,
+                oppositeRowCoord,
+                attacker,
+                attackerDamagePerHit,
                 attackerDamageType,
-                attacker.OwnerId,
-                attacker.RuntimeId,
-                attacker.CardId);
-            return actualDamage;
+                affectedDefenders,
+                BattleValueChangeCause.Piercing);
         }
 
-        private static int ApplyAttackDamageToDeclaredTargetWithoutHitEffects(
+        private static int ApplyAttackDamagePacketWithoutHitEffects(
             BattleState battleState,
             BoardState defenderBoard,
             TileCoord declaredTargetCoord,
             OccupantState attacker,
             int attackerDamagePerHit,
             DamageType attackerDamageType,
-            ISet<OccupantState> affectedDefenders)
+            ISet<OccupantState> affectedDefenders,
+            BattleValueChangeCause damageCause = BattleValueChangeCause.NormalAttack)
         {
             var shielderInfo = ShielderService.ResolveForNormalAttack(
                 defenderBoard,
@@ -524,12 +519,13 @@ namespace Project333.Runtime.Application.Services
                 var directDamage = DamageResolutionRules.ApplyAttackDamage(
                     shielderInfo.OriginalTarget,
                     attackerDamagePerHit,
-                    attackerDamageType);
+                    attackerDamageType,
+                    DamageResolutionRules.ShouldHalveForFlying(attacker, shielderInfo.OriginalTarget));
                 BattleValuePopupRecorder.RecordDamage(
                     battleState,
                     shielderInfo.OriginalTarget,
                     directDamage,
-                    BattleValueChangeCause.NormalAttack,
+                    damageCause,
                     attackerDamageType,
                     attacker.OwnerId,
                     attacker.RuntimeId,
@@ -538,20 +534,22 @@ namespace Project333.Runtime.Application.Services
             }
 
             affectedDefenders.Add(shielderInfo.Shielder);
+            var shielderDamage = ResolveDeclaredTargetDamage(
+                attacker, shielderInfo.OriginalTarget, attackerDamagePerHit, attackerDamageType);
             var shielderHpBefore = Math.Max(0, shielderInfo.Shielder.CurrentHp);
             var resolvedShielderDamage = DamageResolutionRules.ResolveIncomingDamage(
                 shielderInfo.Shielder,
-                attackerDamagePerHit,
+                shielderDamage,
                 attackerDamageType);
             var absorbedDamage = DamageResolutionRules.ApplyAttackDamage(
                 shielderInfo.Shielder,
-                attackerDamagePerHit,
+                shielderDamage,
                 attackerDamageType);
             BattleValuePopupRecorder.RecordDamage(
                 battleState,
                 shielderInfo.Shielder,
                 absorbedDamage,
-                BattleValueChangeCause.NormalAttack,
+                damageCause,
                 attackerDamageType,
                 attacker.OwnerId,
                 attacker.RuntimeId,
@@ -565,20 +563,30 @@ namespace Project333.Runtime.Application.Services
             }
 
             affectedDefenders.Add(shielderInfo.OriginalTarget);
-            var overflowDamage = DamageResolutionRules.ApplyAttackDamage(
+            var overflowDamage = DamageResolutionRules.ApplyResolvedAttackDamage(
                 shielderInfo.OriginalTarget,
-                remainingDamage,
-                attackerDamageType);
+                remainingDamage);
             BattleValuePopupRecorder.RecordDamage(
                 battleState,
                 shielderInfo.OriginalTarget,
                 overflowDamage,
-                BattleValueChangeCause.NormalAttack,
+                damageCause,
                 attackerDamageType,
                 attacker.OwnerId,
                 attacker.RuntimeId,
                 attacker.CardId);
             return totalDamage + overflowDamage;
+        }
+
+        private static int ResolveDeclaredTargetDamage(
+            OccupantState attacker,
+            OccupantState target,
+            int rawDamage,
+            DamageType damageType)
+        {
+            // Redirect the target's resolved packet; the Shielder's Flying flag never reduces it again.
+            return DamageResolutionRules.ResolveIncomingDamage(
+                target, rawDamage, damageType, DamageResolutionRules.ShouldHalveForFlying(attacker, target));
         }
 
         private static void ApplyAttackHitEffectsIfAlive(BattleState battleState, OccupantState attacker, int actualDamageDealt)

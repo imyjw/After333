@@ -322,6 +322,8 @@ namespace Project333.Runtime.Application.Services
 
             var targetPlayer = battleState.GetOpponent(effect.OwnerId);
             var targetBoard = battleState.GetBoard(targetPlayer.Id);
+            var resolvedEffectDamage = SpellPowerRules.ApplyCaptured(
+                effect.EffectDamage, effect.EffectDamageType, effect.CapturedSpellPower);
             var targets = new List<OccupantState>();
             var targetCoords = new List<TileCoord>(BiochemicalBombRules.AreaWidth * BoardState.RowCount);
             for (var column = effect.TargetStartColumn;
@@ -356,7 +358,7 @@ namespace Project333.Runtime.Application.Services
 
                 var actualDamage = DamageResolutionRules.ApplyEffectDamage(
                     target,
-                    effect.EffectDamage,
+                    resolvedEffectDamage,
                     effect.EffectDamageType);
                 BattleValuePopupRecorder.RecordDamage(
                     battleState,

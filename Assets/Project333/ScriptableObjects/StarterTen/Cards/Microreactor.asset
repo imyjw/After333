@@ -22,8 +22,11 @@ MonoBehaviour:
     _gold: 0
   _affiliation: 2
   _chargeTileFootprint: 0
-  _effectText: Gain +1 Power at the start of your next 3 turns.
-  _specialEffectText: 'Persistent Spell : Expires after next three turns. '
+  _effectText: "\uB2E4\uC74C \uB0B4 3\uD134\uB3D9\uC548 \uC804\uB825+1"
+  _specialEffectText: 
+  _hasReplicate: 0
+  _boardSprite: {fileID: 0}
+  _boardAnimatorController: {fileID: 0}
   _effectId: Microreactor_Effect
   _turnStartResourceGain:
     _mana: 0

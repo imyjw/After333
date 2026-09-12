@@ -62,7 +62,7 @@ namespace Project333.Tests.EditMode
             AssertUnit(provider, "Zombie", DamageType.Physical);
             AssertUnit(provider, "OrcWarrior", DamageType.Physical);
             AssertUnit(provider, WerewolfRules.CardId, DamageType.Physical);
-            AssertUnit(provider, "RedDragon", DamageType.Physical);
+            AssertUnit(provider, "RedDragon", DamageType.Magic);
             AssertUnit(provider, "Shaolin_1st_Disciple", DamageType.Physical);
             AssertUnit(provider, "Vampire", DamageType.Physical);
             Assert.That(
@@ -113,8 +113,8 @@ namespace Project333.Tests.EditMode
             Assert.That(a301Record, Is.Not.Null);
             Assert.That(a301Record.Rarity, Is.EqualTo(CardRarity.Common));
             Assert.That(a301Record.Affiliation, Is.EqualTo(CardAffiliation.ScienceCivilization));
-            Assert.That(a301Record.IncludeInDraft, Is.False);
-            Assert.That(a301Record.IncludeInRewards, Is.False);
+            Assert.That(a301Record.IncludeInDraft, Is.True);
+            Assert.That(a301Record.IncludeInRewards, Is.True);
             Assert.That(a301Record.HasRush, Is.False);
             Assert.That(a301Record.HasReplicate, Is.True);
             Assert.That(a301Record.SpecialEffectText, Does.Contain("비행"));
@@ -124,7 +124,7 @@ namespace Project333.Tests.EditMode
             Assert.That(a301Record.SpecialEffectText, Does.Not.Contain("속공"));
 
             AssertSimpleFantasyUnit(provider, path, "Skeleton", 10, 10);
-            AssertSimpleFantasyUnit(provider, path, "Zombie", 20, 1);
+            AssertSimpleFantasyUnit(provider, path, "Zombie", 15, 1);
             AssertSimpleFantasyUnit(provider, path, "OrcWarrior", 25, 40, expectedManaCost: 3);
 
             var werewolf = provider.GetRequired(WerewolfRules.CardId) as UnitCardDefinition;
@@ -141,8 +141,8 @@ namespace Project333.Tests.EditMode
             Assert.That(werewolfRecord, Is.Not.Null);
             Assert.That(werewolfRecord.Rarity, Is.EqualTo(CardRarity.Rare));
             Assert.That(werewolfRecord.Affiliation, Is.EqualTo(CardAffiliation.Fantasy));
-            Assert.That(werewolfRecord.IncludeInDraft, Is.False);
-            Assert.That(werewolfRecord.IncludeInRewards, Is.False);
+            Assert.That(werewolfRecord.IncludeInDraft, Is.True);
+            Assert.That(werewolfRecord.IncludeInRewards, Is.True);
             Assert.That(werewolfRecord.PhysicalDefense, Is.Zero);
             Assert.That(werewolfRecord.MagicDefense, Is.Zero);
             Assert.That(werewolfRecord.SpecialEffectText, Does.Contain("복제"));
@@ -193,13 +193,13 @@ namespace Project333.Tests.EditMode
             var blueDragon = provider.GetRequired("BlueDragon") as UnitCardDefinition;
             Assert.That(blueDragon, Is.Not.Null);
             Assert.That(blueDragon.Attack, Is.EqualTo(40));
-            Assert.That(blueDragon.Health, Is.EqualTo(70));
+            Assert.That(blueDragon.Health, Is.EqualTo(50));
             Assert.That(blueDragon.HasFlying, Is.True);
 
             var redDragon = provider.GetRequired("RedDragon") as UnitCardDefinition;
             Assert.That(redDragon, Is.Not.Null);
-            Assert.That(redDragon.Attack, Is.EqualTo(50));
-            Assert.That(redDragon.Health, Is.EqualTo(50));
+            Assert.That(redDragon.Attack, Is.EqualTo(40));
+            Assert.That(redDragon.Health, Is.EqualTo(40));
             Assert.That(redDragon.HasFlying, Is.True);
 
             var goldMiner = provider.GetRequired("GoldMiner") as UnitCardDefinition;
@@ -228,7 +228,7 @@ namespace Project333.Tests.EditMode
             Assert.That(snowGinsengRecord, Is.Not.Null);
             Assert.That(snowGinsengRecord.Rarity, Is.EqualTo(CardRarity.Unique));
             Assert.That(snowGinsengRecord.Affiliation, Is.EqualTo(CardAffiliation.Murim));
-            Assert.That(snowGinsengRecord.IncludeInDraft, Is.False);
+            Assert.That(snowGinsengRecord.IncludeInDraft, Is.True);
             Assert.That(snowGinsengRecord.IncludeInRewards, Is.False);
 
             var gaebangBranch = provider.GetRequired("GaebangBranch") as BuildingCardDefinition;
@@ -245,8 +245,8 @@ namespace Project333.Tests.EditMode
             Assert.That(gaebangBranchRecord, Is.Not.Null);
             Assert.That(gaebangBranchRecord.Rarity, Is.EqualTo(CardRarity.Common));
             Assert.That(gaebangBranchRecord.Affiliation, Is.EqualTo(CardAffiliation.Murim));
-            Assert.That(gaebangBranchRecord.IncludeInDraft, Is.False);
-            Assert.That(gaebangBranchRecord.IncludeInRewards, Is.False);
+            Assert.That(gaebangBranchRecord.IncludeInDraft, Is.True);
+            Assert.That(gaebangBranchRecord.IncludeInRewards, Is.True);
 
             var merchantCaravan = provider.GetRequired(MerchantCaravanRules.CardId) as BuildingCardDefinition;
             Assert.That(merchantCaravan, Is.Not.Null);
@@ -266,8 +266,8 @@ namespace Project333.Tests.EditMode
             Assert.That(merchantCaravanRecord, Is.Not.Null);
             Assert.That(merchantCaravanRecord.Rarity, Is.EqualTo(CardRarity.Uncommon));
             Assert.That(merchantCaravanRecord.Affiliation, Is.EqualTo(CardAffiliation.Murim));
-            Assert.That(merchantCaravanRecord.IncludeInDraft, Is.False);
-            Assert.That(merchantCaravanRecord.IncludeInRewards, Is.False);
+            Assert.That(merchantCaravanRecord.IncludeInDraft, Is.True);
+            Assert.That(merchantCaravanRecord.IncludeInRewards, Is.True);
 
             var inn = provider.GetRequired(InnRules.CardId) as BuildingCardDefinition;
             Assert.That(inn, Is.Not.Null);
@@ -305,8 +305,8 @@ namespace Project333.Tests.EditMode
             Assert.That(powerPlantRecord, Is.Not.Null);
             Assert.That(powerPlantRecord.Rarity, Is.EqualTo(CardRarity.Common));
             Assert.That(powerPlantRecord.Affiliation, Is.EqualTo(CardAffiliation.ScienceCivilization));
-            Assert.That(powerPlantRecord.IncludeInDraft, Is.False);
-            Assert.That(powerPlantRecord.IncludeInRewards, Is.False);
+            Assert.That(powerPlantRecord.IncludeInDraft, Is.True);
+            Assert.That(powerPlantRecord.IncludeInRewards, Is.True);
 
             var nuclearPowerPlant = provider.GetRequired(NuclearPowerPlantRules.CardId) as BuildingCardDefinition;
             Assert.That(nuclearPowerPlant, Is.Not.Null);
@@ -329,8 +329,8 @@ namespace Project333.Tests.EditMode
             Assert.That(
                 nuclearPowerPlantRecord.Affiliation,
                 Is.EqualTo(CardAffiliation.ScienceCivilization));
-            Assert.That(nuclearPowerPlantRecord.IncludeInDraft, Is.False);
-            Assert.That(nuclearPowerPlantRecord.IncludeInRewards, Is.False);
+            Assert.That(nuclearPowerPlantRecord.IncludeInDraft, Is.True);
+            Assert.That(nuclearPowerPlantRecord.IncludeInRewards, Is.True);
 
             var firebolt = provider.GetRequired("firebolt") as DamageSpellCardDefinition;
             Assert.That(firebolt, Is.Not.Null);
@@ -363,8 +363,8 @@ namespace Project333.Tests.EditMode
             Assert.That(timedBombRecord, Is.Not.Null);
             Assert.That(timedBombRecord.Rarity, Is.EqualTo(CardRarity.Common));
             Assert.That(timedBombRecord.Affiliation, Is.EqualTo(CardAffiliation.ScienceCivilization));
-            Assert.That(timedBombRecord.IncludeInDraft, Is.False);
-            Assert.That(timedBombRecord.IncludeInRewards, Is.False);
+            Assert.That(timedBombRecord.IncludeInDraft, Is.True);
+            Assert.That(timedBombRecord.IncludeInRewards, Is.True);
 
             var biochemicalBomb = provider.GetRequired(BiochemicalBombRules.CardId) as ScriptedSpellCardDefinition;
             Assert.That(biochemicalBomb, Is.Not.Null);
@@ -372,7 +372,7 @@ namespace Project333.Tests.EditMode
             Assert.That(biochemicalBomb.Cost.Gold, Is.EqualTo(BiochemicalBombRules.GoldCost));
             Assert.That(biochemicalBomb.EffectId, Is.EqualTo(BiochemicalBombRules.EffectId));
             Assert.That(biochemicalBomb.Damage, Is.EqualTo(BiochemicalBombRules.BaseDamage));
-            Assert.That(biochemicalBomb.DamageType, Is.EqualTo(DamageType.Physical));
+            Assert.That(biochemicalBomb.DamageType, Is.EqualTo(DamageType.Fixed));
             Assert.That(biochemicalBomb.TriggerCount, Is.EqualTo(BiochemicalBombRules.TriggerCount));
 
             var biochemicalBombRecord = JsonCardDefinitionDatabase.FromJson(File.ReadAllText(path)).Cards
@@ -380,8 +380,8 @@ namespace Project333.Tests.EditMode
             Assert.That(biochemicalBombRecord, Is.Not.Null);
             Assert.That(biochemicalBombRecord.Rarity, Is.EqualTo(CardRarity.Uncommon));
             Assert.That(biochemicalBombRecord.Affiliation, Is.EqualTo(CardAffiliation.ScienceCivilization));
-            Assert.That(biochemicalBombRecord.IncludeInDraft, Is.False);
-            Assert.That(biochemicalBombRecord.IncludeInRewards, Is.False);
+            Assert.That(biochemicalBombRecord.IncludeInDraft, Is.True);
+            Assert.That(biochemicalBombRecord.IncludeInRewards, Is.True);
 
             var powerBank = provider.GetRequired(PowerBankRules.CardId) as ScriptedSpellCardDefinition;
             Assert.That(powerBank, Is.Not.Null);
@@ -395,7 +395,7 @@ namespace Project333.Tests.EditMode
             Assert.That(powerBankRecord, Is.Not.Null);
             Assert.That(powerBankRecord.Rarity, Is.EqualTo(CardRarity.Common));
             Assert.That(powerBankRecord.Affiliation, Is.EqualTo(CardAffiliation.ScienceCivilization));
-            Assert.That(powerBankRecord.IncludeInDraft, Is.False);
+            Assert.That(powerBankRecord.IncludeInDraft, Is.True);
             Assert.That(powerBankRecord.IncludeInRewards, Is.False);
 
             var manaStone = provider.GetRequired(ManaStoneRules.CardId) as ScriptedSpellCardDefinition;
@@ -412,7 +412,7 @@ namespace Project333.Tests.EditMode
             Assert.That(manaStoneRecord, Is.Not.Null);
             Assert.That(manaStoneRecord.Rarity, Is.EqualTo(CardRarity.Common));
             Assert.That(manaStoneRecord.Affiliation, Is.EqualTo(CardAffiliation.Fantasy));
-            Assert.That(manaStoneRecord.IncludeInDraft, Is.False);
+            Assert.That(manaStoneRecord.IncludeInDraft, Is.True);
             Assert.That(manaStoneRecord.IncludeInRewards, Is.False);
 
             var manaStoneBundle = provider.GetRequired(ManaStoneBundleRules.CardId) as ScriptedSpellCardDefinition;
@@ -454,7 +454,7 @@ namespace Project333.Tests.EditMode
             Assert.That(guRecord, Is.Not.Null);
             Assert.That(guRecord.Rarity, Is.EqualTo(CardRarity.Unique));
             Assert.That(guRecord.Affiliation, Is.EqualTo(CardAffiliation.Murim));
-            Assert.That(guRecord.IncludeInDraft, Is.False);
+            Assert.That(guRecord.IncludeInDraft, Is.True);
             Assert.That(guRecord.IncludeInRewards, Is.False);
 
             var huanShu = provider.GetRequired(HuanShuRules.CardId) as ScriptedSpellCardDefinition;
@@ -469,7 +469,7 @@ namespace Project333.Tests.EditMode
             Assert.That(huanShuRecord, Is.Not.Null);
             Assert.That(huanShuRecord.Rarity, Is.EqualTo(CardRarity.Uncommon));
             Assert.That(huanShuRecord.Affiliation, Is.EqualTo(CardAffiliation.Murim));
-            Assert.That(huanShuRecord.IncludeInDraft, Is.False);
+            Assert.That(huanShuRecord.IncludeInDraft, Is.True);
             Assert.That(huanShuRecord.IncludeInRewards, Is.False);
             Assert.That(huanShuRecord.EffectText, Does.Contain("영구"));
         }
@@ -593,7 +593,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Validate_GuWithWrongCostAndAvailability_Fails()
+        public void Validate_GuWithWrongCost_FailsWithoutRejectingReleasedAvailability()
         {
             var gu = new JsonCardDefinitionRecord
             {
@@ -614,7 +614,7 @@ namespace Project333.Tests.EditMode
             var result = CardDatabaseValidator.Validate(CreateDraftCompatibleDatabase(gu));
 
             Assert.That(result.Errors, Has.Some.Contains("cost exactly 10 qi"));
-            Assert.That(result.Errors, Has.Some.Contains("disabled in draft and rewards"));
+            Assert.That(result.Errors, Has.None.Contains("disabled in draft and rewards"));
         }
 
         [Test]
@@ -640,7 +640,7 @@ namespace Project333.Tests.EditMode
 
             Assert.That(result.Errors, Has.Some.Contains("Uncommon Murim ScriptedSpell"));
             Assert.That(result.Errors, Has.Some.Contains("cost exactly 3 qi"));
-            Assert.That(result.Errors, Has.Some.Contains("disabled in draft and rewards"));
+            Assert.That(result.Errors, Has.None.Contains("disabled in draft and rewards"));
             Assert.That(result.Errors, Has.Some.Contains("permanent random attack targeting effect"));
         }
 
@@ -670,7 +670,7 @@ namespace Project333.Tests.EditMode
 
             Assert.That(result.Errors, Has.Some.Contains("cost exactly 4 gold"));
             Assert.That(result.Errors, Has.Some.Contains("next 3 owner turn starts"));
-            Assert.That(result.Errors, Has.Some.Contains("disabled in draft"));
+            Assert.That(result.Errors, Has.None.Contains("disabled in draft"));
             Assert.That(result.Errors, Has.Some.Contains("must not appear in random rewards"));
         }
 
@@ -744,14 +744,14 @@ namespace Project333.Tests.EditMode
                 },
                 EffectId = BiochemicalBombRules.EffectId,
                 Damage = 40,
-                DamageType = DamageType.Magic,
+                DamageType = DamageType.Physical,
                 TriggerCount = 3,
             };
 
             var result = CardDatabaseValidator.Validate(CreateDraftCompatibleDatabase(biochemicalBomb));
 
-            Assert.That(result.Errors, Has.Some.Contains("44 physical damage for 4 global turn starts"));
-            Assert.That(result.Errors, Has.Some.Contains("Physical damageType"));
+            Assert.That(result.Errors, Has.Some.Contains("25 fixed damage for 4 global turn starts"));
+            Assert.That(result.Errors, Has.Some.Contains("Fixed damageType"));
             Assert.That(result.Errors, Has.Some.Contains("triggerCount 4"));
         }
 
@@ -923,7 +923,10 @@ namespace Project333.Tests.EditMode
 
             var result = CardDatabaseValidator.Validate(CreateDraftCompatibleDatabase(manaStone));
 
-            Assert.That(result.Errors, Has.Some.Contains("immediate mana +6"));
+            Assert.That(result.Errors, Is.EquivalentTo(new[]
+            {
+                "ManaStone effectText must describe its immediate mana +3 effect."
+            }));
         }
 
         [Test]
@@ -1384,7 +1387,8 @@ namespace Project333.Tests.EditMode
                 database.Cards.Add(legendary);
             }
 
-            for (var index = 0; database.Cards.Count < 16; index += 1)
+            // The tested card can be excluded from the draft pool.
+            for (var index = 0; index < 13; index += 1)
             {
                 database.Cards.Add(CreateUnitRecord($"non-legendary-filler-{index}"));
             }
@@ -1445,8 +1449,8 @@ namespace Project333.Tests.EditMode
             Assert.That(record, Is.Not.Null);
             Assert.That(record.Rarity, Is.EqualTo(CardRarity.Common), cardId);
             Assert.That(record.Affiliation, Is.EqualTo(CardAffiliation.Fantasy), cardId);
-            Assert.That(record.IncludeInDraft, Is.False, cardId);
-            Assert.That(record.IncludeInRewards, Is.False, cardId);
+            Assert.That(record.IncludeInDraft, Is.True, cardId);
+            Assert.That(record.IncludeInRewards, Is.True, cardId);
             Assert.That(record.EffectText, Is.Empty, cardId);
             Assert.That(record.SpecialEffectText, Is.Empty, cardId);
         }

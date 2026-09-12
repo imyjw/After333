@@ -32,7 +32,7 @@ The full game design loop is:
 
 The current implemented loop is:
 
-1. Login with a server-backed guest or Game ID account
+1. Login with a server-backed guest, Game ID, or Google account
 2. Spend `3` tickets to start a run
 3. Build and persist a `33`-card deck through draft
 4. Play server-backed PvE or account-matched 1:1 PvP battles
@@ -42,7 +42,7 @@ The current implemented loop is:
 
 The current prototype does not yet implement:
 
-- Production Google, Kakao, or Naver OAuth login
+- Kakao or Naver OAuth login
 - Ranked matchmaking, MMR, seasons, or ladders
 - Shop inventory or purchases
 - Pack opening

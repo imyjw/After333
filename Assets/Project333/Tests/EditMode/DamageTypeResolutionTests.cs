@@ -296,6 +296,30 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
+        public void Attack_RedDragonFromCardDatabaseUsesMagicDefense()
+        {
+            var path = System.IO.Path.Combine(UnityEngine.Application.dataPath, "Project333/Resources/Project333/Data/cards.json");
+            var definition = (UnitCardDefinition)JsonCardDefinitionDatabase.FromJson(System.IO.File.ReadAllText(path))
+                .CreateProvider().GetRequired("RedDragon");
+            var battleState = CreateBattleState();
+            var redDragon = CreateUnit("RedDragon", PlayerId.Player, new TileCoord(0, 0),
+                definition.AttackType, definition.Attack, definition.Health, definition.DamageType);
+            var target = CreateUnit("target", PlayerId.AI, new TileCoord(0, 0), AttackType.Melee,
+                0, 100, DamageType.Physical, physicalDefense: 99, magicDefense: 7);
+            redDragon.HasSummoningSickness = false;
+            redDragon.RemainingAttacksThisTurn = 1;
+            battleState.PlayerBoard.Place(redDragon.Position, redDragon);
+            battleState.AIBoard.Place(target.Position, target);
+
+            new AttackService().Attack(battleState, PlayerId.Player, redDragon.Position, target.Position);
+
+            Assert.That(target.CurrentHp, Is.EqualTo(67));
+            Assert.That(battleState.ValuePopupEvents.Count, Is.EqualTo(1));
+            Assert.That(battleState.ValuePopupEvents[0].Amount, Is.EqualTo(33));
+            Assert.That(battleState.ValuePopupEvents[0].DamageType, Is.EqualTo(DamageType.Magic));
+        }
+
+        [Test]
         public void EndTurn_RedDragonEffectUsesMagicDamageType()
         {
             var battleState = CreateBattleState();
@@ -306,7 +330,7 @@ namespace Project333.Tests.EditMode
                 AttackType.Melee,
                 attack: 50,
                 maxHp: 50,
-                damageType: DamageType.Physical);
+                damageType: DamageType.Magic);
             var target = CreateUnit(
                 "target",
                 PlayerId.AI,

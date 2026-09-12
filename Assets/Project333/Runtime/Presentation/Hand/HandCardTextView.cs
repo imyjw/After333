@@ -1,5 +1,6 @@
 using TMPro;
 using Project333.Runtime.Application.Accounts;
+using Project333.Runtime.Application.Services;
 using Project333.Runtime.Infrastructure.Data;
 using Project333.Runtime.Presentation.Battle;
 using Project333.Runtime.Presentation.Cards;
@@ -58,8 +59,8 @@ namespace Project333.Runtime.Presentation.Hand
         [SerializeField] private int _runtimeStatOverlayFontSize = 34;
 
         [Header("Runtime Hand Card Stat Layout")]
-        [SerializeField] private Vector2 _runtimeStatAttackNormalizedPosition = new Vector2(0.09f, 0.07f);
-        [SerializeField] private Vector2 _runtimeStatHpNormalizedPosition = new Vector2(0.92f, 0.07f);
+        [SerializeField] private Vector2 _runtimeStatAttackNormalizedPosition = HandCardStatOverlayLayout.DefaultAttackPosition;
+        [SerializeField] private Vector2 _runtimeStatHpNormalizedPosition = HandCardStatOverlayLayout.DefaultHpPosition;
         [SerializeField, Min(1f)] private float _runtimeStatReferenceCardHeight = 250f;
 
         private const string CardDefinitionJsonResourcePath = "Project333/Data/cards";
@@ -87,6 +88,7 @@ namespace Project333.Runtime.Presentation.Hand
         [SerializeField, HideInInspector] private Image _runtimeHitboxImage;
         [SerializeField, HideInInspector] private Image _runtimePlayableGlowImage;
         [SerializeField, HideInInspector] private Image _runtimeCardImage;
+        private HandCardEdgeGlow _runtimeEdgeGlow;
         [SerializeField, HideInInspector] private RectTransform _runtimeStatOverlayRect;
         [SerializeField, HideInInspector] private RectTransform _runtimeStatAttackTextRect;
         [SerializeField, HideInInspector] private RectTransform _runtimeStatHpTextRect;
@@ -146,6 +148,7 @@ namespace Project333.Runtime.Presentation.Hand
             if (HasRuntimeVisual)
             {
                 ApplyRuntimeAnimation();
+                RefreshRuntimeEdgeGlow();
                 return;
             }
 
@@ -356,6 +359,10 @@ namespace Project333.Runtime.Presentation.Hand
                     _runtimePlayableGlowImage.enabled = false;
                     _runtimePlayableGlowImage.color = Color.clear;
                 }
+                if (_runtimeEdgeGlow != null)
+                {
+                    _runtimeEdgeGlow.Present(_runtimeCardImage, false);
+                }
                 _runtimeFallbackText.enabled = false;
                 SetRuntimeStatOverlayVisible(false);
                 _runtimeCanvasGroup.alpha = 0f;
@@ -396,7 +403,7 @@ namespace Project333.Runtime.Presentation.Hand
             {
                 var isPlayable = highlightState == BattleHighlightState.Playable;
                 var isMulliganSelected = highlightState == BattleHighlightState.MulliganSelected;
-                _runtimeCardOutline.enabled = isPlayable || isMulliganSelected;
+                _runtimeCardOutline.enabled = isMulliganSelected;
                 _runtimeCardOutline.effectColor = isMulliganSelected
                     ? _mulliganOutlineColor
                     : _playableOutlineColor;
@@ -407,7 +414,7 @@ namespace Project333.Runtime.Presentation.Hand
             {
                 var isPlayable = highlightState == BattleHighlightState.Playable;
                 var isMulliganSelected = highlightState == BattleHighlightState.MulliganSelected;
-                _runtimePlayableGlowImage.enabled = isPlayable || isMulliganSelected;
+                _runtimePlayableGlowImage.enabled = isMulliganSelected;
                 _runtimePlayableGlowImage.color = isMulliganSelected
                     ? _mulliganGlowColor
                     : isPlayable
@@ -415,8 +422,29 @@ namespace Project333.Runtime.Presentation.Hand
                         : Color.clear;
             }
 
+            RefreshRuntimeEdgeGlow();
+
             _runtimeShadow.effectColor = ResolveRuntimeShadowColor(highlightState);
             _runtimeShadow.effectDistance = ResolveRuntimeShadowDistance(highlightState);
+        }
+
+        private void RefreshRuntimeEdgeGlow()
+        {
+            if (_runtimeCardImage == null)
+                return;
+
+            var visible = _handCardView != null && _handCardView.HasCard &&
+                          _handCardView.IsPlayable;
+            if (_runtimeEdgeGlow == null && visible)
+            {
+                var existing = _runtimeCardImage.transform.Find("PlayableEdgeGlow");
+                var glow = existing != null ? existing.gameObject :
+                    new GameObject("PlayableEdgeGlow", typeof(RectTransform), typeof(Image));
+                glow.transform.SetParent(_runtimeCardImage.transform, false);
+                _runtimeEdgeGlow = new HandCardEdgeGlow(glow.GetComponent<Image>());
+            }
+            if (_runtimeEdgeGlow != null)
+                _runtimeEdgeGlow.Present(_runtimeCardImage, visible);
         }
 
         private void AutoAssignView()
@@ -1047,7 +1075,7 @@ namespace Project333.Runtime.Presentation.Hand
             {
                 BattleHighlightState.Selected => _artworkSelectedColor,
                 BattleHighlightState.MulliganSelected => _artworkMulliganSelectedColor,
-                BattleHighlightState.Playable => _artworkPlayableColor,
+                BattleHighlightState.Playable => _artworkNormalColor,
                 _ => _artworkNormalColor,
             };
         }
@@ -1069,7 +1097,7 @@ namespace Project333.Runtime.Presentation.Hand
             {
                 BattleHighlightState.Selected => _selectedShadowColor,
                 BattleHighlightState.MulliganSelected => _mulliganSelectedShadowColor,
-                BattleHighlightState.Playable => _playableShadowColor,
+                BattleHighlightState.Playable => _shadowColor,
                 _ => _shadowColor,
             };
         }
@@ -1080,7 +1108,7 @@ namespace Project333.Runtime.Presentation.Hand
             {
                 BattleHighlightState.Selected => _selectedShadowDistance,
                 BattleHighlightState.MulliganSelected => _selectedShadowDistance,
-                BattleHighlightState.Playable => _playableShadowDistance,
+                BattleHighlightState.Playable => _shadowDistance,
                 _ => _shadowDistance,
             };
         }
@@ -1260,15 +1288,11 @@ namespace Project333.Runtime.Presentation.Hand
         {
             if (!_showRuntimeStatOverlay ||
                 string.IsNullOrWhiteSpace(cardId) ||
-                !TryResolveRuntimeBaseStats(cardId, out var baseAttack, out var baseHp))
+                !TryResolveRuntimeStats(cardId, out var stats))
             {
                 SetRuntimeStatOverlayVisible(false);
                 return;
             }
-
-            var upgradeLevel = AccountSessionState.GetOwnedCardUpgradeLevel(cardId);
-            var attack = CardLevelStatRules.ApplyAttackBonus(cardId, baseAttack, upgradeLevel);
-            var hp = CardLevelStatRules.ApplyHpBonus(cardId, baseHp, upgradeLevel);
 
             ApplyRuntimeStatOverlayTemplate(
                 _runtimeStatOverlayRect,
@@ -1281,15 +1305,15 @@ namespace Project333.Runtime.Presentation.Hand
 
             if (_runtimeStatAttackText != null)
             {
-                _runtimeStatAttackText.text = attack.ToString();
+                _runtimeStatAttackText.text = stats.Attack.ToString();
             }
 
             if (_runtimeStatHpText != null)
             {
-                _runtimeStatHpText.text = hp.ToString();
+                _runtimeStatHpText.text = stats.HasHp ? stats.Hp.ToString() : string.Empty;
             }
 
-            SetRuntimeStatOverlayVisible(true);
+            SetRuntimeStatOverlayVisible(true, stats.HasHp);
         }
 
         private void RefreshRuntimeStatLayout()
@@ -1302,11 +1326,7 @@ namespace Project333.Runtime.Presentation.Hand
             }
 
             var artworkRectTransform = _runtimeCardImage.rectTransform;
-            var artworkContainerRect = artworkRectTransform.rect;
-            var renderedSpriteRect = HandCardStatOverlayLayout.CalculateRenderedSpriteRect(
-                artworkContainerRect,
-                _runtimeCardImage.sprite.rect.size,
-                _runtimeCardImage.preserveAspect);
+            var renderedSpriteRect = HandCardStatOverlayLayout.CalculateRenderedSpriteRect(_runtimeCardImage);
 
             PositionRuntimeStatText(
                 _runtimeStatAttackText,
@@ -1330,40 +1350,11 @@ namespace Project333.Runtime.Presentation.Hand
                 renderedCardHeight);
         }
 
-        private static void PositionRuntimeStatText(
-            Text text,
-            RectTransform artworkRectTransform,
-            Rect renderedSpriteRect,
-            Vector2 normalizedSpritePosition)
+        private static void PositionRuntimeStatText(Text text, RectTransform artworkRectTransform,
+            Rect renderedSpriteRect, Vector2 normalizedSpritePosition)
         {
-            if (text == null || artworkRectTransform == null)
-            {
-                return;
-            }
-
-            var textParent = text.rectTransform.parent as RectTransform;
-            if (textParent == null ||
-                textParent.rect.width <= 0f ||
-                textParent.rect.height <= 0f)
-            {
-                return;
-            }
-
-            var artworkLocalPoint = HandCardStatOverlayLayout.CalculateRenderedSpritePoint(
-                renderedSpriteRect,
-                normalizedSpritePosition);
-            var worldPoint = artworkRectTransform.TransformPoint(artworkLocalPoint);
-            var parentLocalPoint = textParent.InverseTransformPoint(worldPoint);
-            var anchor = HandCardStatOverlayLayout.CalculateContainerAnchor(
-                textParent.rect,
-                parentLocalPoint);
-
-            var rectTransform = text.rectTransform;
-            rectTransform.anchorMin = anchor;
-            rectTransform.anchorMax = anchor;
-            rectTransform.anchoredPosition = Vector2.zero;
-            rectTransform.localScale = Vector3.one;
-            rectTransform.localRotation = Quaternion.identity;
+            HandCardStatOverlayLayout.PositionStatText(text?.rectTransform, artworkRectTransform,
+                renderedSpriteRect, normalizedSpritePosition);
         }
 
         private void ScaleRuntimeStatFont(Text runtimeText, Text templateText, float renderedCardHeight)
@@ -1386,7 +1377,7 @@ namespace Project333.Runtime.Presentation.Hand
             runtimeText.resizeTextMaxSize = scaledFontSize;
         }
 
-        private void SetRuntimeStatOverlayVisible(bool visible)
+        private void SetRuntimeStatOverlayVisible(bool visible, bool showHp = true)
         {
             if (_runtimeStatOverlayBackgroundImage != null)
             {
@@ -1400,7 +1391,7 @@ namespace Project333.Runtime.Presentation.Hand
 
             if (_runtimeStatHpText != null)
             {
-                _runtimeStatHpText.enabled = visible;
+                _runtimeStatHpText.enabled = visible && showHp;
             }
         }
 
@@ -1419,10 +1410,9 @@ namespace Project333.Runtime.Presentation.Hand
             return _emptyLabel;
         }
 
-        private static bool TryResolveRuntimeBaseStats(string cardId, out int attack, out int hp)
+        private bool TryResolveRuntimeStats(string cardId, out CardStatDisplay stats)
         {
-            attack = 0;
-            hp = 0;
+            stats = default;
 
             var provider = GetRuntimeCardDefinitionProvider();
             if (provider == null || string.IsNullOrWhiteSpace(cardId))
@@ -1432,22 +1422,9 @@ namespace Project333.Runtime.Presentation.Hand
 
             try
             {
-                var definition = provider.GetRequired(cardId);
-                switch (definition)
-                {
-                    case UnitCardDefinition unit:
-                        attack = unit.Attack;
-                        hp = unit.Health;
-                        return true;
-
-                    case BuildingCardDefinition building:
-                        attack = building.Attack;
-                        hp = building.Health;
-                        return true;
-
-                    default:
-                        return false;
-                }
+                return CardStatDisplay.TryCreate(provider.GetRequired(cardId),
+                    AccountSessionState.GetOwnedCardUpgradeLevel(cardId), out stats,
+                    _handCardView?.SpellPower ?? 0);
             }
             catch (Exception)
             {
@@ -1614,6 +1591,186 @@ namespace Project333.Runtime.Presentation.Hand
             s_runtimeWhiteSprite = Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
             s_runtimeWhiteSprite.name = "HandRuntimeWhite";
             return s_runtimeWhiteSprite;
+        }
+    }
+
+    /// <summary>A cached, hollow halo following the artwork's exterior alpha contour.</summary>
+    internal sealed class HandCardEdgeGlow
+    {
+        private const int MaskResolution = 384;
+        private const int Padding = 24;
+        private static readonly Dictionary<Sprite, Sprite> Cache = new Dictionary<Sprite, Sprite>();
+        private readonly Image _image;
+        private Sprite _source;
+
+        public HandCardEdgeGlow(Image image)
+        {
+            _image = image;
+            _image.raycastTarget = false;
+            _image.preserveAspect = false;
+        }
+
+        public void Present(Image artwork, bool visible)
+        {
+            var source = artwork != null ? artwork.overrideSprite : null;
+            _image.enabled = visible && source != null && artwork.enabled;
+            if (!_image.enabled)
+                return;
+
+            if (_source != source || _image.sprite == null)
+            {
+                _source = source;
+                if (!Cache.TryGetValue(source, out var halo) || halo == null)
+                {
+                    halo = CreateHalo(source);
+                    Cache[source] = halo;
+                }
+                _image.sprite = halo;
+            }
+
+            // Inherit rotation and drag scale, and fit the actual aspect-preserved image.
+            var rect = HandCardStatOverlayLayout.CalculateRenderedSpriteRect(artwork);
+            var haloRect = _image.rectTransform;
+            haloRect.anchorMin = haloRect.anchorMax = artwork.rectTransform.pivot;
+            haloRect.pivot = Vector2.one * 0.5f;
+            haloRect.anchoredPosition = rect.center;
+            var textureSize = _image.sprite.rect.size;
+            haloRect.sizeDelta = new Vector2(
+                rect.width * textureSize.x / (textureSize.x - 2 * Padding),
+                rect.height * textureSize.y / (textureSize.y - 2 * Padding));
+            var intensity = 0.9f + 0.1f * Mathf.Sin(Time.unscaledTime * 2.2f);
+            _image.color = new Color(1f, 1f, 1f, intensity);
+        }
+
+        private static Sprite CreateHalo(Sprite source)
+        {
+            var scale = MaskResolution / Mathf.Max(source.rect.width, source.rect.height);
+            var contentWidth = Mathf.Max(1, Mathf.RoundToInt(source.rect.width * scale));
+            var contentHeight = Mathf.Max(1, Mathf.RoundToInt(source.rect.height * scale));
+            var width = contentWidth + 2 * Padding;
+            var height = contentHeight + 2 * Padding;
+            var pixels = ReadAlpha(source, contentWidth, contentHeight);
+            var solid = new bool[width * height];
+            for (var y = 0; y < contentHeight; y++)
+                for (var x = 0; x < contentWidth; x++)
+                    solid[(y + Padding) * width + x + Padding] = pixels[y * contentWidth + x].a >= 32;
+
+            // Flood only the exterior. Transparent holes inside the artwork never glow.
+            var exterior = new bool[solid.Length];
+            var queue = new int[solid.Length];
+            var head = 0;
+            var tail = 1;
+            queue[0] = 0;
+            exterior[0] = true;
+            while (head < tail)
+            {
+                var index = queue[head++];
+                var x = index % width;
+                var y = index / width;
+                if (x > 0) Visit(index - 1);
+                if (x < width - 1) Visit(index + 1);
+                if (y > 0) Visit(index - width);
+                if (y < height - 1) Visit(index + width);
+            }
+
+            void Visit(int index)
+            {
+                if (solid[index] || exterior[index]) return;
+                exterior[index] = true;
+                queue[tail++] = index;
+            }
+
+            // Two-pass chamfer distance keeps generation linear in the mask size.
+            var distance = new float[solid.Length];
+            for (var i = 0; i < distance.Length; i++)
+                distance[i] = exterior[i] ? 10000f : 0f;
+            for (var y = 0; y < height; y++)
+                for (var x = 0; x < width; x++)
+                {
+                    var i = y * width + x;
+                    if (x > 0) distance[i] = Mathf.Min(distance[i], distance[i - 1] + 1f);
+                    if (y == 0) continue;
+                    distance[i] = Mathf.Min(distance[i], distance[i - width] + 1f);
+                    if (x > 0) distance[i] = Mathf.Min(distance[i], distance[i - width - 1] + 1.414214f);
+                    if (x < width - 1) distance[i] = Mathf.Min(distance[i], distance[i - width + 1] + 1.414214f);
+                }
+            for (var y = height - 1; y >= 0; y--)
+                for (var x = width - 1; x >= 0; x--)
+                {
+                    var i = y * width + x;
+                    if (x < width - 1) distance[i] = Mathf.Min(distance[i], distance[i + 1] + 1f);
+                    if (y == height - 1) continue;
+                    distance[i] = Mathf.Min(distance[i], distance[i + width] + 1f);
+                    if (x > 0) distance[i] = Mathf.Min(distance[i], distance[i + width - 1] + 1.414214f);
+                    if (x < width - 1) distance[i] = Mathf.Min(distance[i], distance[i + width + 1] + 1.414214f);
+                }
+
+            var colors = new Color32[solid.Length];
+            for (var i = 0; i < colors.Length; i++)
+            {
+                var d = distance[i];
+                var rim = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(1f, 3.6f, d));
+                var bloom = 0.6f * Mathf.Exp(-d * d / 65f);
+                var color = Color.Lerp(new Color(0.08f, 1f, 0.16f), new Color(0.7f, 1f, 0.48f), rim);
+                color.a = exterior[i] ? Mathf.Max(rim, bloom) : 0f;
+                colors[i] = color;
+            }
+
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = source.name + "_EdgeGlow",
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            texture.SetPixels32(colors);
+            texture.Apply(false, true);
+            var result = Sprite.Create(texture, new Rect(0, 0, width, height), Vector2.one * 0.5f,
+                100f, 0, SpriteMeshType.FullRect);
+            result.name = texture.name;
+            result.hideFlags = HideFlags.HideAndDontSave;
+            return result;
+        }
+
+        private static Color32[] ReadAlpha(Sprite source, int width, int height)
+        {
+            var target = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
+            var previous = RenderTexture.active;
+            Texture2D readable = null;
+            try
+            {
+                var texture = source.texture;
+                var rect = source.rect;
+                Graphics.Blit(texture, target,
+                    new Vector2(rect.width / texture.width, rect.height / texture.height),
+                    new Vector2(rect.x / texture.width, rect.y / texture.height));
+                RenderTexture.active = target;
+                readable = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                readable.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                return readable.GetPixels32();
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(target);
+                if (readable != null)
+                {
+                    if (UnityEngine.Application.isPlaying) UnityEngine.Object.Destroy(readable);
+                    else UnityEngine.Object.DestroyImmediate(readable);
+                }
+            }
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ClearCache()
+        {
+            foreach (var halo in Cache.Values)
+            {
+                if (halo == null) continue;
+                UnityEngine.Object.Destroy(halo.texture);
+                UnityEngine.Object.Destroy(halo);
+            }
+            Cache.Clear();
         }
     }
 }

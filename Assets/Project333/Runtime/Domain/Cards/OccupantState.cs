@@ -10,7 +10,7 @@ namespace Project333.Runtime.Domain.Cards
     {
         private const int ActiveHuanShuStateMarker = 1;
         private bool _isDrained;
-        private readonly List<InvincibleEffectState> _invincibleEffects = new List<InvincibleEffectState>();
+        private List<InvincibleEffectState> _invincibleEffects = new List<InvincibleEffectState>();
         private BoardState _currentBoard;
         private PlayerId _currentActivePlayerId;
         private int _currentBattleTurnNumber;
@@ -110,7 +110,7 @@ namespace Project333.Runtime.Domain.Cards
         public int MaxHp { get; protected set; }
         public int CurrentHp { get; set; }
         public bool CanMove { get; protected set; }
-        public ResourceSet TurnStartResourceGain { get; }
+        public ResourceSet TurnStartResourceGain { get; private set; }
         public int MaxAttacksPerTurn { get; protected set; }
         public int HitsPerAttack { get; protected set; }
         public bool HasBerserker { get; protected set; }
@@ -208,6 +208,17 @@ namespace Project333.Runtime.Domain.Cards
         internal void AttachToBoard(BoardState board)
         {
             _currentBoard = board;
+        }
+
+        // Preserve all scalar status/baseline fields, but never share mutable simulation state.
+        public OccupantState CloneDetached()
+        {
+            var copy = (OccupantState)MemberwiseClone();
+            copy._currentBoard = null!;
+            copy.TurnStartResourceGain = TurnStartResourceGain.Clone();
+            copy._invincibleEffects = new List<InvincibleEffectState>();
+            foreach (var effect in _invincibleEffects) copy._invincibleEffects.Add(effect.Clone());
+            return copy;
         }
 
         internal void DetachFromBoard(BoardState board)

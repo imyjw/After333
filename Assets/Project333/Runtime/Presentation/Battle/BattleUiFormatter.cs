@@ -7,9 +7,14 @@ namespace Project333.Runtime.Presentation.Battle
 {
     public static class BattleUiFormatter
     {
+        public static string FormatSide(PlayerId ownerId)
+        {
+            return ownerId == PlayerId.Player ? "Player" : "Opponent";
+        }
+
         public static string FormatTileTitle(PlayerId ownerId, int column, int row)
         {
-            return $"{ownerId} ({column},{row})";
+            return $"{FormatSide(ownerId)} ({column},{row})";
         }
 
         public static string FormatTileOccupant(OccupantState occupant)

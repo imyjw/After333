@@ -39,7 +39,12 @@ namespace Project333.Runtime.Presentation.Hand
 
         public bool IsTemporaryReplicate => _isTemporaryReplicate;
 
+        public int SpellPower { get; private set; }
+
         public BattleHighlightState HighlightState => _highlightState;
+
+        // Availability is independent of the selected visual overlay.
+        public bool IsPlayable { get; private set; }
 
         public void Configure(int slotIndex)
         {
@@ -52,10 +57,20 @@ namespace Project333.Runtime.Presentation.Hand
             Present(cardId, string.Empty, isTemporaryReplicate: false);
         }
 
-        public void Present(string cardId, string runtimeId, bool isTemporaryReplicate)
+        public void Present(string cardId, string runtimeId, bool isTemporaryReplicate, int spellPower = 0)
         {
-            _cardId = cardId ?? string.Empty;
-            _runtimeId = runtimeId ?? string.Empty;
+            var nextCardId = cardId ?? string.Empty;
+            var nextRuntimeId = runtimeId ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(nextCardId) ||
+                !string.Equals(_cardId, nextCardId, StringComparison.Ordinal) ||
+                !string.Equals(_runtimeId, nextRuntimeId, StringComparison.Ordinal))
+            {
+                IsPlayable = false;
+            }
+
+            SpellPower = spellPower;
+            _cardId = nextCardId;
+            _runtimeId = nextRuntimeId;
             _isTemporaryReplicate = isTemporaryReplicate;
             _hasCard = !string.IsNullOrWhiteSpace(cardId);
             _label = BattleUiFormatter.FormatHandCard(_slotIndex, cardId);
@@ -64,6 +79,9 @@ namespace Project333.Runtime.Presentation.Hand
 
         public void SetHighlight(BattleHighlightState highlightState)
         {
+            // RefreshHighlights clears availability, recalculates it, then overlays selection.
+            IsPlayable = highlightState == BattleHighlightState.Playable ||
+                         (highlightState == BattleHighlightState.Selected && IsPlayable);
             _highlightState = highlightState;
         }
 

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>disable</Nullable><NoWarn>$(NoWarn);0649;0067</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/Project333/Runtime/Application/Accounts/PendingRewardedAd.cs" Link="PendingRewardedAd.cs" />
+    <Compile Include="../../Assets/Project333/Runtime/Application/Accounts/RewardedAdRecovery.cs" Link="RewardedAdRecovery.cs" />
+    <Compile Include="../../Assets/Project333/Runtime/Application/Accounts/RewardedTicketClient.cs" Link="RewardedTicketClient.cs" />
+    <Compile Include="../../Assets/Project333/Runtime/Application/Accounts/AccountHttpTransport.cs" Link="AccountHttpTransport.cs" />
+    <Compile Include="../../Assets/Project333/Runtime/Application/Ads/IRewardedAdService.cs" Link="IRewardedAdService.cs" />
+  </ItemGroup>
+</Project>

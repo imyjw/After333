@@ -41,7 +41,7 @@
 - 객잔: `Building`, CardId `Inn`; 소유자의 턴 시작 자원 획득 단계에 골드 +1
 - 웨어울프: `Unit`, CardId `Werewolf`; 현재 같은 아군 필드의 다른 살아 있는 웨어울프마다 ATK +10을 실시간 계산하며, 효과를 받는 자신은 방전·망각·봉인 상태가 아니어야 한다. 셀 때는 방전·망각 웨어울프를 포함하고 봉인·사망 웨어울프를 제외한다.
 - 용사: `Unit`, CardId `Hero`; 소환 시 `GlobalTurnEnds(3)` 무적을 얻고, 매 전역 턴 종료마다 서버가 ATK +13 또는 HP +13 중 하나를 같은 확률로 영구 부여한다.
-- 관통: `hasPiercing: true`, `specialEffectText`에 `관통` 또는 `Piercing`; 전열 일반공격의 각 타격 후 같은 열 후열에 별도 피해
+- 관통: `hasPiercing: true`, `specialEffectText`에 `관통` 또는 `Piercing`; 일반공격의 각 타격 후 같은 열 반대 행에 별도 피해; 쉴더 이전 적용
 - 더블/트리플 어택: `hitsPerAttack: 2` 또는 `3`, `specialEffectText`에 `Double Attack` 또는 `Triple Attack`
 - 스크립트 마법: `definitionType: "ScriptedSpell"`, 지원 중인 `effectId`만 사용
 
@@ -52,6 +52,20 @@
 - 마스터, 건물, 방전(Drained), 망각(Erasure), Shielder, Endure와 어떻게 상호작용하는가
 - 서버 PvP에서도 같은 방식으로 처리할 수 있는가
 - 어떤 전투 이벤트와 연출이 필요한가
+
+## 1-1. 새 카드마다 강화 증가량을 사용자에게 요청
+
+2026-09-12 사용자 지시. 새 카드를 추가할 때마다 아래 정보를 먼저 요청한다.
+
+- 강화 가능 여부. 불가능하다고 지정하면 레벨별 증가치는 필요 없다.
+- 강화 가능하면 Lv.1~13 각각의 능력치·효과 증가량. **해당 레벨에서 추가되는 값**과 누적 결과를 구분한다.
+- 공격력·HP·방어력·마법 피해·기타 효과 중 무엇이 변하는지 명시하고, 지정되지 않은 새 증가 효과를 만들지 않는다.
+- 같은 증가량을 갖는 레벨은 묶어서 답해도 된다. 사용자가 해당 카드에 기존 성장 방식을 명시적으로 지정해도 되지만, 모든 레벨의 동작이 확정되어야 한다.
+- 카드 종류·희귀도·공격 가능 여부·유사 카드나 코드의 기본 분기를 근거로 강화 방식을 자동 지정하지 않는다.
+- 해당 카드의 규칙을 이미 전달받았다면 재확인하지 않는다. 미정인 부분만 질문하고, 답변 전에 강화 규칙을 임의로 구현하지 않는다.
+- 확정한 증가량은 카드 상세와 메타 규칙에 기록하고, 각 레벨 증가량·Lv.13 합계·실제 소환 또는 마법 적용값을 검증한다.
+
+현재 확정 예: 케르베로스는 Lv.1~12 HP +1, Lv.13 ATK +1(최종 10/78). 마나의 샘은 Lv.1~13 모두 HP +1(최종 0/33). 이 예를 다른 카드에 자동 적용하지 않는다.
 
 ## 2. cardId 정하기
 
@@ -81,6 +95,21 @@ cardId:
 덱 빌딩 등장: On / Off
 랜덤 보상 등장: On / Off
 강화 가능 여부: 가능 / 불가능
+강화 레벨별 추가 증가량 (강화 가능일 때 필수; 같은 규칙의 레벨은 묶어도 됨):
+  Lv.1:
+  Lv.2:
+  Lv.3:
+  Lv.4:
+  Lv.5:
+  Lv.6:
+  Lv.7:
+  Lv.8:
+  Lv.9:
+  Lv.10:
+  Lv.11:
+  Lv.12:
+  Lv.13:
+Lv.13 최종 능력치/효과 수치 (기본값 + 누적 증가량):
 
 비용:
 희귀도:
@@ -119,7 +148,7 @@ Shielder/Endure/LifeSteal/Drained/Erasure 상호작용:
 - `속성/Attribute`는 더 이상 사용하지 않는다.
 - `데미지 유형`은 `Physical`, `Magic`, `Fixed`, `None` 중 하나로 적는다.
 - 공격력이 있는 유닛/건물은 `None`을 사용할 수 없다.
-- 물리/마법 방어력은 `0` 이상의 정수다. 기본값은 `0/0`이며, 현재 골렘은 `1/0`을 사용한다.
+- 물리/마법 방어력은 `0` 이상의 정수다. 기본값은 `0/0`이며, 현재 골렘은 `1/0`, 마왕은 `3/3`을 사용한다.
 - `강화 가능 여부`는 `강화 가능` 또는 `강화 불가능`으로 적는다.
 - `개발 상태`는 `기획 중`, `효과 개발 중`, `기능 검증 중`, `출시 가능`처럼 현재 단계를 적는다.
 - `덱 빌딩 등장`과 `랜덤 보상 등장`은 각각 `On` 또는 `Off`로 적는다.
@@ -194,9 +223,9 @@ Assets/Project333/Resources/Project333/Data/cards.json
 
 은신(`Hiding`)은 구현되어 있다. 유닛 전용 `hasHiding: true`를 사용하고 `specialEffectText`에는 `은신` 또는 `Hiding`을 반드시 적는다. 은신 중에는 상대 일반공격과 상대 단일 대상 마법의 지정을 막고 전열차단과 Shielder에 참여하지 않는다. 합법적인 일반공격 선언 또는 Drained/Erasure 진입 시 영구 해제되며, 봉인 중에는 봉인이 우선되어 해제 후 은신 상태로 돌아온다. 건물과 마스터에는 사용할 수 없다.
 
-비행(`Flying`)은 구현되어 있다. 유닛 또는 건물에 `hasFlying: true`를 사용하고 `specialEffectText`에는 `비행` 또는 `Flying`을 반드시 적는다. 비행 또는 원거리 공격자만 활성 비행 소환물을 일반공격할 수 있고, 비행 근접 공격자는 전열차단을 무시하며, 활성 비행 소환물은 전열차단을 하지 않는다. Drained와 Erasure는 비행을 억제하고, 봉인과 은신이 활성화되어 있으면 해당 상태의 대상 지정 규칙이 먼저 적용된다. 마스터의 비행은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
+비행(`Flying`)은 구현되어 있다. 유닛 또는 건물에 `hasFlying: true`를 사용하고 `specialEffectText`에는 `비행` 또는 `Flying`을 반드시 적는다. 지상 근접 공격자도 활성 비행 소환물을 일반공격할 수 있다. 지상 근접의 일반공격·관통 피해는 대상의 방어력·상태 적용 후 절반으로 줄이고 소수점은 버린다. 반격·마법 피해는 이 감소를 적용하지 않는다. 비행 근접 공격자는 전열차단을 무시하며, 활성 비행 소환물은 전열차단을 하지 않는다. Drained와 Erasure는 비행을 억제하고, 봉인과 은신이 활성화되어 있으면 해당 상태의 대상 지정 규칙이 먼저 적용된다. 마스터의 비행은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
 
-관통(`Piercing`)은 구현되어 있다. 유닛 또는 공격 가능한 건물에 `hasPiercing: true`를 사용하고 `specialEffectText`에는 `관통` 또는 `Piercing`을 반드시 적는다. 실제 일반공격 대상이 전열이면 각 타격 후 같은 열 후열에 공격자의 동일한 타격 ATK와 데미지 유형으로 별도 피해를 준다. 후열 피해는 Shielder가 대신 받지 않고 반격도 발생하지 않지만, 후열 자신의 방어력·Drained·Invincible·Endure·Sealbound 판정은 정상 적용한다. 다단히트는 매 타격마다 발동하고 실제 후열 HP 감소량도 LifeSteal에 포함한다. HuanShu는 원래 클릭 대상이 아니라 서버가 확정한 실제 대상의 열을 사용한다. Erasure 중에는 관통이 무효화된다. 마스터의 관통은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
+관통(`Piercing`)은 구현되어 있다. 유닛 또는 공격 가능한 건물에 `hasPiercing: true`를 사용하고 `specialEffectText`에는 `관통` 또는 `Piercing`을 반드시 적는다. 실제 일반공격 대상이 전열이면 후열에, 후열이면 전열에 각 타격 후 같은 열 반대 행으로 공격자의 동일한 타격 ATK와 데미지 유형의 별도 피해를 준다. 관통은 Shielder가 대신 받을 수 있지만 추가 반격이나 재귀 관통은 발생하지 않는다. 일반공격·관통은 원래 보호 대상의 방어력·상태·비행 감소를 먼저 적용하고 Shielder의 방어력·상태를 적용한다. 초과분에는 원래 대상의 피해 감소를 중복 적용하지 않는다. 단일 대상 마법은 기존 Shielder 우선 처리 순서를 유지한다. Invincible·Endure·Sealbound 판정은 정상 적용한다. 다단히트는 매 타격마다 발동하고 반대 행 피해의 실제 HP 감소량(대신 받은 Shielder와 초과분 포함)도 LifeSteal에 포함한다. HuanShu는 원래 클릭 대상이 아니라 서버가 확정한 실제 대상의 열을 사용한다. Erasure 중에는 관통이 무효화된다. 마스터의 관통은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
 
 주문력(`SpellPower`)은 구현되어 있다. 유닛 또는 건물에 `spellPower: n`을 사용하며 `0` 또는 필드 생략은 주문력 없음이다. `specialEffectText`에는 `주문력` 또는 `SpellPower`를 반드시 적는다. 살아 있고 효과가 활성화된 아군 소환물의 주문력을 합산해 Spell 카드가 만드는 Magic 피해에 더한다. Physical/Fixed 피해, 일반공격, 유닛·건물 효과에는 적용하지 않는다. 광역은 대상마다, 다단히트는 타격마다 전체 보너스를 적용하고, 지속마법은 손패에서 사용한 순간의 주문력을 고정한다. Drained·Erasure·Sealbound 상태에서는 제공하지 않지만 Hiding·Flying은 주문력을 억제하지 않는다. 마스터 주문력은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
 
@@ -273,7 +302,7 @@ Assets/Project333/Resources/Project333/Data/cards.json
 - 강화 불가능 카드라면 `CardUpgradeRules.IsCardUpgradeable(...)`에서 false가 되도록 한다.
 - 강화 불가능 카드는 보상 카드 풀에 들어가면 안 된다.
 - 강화 가능 카드는 보유 카드 씬에서 다음 강화 비용과 초록 테두리 표시가 정상적으로 떠야 한다.
-- 유닛/건물은 레벨 보너스가 전투 스탯에 적용되는지 확인한다.
+- 사용자가 확정한 Lv.1~13 증가량이 CardLevelStatRules 및 필요한 효과 처리에 반영되고, 카드 표시와 실제 전투 적용값이 일치하는지 확인한다.
 - 마법 카드는 강화 가능 카드와 강화 불가능 카드의 정책을 카드별로 명확히 정한다.
 
 현재 카드별 강화 정책:
@@ -281,10 +310,11 @@ Assets/Project333/Resources/Project333/Data/cards.json
 | cardId | 카드 이름 | 종류 | 강화 가능 여부 | 기준 |
 | --- | --- | --- | --- | --- |
 | A-111 | A-111 | Unit | 강화 가능 | 유닛 |
-| A-301 | A-301 | Unit | 강화 가능 | 3·6·9·13레벨 ATK +1, 나머지 레벨 HP +1, 이미지 준비 전 드래프트·보상 제외 |
-| BiochemicalBomb | 생화학폭탄 | ScriptedSpell | 강화 가능 | 카드 레벨당 4회 지속 물리 피해 +1, 이미지 준비 전 드래프트·보상 제외 |
-| BlueDragon | 블루 드래곤 | Unit | 강화 가능 | 유닛 |
-| Cerberus | 케르베로스 | Unit | 강화 가능 | 유닛 |
+| A-212 | A-212 | Unit | 강화 가능 | Lv.1~12 HP +1, Lv.13 ATK +1; Lv.13 ATK/HP 7/34; 드래프트·보상 On |
+| A-301 | A-301 | Unit | 강화 가능 | 3·6·9·13레벨 ATK +1, 나머지 레벨 HP +1, 드래프트·보상 On |
+| BiochemicalBomb | 생화학폭탄 | ScriptedSpell | 강화 가능 | 카드 레벨당 4회 지속 고정 피해 +1 (기본 25), 방어력·주문력 미적용, 드래프트·보상 On |
+| BlueDragon | 블루 드래곤 | Unit | 강화 가능 | 기본 ATK/HP 40/50, 표준 강화 (Lv.13: 44/59) |
+| Cerberus | 케르베로스 | Unit | 강화 가능 | Lv.1~12 HP +1, Lv.13 ATK +1; Lv.13 ATK/HP 10/78 |
 | ElfLongbowScout | 엘프 장궁수 | Unit | 강화 가능 | 유닛 |
 | firebolt | 파이어볼 | DamageSpell | 강화 가능 | 강화 가능한 마법으로 예외 허용 |
 | Firewall | 파이어월 | ScriptedSpell | 강화 가능 | 카드 레벨당 지속 피해 +1 |
@@ -293,26 +323,34 @@ Assets/Project333/Resources/Project333/Data/cards.json
 | Golem | 골렘 | Unit | 강화 가능 | 유닛 |
 | Gwangma | 광마 | Unit | 강화 가능 | 유닛 |
 | Inn | 객잔 | Building | 강화 가능 | 매 레벨 HP +1, 이미지 준비 전 드래프트·보상 제외 |
-| ManaPond | 마나의 샘 | Building | 강화 가능 | 건물 |
+| ManaPond | 마나의 샘 | Building | 강화 가능 | Lv.1~13 HP +1, ATK 증가 없음; Lv.13 ATK/HP 0/33 |
 | ManaWeaver | 마나 위버 | Unit | 강화 가능 | 유닛 |
-| RedDragon | 레드 드래곤 | Unit | 강화 가능 | 유닛 |
+| RedDragon | 레드 드래곤 | Unit | 강화 가능 | 기본 ATK/HP 40/40, 표준 강화 (Lv.13: 44/49) |
 | Shaolin_1st_Disciple | 소림 1대 제자 | Unit | 강화 가능 | 유닛 |
 | Shieldbearer | 방패병 | Unit | 강화 가능 | 유닛 |
 | Vampire | 뱀파이어 | Unit | 강화 가능 | 유닛 |
 | CheonraJimang | 천라지망 | ScriptedSpell | 강화 불가능 | 강화 불가능 마법 |
 | Daehwandan | 대환단 | ScriptedSpell | 강화 불가능 | 강화 불가능 마법 |
-| TenThousandYearSnowGinseng | 영약: 만년설삼 | PersistentResourceSpell | 강화 불가능 | 다음 3번의 내 턴 시작마다 기 +3, 이미지 준비 전 드래프트 제외·랜덤 보상 제외 |
-| Gu | 고독 | ScriptedSpell | 강화 불가능 | 소유권 이전 마법, 이미지 준비 전 드래프트·보상 제외 |
-| HuanShu | 환술 | ScriptedSpell | 강화 불가능 | 영구적으로 일반 공격 대상 무작위 변경, 이미지 준비 전 드래프트·보상 제외 |
-| ManaStone | 마정석 | ScriptedSpell | 강화 불가능 | 즉시 자원 획득 마법, 이미지 준비 전 드래프트·보상 제외 |
-| ManaStoneBundle | 마정석 꾸러미 | ScriptedSpell | 강화 불가능 | 즉시 자원 획득 마법, 이미지 준비 전 드래프트·보상 제외 |
-| MerchantCaravan | 상단 | Building | 강화 가능 | 매 레벨 HP +1, 이미지 준비 전 드래프트·보상 제외 |
+| TenThousandYearSnowGinseng | 영약: 만년설삼 | PersistentResourceSpell | 강화 불가능 | 다음 3번의 내 턴 시작마다 기 +3, 드래프트 On·보상 Off |
+| Gu | 고독 | ScriptedSpell | 강화 불가능 | 소유권 이전 마법, 드래프트 On·보상 Off |
+| HuanShu | 환술 | ScriptedSpell | 강화 불가능 | 영구적으로 일반 공격 대상 무작위 변경, 드래프트 On·보상 Off |
+| ManaStone | 마정석 | ScriptedSpell | 강화 불가능 | 즉시 자원 획득 마법, 드래프트 On·보상 Off |
+| ManaStoneBundle | 마정석 꾸러미 | ScriptedSpell | 강화 불가능 | 즉시 자원 획득 마법, 드래프트 On·보상 Off |
+| MerchantCaravan | 상단 | Building | 강화 가능 | 매 레벨 HP +1, 드래프트·보상 On |
 | Microreactor | 초소형 발전기 | PersistentResourceSpell | 강화 불가능 | 강화 불가능 마법 |
-| PowerBank | 보조배터리 | ScriptedSpell | 강화 불가능 | 즉시 자원 획득 마법, 이미지 준비 전 드래프트·보상 제외 |
-| PowerPlant | 발전소 | Building | 강화 가능 | 매 레벨 HP +1, 이미지 준비 전 드래프트·보상 제외 |
-| NuclearPowerPlant | 원자력 발전소 | Building | 강화 가능 | 매 레벨 HP +1, 파괴 시 양쪽 전장 물리 피해 30, 이미지 준비 전 드래프트·보상 제외 |
+| PowerBank | 보조배터리 | ScriptedSpell | 강화 불가능 | 즉시 자원 획득 마법, 드래프트 On·보상 Off |
+| PowerPlant | 발전소 | Building | 강화 가능 | 매 레벨 HP +1, 드래프트·보상 On |
+| NuclearPowerPlant | 원자력 발전소 | Building | 강화 가능 | 매 레벨 HP +1, 파괴 시 양쪽 전장 물리 피해 30, 드래프트·보상 On |
 | RobotFusion | 로봇 합체 | ScriptedSpell | 강화 불가능 | 이미지 준비 전 드래프트·보상 제외 |
 | RobotFactory | 로봇 공장 | Building | 강화 가능 | 매 레벨 HP +1, 이미지 준비 전 드래프트·보상 제외 |
+| GaebangBranch | 개방 분타 | Building | 강화 가능 | 매 레벨 HP +1, 드래프트·보상 On |
+| Skeleton | 스켈레톤 | Unit | 강화 가능 | 표준 강화, 드래프트·보상 On |
+| Zombie | 좀비 | Unit | 강화 가능 | 표준 강화, 드래프트·보상 On |
+| OrcWarrior | 오크 전사 | Unit | 강화 가능 | 표준 강화, 드래프트·보상 On |
+| Werewolf | 웨어울프 | Unit | 강화 가능 | 표준 강화, 드래프트·보상 On |
+| DemonKing | 마왕 | Unit | 강화 가능 | Lv.3/6/9 ATK +1, Lv.13 ATK +3, 나머지 HP +1, 드래프트·보상 Off |
+| Hero | 용사 | Unit | 강화 가능 | Lv.3/6/9 ATK +1, Lv.13 ATK +3, 나머지 HP +1, 드래프트·보상 Off |
+| TimedBomb | 시한폭탄 | ScriptedSpell | 강화 가능 | 비용 전력 3, 매 레벨 물리 피해 +1 (기본 33), 드래프트·보상 On |
 
 정책 테스트:
 
@@ -358,6 +396,55 @@ Assets/Project333/Resources/Project333/CardArtwork/firebolt.png
 - 파일명은 가능하면 `cards.json`의 `id`와 정확히 같게 둔다.
 - Unity Import Settings에서 `Texture Type = Sprite (2D and UI)`로 설정한다.
 - 픽셀 아트는 `Filter Mode = Point`, `Compression = None` 또는 낮은 압축을 권장한다.
+
+### 7.1. 카드별 표시 크기와 비율 통일
+
+현재 카드 앞면 원본은 `1086 x 1448`의 3:4 비율이다. `Default` 텍스처의
+`Non Power of 2 = To nearest` 설정은 이를 `1024 x 1024`처럼 정사각형으로
+변형할 수 있다. 덱 빌딩과 손패는 이미지 비율을 유지해서 표시하므로, 이렇게
+불러온 카드만 세로가 짧아지고 같은 카드 칸에서 작게 보인다.
+
+`Project333CardArtworkImporter`가 위 `CardArtwork` 폴더의 카드 앞면 PNG에
+다음 설정을 자동 적용한다. 카드 뒷면과 유닛 애니메이션 시트는 대상이 아니다.
+
+- `Texture Type = Sprite (2D and UI)`
+- `Sprite Mode = Single`
+- `Mesh Type = Full Rect`: 프레임과 ATK/HP 표시 영역을 포함한 사각형 전체 사용
+- `Non Power of 2 = None`: 원본 가로/세로 비율 유지
+- `Generate Mip Maps = Off`, `Alpha Is Transparency = On`
+
+기존 이미지들을 일괄 복구하려면 플레이 모드를 종료하고
+`Tools > Project333 > Cards > Normalize Card Artwork Imports`를 실행한다.
+이미지 원본, GUID, 필터 모드, 압축, 최대 해상도, 플랫폼별 설정은 변경하지 않는다.
+UI 크기와 스탯 텍스트의 글꼴/위치도 덮어쓰지 않는다. 원본 자체에 큰 여백이 있다면
+별도로 이미지 여백을 조정해야 하며, 이 도구가 이미지를 자르지는 않는다.
+
+`CardArtworkAspectTests`는 카드별 원본/스프라이트 비율과 여러 크기의 손패·선택
+카드 영역에서 동일한 표시 크기를 검사한다. Android 설치본에는 다시 빌드해야 반영된다.
+
+### 7.2. 카드 이미지의 ATK/HP 및 피해량 위치
+
+모든 카드 수치는 실제 이미지가 그려지는 사각형을 기준으로 배치한다.
+공통 기본 위치는 이미지 왼쪽 아래를 (0,0), 오른쪽 위를 (1,1)로 보았을 때
+공격력/마법 피해량 (0.09, 0.055), HP (0.92, 0.055)이다.
+마법 피해량은 공격력과 같은 건틀릿/지팡이 위치를 사용하며, 피해 마법에는 HP를 표시하지 않는다.
+
+공통 계산은 `HandCardStatOverlayLayout`에 있다. Unity Image의 피벗과
+실제 종횡비 유지 영역을 따르고, 이미지의 좌표를 텍스트 부모의 좌표로 변환한다.
+작은 기존 StatOverlay 영역에 좌표를 강제로 가두지 않는다.
+카드 확대·회전·해상도 변경에도 문양을 따라가며, 글꼴은 이 계산에서 변경하지 않는다.
+
+화면별 Inspector 조정 위치:
+
+- 손패: `HandCardTextView > Runtime Stat Attack/Hp Normalized Position`
+- 멀리건: `BattleMulliganOverlayPresenter > Attack/Hp Stat Normalized Position`
+- 덱 빌딩: `DraftOverlayPresenter > Option Attack/Hp Stat Normalized Position`
+- 보유 카드: `OwnedCardsSceneController > Detail Attack/Hp Stat Normalized Position`
+- 소환물 미리보기: `TileTextView > Card Preview Attack/Hp Normalized Position`
+- 상대 카드 공개: `BattleBootstrapper > Opponent Played Card Attack/Hp Stat Normalized Position`
+
+저장된 씬의 Inspector 값은 코드의 기본값보다 우선한다. 기본값만 고쳐도 기존 씬이
+자동으로 바뀌는 것은 아니므로, 의도적으로 미세 조정한 값은 해당 씬에서 관리한다.
 
 ## 8. 보드 위 유닛/건물 비주얼 추가
 

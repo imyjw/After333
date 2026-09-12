@@ -1,5 +1,6 @@
 using System.Reflection;
 using NUnit.Framework;
+using Project333.Runtime.Presentation;
 using Project333.Runtime.Presentation.Draft;
 using UnityEngine;
 using UnityEngine.UI;
@@ -62,8 +63,13 @@ namespace Project333.Tests.EditMode
 
             Assert.That(label.fontSize, Is.EqualTo(31));
             Assert.That(label.color, Is.EqualTo(Color.cyan));
-            Assert.That(label.text, Does.StartWith("Tickets:"));
-            Assert.That(label.text, Does.Contain("Gold:"));
+            Assert.That(label.text, Is.Empty);
+            var wallet = label.GetComponent<AccountWalletView>();
+            Assert.That(wallet, Is.Not.Null);
+            Assert.That(wallet.TicketValue.text, Is.Not.Empty);
+            Assert.That(wallet.GoldValue.text, Is.Not.Empty);
+            Assert.That(wallet.TicketValue.fontSize, Is.EqualTo(31));
+            Assert.That(wallet.TicketValue.color, Is.EqualTo(Color.cyan));
         }
 
         [Test]

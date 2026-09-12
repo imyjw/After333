@@ -285,14 +285,7 @@ namespace Project333.Runtime.Application.Accounts
 
         private static async Task SendAsync(UnityWebRequest webRequest, CancellationToken cancellationToken)
         {
-            var operation = webRequest.SendWebRequest();
-            while (!operation.isDone)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                await Task.Yield();
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
+            await AccountHttpTransport.SendAsync(webRequest, cancellationToken);
 
             if (webRequest.result != UnityWebRequest.Result.Success)
             {

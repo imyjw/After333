@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3009c6625a5e04942abb529a14d6fb06, type: 3}
+  m_Name: TimedBomb
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.ScriptedSpellCardDefinitionAsset
+  _cardId: TimedBomb
+  _displayName: "\uC2DC\uD55C\uD3ED\uD0C4"
+  _rarity: 0
+  _cost:
+    _mana: 0
+    _qi: 0
+    _power: 3
+    _gold: 0
+  _affiliation: 2
+  _chargeTileFootprint: 0
+  _effectText: "\uB2E4\uC74C \uC138 \uBC88\uC9F8 \uD134 \uC2DC\uC791 \uC2DC \uC0C1\uB300\uBC29
+    \uD0C0\uC77C \uC804\uCCB4\uC5D0 \uBB3C\uB9AC \uB370\uBBF8\uC9C0"
+  _specialEffectText: 
+  _hasReplicate: 0
+  _boardSprite: {fileID: 0}
+  _boardAnimatorController: {fileID: 0}
+  _effectId: timed_bomb
+  _damage: 33
+  _damageType: 1
+  _triggerCount: 3

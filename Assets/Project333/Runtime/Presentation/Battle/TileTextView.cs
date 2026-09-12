@@ -5,6 +5,7 @@ using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Cards;
 using Project333.Runtime.Infrastructure.Data;
 using Project333.Runtime.Presentation.Cards;
+using Project333.Runtime.Presentation.Hand;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -41,6 +42,9 @@ namespace Project333.Runtime.Presentation.Battle
         private static RectTransform s_previewOverlayRoot;
         private static Image s_previewBackdropImage;
         private static Image s_previewCardImage;
+        private static TMP_Text s_previewAttackText;
+        private static TMP_Text s_previewHpText;
+        private static TileTextView s_previewOwner;
         private static RectTransform s_previewTooltipRoot;
         private static readonly List<PreviewTooltipPanel> PreviewTooltipPanels =
             new List<PreviewTooltipPanel>();
@@ -132,6 +136,13 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private Vector2 _cardPreviewSize = new Vector2(440f, 620f);
         [SerializeField] private Color _cardPreviewBackdropColor = new Color(0f, 0f, 0f, 0.74f);
         [SerializeField] private int _cardPreviewSortingOrder = 5000;
+        [Header("Card Preview Stats")]
+        [SerializeField] private TMP_FontAsset _cardPreviewStatFont;
+        [SerializeField] private Vector2 _cardPreviewAttackNormalizedPosition = HandCardStatOverlayLayout.DefaultAttackPosition;
+        [SerializeField] private Vector2 _cardPreviewHpNormalizedPosition = HandCardStatOverlayLayout.DefaultHpPosition;
+        [SerializeField] private Vector2 _cardPreviewStatTextSize = new Vector2(96f, 72f);
+        [SerializeField] private int _cardPreviewStatFontSize = 44;
+        [SerializeField] private Color _cardPreviewStatTextColor = Color.white;
         [Header("Card Preview Special Effect Tooltips")]
         [SerializeField] private TMP_FontAsset _cardPreviewTooltipFont;
         [SerializeField] private Vector2 _cardPreviewTooltipSize = new Vector2(340f, 116f);
@@ -191,6 +202,9 @@ namespace Project333.Runtime.Presentation.Battle
         private TileLongPressRelay _longPressRelay;
         private RectTransform _interactionSurfaceRoot;
         private Image _interactionSurfaceImage;
+        private string _previewOccupantRuntimeId;
+        private int _previewTooltipCount;
+        private Vector2 _previewLayoutSize;
 
         public float LongPressPreviewHoldSeconds => Mathf.Max(0.05f, _longPressPreviewHoldSeconds);
 
@@ -234,6 +248,7 @@ namespace Project333.Runtime.Presentation.Battle
             AdvanceSampledAnimation();
             SyncAnimatedVisualSprite();
             ApplyPulse();
+            RefreshCurrentCardPreview();
         }
 
         private void OnDestroy()
@@ -519,14 +534,36 @@ namespace Project333.Runtime.Presentation.Battle
 
             s_previewCardImage.sprite = previewSprite;
             s_previewCardImage.enabled = true;
+            s_previewOwner = this;
+            _previewOccupantRuntimeId = _tileView.CurrentOccupantRuntimeId;
             ShowCurrentSpecialEffectTooltips();
             s_previewOverlayRoot.SetAsLastSibling();
             s_previewOverlayRoot.gameObject.SetActive(true);
+            RefreshPreviewStats();
             return true;
         }
 
         public void HideCurrentCardPreview()
         {
+            // Each tile shares one overlay. Releasing another tile must not close it.
+            if (s_previewOwner != null && s_previewOwner != this)
+            {
+                return;
+            }
+
+            s_previewOwner = null;
+            if (s_previewAttackText != null)
+            {
+                s_previewAttackText.text = string.Empty;
+                s_previewAttackText.gameObject.SetActive(false);
+            }
+
+            if (s_previewHpText != null)
+            {
+                s_previewHpText.text = string.Empty;
+                s_previewHpText.gameObject.SetActive(false);
+            }
+
             if (s_previewCardImage != null)
             {
                 s_previewCardImage.sprite = null;
@@ -1349,6 +1386,8 @@ namespace Project333.Runtime.Presentation.Battle
             {
                 s_previewBackdropImage = null;
                 s_previewCardImage = null;
+                s_previewAttackText = null;
+                s_previewHpText = null;
                 s_previewTooltipRoot = null;
                 PreviewTooltipPanels.Clear();
             }
@@ -1362,6 +1401,7 @@ namespace Project333.Runtime.Presentation.Battle
                 s_previewCardImage != null &&
                 s_previewTooltipRoot != null)
             {
+                EnsurePreviewStatTexts();
                 ApplyPreviewOverlayLayout(0);
                 return;
             }
@@ -1463,8 +1503,116 @@ namespace Project333.Runtime.Presentation.Battle
             s_previewTooltipRoot.localScale = Vector3.one;
             s_previewTooltipRoot.SetAsLastSibling();
 
+            EnsurePreviewStatTexts();
             ApplyPreviewOverlayLayout(0);
             s_previewOverlayRoot.gameObject.SetActive(false);
+        }
+
+        [ContextMenu("Ensure Editable Card Preview")]
+        public void EnsureEditableCardPreview()
+        {
+            AutoAssignView();
+            EnsurePreviewOverlay();
+        }
+
+        private void EnsurePreviewStatTexts()
+        {
+            if (s_previewCardImage == null)
+            {
+                return;
+            }
+
+            s_previewAttackText = FindOrCreatePreviewStatText("AttackValueText");
+            s_previewHpText = FindOrCreatePreviewStatText("HpValueText");
+        }
+
+        private TMP_Text FindOrCreatePreviewStatText(string objectName)
+        {
+            var existing = s_previewCardImage.transform.Find(objectName)?.GetComponent<TMP_Text>();
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            var textObject = new GameObject(objectName, typeof(RectTransform), typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(s_previewCardImage.transform, false);
+            var text = textObject.GetComponent<TextMeshProUGUI>();
+            text.alignment = TextAlignmentOptions.Center;
+            text.fontStyle = FontStyles.Bold;
+            text.enableAutoSizing = false;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.overflowMode = TextOverflowModes.Overflow;
+            text.raycastTarget = false;
+            return text;
+        }
+
+        private void RefreshCurrentCardPreview()
+        {
+            if (s_previewOwner != this || s_previewOverlayRoot == null ||
+                !s_previewOverlayRoot.gameObject.activeSelf)
+            {
+                return;
+            }
+
+            if (_tileView == null || _tileView.CurrentOccupant == null ||
+                _tileView.CurrentOccupantRuntimeId != _previewOccupantRuntimeId)
+            {
+                HideCurrentCardPreview();
+                return;
+            }
+
+            if (_previewLayoutSize != s_previewOverlayRoot.rect.size)
+            {
+                ApplyPreviewOverlayLayout(_previewTooltipCount);
+            }
+
+            RefreshPreviewStats();
+        }
+
+        private void RefreshPreviewStats()
+        {
+            if (s_previewCardImage == null || s_previewCardImage.sprite == null ||
+                s_previewAttackText == null || s_previewHpText == null)
+            {
+                return;
+            }
+
+            var occupant = _tileView == null ? null : _tileView.CurrentOccupant;
+            s_previewAttackText.gameObject.SetActive(occupant != null);
+            s_previewHpText.gameObject.SetActive(occupant != null);
+            if (occupant == null)
+            {
+                return;
+            }
+
+            s_previewAttackText.text = Mathf.Max(0, occupant.Attack).ToString();
+            s_previewHpText.text = Mathf.Max(0, occupant.CurrentHp).ToString();
+            var renderedRect = HandCardStatOverlayLayout.CalculateRenderedSpriteRect(s_previewCardImage);
+            ApplyPreviewStatLayout(s_previewAttackText, renderedRect, _cardPreviewAttackNormalizedPosition);
+            ApplyPreviewStatLayout(s_previewHpText, renderedRect, _cardPreviewHpNormalizedPosition);
+        }
+
+        private void ApplyPreviewStatLayout(TMP_Text text, Rect renderedRect, Vector2 normalizedPosition)
+        {
+            var rect = text.rectTransform;
+            HandCardStatOverlayLayout.PositionStatText(rect, s_previewCardImage.rectTransform,
+                renderedRect, normalizedPosition);
+            var referenceHeight = Mathf.Max(1f, _cardPreviewSize.y);
+            rect.sizeDelta = _cardPreviewStatTextSize * (renderedRect.height / referenceHeight);
+            rect.localScale = Vector3.one;
+            text.fontSize = HandCardStatOverlayLayout.CalculateScaledFontSize(
+                _cardPreviewStatFontSize, renderedRect.height, referenceHeight);
+            text.color = _cardPreviewStatTextColor;
+            var font = _cardPreviewStatFont != null ? _cardPreviewStatFont : _occupantStatFontOverride;
+            if (font == null && _text != null)
+            {
+                font = _text.font;
+            }
+
+            if (font != null && text.font != font)
+            {
+                text.font = font;
+            }
         }
 
         private void ShowCurrentSpecialEffectTooltips()
@@ -1616,6 +1764,8 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             Canvas.ForceUpdateCanvases();
+            _previewTooltipCount = tooltipCount;
+            _previewLayoutSize = s_previewOverlayRoot.rect.size;
             var overlaySize = s_previewOverlayRoot.rect.size;
             if (overlaySize.x <= 1f || overlaySize.y <= 1f)
             {

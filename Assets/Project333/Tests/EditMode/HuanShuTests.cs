@@ -179,7 +179,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Attack_HuanShuCandidatePoolKeepsFriendlyHidingButExcludesProtectedEnemies()
+        public void Attack_HuanShuCandidatePoolIncludesFlyingAndFriendlyHidingButNotEnemyHiding()
         {
             var battleState = CreateBattleState();
             var attackerCoord = new TileCoord(0, 0);
@@ -211,7 +211,7 @@ namespace Project333.Tests.EditMode
                 return 2;
             }).Attack(battleState, PlayerId.Player, attackerCoord, declaredTargetCoord);
 
-            Assert.That(candidateCount, Is.EqualTo(4));
+            Assert.That(candidateCount, Is.EqualTo(5));
         }
 
         [Test]

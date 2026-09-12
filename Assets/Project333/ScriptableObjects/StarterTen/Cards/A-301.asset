@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d156977586279774da74f0d5231a78e4, type: 3}
+  m_Name: A-301
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.UnitCardDefinitionAsset
+  _cardId: A-301
+  _displayName: A-301
+  _rarity: 0
+  _cost:
+    _mana: 0
+    _qi: 0
+    _power: 2
+    _gold: 0
+  _affiliation: 2
+  _chargeTileFootprint: 1
+  _effectText: 
+  _specialEffectText: "\uBE44\uD589\n\uB85C\uBD07\n\uC804\uB825 -1\n\uBCF5\uC81C"
+  _hasReplicate: 1
+  _boardSprite: {fileID: 439316658, guid: d844383a5b27c4f428917c17331128b1, type: 3}
+  _boardAnimatorController: {fileID: 9100000, guid: 46d9d6ef07bae8047b36b48d3ac244b6, type: 2}
+  _attackType: 1
+  _damageType: 1
+  _attack: 33
+  _health: 3
+  _physicalDefense: 0
+  _magicDefense: 0
+  _hitsPerAttack: 1
+  _hasBerserker: 0
+  _hasEndure: 0
+  _hasShielder: 0
+  _hasLifeSteal: 0
+  _hasRobot: 1
+  _canMove: 1
+  _sealboundOwnerTurnStarts: 0
+  _hasHiding: 0
+  _hasFlying: 1
+  _hasPiercing: 0
+  _spellPower: 0
+  _invincibleDuration: 0
+  _invincibleOwnerTurns: 0
+  _isScience: 1
+  _sciencePowerUpkeep: 1
+  _turnStartResourceGain:
+    _mana: 0
+    _qi: 0
+    _power: 0
+    _gold: 0
+  _maxAttacksPerTurn: 1
+  _canAttackOnSummon: 0

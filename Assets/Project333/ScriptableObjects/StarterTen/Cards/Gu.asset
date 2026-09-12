@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3009c6625a5e04942abb529a14d6fb06, type: 3}
+  m_Name: Gu
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.ScriptedSpellCardDefinitionAsset
+  _cardId: Gu
+  _displayName: "\uACE0\uB3C5"
+  _rarity: 3
+  _cost:
+    _mana: 0
+    _qi: 10
+    _power: 0
+    _gold: 0
+  _affiliation: 0
+  _chargeTileFootprint: 0
+  _effectText: "\uC0C1\uB300 \uC720\uB2DB \uD558\uB098\uB97C \uC120\uD0DD\uD55C\uB2E4.
+    \uADF8 \uC720\uB2DB\uC758 \uC81C\uC5B4\uAD8C\uC744 \uC5BB\uB294\uB2E4."
+  _specialEffectText: 
+  _hasReplicate: 0
+  _boardSprite: {fileID: 0}
+  _boardAnimatorController: {fileID: 0}
+  _effectId: gu
+  _damage: 0
+  _damageType: 0
+  _triggerCount: 0

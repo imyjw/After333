@@ -10,8 +10,8 @@ The Unity client never grants the ticket directly. PostgreSQL wallet data change
 
 - Placement: `start_ticket_reward`
 - Reward: `1` ticket
-- Daily limit: `3` rewarded tickets per account, reset at `00:00 UTC`
-- Reward cooldown: `60` seconds per account
+- Daily limit: `10` rewarded tickets per account, reset at `00:00 UTC`
+- Reward cooldown: `30` seconds per account
 - Authenticated registered accounts are eligible.
 - Closing or skipping an ad does not grant a ticket.
 - A LevelPlay event ID can grant a reward only once.
@@ -75,8 +75,8 @@ Optional defaults:
 
 - `PROJECT333_LEVELPLAY_REWARDED_PLACEMENT=start_ticket_reward`
 - `PROJECT333_REWARDED_AD_REWARD_TICKETS=1`
-- `PROJECT333_REWARDED_AD_DAILY_LIMIT=3`
-- `PROJECT333_REWARDED_AD_COOLDOWN_SECONDS=60`
+- `PROJECT333_REWARDED_AD_DAILY_LIMIT=10`
+- `PROJECT333_REWARDED_AD_COOLDOWN_SECONDS=30`
 - `PROJECT333_REWARDED_AD_ATTEMPT_TTL_MINUTES=30`
 
 Local launcher example:
@@ -161,3 +161,13 @@ The After333 client retries failed rewarded-ad loads with backoff delays of `5`,
 - Store privacy disclosures and Google Play Data safety answers
 - Final daily limit, cooldown, and economy balancing
 - Monitoring for callback latency, rejection rate, and suspicious completion patterns
+
+## Automatic verification recovery (2026-09-12)
+
+The client saves the server attempt ID per account/server before entering the ad SDK. A persistent recovery worker queries that same attempt automatically; a 30-second polling window, network failure or scene exit no longer discards it. App relaunch resumes verification after login. Each HTTP request uses the common 20-second deadline; subsequent verification is retried approximately every five seconds while online. SDK completion never grants currency.
+
+Only server `granted` with a wallet updates the displayed balance. Server `expired`/`rejected` releases the pending record without a reward. Unknown, malformed or failed responses retain it. Account/session/endpoint changes and mismatched attempt IDs prevent stale response application.
+
+A completion-marked attempt blocks another viewing while unresolved. An ad closed without a completion signal retains its ID but can be retried explicitly after checking server status; a terminal server result is resolved instead of replaying it. A late completion signal blocks replay. A process exit before the SDK reports either completion or close remains ambiguous and waits for server grant/rejection/expiry. No local timer pretends to cancel a server attempt.
+
+Verification is automatic, with no previous-result button or reconnect instruction. This source change has passed 11 isolated client recovery groups and Unity runtime compilation; actual provider callbacks and physical-device checks of the new client remain separate. [Implementation and evidence](C:/Project_333/TempBuild/RewardedAdRecovery_20260912/README.md)

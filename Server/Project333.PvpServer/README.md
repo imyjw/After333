@@ -165,6 +165,33 @@ The server applies fixed-window limits by client IP to public mutation and conne
 
 HTTP `429` responses use error code `rate_limited` and include a `Retry-After` header. Health and status endpoints are not limited. Caddy's local forwarded client address is processed before rate limiting. Production launcher scripts explicitly enable these defaults, and `/server/status` exposes the active `RateLimits` block.
 
+Battle WebSocket input has a **65,536-byte limit per complete client text message**, accumulated across all continuation frames. The reader checks the limit before appending to its message buffer. Oversized input closes with `1009`, binary input with `1003`, and invalid UTF-8 with `1007` (the WebSocket implementation may also reject invalid wire encoding). Valid UTF-8 characters split across frames are supported. Normal JSON validation remains in the command handler. Outbound server StateViews are not subject to this input limit.
+
+Protocol rejection uses the connection's serialized close path and the existing disconnect/reconnect grace cleanup. The later connection guards below add command rate limits, an authentication deadline and an account connection cap; their deployment status is recorded separately. Source verification for this change: `TempBuild/ServerInputLimits_20260909/README.md`. Deployed at 20:15 KST on 2026-09-09; public HTTP/WSS, protocol rejection and DB aggregate preservation checks are recorded in `TempBuild/ServerInputLimitsDeploy_20260909/README.md`.
+
+Matchmaking now requires migration `0013_pvp_match_reservations` (deployed and verified on 2026-09-09). Match selection and reservation of `PlayerA`/`PlayerB` commit together. A server-generated reservation binds the account, connection, run and deck, and counts toward capacity before the socket joins the in-memory session. Its 60-second internal join lease is distinct from the battle reconnect grace. Successful player/connection persistence consumes it in the same transaction; failed handlers release only their own reservation. Abandoned leases expire lazily when another matchmaking request runs. Waiting disconnects release their seat; an in-progress join holds a session lease to prevent deletion of the shared room.
+
+Short PostgreSQL advisory transaction locking serializes matchmaking capacity changes in the current single-region deployment. It covers DB work only, not socket I/O or battle simulation. A battle waits until all its registered connections have completed DB joining. This does not add multiple-server battle ownership, ranked matchmaking, or a queue throughput guarantee. See `TempBuild/ServerMatchReservations_20260909/README.md` for the reproduction and 44-group isolated regression run.
+
+
+Battle connection guards (deployed and verified on 2026-09-09; see `TempBuild/ServerConnectionGuardsDeploy_20260909/README.md`) add the following server-only defaults:
+
+| Environment variable | Default | Meaning |
+| --- | ---: | --- |
+| `PROJECT333_BATTLE_AUTH_TIMEOUT_SECONDS` | 30 | Time from WebSocket acceptance to successful server account authentication |
+| `PROJECT333_BATTLE_ACCOUNT_CONNECTION_LIMIT` | 2 | Authenticated sockets per account in this server process, including sockets without a battle seat |
+| `PROJECT333_BATTLE_MESSAGE_BURST` | 30 | Maximum accumulated message permits per socket |
+| `PROJECT333_BATTLE_MESSAGES_PER_SECOND` | 10 | Message permits replenished per second |
+| `PROJECT333_BATTLE_JOIN_BURST` | 4 | Maximum accumulated JoinMatch permits per socket |
+| `PROJECT333_BATTLE_JOIN_REFILL_SECONDS` | 5 | Seconds to replenish one JoinMatch permit |
+
+Every complete text message consumes a permit before JSON parsing/logging, including KeepAlive, malformed JSON and rejected commands. JoinMatch also consumes a separate permit before token lookup or matchmaking. Budgets use monotonic elapsed time and do not queue commands. Exceeding a budget closes with `1008` and reason `message_rate_limited` or `join_rate_limited`.
+
+KeepAlive, invalid authentication and partial frames do not extend the authentication deadline. Late authentication responses cannot acquire account capacity. Only a server-verified account ID can acquire a connection slot; repeated authentication of the same identity reuses the slot and switching identity is rejected even before joining a battle. A third socket closes with `1008` / `account_connection_limit`. The default two sockets leave room for an existing connection and its reconnect replacement; existing one-battle/seat ownership checks still apply. Slots are released before DB disconnect cleanup, and empty account registry entries are removed.
+
+Authentication expiry closes with `1008` / `authentication_timeout`. Policy close uses the serialized send gate and waits at most one second for the peer close (within the existing send deadline). A receive-loop rejection discards at most 32 reads of 2 KiB without processing commands. The authentication timer waits for the existing reader's close notification and never starts a concurrent receive. Completed close handshakes are not aborted again. Transport failure can still prevent a peer from receiving any close frame. Started battles keep the existing 60-second reconnect grace.
+
+These guards are independent of the HTTP limiter's enable flag. Invalid explicit settings fail startup; the account cap cannot be configured below two. Budgets are per socket, account capacity is per server process, and this is not a distributed rate limiter. No DB migration or Unity client change is required. Verification: `TempBuild/ServerConnectionGuards_20260909/README.md`.
 Override the defaults only when a load test demonstrates a legitimate need:
 
 ```text
@@ -417,3 +444,11 @@ $env:PROJECT333_RUN_REWARD_PACK_REWARDS='starter_pack:1'
 - Broadcasts a simple `BattleEvents` ACK response to every connection in the same match after accepted commands.
 
 The prototype card pool includes basic unit cards plus `firebolt`, `starter_power_contract`, `CheonraJimang`, and `Daehwandan` so spell commands can be smoke-tested through the same server-authored `StateView` loop.
+
+## Atomic draft run start
+
+Migration `0014_single_active_draft_run` and the corresponding start fix were deployed and verified on 2026-09-09 at 22:09 KST. See `TempBuild/ServerRunStartAtomicityDeploy_20260909/README.md`. `StartDraftRunAsync` uses an explicit READ COMMITTED transaction and locks the account wallet before checking for existing resumable runs or completed runs with unclaimed rewards. The check searches all blocking runs, so a newer abandoned/claimed historical row cannot hide an older blocker. Ticket debit, run creation, opening offer and ticket ledger commit together. Other accounts use their own wallet locks.
+
+The partial unique index `draft_runs_one_active_per_account_idx` permits only one `drafting`, `ready` or `in_progress` run per account across PvE/PvP. It also rejects direct inserts or status changes that bypass the service. Known index conflicts roll back the debit and return the existing `active_run_exists` error; `/runs/start` keeps its HTTP 409 contract. Retrying while that run remains active cannot spend another ticket. This does not add request-ID replay after the run has already ended and all its rewards have been claimed.
+
+The migration does not delete, abandon, select or refund existing runs. It fails transactionally if active duplicates exist. Check for active duplicates before deployment. Historical unclaimed rewards are preserved and continue to block new starts according to `docs/meta_rules.md`. See `TempBuild/ServerRunStartAtomicity_20260909/README.md` for the reproduced two-creation bug and 58-group isolated validation.

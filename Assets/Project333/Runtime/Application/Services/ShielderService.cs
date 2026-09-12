@@ -8,12 +8,7 @@ namespace Project333.Runtime.Application.Services
     {
         public static ShielderInfo Resolve(BoardState board, TileCoord targetCoord)
         {
-            return ResolveInternal(
-                board,
-                targetCoord,
-                isNormalAttack: false,
-                attackerAttackType: AttackType.Ranged,
-                attackerHasActiveFlying: false);
+            return ResolveInternal(board, targetCoord);
         }
 
         public static ShielderInfo ResolveForNormalAttack(
@@ -39,20 +34,12 @@ namespace Project333.Runtime.Application.Services
             AttackType attackerAttackType,
             bool attackerHasActiveFlying)
         {
-            return ResolveInternal(
-                board,
-                targetCoord,
-                isNormalAttack: true,
-                attackerAttackType: attackerAttackType,
-                attackerHasActiveFlying: attackerHasActiveFlying);
+            return ResolveInternal(board, targetCoord);
         }
 
         private static ShielderInfo ResolveInternal(
             BoardState board,
-            TileCoord targetCoord,
-            bool isNormalAttack,
-            AttackType attackerAttackType,
-            bool attackerHasActiveFlying)
+            TileCoord targetCoord)
         {
             if (board == null)
             {
@@ -75,14 +62,6 @@ namespace Project333.Runtime.Application.Services
             var shielderCoord = new TileCoord(targetCoord.Column, 0);
             var shielder = board.GetOccupant(shielderCoord);
             if (shielder == null || !shielder.HasActiveShielder)
-            {
-                return new ShielderInfo(originalTarget, targetCoord, null, null);
-            }
-
-            if (isNormalAttack &&
-                shielder.HasActiveFlying &&
-                attackerAttackType == AttackType.Melee &&
-                !attackerHasActiveFlying)
             {
                 return new ShielderInfo(originalTarget, targetCoord, null, null);
             }

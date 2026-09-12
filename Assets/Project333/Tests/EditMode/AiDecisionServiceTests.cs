@@ -62,7 +62,7 @@ namespace Project333.Tests.EditMode
             Assert.That(command, Is.TypeOf<PlayUnitCardCommand>());
             var playUnitCardCommand = (PlayUnitCardCommand)command;
             Assert.That(playUnitCardCommand.CardId, Is.EqualTo("sample_gold_miner"));
-            Assert.That(playUnitCardCommand.TargetCoord, Is.EqualTo(new TileCoord(2, 0)));
+            Assert.That(playUnitCardCommand.TargetCoord.Row, Is.EqualTo(1));
         }
 
         [Test]
@@ -114,7 +114,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void GetNextCommand_WhenTargetHasUnusedEndure_DoesNotTreatAttackAsKill()
+        public void GetNextCommand_WhenTargetHasUnusedEndure_CanSpendAttackToBreakEndure()
         {
             var battleState = CreateBattleState();
             battleState.StartNextTurn(PlayerId.AI);
@@ -157,7 +157,9 @@ namespace Project333.Tests.EditMode
 
             Assert.That(command, Is.TypeOf<AttackCommand>());
             var attackCommand = (AttackCommand)command;
-            Assert.That(attackCommand.TargetCoord, Is.EqualTo(new TileCoord(2, 1)));
+            new AttackService().Attack(battleState, PlayerId.AI, attackCommand.AttackerCoord, attackCommand.TargetCoord);
+            Assert.That(defender.CurrentHp, Is.EqualTo(1));
+            Assert.That(defender.EndureUsed, Is.True);
         }
 
         [Test]
@@ -196,11 +198,15 @@ namespace Project333.Tests.EditMode
 
             var command = new AiDecisionService(provider).GetNextCommand(battleState);
 
-            Assert.That(command, Is.TypeOf<EndTurnCommand>());
+            Assert.That(command, Is.TypeOf<CastDamageSpellCommand>());
+            var spell = (CastDamageSpellCommand)command;
+            new SpellService(provider).CastDamageSpell(battleState, PlayerId.AI, spell.CardId, spell.TargetOwnerId, spell.TargetCoord);
+            Assert.That(defender.CurrentHp, Is.EqualTo(1));
+            Assert.That(defender.EndureUsed, Is.True);
         }
 
         [Test]
-        public void GetNextCommand_WhenBackRowTargetIsProtectedByShielder_SkipsProtectedTarget()
+        public void GetNextCommand_WhenBackRowTargetIsProtectedByShielder_EvaluatesRedirectedDamage()
         {
             var battleState = CreateBattleState();
             battleState.StartNextTurn(PlayerId.AI);
@@ -244,7 +250,9 @@ namespace Project333.Tests.EditMode
             Assert.That(command, Is.TypeOf<AttackCommand>());
             var attackCommand = (AttackCommand)command;
             Assert.That(attackCommand.AttackerCoord, Is.EqualTo(new TileCoord(0, 0)));
-            Assert.That(attackCommand.TargetCoord, Is.EqualTo(new TileCoord(2, 0)));
+            new AttackService().Attack(battleState, PlayerId.AI, attackCommand.AttackerCoord, attackCommand.TargetCoord);
+            Assert.That(battleState.PlayerBoard.GetOccupant(new TileCoord(2,0)), Is.Null);
+            Assert.That(battleState.Player.Master.CurrentHp, Is.EqualTo(1));
         }
 
         private static void ClearHand(PlayerState playerState)

@@ -190,8 +190,11 @@ namespace Project333.Tests.EditMode
                 Is.Zero);
         }
 
-        [Test]
-        public void Attack_PiercingBypassesShielderRedirectionForRearDamage()
+        [TestCase(0, 0)]
+        [TestCase(1, 0)]
+        [TestCase(0, 3)]
+        [TestCase(1, 3)]
+        public void Attack_PiercingShielderAbsorbsBothPacketsFromEitherRow(int targetRow, int defense)
         {
             var battleState = CreateBattleState();
             var attacker = CreateUnit(
@@ -209,6 +212,7 @@ namespace Project333.Tests.EditMode
                 AttackType.Melee,
                 attack: 0,
                 maxHp: 30,
+                physicalDefense: defense,
                 hasShielder: true);
             var rear = CreateUnit(
                 "rear",
@@ -222,10 +226,139 @@ namespace Project333.Tests.EditMode
             battleState.AIBoard.Place(frontShielder.Position, frontShielder);
             battleState.AIBoard.Place(rear.Position, rear);
 
-            new AttackService().Attack(battleState, PlayerId.Player, attacker.Position, frontShielder.Position);
+            new AttackService().Attack(battleState, PlayerId.Player, attacker.Position, new TileCoord(1, targetRow));
 
-            Assert.That(frontShielder.CurrentHp, Is.EqualTo(20));
+            Assert.That(frontShielder.CurrentHp, Is.EqualTo(30 - 2 * (10 - defense)));
+            Assert.That(rear.CurrentHp, Is.EqualTo(30));
+            var normalHit = battleState.ValuePopupEvents.Single(value => value.Cause == BattleValueChangeCause.NormalAttack);
+            var piercingHit = battleState.ValuePopupEvents.Single(value => value.Cause == BattleValueChangeCause.Piercing);
+            Assert.That(normalHit.RuntimeId, Is.EqualTo(frontShielder.RuntimeId));
+            Assert.That(piercingHit.RuntimeId, Is.EqualTo(frontShielder.RuntimeId));
+            Assert.That(normalHit.Amount, Is.EqualTo(10 - defense));
+            Assert.That(piercingHit.Amount, Is.EqualTo(10 - defense));
+        }
+
+        [Test]
+        public void Attack_RedirectedPiercingOverflowsAfterBothDefensesAndLifeStealsOnlyActualHpLoss()
+        {
+            var battleState = CreateShielderBattle(out var attacker, out var front, out var rear,
+                shielderHp: 12, shielderDefense: 2, rearDefense: 3, hasLifeSteal: true);
+            attacker.CurrentHp = 1;
+
+            new AttackService().Attack(battleState, PlayerId.Player, attacker.Position, front.Position);
+
+            Assert.That(front.CurrentHp, Is.EqualTo(-1),
+                "Direct hit: 10-2=8. Redirected Piercing: (10-3)-2=5, including 1 overflow.");
+            Assert.That(battleState.AIBoard.GetOccupant(front.Position), Is.Null);
+            Assert.That(rear.CurrentHp, Is.EqualTo(29));
+            Assert.That(attacker.CurrentHp, Is.EqualTo(14));
+            var piercingHits = battleState.ValuePopupEvents.Where(value => value.Cause == BattleValueChangeCause.Piercing).ToList();
+            Assert.That(piercingHits.Count, Is.EqualTo(2));
+            Assert.That(piercingHits.Single(value => value.RuntimeId == front.RuntimeId).Amount, Is.EqualTo(4));
+            Assert.That(piercingHits.Single(value => value.RuntimeId == rear.RuntimeId).Amount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Attack_ShielderKilledByDirectHitCannotRedirectPiercing()
+        {
+            var battleState = CreateShielderBattle(out var attacker, out var front, out var rear, shielderHp: 10);
+
+            new AttackService().Attack(battleState, PlayerId.Player, attacker.Position, front.Position);
+
+            Assert.That(battleState.AIBoard.GetOccupant(front.Position), Is.Null);
             Assert.That(rear.CurrentHp, Is.EqualTo(20));
+            var piercingHit = battleState.ValuePopupEvents.Single(value => value.Cause == BattleValueChangeCause.Piercing);
+            Assert.That(piercingHit.RuntimeId, Is.EqualTo(rear.RuntimeId));
+            Assert.That(piercingHit.Amount, Is.EqualTo(10));
+        }
+
+        [Test]
+        public void Attack_MultihitRedirectedPiercingAppliesDefenseAndLifeStealPerPacket()
+        {
+            var battleState = CreateShielderBattle(out var attacker, out var front, out var rear,
+                shielderHp: 100, shielderDefense: 2, hitsPerAttack: 3, hasLifeSteal: true);
+            attacker.CurrentHp = 1;
+
+            new AttackService().Attack(battleState, PlayerId.Player, attacker.Position, front.Position);
+
+            Assert.That(front.CurrentHp, Is.EqualTo(52));
+            Assert.That(rear.CurrentHp, Is.EqualTo(30));
+            Assert.That(attacker.CurrentHp, Is.EqualTo(49));
+            var piercingHits = battleState.ValuePopupEvents.Where(value => value.Cause == BattleValueChangeCause.Piercing).ToList();
+            Assert.That(piercingHits.Count, Is.EqualTo(3));
+            Assert.That(piercingHits.All(value => value.RuntimeId == front.RuntimeId && value.Amount == 8), Is.True);
+        }
+
+        [Test]
+        public void Attack_MeleeRedirectedPiercingDoesNotAddAnotherCounterattack()
+        {
+            var battleState = CreateShielderBattle(out var attacker, out var front, out var rear, attackType: AttackType.Melee);
+
+            new AttackService().Attack(battleState, PlayerId.Player, attacker.Position, front.Position);
+
+            Assert.That(front.CurrentHp, Is.EqualTo(10));
+            Assert.That(rear.CurrentHp, Is.EqualTo(30));
+            Assert.That(attacker.CurrentHp, Is.EqualTo(97));
+            Assert.That(battleState.ValuePopupEvents.Count(value => value.Cause == BattleValueChangeCause.Counterattack), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Attack_InvincibleShielderPreventsBothPackets()
+        {
+            var battleState = CreateShielderBattle(out var attacker, out var front, out var rear);
+            front.AddInvincibleEffect(InvincibleDurationType.Always);
+
+            new AttackService().Attack(battleState, PlayerId.Player, attacker.Position, front.Position);
+
+            Assert.That(front.CurrentHp, Is.EqualTo(30));
+            Assert.That(rear.CurrentHp, Is.EqualTo(30));
+            var piercingHit = battleState.ValuePopupEvents.Single(value => value.Cause == BattleValueChangeCause.Piercing);
+            Assert.That(piercingHit.RuntimeId, Is.EqualTo(front.RuntimeId));
+            Assert.That(piercingHit.Amount, Is.Zero);
+            Assert.That(piercingHit.IsInvinciblePrevented, Is.True);
+        }
+
+        [Test]
+        public void Attack_SealboundRearDoesNotRedirectPiercingToShielder()
+        {
+            var battleState = CreateShielderBattle(out var attacker, out var front, out var rear);
+            rear.EnterSealbound(2);
+
+            new AttackService().Attack(battleState, PlayerId.Player, attacker.Position, front.Position);
+
+            Assert.That(front.CurrentHp, Is.EqualTo(20));
+            Assert.That(rear.CurrentHp, Is.EqualTo(30));
+            Assert.That(battleState.ValuePopupEvents.Any(value => value.Cause == BattleValueChangeCause.Piercing), Is.False);
+        }
+
+        [Test]
+        public void Attack_ErasedShielderCannotRedirectPiercing()
+        {
+            var battleState = CreateShielderBattle(out var attacker, out var front, out var rear);
+            front.ApplyErasure();
+
+            new AttackService().Attack(battleState, PlayerId.Player, attacker.Position, front.Position);
+
+            Assert.That(front.CurrentHp, Is.EqualTo(20));
+            Assert.That(rear.CurrentHp, Is.EqualTo(20));
+            Assert.That(battleState.ValuePopupEvents.Single(value => value.Cause == BattleValueChangeCause.Piercing).RuntimeId,
+                Is.EqualTo(rear.RuntimeId));
+        }
+
+        [Test]
+        public void Attack_ShielderEndureIsConsumedOnlyOnceAcrossDirectAndPiercingPackets()
+        {
+            var battleState = CreateShielderBattle(out var attacker, out var front, out var rear,
+                shielderHp: 5, shielderHasEndure: true);
+
+            new AttackService().Attack(battleState, PlayerId.Player, attacker.Position, front.Position);
+
+            Assert.That(front.EndureUsed, Is.True);
+            Assert.That(battleState.AIBoard.GetOccupant(front.Position), Is.Null);
+            Assert.That(rear.CurrentHp, Is.EqualTo(21));
+            var piercingHits = battleState.ValuePopupEvents.Where(value => value.Cause == BattleValueChangeCause.Piercing).ToList();
+            Assert.That(piercingHits.Single(value => value.RuntimeId == front.RuntimeId).Amount, Is.EqualTo(1));
+            Assert.That(piercingHits.Single(value => value.RuntimeId == rear.RuntimeId).Amount, Is.EqualTo(9));
         }
 
         [Test]
@@ -486,6 +619,32 @@ namespace Project333.Tests.EditMode
             Assert.That(projected.Player.Master.HasPiercing, Is.True);
             Assert.That(projected.PlayerBoard.GetOccupant(building.Position).HasPiercing, Is.True);
             Assert.That(projected.AIBoard.GetOccupant(unit.Position).HasPiercing, Is.True);
+        }
+
+        private static BattleState CreateShielderBattle(
+            out UnitState attacker,
+            out UnitState front,
+            out UnitState rear,
+            AttackType attackType = AttackType.Ranged,
+            int shielderHp = 30,
+            int shielderDefense = 0,
+            int rearDefense = 0,
+            int hitsPerAttack = 1,
+            bool hasLifeSteal = false,
+            bool shielderHasEndure = false)
+        {
+            var battleState = CreateBattleState();
+            attacker = CreateUnit("piercing-attacker", PlayerId.Player, new TileCoord(0, 0), attackType, 10, 100,
+                hitsPerAttack: hitsPerAttack, hasLifeSteal: hasLifeSteal, hasPiercing: true);
+            front = CreateUnit("front-shielder", PlayerId.AI, new TileCoord(1, 0), AttackType.Melee, 3, shielderHp,
+                physicalDefense: shielderDefense, hasShielder: true, hasEndure: shielderHasEndure);
+            rear = CreateUnit("rear", PlayerId.AI, new TileCoord(1, 1), AttackType.Melee, 50, 30,
+                physicalDefense: rearDefense);
+            PrepareAttacker(attacker);
+            battleState.PlayerBoard.Place(attacker.Position, attacker);
+            battleState.AIBoard.Place(front.Position, front);
+            battleState.AIBoard.Place(rear.Position, rear);
+            return battleState;
         }
 
         private static UnitState ResolveRearHit(

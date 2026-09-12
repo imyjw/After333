@@ -546,10 +546,6 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError("Werewolf must have Replicate.");
             }
 
-            if (card.IncludeInDraft || card.IncludeInRewards)
-            {
-                result.AddError("Werewolf must stay disabled in draft and rewards until its art is ready.");
-            }
 
             if (string.IsNullOrWhiteSpace(card.EffectText) ||
                 !card.EffectText.Contains("웨어울프") ||
@@ -584,10 +580,6 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError("HuanShu must use the huan_shu non-damage scripted effect.");
             }
 
-            if (card.IncludeInDraft || card.IncludeInRewards)
-            {
-                result.AddError("HuanShu must stay disabled in draft and rewards until its art is ready.");
-            }
 
             if (string.IsNullOrWhiteSpace(card.EffectText) ||
                 !card.EffectText.Contains("환술") ||
@@ -640,11 +632,6 @@ namespace Project333.Runtime.Infrastructure.Data
                     "TenThousandYearSnowGinseng must grant exactly 3 qi at the next 3 owner turn starts.");
             }
 
-            if (card.IncludeInDraft)
-            {
-                result.AddError(
-                    "TenThousandYearSnowGinseng must stay disabled in draft until its art is ready.");
-            }
 
             if (card.IncludeInRewards)
             {
@@ -687,10 +674,6 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError("Gu must use the gu non-damage scripted effect.");
             }
 
-            if (card.IncludeInDraft || card.IncludeInRewards)
-            {
-                result.AddError("Gu must stay disabled in draft and rewards until its art is ready.");
-            }
 
             if (string.IsNullOrWhiteSpace(card.EffectText) ||
                 !card.EffectText.Contains("상대방") ||
@@ -759,10 +742,6 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError("ManaStone must use the mana_stone non-damage scripted effect.");
             }
 
-            if (card.IncludeInDraft || card.IncludeInRewards)
-            {
-                result.AddError("ManaStone must stay disabled in draft and rewards until its art is ready.");
-            }
 
             if (string.IsNullOrWhiteSpace(card.EffectText) ||
                 !card.EffectText.Contains("마나") ||
@@ -797,10 +776,6 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError("PowerBank must use the power_bank non-damage scripted effect.");
             }
 
-            if (card.IncludeInDraft || card.IncludeInRewards)
-            {
-                result.AddError("PowerBank must stay disabled in draft and rewards until its art is ready.");
-            }
 
             if (string.IsNullOrWhiteSpace(card.EffectText) ||
                 !card.EffectText.Contains("전력") ||
@@ -827,7 +802,7 @@ namespace Project333.Runtime.Infrastructure.Data
                 card.Cost.Power != TimedBombRules.PowerCost ||
                 card.Cost.Mana != 0 || card.Cost.Qi != 0)
             {
-                result.AddError("TimedBomb must cost exactly 3 power and 1 gold.");
+                result.AddError("TimedBomb must cost exactly 3 power with no additional gold cost.");
             }
 
             if (!string.Equals(card.EffectId, TimedBombRules.EffectId, StringComparison.Ordinal) ||
@@ -838,10 +813,6 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError("TimedBomb must detonate after 3 turn starts for 33 physical damage.");
             }
 
-            if (card.IncludeInDraft || card.IncludeInRewards)
-            {
-                result.AddError("TimedBomb must stay disabled in draft and rewards until its art is ready.");
-            }
         }
 
         private static void ValidateBiochemicalBomb(
@@ -866,16 +837,12 @@ namespace Project333.Runtime.Infrastructure.Data
 
             if (!string.Equals(card.EffectId, BiochemicalBombRules.EffectId, StringComparison.Ordinal) ||
                 card.Damage != BiochemicalBombRules.BaseDamage ||
-                card.DamageType != DamageType.Physical ||
+                card.DamageType != DamageType.Fixed ||
                 card.TriggerCount != BiochemicalBombRules.TriggerCount)
             {
-                result.AddError("BiochemicalBomb must deal 44 physical damage for 4 global turn starts.");
+                result.AddError("BiochemicalBomb must deal 25 fixed damage for 4 global turn starts.");
             }
 
-            if (card.IncludeInDraft || card.IncludeInRewards)
-            {
-                result.AddError("BiochemicalBomb must stay disabled in draft and rewards until its art is ready.");
-            }
         }
 
         private static void ValidateGaebangBranch(
@@ -906,10 +873,6 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError("GaebangBranch must use ATK 0, HP 20, DEF 0/0, no attack, and DamageType None.");
             }
 
-            if (card.IncludeInDraft || card.IncludeInRewards)
-            {
-                result.AddError("GaebangBranch must stay disabled in draft and rewards until its art is ready.");
-            }
 
             if (string.IsNullOrWhiteSpace(card.EffectText) ||
                 !card.EffectText.Contains("골드") ||
@@ -944,7 +907,7 @@ namespace Project333.Runtime.Infrastructure.Data
                 card.DamageType != DamageType.None ||
                 card.PhysicalDefense != 0 || card.MagicDefense != 0)
             {
-                result.AddError("MerchantCaravan must use ATK 0, HP 30, DEF 0/0, no attack, and DamageType None.");
+                result.AddError($"MerchantCaravan must use ATK 0, HP {MerchantCaravanRules.BaseHealth}, DEF 0/0, no attack, and DamageType None.");
             }
 
             if (card.IsScience || card.SciencePowerUpkeep != 0)
@@ -961,10 +924,6 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError("MerchantCaravan must grant exactly 3 gold at its owner's turn start.");
             }
 
-            if (card.IncludeInDraft || card.IncludeInRewards)
-            {
-                result.AddError("MerchantCaravan must stay disabled in draft and rewards until its art is ready.");
-            }
 
             if (string.IsNullOrWhiteSpace(card.EffectText) ||
                 !card.EffectText.Contains("턴 시작") ||
@@ -1073,10 +1032,6 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError("PowerPlant must use its conditional gold-to-power effect instead of turnStartResourceGain.");
             }
 
-            if (card.IncludeInDraft || card.IncludeInRewards)
-            {
-                result.AddError("PowerPlant must stay disabled in draft and rewards until its art is ready.");
-            }
 
             if (string.IsNullOrWhiteSpace(card.EffectText) ||
                 !card.EffectText.Contains("골드") ||
@@ -1130,10 +1085,6 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError("NuclearPowerPlant must grant exactly 3 power at its owner's turn start.");
             }
 
-            if (card.IncludeInDraft || card.IncludeInRewards)
-            {
-                result.AddError("NuclearPowerPlant must stay disabled in draft and rewards until its art is ready.");
-            }
 
             if (string.IsNullOrWhiteSpace(card.EffectText) ||
                 !card.EffectText.Contains("턴 시작") ||
@@ -1447,9 +1398,9 @@ namespace Project333.Runtime.Infrastructure.Data
                     result.AddError($"Biochemical Bomb card '{id}' must have damage greater than 0.");
                 }
 
-                if (card.DamageType != DamageType.Physical)
+                if (card.DamageType != DamageType.Fixed)
                 {
-                    result.AddError($"Biochemical Bomb card '{id}' must use Physical damageType.");
+                    result.AddError($"Biochemical Bomb card '{id}' must use Fixed damageType.");
                 }
 
                 if (card.TriggerCount != BiochemicalBombRules.TriggerCount)
@@ -1523,7 +1474,7 @@ namespace Project333.Runtime.Infrastructure.Data
             }
             else if (card.HitsPerAttack > 3)
             {
-                result.AddWarning($"Card '{id}' has hitsPerAttack {card.HitsPerAttack}; confirm this is intended.");
+                RequireTextContains(text, $"{card.HitsPerAttack}연타", result, id, $"hitsPerAttack {card.HitsPerAttack}");
             }
 
             if (card.SciencePowerUpkeep > 0)

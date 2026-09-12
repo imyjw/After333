@@ -82,7 +82,6 @@ namespace Project333.Runtime.Presentation.Draft
         [SerializeField] private Vector2 _claimRewardsScreenOffset = Vector2.zero;
         [SerializeField] private int _claimRewardsCanvasSortingOrder = 3350;
         [SerializeField] private string _claimRewardsButtonReadyLabel = "보상 받기";
-        [SerializeField] private string _claimRewardsButtonSyncingLabel = "보상 받기";
         [SerializeField] private string _claimRewardsButtonClaimingLabel = "보상 받기";
         [SerializeField] private string _claimRewardsButtonClaimedLabel = "수령 완료";
         [Header("Reward Claim Toast")]
@@ -957,7 +956,7 @@ namespace Project333.Runtime.Presentation.Draft
             {
                 if (DraftRunSessionState.HasRunEnded)
                 {
-                    SetStatus("Syncing completed run rewards with the server...");
+                    SetStatus("Checking the server battle result...");
                     RefreshStaticUi();
                     await RefreshServerAccountStateAsync();
                     if (this == null)
@@ -979,26 +978,10 @@ namespace Project333.Runtime.Presentation.Draft
                     }
                     else
                     {
-                        var syncIds = ResolveServerRunDeckIdsForLocalCompletion();
-                        var syncRunId = syncIds.RunId;
-                        var syncDeckId = syncIds.DeckId;
-                        var syncedLocalRecord = await TrySyncLocalCompletedRunRecordAsync(syncRunId, syncDeckId);
-                        if (this == null)
-                        {
-                            return;
-                        }
-
-                        if (syncedLocalRecord)
-                        {
-                            RefreshStaticUi();
-                        }
-                        else
-                        {
-                            SetStatus("Rewards are still syncing. Please wait a moment and try again.");
-                            QueueCompletedRunServerSyncRetry();
-                            RefreshStaticUi();
-                            return;
-                        }
+                        SetStatus("The server has not completed this run. Rewards are not available yet.");
+                        QueueCompletedRunServerSyncRetry();
+                        RefreshStaticUi();
+                        return;
                     }
                 }
                 else
@@ -1855,7 +1838,7 @@ namespace Project333.Runtime.Presentation.Draft
             }
             else if (!canClaimRewards && localRunEnded)
             {
-                label.text = _claimRewardsButtonSyncingLabel;
+                label.text = "서버 결과 확인";
             }
             else
             {
@@ -2157,13 +2140,7 @@ namespace Project333.Runtime.Presentation.Draft
             }
 
             var restoredSession = new DraftSessionService(_cardCatalogAsset, CreateDraftRandom());
-            var validation = restoredSession.ValidateCatalog();
-            if (!validation.IsValid)
-            {
-                throw new InvalidOperationException(validation.Message);
-            }
-
-            var offer = restoredSession.ResumeDraft(draftPickCardIds, currentOfferCardIds);
+            var offer = restoredSession.RestoreServerDraft(draftPickCardIds, currentOfferCardIds);
             if (offer == null)
             {
                 throw new InvalidOperationException("Server draft did not return a current offer.");
@@ -2330,7 +2307,7 @@ namespace Project333.Runtime.Presentation.Draft
                     else if (localRunEndedBeforeSync && AccountSessionState.HasResumableRun)
                     {
                         _isWaitingForServerRunResultSync = true;
-                        SetStatus("Run complete locally. Waiting for server reward sync...");
+                        SetStatus("Waiting for the server to confirm the run result. Rewards are not available yet.");
                         QueueCompletedRunServerSyncRetry();
                     }
                     else
@@ -2385,7 +2362,7 @@ namespace Project333.Runtime.Presentation.Draft
                     if (localRunEndedBeforeSync && DraftRunSessionState.HasDraftedDeckReady && !IsCurrentRunRewardClaimed())
                     {
                         _isWaitingForServerRunResultSync = true;
-                        SetStatus("Run complete locally. Waiting for server reward sync...");
+                        SetStatus("Waiting for the server to confirm the run result. Rewards are not available yet.");
                         QueueCompletedRunServerSyncRetry();
                     }
                     else
@@ -2403,7 +2380,7 @@ namespace Project333.Runtime.Presentation.Draft
                     if (localRunEndedBeforeSync && DraftRunSessionState.HasDraftedDeckReady)
                     {
                         _isWaitingForServerRunResultSync = true;
-                        SetStatus("Run complete locally. Waiting for server reward sync...");
+                        SetStatus("Waiting for the server to confirm the run result. Rewards are not available yet.");
                         QueueCompletedRunServerSyncRetry();
                     }
 
@@ -2500,60 +2477,6 @@ namespace Project333.Runtime.Presentation.Draft
             int serverLosses)
         {
             return serverWins < localWins || serverLosses < localLosses;
-        }
-
-        private async Task<bool> TrySyncLocalCompletedRunRecordAsync(string runId, string deckId)
-        {
-            if (!AccountSessionState.IsAuthenticated || !DraftRunSessionState.HasRunEnded)
-            {
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(runId) || string.IsNullOrWhiteSpace(deckId))
-            {
-                Debug.LogWarning(
-                    $"After333 local run reward sync skipped: missing run/deck id. run={FormatLogValue(runId)} deck={FormatLogValue(deckId)}");
-                SetStatus("Reward sync failed: server run or deck id is missing.");
-                return false;
-            }
-
-            try
-            {
-                CancelCompletedRunServerSyncRetry();
-                SetStatus("Updating completed PVE run record on server...");
-                RefreshStaticUi();
-                Debug.Log(
-                    $"After333 local run reward sync request: run={FormatLogValue(runId)} deck={FormatLogValue(deckId)} localRecord={DraftRunSessionState.Wins}-{DraftRunSessionState.Losses} activeRun={FormatLogValue(AccountSessionState.ActiveRunId)} activeDeck={FormatLogValue(AccountSessionState.ActiveDeckId)} latestRun={FormatLogValue(AccountSessionState.LatestRunId)} latestDeck={FormatLogValue(AccountSessionState.LatestDeckId)} sessionRun={FormatLogValue(DraftRunSessionState.ServerRunId)} sessionDeck={FormatLogValue(DraftRunSessionState.ServerDeckId)}");
-                var client = new ServerRunClient(AccountServerUrl);
-                var response = await client.SyncLocalRunRecordAsync(
-                    AccountSessionState.SessionToken,
-                    runId,
-                    deckId,
-                    DraftRunSessionState.Wins,
-                    DraftRunSessionState.Losses,
-                    CancellationToken.None);
-                if (this == null)
-                {
-                    return false;
-                }
-
-                AccountSessionState.ApplySyncLocalRunRecordResponse(response);
-                DraftRunSessionState.SetServerRunDeckMetadata(runId, deckId);
-                DraftRunSessionState.ApplyServerRunRecord(
-                    AccountSessionState.LatestRunWins,
-                    AccountSessionState.LatestRunLosses);
-                _completedRunServerSyncAttempts = 0;
-                Debug.Log(
-                    $"After333 local PVE run record synced: run={AccountSessionState.LatestRunId}, wins={AccountSessionState.LatestRunWins}, losses={AccountSessionState.LatestRunLosses}, status={AccountSessionState.LatestRunStatus}");
-                SetStatus("Server run record synced. Claiming rewards...");
-                return IsLatestServerRunCompleted();
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"After333 local run reward sync failed: {ex.Message}");
-                SetStatus($"Reward sync failed: {ex.Message}");
-                return false;
-            }
         }
 
         private static string ResolveServerRunIdForLocalCompletion()
@@ -2793,32 +2716,27 @@ namespace Project333.Runtime.Presentation.Draft
 
         private static string BuildRunCompleteStatusText()
         {
-            if (DraftRunSessionState.Wins >= DraftRunSessionState.RunWinLimit)
-            {
-                return "Run Complete: 33 Wins. Rewards are ready.";
-            }
-
-            if (DraftRunSessionState.Losses >= DraftRunSessionState.RunLossLimit)
-            {
-                return "Run Complete: 3 Losses. Rewards are ready.";
-            }
-
             if (AccountSessionState.IsLatestRunRewardClaimed)
             {
                 return "Run Complete. Rewards claimed.";
             }
 
+            if (!IsLatestServerRunCompleted())
+            {
+                return "Waiting for the server to confirm the run result. Rewards are not available yet.";
+            }
+
             if (AccountSessionState.LatestRunEndedByWins)
             {
-                return $"Run Complete: 33 Wins. Rewards are ready.";
+                return "Run Complete: 33 Wins. Rewards are ready.";
             }
 
             if (AccountSessionState.LatestRunEndedByLosses)
             {
-                return $"Run Complete: 3 Losses. Rewards are ready.";
+                return "Run Complete: 3 Losses. Rewards are ready.";
             }
 
-            return $"Run Complete. Rewards are ready.";
+            return "Run Complete. Rewards are ready.";
         }
 
         private static string FormatLogValue(string value)
@@ -3058,9 +2976,7 @@ namespace Project333.Runtime.Presentation.Draft
             }
 
             ApplyServerWalletDisplaySettings();
-            _serverWalletText.text = AccountSessionState.IsAuthenticated
-                ? $"Tickets: {AccountSessionState.Tickets}\nGold: {AccountSessionState.ResourceGold}"
-                : "Tickets: -\nGold: -";
+            AccountWalletView.ShowSession(_serverWalletText, vertical: true);
         }
 
         private void ApplyServerWalletDisplaySettings()

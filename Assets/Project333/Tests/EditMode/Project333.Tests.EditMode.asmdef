@@ -2,7 +2,9 @@
   "name": "Project333.Tests.EditMode",
   "rootNamespace": "Project333.Tests",
   "references": [
-    "Project333.Runtime"
+    "Project333.Runtime",
+    "Unity.TextMeshPro",
+    "UnityEngine.UI"
   ],
   "includePlatforms": [
     "Editor"

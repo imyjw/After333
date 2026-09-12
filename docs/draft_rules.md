@@ -65,11 +65,13 @@ Confirmed rarity order from lowest to highest:
 Confirmed appearance rule:
 
 - The Legendary opening offer is separate from the non-Legendary rarity roll.
-- Non-Legendary offer slots use these weights:
-  - Common: `40`
-  - Uncommon: `30`
-  - Rare: `20`
-  - Unique: `10`
+- Non-Legendary offer slots use these integer weights (total 10,000):
+  - Common: `6600` (66%)
+  - Uncommon: `2000` (20%)
+  - Rare: `1000` (10%)
+  - Unique: `400` (4%)
+- Server and local draft use the shared `DraftRarityWeights` constants.
+- These are per-slot probabilities, not predetermined deck counts. Under an ideal independent-slot model where the player always chooses the highest rarity, the expected non-Legendary selected proportions are Unique 11.53%, Rare 24.87%, Uncommon 34.86%, Common 28.75%. Player choices and exhausted candidate pools can change the actual proportions.
 - When a rarity has no eligible card for the current slot, only currently available rarity weights participate in that roll.
 
 ## Offer Generation
@@ -79,7 +81,7 @@ Confirmed:
 - Each pick presents exactly `3` different card ids; one offer cannot contain duplicate cards.
 - The global card pool is non-consuming. Each new offer samples independently from all currently eligible cards.
 - A card that has reached its deck copy limit is excluded from later offers.
-- Non-Legendary rarity is rolled independently for each offer slot using `40/30/20/10` weights.
+- Non-Legendary rarity is rolled separately for each offer slot using `6600/2000/1000/400` weights (Common/Uncommon/Rare/Unique), subject to candidate availability.
 - Before draft starts, the catalog must contain at least `3` unique Legendary cards.
 - Before draft starts, the catalog must contain at least `13` unique non-Legendary cards.
 - The non-Legendary pool must also provide at least `32` total copies under the three-copy limit.
@@ -90,11 +92,13 @@ Confirmed:
 - `POST /runs/start` returns the server-generated Legendary opening offer.
 - `POST /runs/draft-state` returns the server-owned ordered pick history and current offer.
 - `POST /runs/select-draft-card` accepts only `runId`, `cardId`, and the client's expected zero-based `pickIndex`.
-- The server reconstructs the authoritative current offer from `draft_seed` and ordered pick history before accepting a selection.
+- The server reads the authoritative current offer from the saved `current_offer_card_ids`, preserving all three card IDs and their order. It does not regenerate an already issued offer from the seed or current catalog.
 - A confirmed pick, its actual three-card offer, and the next offer are saved in one database transaction.
-- Resume restores both the ordered selected-card list and the exact deterministic offer.
-- The first restored pick must be Legendary; all later restored picks must be non-Legendary.
-- A restored offer must contain exactly `3` unique, currently eligible card ids.
+- Resume restores both the ordered selected-card list and the exact saved offer. Legacy runs without a saved offer initialize it once under the run row lock.
+- Opening and later-offer rarity rules apply when generating new offers. Later changes to rarity or draft eligibility do not invalidate previously issued offers or accepted picks.
+- A restored offer must contain exactly `3` distinct card IDs. A selection is checked against those saved IDs; the client cannot replace the offer.
+- Cards always resolve through the current deployed card definitions: stats, effects and rarity are not frozen per run. Previously selected IDs and copy counts remain intact after a card update; newly generated offers use current rarity and eligibility.
+- A missing current card definition or corrupt saved offer produces an error instead of silently substituting another card or rerolling. Existing IDs must remain available in the catalog even when excluded from future drafts.
 - Leaving DeckBuilding does not abandon or reroll the current draft.
 - A stale or replayed pick index is rejected instead of adding a duplicate card.
 - Unity cannot submit an arbitrary offer, full pick history, or completed deck as authority.
@@ -102,9 +106,13 @@ Confirmed:
 
 ## AI and Draft
 
-The player draft rule is fixed, but the full-game AI deck source is not.
-
-> TBD: Whether AI opponents use drafted decks, fixed decks, generated decks, or curated encounter decks in the full game loop
+Online PvE uses ten fixed cross-civilization AI decks from `Server/Project333.PvpServer/Data/pve_ai_decks.json`.
+At each new battle the server chooses one deck uniformly (10% each), then shuffles it with the normal battle setup.
+Each deck contains 33 cards: 1 Legendary, 5 Unique, 9 Rare, 11 Uncommon, and 7 Common.
+Only includeInDraft=true cards are eligible (omitted flags default to true), with at most 3 copies per card and 1 Legendary total.
+The selected composition stays fixed for that battle; restoring an existing battle does not reroll it.
+AI upgrades remain level 0. This does not change player draft rules or PvP opponent decks.
+See [pve_ai_decks.md](./pve_ai_decks.md) for all ten lists and maintenance rules.
 
 ## Relationship to Other Documents
 
@@ -114,6 +122,6 @@ The player draft rule is fixed, but the full-game AI deck source is not.
 
 ## Open Issues / TBD
 
-> TBD: AI deck sourcing for future non-demonstration PvE content
+> TBD: Future PvE difficulty tiers or win-count-based encounter selection
 
 > TBD: Any future draft preview or undo feature beyond the current immediate-save flow

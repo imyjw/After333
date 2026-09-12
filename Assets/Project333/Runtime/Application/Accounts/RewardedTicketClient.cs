@@ -81,14 +81,7 @@ namespace Project333.Runtime.Application.Accounts
             webRequest.SetRequestHeader("Accept", "application/json");
             webRequest.SetRequestHeader("Authorization", $"Bearer {sessionToken}");
 
-            var operation = webRequest.SendWebRequest();
-            while (!operation.isDone)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                await Task.Yield();
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
+            await AccountHttpTransport.SendAsync(webRequest, cancellationToken);
             if (webRequest.result != UnityWebRequest.Result.Success)
             {
                 throw new InvalidOperationException(BuildErrorMessage(webRequest));

@@ -33,7 +33,7 @@ namespace Project333.Runtime.Presentation.HUD
             }
             else
             {
-                _turnSummary = $"Turn {battleState.TurnNumber} / {battleState.Phase} / {battleState.ActivePlayerId}";
+                _turnSummary = $"Turn {battleState.TurnNumber} / {battleState.Phase} / {BattleUiFormatter.FormatSide(battleState.ActivePlayerId)}";
                 _playerResourceSummary = BattleUiFormatter.FormatResources(battleState.Player.Resources);
                 _aiResourceSummary = BattleUiFormatter.FormatResources(battleState.AI.Resources);
             }

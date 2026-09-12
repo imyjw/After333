@@ -29,9 +29,9 @@ MonoBehaviour:
   _boardSprite: {fileID: 954118651, guid: 344e1e15725a74e4e8b22f54f47c25cd, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: 96d2d0d396818d24dbc6380f8d565c28, type: 2}
   _attackType: 0
-  _damageType: 1
-  _attack: 50
-  _health: 50
+  _damageType: 2
+  _attack: 40
+  _health: 40
   _physicalDefense: 0
   _magicDefense: 0
   _hitsPerAttack: 1

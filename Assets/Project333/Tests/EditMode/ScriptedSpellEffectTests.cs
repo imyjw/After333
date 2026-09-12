@@ -396,6 +396,7 @@ namespace Project333.Tests.EditMode
                 new CardDefinition[] { CreateTimedBombDefinition() },
                 upgrades);
             battleState.Player.Hand.Add(TimedBombRules.CardId);
+            battleState.Player.Resources.Spend(new ResourceSet(mana: 0, qi: 0, power: 0, gold: 3));
             battleState.Player.Resources.Add(new ResourceSet(
                 mana: 0,
                 qi: 0,
@@ -407,7 +408,7 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.Player.Hand.Contains(TimedBombRules.CardId), Is.False);
             Assert.That(battleState.Player.Discard.CardIds, Does.Contain(TimedBombRules.CardId));
             Assert.That(battleState.Player.Resources.Power, Is.Zero);
-            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(3));
+            Assert.That(battleState.Player.Resources.Gold, Is.Zero);
             Assert.That(battleState.PersistentEffects.Count, Is.EqualTo(1));
             Assert.That(battleState.PersistentEffects[0].RemainingTriggers,
                 Is.EqualTo(TimedBombRules.TurnStartsUntilDetonation));
@@ -422,13 +423,12 @@ namespace Project333.Tests.EditMode
             var battleState = CreateBattleState();
             var spellService = CreateSpellService(new CardDefinition[] { CreateTimedBombDefinition() });
             battleState.Player.Hand.Add(TimedBombRules.CardId);
-            battleState.Player.Resources.Add(new ResourceSet(mana: 0, qi: 0, power: 0, gold: 1));
 
             spellService.CastScriptedSpell(battleState, PlayerId.Player, TimedBombRules.CardId);
 
             Assert.That(battleState.Player.Resources.Power, Is.Zero);
             Assert.That(battleState.Player.Resources.Gold, Is.Zero,
-                "Three gold replaces the missing power and one additional gold pays the printed gold cost.");
+                "Three gold replaces the missing power; there is no additional printed gold cost.");
             Assert.That(battleState.PersistentEffects.Count, Is.EqualTo(1));
         }
 
@@ -506,8 +506,8 @@ namespace Project333.Tests.EditMode
             var effect = battleState.PersistentEffects[0];
             Assert.That(effect.TargetStartColumn, Is.EqualTo(BiochemicalBombRules.RightAreaStartColumn));
             Assert.That(effect.RemainingTriggers, Is.EqualTo(BiochemicalBombRules.TriggerCount));
-            Assert.That(effect.EffectDamage, Is.EqualTo(47));
-            Assert.That(effect.EffectDamageType, Is.EqualTo(DamageType.Physical));
+            Assert.That(effect.EffectDamage, Is.EqualTo(28));
+            Assert.That(effect.EffectDamageType, Is.EqualTo(DamageType.Fixed));
             Assert.That(battleState.Player.Hand.Contains(BiochemicalBombRules.CardId), Is.False);
             Assert.That(battleState.Player.Discard.CardIds, Does.Contain(BiochemicalBombRules.CardId));
         }
@@ -552,7 +552,8 @@ namespace Project333.Tests.EditMode
                 isScience: false,
                 sciencePowerUpkeep: 0,
                 damageType: DamageType.Physical,
-                physicalDefense: 4);
+                physicalDefense: 15,
+                magicDefense: 4);
             battleState.AIBoard.Place(outsideTarget.Position, outsideTarget);
             battleState.AIBoard.Place(insideTarget.Position, insideTarget);
             battleState.Player.Hand.Add(BiochemicalBombRules.CardId);
@@ -572,7 +573,7 @@ namespace Project333.Tests.EditMode
             battleState.StartNextTurn(PlayerId.AI);
             turnStartService.ResolveTurnStart(battleState);
             Assert.That(outsideTarget.CurrentHp, Is.EqualTo(250));
-            Assert.That(insideTarget.CurrentHp, Is.EqualTo(210));
+            Assert.That(insideTarget.CurrentHp, Is.EqualTo(225));
 
             var laterTarget = CreateUnit("later-target", new TileCoord(4, 0), maxHp: 250);
             battleState.AIBoard.Place(laterTarget.Position, laterTarget);
@@ -584,8 +585,8 @@ namespace Project333.Tests.EditMode
             }
 
             Assert.That(outsideTarget.CurrentHp, Is.EqualTo(250));
-            Assert.That(insideTarget.CurrentHp, Is.EqualTo(90));
-            Assert.That(laterTarget.CurrentHp, Is.EqualTo(118));
+            Assert.That(insideTarget.CurrentHp, Is.EqualTo(150));
+            Assert.That(laterTarget.CurrentHp, Is.EqualTo(175));
             Assert.That(battleState.PersistentEffects[0].RemainingTriggers, Is.Zero);
             Assert.That(battleState.PersistentEffects[0].IsExpired, Is.True);
         }
@@ -801,7 +802,7 @@ namespace Project333.Tests.EditMode
                     gold: BiochemicalBombRules.GoldCost),
                 effectId: BiochemicalBombRules.EffectId,
                 damage: BiochemicalBombRules.BaseDamage,
-                damageType: DamageType.Physical,
+                damageType: DamageType.Fixed,
                 triggerCount: BiochemicalBombRules.TriggerCount);
         }
 

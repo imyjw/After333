@@ -1,7 +1,9 @@
 using System;
+using Project333.Runtime.Presentation.Hand;
 using System.Collections;
 using System.Collections.Generic;
 using Project333.Runtime.Application.Accounts;
+using Project333.Runtime.Application.Services;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Infrastructure.Data;
 using Project333.Runtime.Presentation.Cards;
@@ -43,8 +45,8 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private int _canvasSortingOrder = DefaultCanvasSortingOrder;
         [SerializeField] [Min(0f)] private float _resultDisplaySeconds = 3f;
         [SerializeField] private bool _showCardStats = true;
-        [SerializeField] private Vector2 _attackStatNormalizedPosition = new Vector2(0.07f, 0.09f);
-        [SerializeField] private Vector2 _hpStatNormalizedPosition = new Vector2(0.92f, 0.09f);
+        [SerializeField] private Vector2 _attackStatNormalizedPosition = HandCardStatOverlayLayout.DefaultAttackPosition;
+        [SerializeField] private Vector2 _hpStatNormalizedPosition = HandCardStatOverlayLayout.DefaultHpPosition;
         [SerializeField] private Vector2 _statTextSize = new Vector2(72f, 54f);
         [SerializeField] private int _statFontSize = 34;
         [SerializeField] private Color _statTextColor = Color.white;
@@ -620,8 +622,6 @@ namespace Project333.Runtime.Presentation.Battle
             ApplyFont(_statusText, font);
             ApplyFont(_confirmButtonText, font);
             ApplyFont(_fallbackCardIdTexts, font);
-            ApplyFont(_attackValueTexts, font);
-            ApplyFont(_hpValueTexts, font);
         }
 
         private void EnsureCardStatTexts()
@@ -702,7 +702,12 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
-            text.font = ResolveKoreanFont();
+            // Numeric stat labels keep their per-object Inspector font across initialization and reactivation.
+            if (text.font == null)
+            {
+                text.font = ResolveKoreanFont();
+            }
+
             text.fontSize = Mathf.Max(1, _statFontSize);
             text.fontStyle = FontStyle.Bold;
             text.alignment = TextAnchor.MiddleCenter;
@@ -737,7 +742,7 @@ namespace Project333.Runtime.Presentation.Battle
             if (!_showCardStats ||
                 _battleBootstrapper == null ||
                 !_battleBootstrapper.TryGetCardDefinition(cardId, out var definition) ||
-                !TryBuildCardStatValues(definition, AccountSessionState.GetOwnedCardUpgradeLevel(cardId), out var attack, out var hp))
+                !CardStatDisplay.TryCreate(definition, AccountSessionState.GetOwnedCardUpgradeLevel(cardId), out var stats))
             {
                 SetCardStatVisible(slotIndex, false);
                 return;
@@ -747,15 +752,15 @@ namespace Project333.Runtime.Presentation.Battle
             var hpText = GetAt(_hpValueTexts, slotIndex);
             if (attackText != null)
             {
-                attackText.text = attack.ToString();
+                attackText.text = stats.Attack.ToString();
             }
 
             if (hpText != null)
             {
-                hpText.text = hp.ToString();
+                hpText.text = stats.HasHp ? stats.Hp.ToString() : string.Empty;
             }
 
-            SetCardStatVisible(slotIndex, true);
+            SetCardStatVisible(slotIndex, true, stats.HasHp);
         }
 
         private void RefreshCardStatLayouts()
@@ -781,91 +786,13 @@ namespace Project333.Runtime.Presentation.Battle
             }
         }
 
-        private static void PositionCardStatText(
-            Text text,
-            Image artworkImage,
-            Vector2 normalizedSpritePosition)
+        private static void PositionCardStatText(Text text, Image artworkImage, Vector2 normalizedSpritePosition)
         {
-            if (text == null || artworkImage == null)
-            {
-                return;
-            }
-
-            var artworkRectTransform = artworkImage.rectTransform;
-            var textParent = text.rectTransform.parent as RectTransform;
-            if (artworkRectTransform == null || textParent == null)
-            {
-                return;
-            }
-
-            var artworkContainerRect = artworkRectTransform.rect;
-            var textParentRect = textParent.rect;
-            if (artworkContainerRect.width <= 0f ||
-                artworkContainerRect.height <= 0f ||
-                textParentRect.width <= 0f ||
-                textParentRect.height <= 0f)
-            {
-                return;
-            }
-
-            var renderedSpriteRect = CalculateRenderedSpriteRect(
-                artworkContainerRect,
-                artworkImage.sprite,
-                artworkImage.preserveAspect);
-            var clampedPosition = new Vector2(
-                Mathf.Clamp01(normalizedSpritePosition.x),
-                Mathf.Clamp01(normalizedSpritePosition.y));
-            var artworkLocalPoint = new Vector2(
-                Mathf.Lerp(renderedSpriteRect.xMin, renderedSpriteRect.xMax, clampedPosition.x),
-                Mathf.Lerp(renderedSpriteRect.yMin, renderedSpriteRect.yMax, clampedPosition.y));
-            var worldPoint = artworkRectTransform.TransformPoint(artworkLocalPoint);
-            var parentLocalPoint = textParent.InverseTransformPoint(worldPoint);
-            var anchor = new Vector2(
-                Mathf.InverseLerp(textParentRect.xMin, textParentRect.xMax, parentLocalPoint.x),
-                Mathf.InverseLerp(textParentRect.yMin, textParentRect.yMax, parentLocalPoint.y));
-
-            var textRectTransform = text.rectTransform;
-            textRectTransform.anchorMin = anchor;
-            textRectTransform.anchorMax = anchor;
-            textRectTransform.anchoredPosition = Vector2.zero;
-            textRectTransform.localScale = Vector3.one;
-            textRectTransform.localRotation = Quaternion.identity;
+            if (artworkImage == null) return;
+            HandCardStatOverlayLayout.PositionStatText(text?.rectTransform, artworkImage.rectTransform,
+                HandCardStatOverlayLayout.CalculateRenderedSpriteRect(artworkImage), normalizedSpritePosition);
         }
 
-        private static Rect CalculateRenderedSpriteRect(
-            Rect containerRect,
-            Sprite sprite,
-            bool preserveAspect)
-        {
-            if (!preserveAspect ||
-                sprite == null ||
-                containerRect.width <= 0f ||
-                containerRect.height <= 0f ||
-                sprite.rect.width <= 0f ||
-                sprite.rect.height <= 0f)
-            {
-                return containerRect;
-            }
-
-            var spriteAspect = sprite.rect.width / sprite.rect.height;
-            var containerAspect = containerRect.width / containerRect.height;
-            if (spriteAspect > containerAspect)
-            {
-                var renderedHeight = containerRect.width / spriteAspect;
-                return new Rect(
-                    containerRect.xMin,
-                    containerRect.center.y - (renderedHeight * 0.5f),
-                    containerRect.width,
-                    renderedHeight);
-            }
-
-            var renderedWidth = containerRect.height * spriteAspect;
-            return new Rect(
-                containerRect.center.x - (renderedWidth * 0.5f),
-                containerRect.yMin,
-                renderedWidth,
-                containerRect.height);
-        }
 
         public static bool TryBuildCardStatValues(
             CardDefinition definition,
@@ -873,27 +800,13 @@ namespace Project333.Runtime.Presentation.Battle
             out int attack,
             out int hp)
         {
-            attack = 0;
-            hp = 0;
-
-            switch (definition)
-            {
-                case UnitCardDefinition unit:
-                    attack = CardLevelStatRules.ApplyAttackBonus(unit.CardId, unit.Attack, upgradeLevel);
-                    hp = CardLevelStatRules.ApplyHpBonus(unit.CardId, unit.Health, upgradeLevel);
-                    return true;
-
-                case BuildingCardDefinition building:
-                    attack = CardLevelStatRules.ApplyAttackBonus(building.CardId, building.Attack, upgradeLevel);
-                    hp = CardLevelStatRules.ApplyHpBonus(building.CardId, building.Health, upgradeLevel);
-                    return true;
-
-                default:
-                    return false;
-            }
+            var hasStats = CardStatDisplay.TryCreate(definition, upgradeLevel, out var stats);
+            attack = stats.Attack;
+            hp = stats.Hp;
+            return hasStats;
         }
 
-        private void SetCardStatVisible(int slotIndex, bool visible)
+        private void SetCardStatVisible(int slotIndex, bool visible, bool showHp = true)
         {
             var attackText = GetAt(_attackValueTexts, slotIndex);
             if (attackText != null)
@@ -904,7 +817,7 @@ namespace Project333.Runtime.Presentation.Battle
             var hpText = GetAt(_hpValueTexts, slotIndex);
             if (hpText != null)
             {
-                hpText.enabled = visible;
+                hpText.enabled = visible && showHp;
             }
         }
 

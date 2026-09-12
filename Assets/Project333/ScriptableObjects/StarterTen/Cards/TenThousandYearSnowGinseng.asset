@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9a3f1ad71d83aed4b8386fecdce840e9, type: 3}
+  m_Name: TenThousandYearSnowGinseng
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.PersistentResourceSpellCardDefinitionAsset
+  _cardId: TenThousandYearSnowGinseng
+  _displayName: "\uC601\uC57D: \uB9CC\uB144\uC124\uC0BC"
+  _rarity: 3
+  _cost:
+    _mana: 0
+    _qi: 0
+    _power: 0
+    _gold: 4
+  _affiliation: 0
+  _chargeTileFootprint: 0
+  _effectText: "\uB2E4\uC74C \uB0B4 3\uD134\uB3D9\uC548 \uAE30+3"
+  _specialEffectText: 
+  _hasReplicate: 0
+  _boardSprite: {fileID: 0}
+  _boardAnimatorController: {fileID: 0}
+  _effectId: ten_thousand_year_snow_ginseng
+  _turnStartResourceGain:
+    _mana: 0
+    _qi: 3
+    _power: 0
+    _gold: 0
+  _ownerTurnStartsRemaining: 3
+  _endConditionText: "\uB2E4\uC74C 3\uBC88\uC758 \uB0B4 \uD134 \uC2DC\uC791 \uD6C4
+    \uC885\uB8CC\uB429\uB2C8\uB2E4."

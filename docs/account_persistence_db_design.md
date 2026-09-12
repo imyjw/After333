@@ -40,6 +40,14 @@ Confirmed design direction:
 - Tickets are spent when starting a new run.
 - PvP matchmaking and reconnect must use authenticated server accounts, not local-only player names.
 - A reconnecting client must prove account identity with a valid `sessionToken` or a freshly restored session.
+- Each started battle retains a server-owned participant snapshot containing account, runtime/online seat, run, deck contents and upgrade levels. Reconnect requests restore these values; they cannot replace them or attach a run to a practice battle.
+- Participant snapshots persist separately from live connections, including when all participants disconnect. Recovery restores participant metadata before constructing upgrade providers. Legacy snapshots may use identities from their server-saved connections; a missing historical participant cannot be reconstructed from new client input, so that seat's recovery is rejected.
+- Started `pvp_match_players` entries reject changes to account, run, deck or runtime seat. Run-result updates also require the bound account to own the run and the completed deck to match.
+- Migration `0012_battle_result_receipts` adds `battle_result_receipts` (result UUID primary key, match ID, complete server result JSON, recorded timestamp) and `battle_run_results` (result UUID + seat primary key, account/run/deck and win flag). The receipt and all run/match updates share one transaction. Duplicate identical delivery succeeds without another increment; conflicting reuse of an ID is rejected.
+- BattleSession generates its result UUID independently of the client-visible room name and persists it in snapshots. Result extraction is non-destructive. Legacy active snapshots derive a stable server-side identity; legacy ended snapshots without result identity are not automatically replayed because prior application cannot be proven.
+- Before a terminal response, BattleSession writes its immutable result to the server result outbox using a flushed temporary file and atomic rename. The hosted worker retries pending files after DB recovery and loads them again on restart. Files are removed only after DB commit; replay after an uncertain commit is safe because of the receipt.
+- `PROJECT333_BATTLE_RESULT_OUTBOX_DIR` may select a persistent private server directory. The default is `LocalApplicationData/After333/Server/BattleResults/<database fingerprint>`; the fingerprint uses host, port, database and username, excluding credentials. Keep the directory across releases and back it up with server state. It is server-owned data, never a client upload directory.
+- Malformed, conflicting or permanently rejected results are retained and logged for investigation. Retry delays grow from 5 to 60 seconds. This does not recover a terminal result that was never durably written, nor protect against simultaneous loss of the DB and server outbox disk.
 
 ## Scope
 
@@ -610,6 +618,14 @@ Rules:
 - Matchmaking must use authenticated `account_id`, not local player names.
 - Canceling matchmaking should update this row instead of deleting it.
 
+### `pvp_match_reservations`
+
+Before a new queue participant connects, `pvp_match_reservations` (migration `0013`, deployed and verified on 2026-09-09) reserves a concrete `PlayerA` or `PlayerB` seat in the same transaction as match selection. Columns are reservation UUID, match UUID, seat, authenticated account UUID, server connection ID, run/deck UUIDs, creation time and expiry. Unique constraints on `(match_id, seat)` and `account_id` prevent duplicate pending seats and pending accounts.
+
+The internal join reservation lasts 60 seconds and is separate from the existing reconnect timer. Same-connection retries reuse it without extending expiry; other simultaneous connections from the same account are rejected. Successful player/connection persistence validates account, connection, seat, run/deck and deadline and consumes the reservation atomically. Failed requests release by reservation UUID plus connection ID; expired abandoned reservations are removed on the next queue resolution. Queue rows retain canceled/expired history. Waiting disconnected seats stop counting as occupied, and empty waiting matches become canceled. Started battles retain the existing reconnect behavior.
+
+Capacity-changing matchmaking transactions share a short PostgreSQL advisory lock in the current single-region service. No network I/O is performed under that lock. In-memory join leases keep the same BattleSession registered while a participant is entering; a battle cannot start before both connections finish DB joining. Validation: `TempBuild/ServerMatchReservations_20260909/README.md`.
+
 ### `pvp_matches`
 
 Stores one PvP match lifecycle row.
@@ -855,6 +871,8 @@ Current implementation:
 
 ### Run End And Rewards
 
+Only server-resolved battle results advance the persisted run counters. The reward service reads these counters from the database; client-provided win/loss totals and offline battle results are never accepted. Clients awaiting persistence refresh /me instead of uploading local totals. The retired local-result endpoint is rejected before request deserialization, authentication, or database access in every environment.
+
 When a run reaches 33 wins or 3 losses:
 
 - Set `draft_runs.status` to `completed`.
@@ -885,7 +903,7 @@ Implemented account/meta endpoints:
 | `POST /runs/select-draft-card` | Select one card from the authoritative offer and advance the draft |
 | `POST /runs/save-draft-picks` | Removed client-authoritative compatibility route; returns `410 Gone` |
 | `POST /runs/complete-draft` | Removed client-authoritative compatibility route; returns `410 Gone` |
-| `POST /runs/sync-local-record` | Development compatibility path for an older local PvE result |
+| `POST /runs/sync-local-record` | Removed client-authoritative result route; always returns 410 Gone with client_authoritative_run_result_removed |
 | `POST /runs/claim-rewards` | Claim one completed run reward |
 | `GET /pvp/reconnect-status` | Query the authenticated account's reconnectable PvP match |
 
@@ -946,8 +964,27 @@ These rules are intentionally not decided by this document:
 
 ## Next Implementation Recommendation
 
+### Connection stability follow-up (2026-09-09; source verified and deployed)
+
+- WebSocket send errors, closed transports, receive termination and heartbeat expiry converge on one disconnect cleanup. The session reserves the original seat and detaches the socket under one lock; repeated cleanup is a no-op.
+- Start the existing grace expiry timer before DB/network awaits. A DB failure cannot prevent the in-memory grace timer from being scheduled.
+- Reconnect joins and disconnect persistence serialize on the same match row. Only closing the exact active connection may mark its seat disconnected; late cleanup of a replaced socket cannot overwrite a newer join or extend a previous deadline.
+- Envelope sends and close-output responses share a per-connection semaphore. State views are created inside the gate; the five-second send deadline includes gate wait. A sender's HTTP cancellation does not propagate to the opponent's broadcast send.
+- This change requires no new DB migration. It does not introduce global event sequencing, a bounded send queue, new matchmaking rules, or additional server-restart recovery guarantees.
+- See `TempBuild/ServerConnectionStability_20260909/README.md` for isolated validation. The same verified binary was deployed at 20:02 KST; see `TempBuild/ServerConnectionStabilityDeploy_20260909/README.md`. Public HTTP/WSS checks passed; Unity visual reconnect validation remains blocked by the Computer Use capture error.
+
+### Other setup recommendations
+
 1. Create the Google Cloud Desktop, Web application, and Android OAuth clients described in `docs/google_auth_setup.md`.
 2. Run live Windows Google login, account-link, duplicate-link rejection, and persistence smoke tests through HTTPS.
 3. Run Android Google login/link, automatic session restore, secure credential migration/logout, and duplicate-link smoke tests on a real device.
 4. Deploy the published server and PostgreSQL to a staging host behind HTTPS/WSS when a VPS is introduced.
 5. Add Kakao and Naver only after both Google platform flows are stable.
+
+### Draft-run start atomicity (migration 0014; deployed and verified 2026-09-09)
+
+`draft_runs_one_active_per_account_idx` is a unique partial index on `draft_runs(account_id)` with predicate `status in ('drafting', 'ready', 'in_progress')`. It applies across modes and to status transitions as well as inserts. Legacy duplicates are not repaired automatically; index creation and the migration version insert roll back together on failure.
+
+The server acquires `user_wallets ... FOR UPDATE` for the authenticated account before checking all active runs and unclaimed completed runs, under READ COMMITTED isolation. Competing starts wait before the read and see the winning transaction's committed run. Wallet debit, run, initial offer and ticket-spend ledger entry commit or roll back as a unit. The lookup does not lock an existing run while holding the wallet, avoiding reversed run/wallet lock order with reward claims. Different accounts remain independent.
+
+Completed historical rows are not constrained by the active-run index. Their unclaimed rewards are checked by the service and must not be silently discarded during deployment. HTTP start retries against an active run retain the existing 409 `active_run_exists` contract rather than creating a new run or returning an idempotency receipt.

@@ -23,7 +23,8 @@ MonoBehaviour:
   _affiliation: 3
   _chargeTileFootprint: 1
   _effectText: 
-  _specialEffectText: 'Shielder : It takes the damage of the object behind it instead. '
+  _specialEffectText: "\uC274\uB354"
+  _hasReplicate: 0
   _boardSprite: {fileID: 1891870504, guid: d46e924057ba7204bae951f6fe4c5b85, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: eb4c6b2d97aaea74eb68e6b1e280086f, type: 2}
   _attackType: 0
@@ -35,8 +36,17 @@ MonoBehaviour:
   _hitsPerAttack: 1
   _hasBerserker: 0
   _hasEndure: 0
-  _hasGuard: 1
+  _hasShielder: 1
+  _hasLifeSteal: 0
+  _hasRobot: 0
   _canMove: 1
+  _sealboundOwnerTurnStarts: 0
+  _hasHiding: 0
+  _hasFlying: 0
+  _hasPiercing: 0
+  _spellPower: 0
+  _invincibleDuration: 0
+  _invincibleOwnerTurns: 0
   _isScience: 0
   _sciencePowerUpkeep: 0
   _turnStartResourceGain:

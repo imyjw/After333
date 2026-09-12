@@ -3,7 +3,7 @@ using Project333.PvpServer.Auth;
 namespace Project333.PvpServer.Cards;
 
 public sealed record UpgradeCardRequest(
-    string? CardId);
+    string? CardId, string? RequestId = null, int? ExpectedUpgradeLevel = null);
 
 public sealed record UpgradeCardCostDto(
     int LevelFrom,
@@ -16,4 +16,4 @@ public sealed record UpgradeCardResponse(
     WalletDto Wallet,
     CollectionSummaryDto CollectionSummary,
     OwnedCardDto UpgradedCard,
-    UpgradeCardCostDto UpgradeCost);
+    UpgradeCardCostDto UpgradeCost, string RequestId, bool Replayed = false);

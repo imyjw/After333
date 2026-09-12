@@ -1,4 +1,5 @@
 using Npgsql;
+using Project333.PvpServer.AccountOperations;
 using Project333.PvpServer.Auth;
 using Project333.PvpServer.BattleSessions;
 using Project333.PvpServer.Persistence.Db;
@@ -29,6 +30,9 @@ public sealed class CardUpgradeService
             throw new ArgumentNullException(nameof(account));
         }
 
+        var requestId = AccountOperationReceipt.ParseRequestId(request?.RequestId);
+        if (request?.ExpectedUpgradeLevel is not int expectedLevel || expectedLevel < 0 || expectedLevel > CardUpgradeRules.MaxLevel)
+            throw new CardUpgradeServiceException("invalid_expected_upgrade_level", "ExpectedUpgradeLevel is required and must be between 0 and 13.");
         var cardDefinition = ResolveCanonicalCardDefinition(request?.CardId);
         var cardId = cardDefinition.CardId;
         if (!CardUpgradeRules.IsCardUpgradeable(cardDefinition))
@@ -39,7 +43,22 @@ public sealed class CardUpgradeService
         }
 
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken);
+
+        // Wallet first, then collection: matches reward spending/grant lock order.
+        var currentWallet = await AccountOperationReceipt.LockWalletAsync(connection, transaction, account.Account.Id, cancellationToken);
+        var fingerprint = System.Text.Json.JsonSerializer.Serialize(new { CardId = cardId, ExpectedUpgradeLevel = expectedLevel });
+        var previous = await AccountOperationReceipt.FindAsync<UpgradeCardResponse>(connection, transaction,
+            account.Account.Id, requestId, "card_upgrade", fingerprint, cancellationToken);
+        if (previous != null)
+        {
+            var currentCollection = await LoadCollectionSummaryAsync(connection, transaction, account.Account.Id, cancellationToken);
+            var currentCard = currentCollection.OwnedCards.Single(c => string.Equals(c.CardId, cardId, StringComparison.OrdinalIgnoreCase));
+            await transaction.CommitAsync(cancellationToken);
+            // Cost describes the original operation; balances and owned card describe current state.
+            return previous with { Account = account.Account, Wallet = currentWallet,
+                CollectionSummary = currentCollection, UpgradedCard = currentCard, Replayed = true };
+        }
 
         var ownedCard = await LoadOwnedCardForUpdateAsync(
             connection,
@@ -53,6 +72,9 @@ public sealed class CardUpgradeService
                 "card_not_owned",
                 $"Card '{cardId}' is not owned by this account.");
         }
+
+        if (ownedCard.UpgradeLevel != expectedLevel)
+            throw new CardUpgradeServiceException("card_upgrade_conflict", "The card level changed. Refresh the collection before upgrading again.");
 
         if (!CardUpgradeRules.TryGetNextUpgradeCost(ownedCard.UpgradeLevel, out _))
         {
@@ -102,14 +124,11 @@ public sealed class CardUpgradeService
             account.Account.Id,
             cancellationToken);
 
+        var response = new UpgradeCardResponse(account.Account, wallet, collection, upgradedCard, cost, requestId.ToString("D"));
+        await AccountOperationReceipt.SaveAsync(connection, transaction, account.Account.Id, requestId,
+            "card_upgrade", fingerprint, response, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-
-        return new UpgradeCardResponse(
-            account.Account,
-            wallet,
-            collection,
-            upgradedCard,
-            cost);
+        return response;
     }
 
     private CardDefinition ResolveCanonicalCardDefinition(string? requestedCardId)

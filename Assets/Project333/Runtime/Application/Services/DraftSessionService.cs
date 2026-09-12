@@ -9,10 +9,10 @@ namespace Project333.Runtime.Application.Services
     public sealed class DraftSessionService
     {
         private const int OfferSize = 3;
-        private const int NonLegendaryCommonWeight = 40;
-        private const int NonLegendaryUncommonWeight = 30;
-        private const int NonLegendaryRareWeight = 20;
-        private const int NonLegendaryUniqueWeight = 10;
+        private const int NonLegendaryCommonWeight = DraftRarityWeights.Common;
+        private const int NonLegendaryUncommonWeight = DraftRarityWeights.Uncommon;
+        private const int NonLegendaryRareWeight = DraftRarityWeights.Rare;
+        private const int NonLegendaryUniqueWeight = DraftRarityWeights.Unique;
         private const int RequiredNonLegendaryUniqueCards = 13;
 
         private static readonly CardRarity[] WeightedRarityOrder =
@@ -81,6 +81,20 @@ namespace Project333.Runtime.Application.Services
             return CurrentOffer;
         }
 
+        // Server response rendering only. Do not apply today's offer eligibility to historical IDs.
+        public DraftOffer RestoreServerDraft(IReadOnlyList<string> selectedIds, IReadOnlyList<string> offerIds)
+        {
+            if (DeckState.Count != 0 || selectedIds == null || selectedIds.Count >= DraftDeckState.TargetDeckSize ||
+                offerIds == null || offerIds.Count != OfferSize || offerIds.Distinct(StringComparer.Ordinal).Count() != OfferSize)
+                throw new InvalidOperationException("Invalid server draft state.");
+            CardDefinitionAsset Resolve(string id) => _catalogCards.FirstOrDefault(card => card.CardId == id) ??
+                throw new InvalidOperationException($"Server draft card '{id}' is missing from the current catalog.");
+            var selected = selectedIds.Select(Resolve).ToArray();
+            var offered = offerIds.Select(Resolve).ToArray();
+            foreach (var card in selected) DeckState.RestoreServerCard(card.CardId);
+            CurrentOffer = new DraftOffer(offered, DeckState.Count + 1, DeckState.Count == 0);
+            return CurrentOffer;
+        }
         public DraftOffer ResumeDraft(
             IReadOnlyList<string> selectedCardIds,
             IReadOnlyList<string> currentOfferCardIds = null)

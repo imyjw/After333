@@ -195,17 +195,17 @@ namespace Project333.Tests.EditMode
                 TargetOwnerId = PlayerId.AI,
                 SourceCardId = BiochemicalBombRules.CardId,
                 TargetCardId = "Goblin",
-                Amount = 44,
-                DamageType = DamageType.Physical,
+                Amount = 25,
+                DamageType = DamageType.Fixed,
                 ValueCause = BattleValueChangeCause.BiochemicalBomb,
-                TargetHpHistory = new List<int> { 50, 6 }
+                TargetHpHistory = new List<int> { 50, 25 }
             };
 
             var result = BattleCombatLogEntryFormatter.Format(entry, ResolveCardName);
 
             Assert.That(
                 result,
-                Is.EqualTo("상대방의 고블린이 생화학폭탄 효과로 44의 물리 피해를 입음 (50→6)"));
+                Is.EqualTo("상대방의 고블린이 생화학폭탄 효과로 25의 고정 피해를 입음 (50→25)"));
         }
 
         [Test]

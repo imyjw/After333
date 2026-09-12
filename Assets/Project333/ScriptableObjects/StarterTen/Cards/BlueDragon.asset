@@ -31,7 +31,7 @@ MonoBehaviour:
   _attackType: 1
   _damageType: 2
   _attack: 40
-  _health: 70
+  _health: 50
   _physicalDefense: 0
   _magicDefense: 0
   _hitsPerAttack: 1

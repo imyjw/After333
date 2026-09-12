@@ -1,4 +1,5 @@
 using System;
+using Project333.Runtime.Presentation.Hand;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
@@ -147,8 +148,8 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] [Min(0f)] private float _opponentPlayedCardFadeOutSeconds = 0.15f;
         [SerializeField] private int _opponentPlayedCardSortingOrder = DefaultOpponentPlayedCardSortingOrder;
         [SerializeField] private bool _showOpponentPlayedCardStats = true;
-        [SerializeField] private Vector2 _opponentPlayedCardAttackStatNormalizedPosition = new Vector2(0.07f, 0.09f);
-        [SerializeField] private Vector2 _opponentPlayedCardHpStatNormalizedPosition = new Vector2(0.92f, 0.09f);
+        [SerializeField] private Vector2 _opponentPlayedCardAttackStatNormalizedPosition = HandCardStatOverlayLayout.DefaultAttackPosition;
+        [SerializeField] private Vector2 _opponentPlayedCardHpStatNormalizedPosition = HandCardStatOverlayLayout.DefaultHpPosition;
         [SerializeField] private Vector2 _opponentPlayedCardStatTextSize = new Vector2(72f, 54f);
         [SerializeField] private int _opponentPlayedCardStatFontSize = 34;
         [SerializeField] private Color _opponentPlayedCardStatTextColor = Color.white;
@@ -950,7 +951,8 @@ namespace Project333.Runtime.Presentation.Battle
                 _opponentPlayedCardRevealQueue.Enqueue(new OpponentPlayedCardRevealRequest(
                     battleEvent.CardId,
                     battleEvent.CardAttack,
-                    battleEvent.CardMaxHp));
+                    battleEvent.CardMaxHp,
+                    battleEvent.CardSpellDamage));
             }
 
             if (_opponentPlayedCardRevealQueue.Count <= 0 || _opponentPlayedCardRevealCoroutine != null)
@@ -1072,17 +1074,18 @@ namespace Project333.Runtime.Presentation.Battle
                 _opponentPlayedCardFallbackText.gameObject.SetActive(!hasArtwork);
             }
 
-            var showStats = _showOpponentPlayedCardStats && request.CardMaxHp > 0;
+            var showHp = _showOpponentPlayedCardStats && request.CardMaxHp > 0;
+            var showAttack = showHp || (_showOpponentPlayedCardStats && request.CardSpellDamage.HasValue);
             if (_opponentPlayedCardAttackText != null)
             {
-                _opponentPlayedCardAttackText.text = request.CardAttack.ToString();
-                _opponentPlayedCardAttackText.gameObject.SetActive(showStats);
+                _opponentPlayedCardAttackText.text = (request.CardSpellDamage ?? request.CardAttack).ToString();
+                _opponentPlayedCardAttackText.gameObject.SetActive(showAttack);
             }
 
             if (_opponentPlayedCardHpText != null)
             {
                 _opponentPlayedCardHpText.text = request.CardMaxHp.ToString();
-                _opponentPlayedCardHpText.gameObject.SetActive(showStats);
+                _opponentPlayedCardHpText.gameObject.SetActive(showHp);
             }
 
             _opponentPlayedCardRevealCanvasGroup.alpha = 0f;
@@ -1102,85 +1105,25 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             var artworkRectTransform = _opponentPlayedCardRevealImage.rectTransform;
-            var containerRect = artworkRectTransform.rect;
-            var renderedSpriteRect = CalculateOpponentPlayedCardRenderedSpriteRect(
-                containerRect,
-                _opponentPlayedCardRevealImage.sprite,
-                _opponentPlayedCardRevealImage.preserveAspect);
+            var renderedSpriteRect = HandCardStatOverlayLayout.CalculateRenderedSpriteRect(_opponentPlayedCardRevealImage);
             PositionOpponentPlayedCardStatText(
                 _opponentPlayedCardAttackText,
-                containerRect,
+                artworkRectTransform,
                 renderedSpriteRect,
                 _opponentPlayedCardAttackStatNormalizedPosition);
             PositionOpponentPlayedCardStatText(
                 _opponentPlayedCardHpText,
-                containerRect,
+                artworkRectTransform,
                 renderedSpriteRect,
                 _opponentPlayedCardHpStatNormalizedPosition);
         }
 
-        private static Rect CalculateOpponentPlayedCardRenderedSpriteRect(
-            Rect containerRect,
-            Sprite sprite,
-            bool preserveAspect)
+
+        private static void PositionOpponentPlayedCardStatText(Text text, RectTransform artworkRectTransform,
+            Rect renderedSpriteRect, Vector2 normalizedSpritePosition)
         {
-            if (!preserveAspect ||
-                sprite == null ||
-                containerRect.width <= 0f ||
-                containerRect.height <= 0f ||
-                sprite.rect.width <= 0f ||
-                sprite.rect.height <= 0f)
-            {
-                return containerRect;
-            }
-
-            var spriteAspect = sprite.rect.width / sprite.rect.height;
-            var containerAspect = containerRect.width / containerRect.height;
-            if (spriteAspect > containerAspect)
-            {
-                var renderedHeight = containerRect.width / spriteAspect;
-                return new Rect(
-                    containerRect.xMin,
-                    containerRect.center.y - (renderedHeight * 0.5f),
-                    containerRect.width,
-                    renderedHeight);
-            }
-
-            var renderedWidth = containerRect.height * spriteAspect;
-            return new Rect(
-                containerRect.center.x - (renderedWidth * 0.5f),
-                containerRect.yMin,
-                renderedWidth,
-                containerRect.height);
-        }
-
-        private static void PositionOpponentPlayedCardStatText(
-            Text text,
-            Rect containerRect,
-            Rect renderedSpriteRect,
-            Vector2 normalizedSpritePosition)
-        {
-            if (text == null || containerRect.width <= 0f || containerRect.height <= 0f)
-            {
-                return;
-            }
-
-            var clampedPosition = new Vector2(
-                Mathf.Clamp01(normalizedSpritePosition.x),
-                Mathf.Clamp01(normalizedSpritePosition.y));
-            var localPoint = new Vector2(
-                Mathf.Lerp(renderedSpriteRect.xMin, renderedSpriteRect.xMax, clampedPosition.x),
-                Mathf.Lerp(renderedSpriteRect.yMin, renderedSpriteRect.yMax, clampedPosition.y));
-            var anchor = new Vector2(
-                Mathf.InverseLerp(containerRect.xMin, containerRect.xMax, localPoint.x),
-                Mathf.InverseLerp(containerRect.yMin, containerRect.yMax, localPoint.y));
-
-            var rectTransform = text.rectTransform;
-            rectTransform.anchorMin = anchor;
-            rectTransform.anchorMax = anchor;
-            rectTransform.anchoredPosition = Vector2.zero;
-            rectTransform.localScale = Vector3.one;
-            rectTransform.localRotation = Quaternion.identity;
+            HandCardStatOverlayLayout.PositionStatText(text?.rectTransform, artworkRectTransform,
+                renderedSpriteRect, normalizedSpritePosition);
         }
 
         private void HideOpponentPlayedCardReveal()
@@ -3858,6 +3801,7 @@ namespace Project333.Runtime.Presentation.Battle
                 }
 
                 var command = _aiDecisionService.GetNextCommand(CurrentBattleState);
+                var actionPresentationStarted = Time.unscaledTime;
                 if (command is EndTurnCommand)
                 {
                     var beforeSnapshot = CaptureBattleSnapshot(CurrentBattleState);
@@ -3896,7 +3840,7 @@ namespace Project333.Runtime.Presentation.Battle
                     var animationRequest = BuildAttackAnimationRequest(beforeSnapshot, afterSnapshot, PlayerId.AI, attackCommand.AttackerCoord, PlayerId.Player, attackCommand.TargetCoord, shielderInfo, attackerIsRanged, defenderCounterattacks, valuePopupEvents);
                     yield return PlayAttackAnimationSequence(animationRequest);
                     RefreshPresenter();
-                    yield return null;
+                    yield return PauseAfterLocalAiAction(command, actionPresentationStarted);
                     continue;
                 }
 
@@ -3909,14 +3853,14 @@ namespace Project333.Runtime.Presentation.Battle
                     var impactRequest = BuildImpactAnimationRequest(beforeSnapshot, afterSnapshot, CloneValuePopupEvents(CurrentBattleState), castDamageSpellCommand.CardId);
                     yield return PlayImpactAnimationSequence(impactRequest);
                     RefreshPresenter();
-                    yield return null;
+                    yield return PauseAfterLocalAiAction(command, actionPresentationStarted);
                     continue;
                 }
 
                 _battleGateway.ExecuteCommand(PlayerId.AI, command);
                 AddCombatLogEntry(CombatLogFormatter.FormatCommand(PlayerId.AI, command));
                 RefreshPresenter();
-                yield return null;
+                yield return PauseAfterLocalAiAction(command, actionPresentationStarted);
             }
 
             if (_autoResolvePlayerTurnStartAfterAi &&
@@ -3937,6 +3881,17 @@ namespace Project333.Runtime.Presentation.Battle
 
                 RefreshPresenter();
             }
+        }
+
+        private IEnumerator PauseAfterLocalAiAction(IBattleCommand command, float presentationStarted)
+        {
+            if (CurrentBattleState == null || CurrentBattleState.IsEnded || CurrentBattleState.ActivePlayerId != PlayerId.AI)
+            {
+                yield break;
+            }
+            var seconds = AiActionTiming.CalculatePostActionPauseSeconds(
+                command is IHandCardCommand, Time.unscaledTime - presentationStarted);
+            yield return new WaitForSecondsRealtime((float)seconds);
         }
 
         private float PlayOnlineAttackAnimation(BattleEventDto attackEvent, IReadOnlyList<BattleEventDto> battleEvents)
@@ -4673,8 +4628,8 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             var localOffset = defenderOwnerId == PlayerId.AI
-                ? new Vector2(-30f, 50f)
-                : new Vector2(30f, 50f);
+                ? new Vector2(-30f, 40f)
+                : new Vector2(30f, 40f);
 
             return destinationView.GetTileAnchorWorldPosition(localOffset);
         }
@@ -5382,16 +5337,18 @@ namespace Project333.Runtime.Presentation.Battle
 
         private sealed class OpponentPlayedCardRevealRequest
         {
-            public OpponentPlayedCardRevealRequest(string cardId, int cardAttack, int cardMaxHp)
+            public OpponentPlayedCardRevealRequest(string cardId, int cardAttack, int cardMaxHp, int? cardSpellDamage)
             {
                 CardId = cardId ?? string.Empty;
                 CardAttack = Mathf.Max(0, cardAttack);
                 CardMaxHp = Mathf.Max(0, cardMaxHp);
+                CardSpellDamage = cardSpellDamage;
             }
 
             public string CardId { get; }
             public int CardAttack { get; }
             public int CardMaxHp { get; }
+            public int? CardSpellDamage { get; }
         }
     }
 }

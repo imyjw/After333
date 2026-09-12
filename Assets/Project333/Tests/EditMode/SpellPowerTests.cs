@@ -102,6 +102,42 @@ namespace Project333.Tests.EditMode
             Assert.That(sourceAndTarget.CurrentHp, Is.EqualTo(15));
         }
 
+        [TestCase(0)]
+        [TestCase(5)]
+        public void BiochemicalBomb_IgnoresSpellPowerAndDefensesForAllFourTriggers(int spellPowerAtCast)
+        {
+            var battleState = CreateBattleState();
+            var source = AddSpellPowerSource(battleState, PlayerId.Player, spellPowerAtCast);
+            var target = CreateUnit("target", PlayerId.AI, new TileCoord(0, 0),
+                maxHp: 300, physicalDefense: 20, magicDefense: 2);
+            battleState.AIBoard.Place(target.Position, target);
+            var upgrades = new InMemoryCardUpgradeLevelProvider();
+            upgrades.SetUpgradeLevel(PlayerId.Player, BiochemicalBombRules.CardId, 3);
+            var definition = new ScriptedSpellCardDefinition(
+                BiochemicalBombRules.CardId, "Biochemical Bomb", new ResourceSet(),
+                BiochemicalBombRules.EffectId, damage: 25, damageType: DamageType.Fixed, triggerCount: 4);
+            var service = new SpellService(
+                new InMemoryCardDefinitionProvider(new CardDefinition[] { definition }),
+                cardUpgradeLevelProvider: upgrades);
+            battleState.Player.Hand.Add(BiochemicalBombRules.CardId);
+
+            service.CastScriptedSpell(battleState, PlayerId.Player, BiochemicalBombRules.CardId,
+                PlayerId.AI, target.Position);
+
+            var effect = battleState.PersistentEffects[0];
+            Assert.That(effect.EffectDamage, Is.EqualTo(28));
+            Assert.That(effect.EffectDamageType, Is.EqualTo(DamageType.Fixed));
+            Assert.That(effect.CapturedSpellPower, Is.Zero);
+            battleState.PlayerBoard.Remove(source.Position);
+            AddSpellPowerSource(battleState, PlayerId.Player, 20);
+            for (var trigger = 1; trigger <= 4; trigger++)
+            {
+                ResolveTurnStart(battleState, trigger % 2 == 1 ? PlayerId.AI : PlayerId.Player);
+                Assert.That(target.CurrentHp, Is.EqualTo(300 - trigger * 28));
+            }
+            Assert.That(effect.IsExpired, Is.True);
+        }
+
         [Test]
         public void Firewall_CapturesSpellPowerAtCastAndUsesItForEveryTargetAndTrigger()
         {

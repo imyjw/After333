@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Compile Include="RunAuthorityChecks.cs" />
+    <Compile Include="SavedDraftOfferChecks.cs" />
+    <Compile Include="BattleParticipantChecks.cs" />
+    <Compile Include="BattleBindingNetworkChecks.cs" />
+    <Compile Include="ResultDeliveryChecks.cs" />
+    <Compile Include="ConnectionStabilityChecks.cs" />
+    <Compile Include="BattleInputChecks.cs" />
+    <Compile Include="RunStartAtomicityChecks.cs" />
+    <Compile Include="AccountOperationChecks.cs" />
+    <Compile Include="BattleConnectionLimitChecks.cs" />
+    <Compile Include="MatchmakingReservationChecks.cs" />
+    <Reference Include="Project333.PvpServer"><HintPath>$(ServerOutput)\Project333.PvpServer.dll</HintPath></Reference>
+    <Reference Include="Npgsql"><HintPath>$(ServerOutput)\Npgsql.dll</HintPath></Reference>
+    <Content Include="$(ServerOutput)\Data\*.json" Link="Data\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="RequireBuiltServer" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ServerOutput)\Project333.PvpServer.dll')" Text="Pass -p:ServerOutput=the freshly built isolated server output directory." />
+  </Target>
+</Project>

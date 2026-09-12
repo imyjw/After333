@@ -1,6 +1,10 @@
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
+using Project333.Runtime.Application.Services;
+using Project333.Runtime.Domain.Battle;
+using Project333.Runtime.Domain.Board;
+using Project333.Runtime.Domain.Resources;
 using Project333.Runtime.Domain.Cards;
 using Project333.Runtime.Infrastructure.Data;
 using UnityEngine;
@@ -12,6 +16,7 @@ namespace Project333.Tests.EditMode
         private static readonly string[] ExpectedUpgradeableCardIds =
         {
             "A-111",
+            "A-212",
             "A-301",
             "BiochemicalBomb",
             "BlueDragon",
@@ -287,6 +292,54 @@ namespace Project333.Tests.EditMode
 
             Assert.That(bonus.AttackBonus, Is.EqualTo(expectedAttackBonus));
             Assert.That(bonus.HpBonus, Is.EqualTo(expectedHpBonus));
+        }
+
+        [TestCase("Cerberus")]
+        [TestCase("ManaPond")]
+        public void RequestedUpgradeProgression_AppliesEveryLevelToActualSummons(string cardId)
+        {
+            var database = JsonCardDefinitionDatabase.FromJson(File.ReadAllText(
+                Path.Combine(Application.dataPath, "Project333/Resources/Project333/Data/cards.json")));
+            var provider = database.CreateProvider();
+            var expectedAttacks = cardId == "Cerberus"
+                ? new[] { 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10 }
+                : new[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+            var expectedHealth = cardId == "Cerberus"
+                ? new[] { 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 78 }
+                : new[] { 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33 };
+            for (var level = 0; level <= 13; level++)
+            {
+                var bonus = CardLevelStatRules.CalculateBonus(cardId, level);
+                Assert.That(bonus.AttackBonus, Is.EqualTo(expectedAttacks[level] - expectedAttacks[0]), $"{cardId} Lv.{level} ATK");
+                Assert.That(bonus.HpBonus, Is.EqualTo(expectedHealth[level] - expectedHealth[0]), $"{cardId} Lv.{level} HP");
+                var deck = Enumerable.Repeat("Goblin", 33).ToArray();
+                var state = new BattleSetupService().CreateInitialState(
+                    new BattleSetupRequest(deck, deck, PlayerId.Player));
+                state.SetPhase(PhaseType.Main);
+                state.Player.Resources.Add(new ResourceSet(10, 0, 0, 10));
+                state.Player.Hand.Add(cardId);
+                var levels = new InMemoryCardUpgradeLevelProvider();
+                levels.SetUpgradeLevel(PlayerId.Player, cardId, level);
+                var play = new PlayCardService(provider,
+                    new SummonService(), levels);
+                var coord = new TileCoord(0, 0);
+                OccupantState occupant;
+                if (cardId == "Cerberus")
+                {
+                    occupant = play.PlayUnitCard(state, PlayerId.Player, cardId, coord);
+                    Assert.That(occupant.EffectiveHitsPerAttack, Is.EqualTo(3));
+                }
+                else
+                {
+                    var building = play.PlayBuildingCard(state, PlayerId.Player, cardId, coord);
+                    occupant = building;
+                    Assert.That(building.CanAttackAsBuilding, Is.False);
+                    Assert.That(building.TurnStartResourceGain.Mana, Is.EqualTo(3));
+                }
+                Assert.That(occupant.Attack, Is.EqualTo(expectedAttacks[level]), $"Summoned {cardId} Lv.{level} ATK");
+                Assert.That(occupant.MaxHp, Is.EqualTo(expectedHealth[level]), $"Summoned {cardId} Lv.{level} max HP");
+                Assert.That(occupant.CurrentHp, Is.EqualTo(expectedHealth[level]), $"Summoned {cardId} Lv.{level} current HP");
+            }
         }
 
         [Test]

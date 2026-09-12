@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d156977586279774da74f0d5231a78e4, type: 3}
+  m_Name: Skeleton
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.UnitCardDefinitionAsset
+  _cardId: Skeleton
+  _displayName: "\uC2A4\uCF08\uB808\uD1A4"
+  _rarity: 0
+  _cost:
+    _mana: 1
+    _qi: 0
+    _power: 0
+    _gold: 0
+  _affiliation: 1
+  _chargeTileFootprint: 1
+  _effectText: 
+  _specialEffectText: 
+  _hasReplicate: 0
+  _boardSprite: {fileID: 4723107735738678597, guid: 4a66309e9fd706345ac0dad11991b903, type: 3}
+  _boardAnimatorController: {fileID: 9100000, guid: 2adbb8448203ea1459b0685cb281620d, type: 2}
+  _attackType: 0
+  _damageType: 1
+  _attack: 10
+  _health: 10
+  _physicalDefense: 0
+  _magicDefense: 0
+  _hitsPerAttack: 1
+  _hasBerserker: 0
+  _hasEndure: 0
+  _hasShielder: 0
+  _hasLifeSteal: 0
+  _hasRobot: 0
+  _canMove: 1
+  _sealboundOwnerTurnStarts: 0
+  _hasHiding: 0
+  _hasFlying: 0
+  _hasPiercing: 0
+  _spellPower: 0
+  _invincibleDuration: 0
+  _invincibleOwnerTurns: 0
+  _isScience: 0
+  _sciencePowerUpkeep: 0
+  _turnStartResourceGain:
+    _mana: 0
+    _qi: 0
+    _power: 0
+    _gold: 0
+  _maxAttacksPerTurn: 1
+  _canAttackOnSummon: 0

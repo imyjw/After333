@@ -25,12 +25,6 @@ public sealed record SelectDraftCardRequest(
 public sealed record ClaimRunRewardsRequest(
     string? RunId);
 
-public sealed record SyncLocalRunRecordRequest(
-    string? RunId,
-    string? DeckId,
-    int Wins,
-    int Losses);
-
 public sealed record RunSummaryDto(
     Guid Id,
     string Status,
@@ -118,8 +112,3 @@ public sealed record ClaimRunRewardsResponse(
     WalletDto Wallet,
     RunSummaryDto Run,
     RewardGrantDto Reward);
-
-public sealed record SyncLocalRunRecordResponse(
-    AuthAccountDto Account,
-    WalletDto Wallet,
-    RunSummaryDto Run);

@@ -18,6 +18,13 @@ namespace Project333.Runtime.Infrastructure.Data
         public static CardLevelStatBonus CalculateBonus(string cardId, int upgradeLevel)
         {
             var normalizedLevel = NormalizeLevel(upgradeLevel);
+            if (string.Equals(cardId, "A-212", System.StringComparison.Ordinal) ||
+                string.Equals(cardId, "Cerberus", System.StringComparison.Ordinal))
+            {
+                var attackBonus = normalizedLevel == CardUpgradeRules.MaxLevel ? 1 : 0;
+                return new CardLevelStatBonus(attackBonus, normalizedLevel - attackBonus);
+            }
+
             if (string.Equals(cardId, DemonKingRules.CardId, System.StringComparison.Ordinal) ||
                 string.Equals(cardId, HeroRules.CardId, System.StringComparison.Ordinal))
             {
@@ -53,6 +60,7 @@ namespace Project333.Runtime.Infrastructure.Data
         private static bool GrantsHpAtEveryLevel(string cardId)
         {
             return string.Equals(cardId, RobotFactoryCardId, System.StringComparison.Ordinal) ||
+                   string.Equals(cardId, "ManaPond", System.StringComparison.Ordinal) ||
                    string.Equals(cardId, GaebangBranchRules.CardId, System.StringComparison.Ordinal) ||
                    string.Equals(cardId, InnRules.CardId, System.StringComparison.Ordinal) ||
                    string.Equals(cardId, MerchantCaravanRules.CardId, System.StringComparison.Ordinal) ||

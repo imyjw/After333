@@ -29,7 +29,12 @@ namespace Project333.Runtime.Domain.Draft
             return GetCopyCount(cardId) < GetMaxCopies(rarity);
         }
 
-        public void AddCard(string cardId, CardRarity rarity)
+        public void AddCard(string cardId, CardRarity rarity) => AddCardCore(cardId, GetMaxCopies(rarity));
+
+        // Restores IDs already accepted by the server before a possible rarity update.
+        internal void RestoreServerCard(string cardId) => AddCardCore(cardId, 3);
+
+        private void AddCardCore(string cardId, int copyLimit)
         {
             if (string.IsNullOrWhiteSpace(cardId))
             {
@@ -41,7 +46,7 @@ namespace Project333.Runtime.Domain.Draft
                 throw new InvalidOperationException("The draft deck is already complete.");
             }
 
-            if (!CanAddCard(cardId, rarity))
+            if (GetCopyCount(cardId) >= copyLimit)
             {
                 throw new InvalidOperationException($"Card '{cardId}' has reached its draft copy limit.");
             }

@@ -30,6 +30,7 @@ namespace Project333.Runtime.Presentation.Shop
 
         private CancellationTokenSource _requestCancellation;
         private bool _isBusy;
+        private bool HasPendingPurchase => PendingAccountOperation.HasPending(AccountServerUrl, "ticket_purchase");
 
         private string AccountServerUrl =>
             Project333ServerEndpointSettings.ResolveHttpUrl(_accountServerUrl);
@@ -45,6 +46,7 @@ namespace Project333.Runtime.Presentation.Shop
 
         private void OnEnable()
         {
+            AccountOperationRecovery.Resolved += OnOperationResolved;
             if (!AccountSessionState.IsAuthenticated)
             {
                 ReturnToStartSceneFromUi();
@@ -60,6 +62,7 @@ namespace Project333.Runtime.Presentation.Shop
 
         private void OnDisable()
         {
+            AccountOperationRecovery.Resolved -= OnOperationResolved;
             CancelRequest();
         }
 
@@ -70,7 +73,7 @@ namespace Project333.Runtime.Presentation.Shop
 
         public async void PurchaseTicketFromUi()
         {
-            if (_isBusy)
+            if (_isBusy || PendingAccountOperation.HasAnyPending(AccountServerUrl))
             {
                 return;
             }
@@ -117,7 +120,7 @@ namespace Project333.Runtime.Presentation.Shop
             catch (Exception ex)
             {
                 Debug.LogWarning($"After333 shop ticket purchase failed: {ex.Message}");
-                SetStatus($"티켓 구매 실패: {ex.Message}");
+                SetStatus(HasPendingPurchase ? string.Empty : $"티켓 구매 실패: {ex.Message}");
             }
             finally
             {
@@ -169,6 +172,12 @@ namespace Project333.Runtime.Presentation.Shop
             }
         }
 
+        private void OnOperationResolved(string operation, string card, bool completed, MeResponse me)
+        {
+            if (operation == "ticket_purchase") SetStatus(completed ? "구매 완료" : "구매 취소");
+            RefreshUi();
+        }
+
         private void BindButtons()
         {
             if (_purchaseTicketButton != null)
@@ -193,12 +202,7 @@ namespace Project333.Runtime.Presentation.Shop
 
             if (_accountText != null)
             {
-                var displayName = string.IsNullOrWhiteSpace(AccountSessionState.DisplayName)
-                    ? "계정"
-                    : AccountSessionState.DisplayName;
-                _accountText.text = AccountSessionState.IsAuthenticated
-                    ? $"{displayName}\n티켓: {AccountSessionState.Tickets}    골드: {AccountSessionState.ResourceGold}"
-                    : "로그인이 필요합니다.\n티켓: -    골드: -";
+                AccountWalletView.ShowSession(_accountText);
             }
 
             if (_purchaseTicketButton != null)
@@ -206,14 +210,12 @@ namespace Project333.Runtime.Presentation.Shop
                 _purchaseTicketButton.interactable =
                     !_isBusy &&
                     AccountSessionState.IsAuthenticated &&
-                    AccountSessionState.ResourceGold >= _ticketPurchaseGoldCost;
+                    !PendingAccountOperation.HasAnyPending(AccountServerUrl) && AccountSessionState.ResourceGold >= _ticketPurchaseGoldCost;
             }
 
             if (_purchaseTicketButtonLabel != null)
             {
-                _purchaseTicketButtonLabel.text = _isBusy
-                    ? "처리 중..."
-                    : _shopVisualVersion > 0 ? "티켓 구매" : $"게임 티켓 1개 구매\n골드 {_ticketPurchaseGoldCost}";
+                _purchaseTicketButtonLabel.text = _shopVisualVersion > 0 ? "티켓 구매" : $"게임 티켓 1개 구매\n골드 {_ticketPurchaseGoldCost}";
             }
 
             if (_ticketPriceText != null)

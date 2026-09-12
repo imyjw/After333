@@ -44,7 +44,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Targeting_NonFlyingMeleeCannotTargetFlyingButRangedAndFlyingMeleeCan()
+        public void Targeting_AllAttackTypesCanTargetFlying_WithoutChangingFrontRowBlocking()
         {
             var battleState = CreateBattleStateInMainPhase();
             var flyingFront = CreateUnit(
@@ -60,7 +60,7 @@ namespace Project333.Tests.EditMode
             battleState.PlayerBoard.Place(melee.Position, melee);
             var meleeTargets = GetTargets(battleState, melee);
 
-            Assert.That(meleeTargets, Has.No.Member(flyingFront.Position));
+            Assert.That(meleeTargets, Does.Contain(flyingFront.Position));
             Assert.That(meleeTargets, Does.Contain(back.Position),
                 "Active Flying does not block its back row.");
 
@@ -160,7 +160,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Shielder_FlyingShielderRejectsOnlyNonFlyingMeleeNormalAttack()
+        public void Shielder_FlyingShielderCanRedirectEveryAttackType()
         {
             var board = new BoardState();
             var flyingShielder = CreateUnit(
@@ -179,7 +179,7 @@ namespace Project333.Tests.EditMode
                     back.Position,
                     AttackType.Melee,
                     attackerHasActiveFlying: false).IsProtected,
-                Is.False);
+                Is.True);
             Assert.That(
                 ShielderService.ResolveForNormalAttack(
                     board,
@@ -234,7 +234,7 @@ namespace Project333.Tests.EditMode
             battleState.AIBoard.Place(flyingFront.Position, flyingFront);
             battleState.AIBoard.Place(back.Position, back);
 
-            Assert.That(GetTargets(battleState, attacker), Has.No.Member(flyingFront.Position));
+            Assert.That(GetTargets(battleState, attacker), Does.Contain(flyingFront.Position));
 
             flyingFront.IsDrained = true;
             Assert.That(flyingFront.HasActiveFlying, Is.False);
@@ -243,7 +243,7 @@ namespace Project333.Tests.EditMode
 
             flyingFront.IsDrained = false;
             Assert.That(flyingFront.HasActiveFlying, Is.True);
-            Assert.That(GetTargets(battleState, attacker), Has.No.Member(flyingFront.Position));
+            Assert.That(GetTargets(battleState, attacker), Does.Contain(flyingFront.Position));
 
             flyingFront.ApplyErasure();
             Assert.That(flyingFront.HasActiveFlying, Is.False);
@@ -261,7 +261,7 @@ namespace Project333.Tests.EditMode
             Assert.That(GetTargets(battleState, attacker), Has.No.Member(sealedFlying.Position));
             sealedFlying.ResolveSealboundOwnerTurnStart();
             Assert.That(sealedFlying.HasActiveFlying, Is.True);
-            Assert.That(GetTargets(battleState, attacker), Has.No.Member(sealedFlying.Position));
+            Assert.That(GetTargets(battleState, attacker), Does.Contain(sealedFlying.Position));
 
             var hiddenFlying = CreateUnit(
                 "hidden-flying",

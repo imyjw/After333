@@ -95,13 +95,13 @@ public sealed record LinkGoogleResponse(
     WalletDto Wallet);
 
 public sealed record PurchaseTicketRequest(
-    int TicketCount);
+    int TicketCount, string? RequestId = null);
 
 public sealed record PurchaseTicketResponse(
     AuthAccountDto Account,
     WalletDto Wallet,
     int TicketCount,
-    long ResourceGoldCost);
+    long ResourceGoldCost, string RequestId, bool Replayed = false);
 
 public sealed record MeResponse(
     AuthAccountDto Account,

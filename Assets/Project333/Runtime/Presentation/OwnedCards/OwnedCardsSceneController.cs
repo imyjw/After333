@@ -1,8 +1,10 @@
 using System;
+using Project333.Runtime.Presentation.Hand;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using Project333.Runtime.Application.Accounts;
+using Project333.Runtime.Application.Services;
 using Project333.Runtime.Domain.Cards;
 using Project333.Runtime.Infrastructure.Data;
 using Project333.Runtime.Presentation.Cards;
@@ -67,8 +69,8 @@ namespace Project333.Runtime.Presentation.OwnedCards
         [SerializeField] private Color _detailStatTextColor = new Color(1f, 0.93f, 0.58f, 1f);
         [SerializeField] private Color _detailBonusStatColor = new Color(0.3f, 1f, 0.4f, 1f);
         [SerializeField] private int _detailStatFontSize = 34;
-        [SerializeField] private Vector2 _detailAttackStatNormalizedPosition = new Vector2(0.07f, 0.09f);
-        [SerializeField] private Vector2 _detailHpStatNormalizedPosition = new Vector2(0.92f, 0.09f);
+        [SerializeField] private Vector2 _detailAttackStatNormalizedPosition = HandCardStatOverlayLayout.DefaultAttackPosition;
+        [SerializeField] private Vector2 _detailHpStatNormalizedPosition = HandCardStatOverlayLayout.DefaultHpPosition;
         [SerializeField] private Color _upgradeButtonColor = new Color(0.18f, 0.36f, 0.2f, 0.96f);
         [SerializeField] private Color _upgradeButtonUnavailableColor = new Color(0.23f, 0.24f, 0.28f, 0.82f);
         [SerializeField] private string _accountServerUrl = "http://127.0.0.1:7333";
@@ -111,6 +113,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
         private void OnEnable()
         {
+            AccountOperationRecovery.Resolved += OnOperationResolved;
             if (!AccountSessionState.IsAuthenticated)
             {
                 ReturnToStartSceneFromUi();
@@ -136,6 +139,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
         private void OnDisable()
         {
+            AccountOperationRecovery.Resolved -= OnOperationResolved;
             CancelRefresh();
             CancelUpgrade();
         }
@@ -179,7 +183,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
         public async void RefreshOwnedCardsFromUi()
         {
-            if (_isRefreshing)
+            if (_isRefreshing || _isUpgradingCard)
             {
                 return;
             }
@@ -269,9 +273,11 @@ namespace Project333.Runtime.Presentation.OwnedCards
             RenderSelectedCardDetail();
         }
 
+        private bool HasPendingUpgrade => PendingAccountOperation.HasPending(AccountServerUrl, "card_upgrade", _selectedCardId);
+
         public async void UpgradeSelectedCardFromUi()
         {
-            if (_isUpgradingCard)
+            if (_isUpgradingCard || _isRefreshing || PendingAccountOperation.HasAnyPending(AccountServerUrl))
             {
                 return;
             }
@@ -318,7 +324,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
             catch (Exception ex)
             {
                 Debug.LogWarning($"After333 card upgrade failed: {ex.Message}");
-                SetStatus($"강화 실패: {ex.Message}");
+                SetStatus(HasPendingUpgrade ? string.Empty : $"강화 실패: {ex.Message}");
             }
             finally
             {
@@ -327,6 +333,14 @@ namespace Project333.Runtime.Presentation.OwnedCards
                 SetBackButtonInteractable(true);
                 RefreshUpgradeButtonState();
             }
+        }
+
+        private void OnOperationResolved(string operation, string card, bool completed, MeResponse me)
+        {
+            PresentOwnedCards(me);
+            if (operation == "card_upgrade")
+                SetStatus($"{ResolveDisplayName(card)} " + (completed ? "강화 완료" : "강화 취소"));
+            RefreshUpgradeButtonState();
         }
 
         private void PresentOwnedCards(MeResponse meResponse)
@@ -741,22 +755,18 @@ namespace Project333.Runtime.Presentation.OwnedCards
             }
 
             var canUpgrade = TryGetSelectedUpgradeCost(out var cost, out var stateText);
-            var isInteractable = canUpgrade && !_isRefreshing && !_isUpgradingCard;
+            var isInteractable = canUpgrade && !PendingAccountOperation.HasAnyPending(AccountServerUrl) && !_isRefreshing && !_isUpgradingCard;
             _upgradeButton.interactable = isInteractable;
 
             if (_upgradeButtonLabel != null)
             {
-                _upgradeButtonLabel.text = _isUpgradingCard
-                    ? "강화 중..."
-                    : canUpgrade
-                        ? $"강화하기 Lv.{cost.LevelTo}"
-                        : stateText;
+                _upgradeButtonLabel.text = "강화";
             }
 
             var image = _upgradeButton.GetComponent<Image>();
             if (image != null)
             {
-                image.color = canUpgrade ? _upgradeButtonColor : _upgradeButtonUnavailableColor;
+                image.color = isInteractable ? _upgradeButtonColor : _upgradeButtonUnavailableColor;
             }
         }
 
@@ -820,12 +830,12 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
             if (_detailHpValueText != null)
             {
-                _detailHpValueText.text = statDisplay.Hp.ToString();
+                _detailHpValueText.text = statDisplay.HasHp ? statDisplay.Hp.ToString() : string.Empty;
             }
 
             _detailStatLayoutDirty = true;
             RefreshDetailStatOverlayLayoutIfNeeded();
-            SetDetailStatOverlayVisible(true);
+            SetDetailStatOverlayVisible(true, statDisplay.HasHp);
         }
 
         private void RefreshDetailStatOverlayLayoutIfNeeded()
@@ -844,18 +854,15 @@ namespace Project333.Runtime.Presentation.OwnedCards
                 return;
             }
 
-            var renderedSpriteRect = CalculateRenderedSpriteRect(
-                artworkRectTransform.rect,
-                _detailArtworkImage.sprite,
-                _detailArtworkImage.preserveAspect);
+            var renderedSpriteRect = HandCardStatOverlayLayout.CalculateRenderedSpriteRect(_detailArtworkImage);
             PositionDetailStatText(
                 _detailAttackValueText,
-                artworkRectTransform.rect,
+                artworkRectTransform,
                 renderedSpriteRect,
                 _detailAttackStatNormalizedPosition);
             PositionDetailStatText(
                 _detailHpValueText,
-                artworkRectTransform.rect,
+                artworkRectTransform,
                 renderedSpriteRect,
                 _detailHpStatNormalizedPosition);
 
@@ -864,71 +871,15 @@ namespace Project333.Runtime.Presentation.OwnedCards
             _detailStatLayoutDirty = false;
         }
 
-        private static Rect CalculateRenderedSpriteRect(
-            Rect containerRect,
-            Sprite sprite,
-            bool preserveAspect)
+
+        private static void PositionDetailStatText(Text text, RectTransform artworkRectTransform,
+            Rect renderedSpriteRect, Vector2 normalizedSpritePosition)
         {
-            if (!preserveAspect ||
-                sprite == null ||
-                containerRect.width <= 0f ||
-                containerRect.height <= 0f ||
-                sprite.rect.width <= 0f ||
-                sprite.rect.height <= 0f)
-            {
-                return containerRect;
-            }
-
-            var spriteAspect = sprite.rect.width / sprite.rect.height;
-            var containerAspect = containerRect.width / containerRect.height;
-            if (spriteAspect > containerAspect)
-            {
-                var renderedHeight = containerRect.width / spriteAspect;
-                return new Rect(
-                    containerRect.xMin,
-                    containerRect.center.y - (renderedHeight * 0.5f),
-                    containerRect.width,
-                    renderedHeight);
-            }
-
-            var renderedWidth = containerRect.height * spriteAspect;
-            return new Rect(
-                containerRect.center.x - (renderedWidth * 0.5f),
-                containerRect.yMin,
-                renderedWidth,
-                containerRect.height);
+            HandCardStatOverlayLayout.PositionStatText(text?.rectTransform, artworkRectTransform,
+                renderedSpriteRect, normalizedSpritePosition);
         }
 
-        private static void PositionDetailStatText(
-            Text text,
-            Rect containerRect,
-            Rect renderedSpriteRect,
-            Vector2 normalizedSpritePosition)
-        {
-            if (text == null || containerRect.width <= 0f || containerRect.height <= 0f)
-            {
-                return;
-            }
-
-            var clampedPosition = new Vector2(
-                Mathf.Clamp01(normalizedSpritePosition.x),
-                Mathf.Clamp01(normalizedSpritePosition.y));
-            var localPoint = new Vector2(
-                Mathf.Lerp(renderedSpriteRect.xMin, renderedSpriteRect.xMax, clampedPosition.x),
-                Mathf.Lerp(renderedSpriteRect.yMin, renderedSpriteRect.yMax, clampedPosition.y));
-            var anchor = new Vector2(
-                Mathf.InverseLerp(containerRect.xMin, containerRect.xMax, localPoint.x),
-                Mathf.InverseLerp(containerRect.yMin, containerRect.yMax, localPoint.y));
-
-            var rectTransform = text.rectTransform;
-            rectTransform.anchorMin = anchor;
-            rectTransform.anchorMax = anchor;
-            rectTransform.anchoredPosition = Vector2.zero;
-            rectTransform.localScale = Vector3.one;
-            rectTransform.localRotation = Quaternion.identity;
-        }
-
-        private void SetDetailStatOverlayVisible(bool visible)
+        private void SetDetailStatOverlayVisible(bool visible, bool showHp = true)
         {
             if (_detailAttackValueText != null)
             {
@@ -937,14 +888,14 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
             if (_detailHpValueText != null)
             {
-                _detailHpValueText.enabled = visible;
+                _detailHpValueText.enabled = visible && showHp;
             }
         }
 
         private static bool TryBuildDetailStatDisplay(
             CardDefinitionAsset cardAsset,
             int upgradeLevel,
-            out DetailStatDisplay statDisplay)
+            out CardStatDisplay statDisplay)
         {
             statDisplay = default;
             if (cardAsset == null)
@@ -962,23 +913,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
                 return false;
             }
 
-            switch (definition)
-            {
-                case UnitCardDefinition unit:
-                    statDisplay = new DetailStatDisplay(
-                        CardLevelStatRules.ApplyAttackBonus(unit.CardId, unit.Attack, upgradeLevel),
-                        CardLevelStatRules.ApplyHpBonus(unit.CardId, unit.Health, upgradeLevel));
-                    return true;
-
-                case BuildingCardDefinition building:
-                    statDisplay = new DetailStatDisplay(
-                        CardLevelStatRules.ApplyAttackBonus(building.CardId, building.Attack, upgradeLevel),
-                        CardLevelStatRules.ApplyHpBonus(building.CardId, building.Health, upgradeLevel));
-                    return true;
-
-                default:
-                    return false;
-            }
+            return CardStatDisplay.TryCreate(definition, upgradeLevel, out statDisplay);
         }
 
         private string BuildDetailMetaText(CardDefinitionAsset cardAsset, int upgradeLevel)
@@ -1267,11 +1202,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
                 return;
             }
 
-            var displayName = string.IsNullOrWhiteSpace(AccountSessionState.DisplayName)
-                ? "서버 계정 정보 없음"
-                : AccountSessionState.DisplayName;
-            _accountText.text =
-                $"Server Account: {displayName}\nTickets: {AccountSessionState.Tickets}   Gold: {AccountSessionState.ResourceGold}";
+            AccountWalletView.ShowSession(_accountText);
         }
 
         private void SetOwnedCardsText(string text)
@@ -2243,19 +2174,6 @@ namespace Project333.Runtime.Presentation.OwnedCards
             return s_runtimeKoreanFont != null
                 ? s_runtimeKoreanFont
                 : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        }
-
-        private readonly struct DetailStatDisplay
-        {
-            public DetailStatDisplay(int attack, int hp)
-            {
-                Attack = attack;
-                Hp = hp;
-            }
-
-            public int Attack { get; }
-
-            public int Hp { get; }
         }
 
         private readonly struct CardGridEntry

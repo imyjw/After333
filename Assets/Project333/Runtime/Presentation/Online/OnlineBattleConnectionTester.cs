@@ -18,7 +18,6 @@ namespace Project333.Runtime.Presentation.Online
     public sealed class OnlineBattleConnectionTester : MonoBehaviour
     {
         private const float MinimumAutomaticReconnectWindowSeconds = 60f;
-        private const float ServerAiCardPlayPacingSeconds = 3f;
         private const float ServerAiBoardCardStateWaitSeconds = 2f;
         private const int MaxCombatLogEntries = 33;
 
@@ -820,6 +819,7 @@ namespace Project333.Runtime.Presentation.Online
                 }
 
                 envelope = _presentationMessages.Dequeue();
+                var followingStatePresented = false;
                 if (ShouldPresentFollowingStateBeforeServerAiCardReveal(envelope))
                 {
                     var stateWaitDeadline = Time.unscaledTime + ServerAiBoardCardStateWaitSeconds;
@@ -832,6 +832,7 @@ namespace Project333.Runtime.Presentation.Online
                         _presentationMessages.Peek()?.MessageType == OnlineBattleMessageType.StateView)
                     {
                         HandleEnvelope(_presentationMessages.Dequeue());
+                        followingStatePresented = true;
                         // Let the newly summoned occupant render before the card reveal fades in.
                         yield return null;
                     }
@@ -841,6 +842,32 @@ namespace Project333.Runtime.Presentation.Online
                 if (durationSeconds > 0f)
                 {
                     yield return new WaitForSecondsRealtime(durationSeconds);
+                }
+
+                var pauseSeconds = envelope.MessageType == OnlineBattleMessageType.BattleEvents
+                    ? AiActionPacing.GetPostActionPauseSeconds(_joinUseServerAiOpponent, envelope.BattleEvents, durationSeconds)
+                    : 0;
+                if (pauseSeconds > 0)
+                {
+                    // Apply this action's HP/position result before pausing, not after the pause.
+                    if (!followingStatePresented)
+                    {
+                        var stateWaitDeadline = Time.unscaledTime + ServerAiBoardCardStateWaitSeconds;
+                        while (_presentationMessages.Count == 0 && Time.unscaledTime < stateWaitDeadline)
+                        {
+                            yield return null;
+                        }
+                        if (_presentationMessages.Count > 0 &&
+                            _presentationMessages.Peek()?.MessageType == OnlineBattleMessageType.StateView)
+                        {
+                            HandleEnvelope(_presentationMessages.Dequeue());
+                            yield return null;
+                        }
+                    }
+                    if (_currentProjectedBattleState == null || !_currentProjectedBattleState.IsEnded)
+                    {
+                        yield return new WaitForSecondsRealtime((float)pauseSeconds);
+                    }
                 }
             }
 
@@ -1543,36 +1570,8 @@ namespace Project333.Runtime.Presentation.Online
                 return 0f;
             }
 
-            var animationDuration = _battleBootstrapper.PlayOnlineBattleEventAnimations(
+            return _battleBootstrapper.PlayOnlineBattleEventAnimations(
                 ProjectBattleEventsToLocalPerspective(battleEvents));
-            return ContainsServerAiCardPlay(battleEvents)
-                ? Mathf.Max(animationDuration, ServerAiCardPlayPacingSeconds)
-                : animationDuration;
-        }
-
-        private bool ContainsServerAiCardPlay(IReadOnlyList<BattleEventDto> battleEvents)
-        {
-            if (!_joinUseServerAiOpponent || battleEvents == null)
-            {
-                return false;
-            }
-
-            for (var eventIndex = 0; eventIndex < battleEvents.Count; eventIndex++)
-            {
-                var battleEvent = battleEvents[eventIndex];
-                if (battleEvent == null || battleEvent.SourceOwnerId != PlayerId.AI)
-                {
-                    continue;
-                }
-
-                if (battleEvent.EventType == BattleEventType.CardPlayed ||
-                    battleEvent.EventType == BattleEventType.SpellCast)
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private void HandleBattleStatusEvents(IReadOnlyList<BattleEventDto> battleEvents)
@@ -1778,6 +1777,7 @@ namespace Project333.Runtime.Presentation.Online
                     TargetCardId = battleEvent.TargetCardId,
                     CardAttack = battleEvent.CardAttack,
                     CardMaxHp = battleEvent.CardMaxHp,
+                    CardSpellDamage = battleEvent.CardSpellDamage,
                     AttackBonus = battleEvent.AttackBonus,
                     HpBonus = battleEvent.HpBonus,
                     Amount = battleEvent.Amount,

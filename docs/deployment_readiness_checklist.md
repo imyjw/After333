@@ -163,34 +163,11 @@ powershell -ExecutionPolicy Bypass -File C:\Project_333\Server\Project333.PvpSer
 
 ## Database Backup And Restore
 
-Use a DB backup before larger tests, before schema changes, and before moving the server to another PC.
+Before schema changes or deployment, preserve a custom-format PostgreSQL backup, its SHA256, the exact server release and backup-time validation records. Current deployment backups are kept outside the repository under `%LOCALAPPDATA%\After333\Server\Backups`; the older backup tool defaults to `C:\Project_333\Backups\PostgreSQL` unless explicitly overridden. Use the private location for account data and supply credentials through the existing protected configuration, not command-line examples or repository files.
 
-Create a backup:
+An actual restore drill passed on 2026-09-12: 30 public tables, backup-time account/economy/run/receipt comparisons, synthetic API operations, and isolated PostgreSQL plus HTTP server restart with idempotent replay. Production was not restored or restarted. Follow the [tested restore runbook](./postgres_restore_runbook.md) for the exact isolated command, locale requirements, verification evidence and production recovery sequence.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File C:\Project_333\Server\Project333.PvpServer\Tools\BackupPostgres_Project333.ps1 -DatabaseConnection 'Host=127.0.0.1;Port=5432;Database=project333;Username=postgres;Password=dev_password'
-```
-
-Backups are written under:
-
-```text
-C:\Project_333\Backups\PostgreSQL
-```
-
-Preview a restore without changing the database:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File C:\Project_333\Server\Project333.PvpServer\Tools\RestorePostgres_Project333.ps1 -BackupPath 'C:\Project_333\Backups\PostgreSQL\project333_YYYYMMDD_HHMMSS.dump' -DatabaseConnection 'Host=127.0.0.1;Port=5432;Database=project333;Username=postgres;Password=dev_password' -PrintOnly
-```
-
-Restore a backup only after stopping the server:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File C:\Project_333\Server\Project333.PvpServer\Tools\RestorePostgres_Project333.ps1 -BackupPath 'C:\Project_333\Backups\PostgreSQL\project333_YYYYMMDD_HHMMSS.dump' -DatabaseConnection 'Host=127.0.0.1;Port=5432;Database=project333;Username=postgres;Password=dev_password' -ConfirmRestore
-```
-
-If PostgreSQL reports active connections during restore, stop the server first.
-If needed for local development only, add `-TerminateExistingConnections`.
+`RestorePostgres_Project333.ps1` is the older in-place helper: it uses `--clean --if-exists`, so its confirmation flag does not make it an isolated drill. Prefer restoration to a new, explicitly verified recovery DB and preserve the current DB. Do not target the live `project333` DB for rehearsal. Database roles, server secrets and uncommitted result journal files require separate recovery planning.
 
 ## Current Limitations
 
@@ -204,7 +181,17 @@ If needed for local development only, add `-TerminateExistingConnections`.
 ## Recommended Next Deployment Work
 
 1. Run the public PvP smoke-test checklist through `https://api.after333.com` with two external clients and record the result.
-2. Add scheduled DB backups and complete a tested restore drill on the development laptop.
+2. The isolated restore drill is complete (2026-09-12); scheduled backups and separate-location retention remain future work and were not configured by the drill.
 3. Choose a VPS and managed PostgreSQL target when moving beyond the graduation-project demonstration stage.
 4. Replace the PowerShell watchdog with a real process manager on that hosted environment.
 5. Generate a staging deployment bundle for the hosted environment and repeat the public smoke test before wider testing.
+
+## Safe server publication (2026-09-12)
+
+PublishServer_Release.ps1 always publishes into a fresh staging directory and checks the native exit code, required artifacts and migrations before promoting it. OutputPath must be strictly below this checkout's Builds/Server directory; links/junctions and unrelated nonempty folders are rejected. Prefer a new release path for each build.
+
+If the target exists, explicitly use -CleanOutput or choose a new path. -CleanOutput now retains the previous output in a sibling backup directory instead of deleting it before building. A caught promotion failure restores that backup. A hard process termination between renames may require manual restoration; failed staging directories, backups and empty lock files remain available for diagnosis. The publisher does not start or restart servers or apply database changes.
+
+The schema-2 publish manifest retains legacy summary fields and adds BuildId, SDK version, exit code and hashes for all published files. Git dirty status includes untracked files; this is artifact traceability, not a substitute for a clean source checkout and CI.
+
+Run Tools/TestPublishServerSafety.ps1 in a separate PowerShell process with a valid server ReferenceOutput to run isolated filesystem/compiler-boundary regression checks. Full validation evidence: [publish safety report](C:/Project_333/TempBuild/PublishSafety_20260912/README.md).

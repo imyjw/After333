@@ -49,6 +49,8 @@ namespace Project333.Runtime.Application.Accounts
         public static IReadOnlyList<string> LatestDraftPicks => LatestDraftPickCardIds;
         public static IReadOnlyList<string> LatestDraftOffer => LatestDraftOfferCardIds;
 
+        public static IEnumerable<string> OwnedCardIds => new List<string>(OwnedCardUpgradeLevels.Keys);
+
         public static int GetOwnedCardUpgradeLevel(string cardId)
         {
             if (string.IsNullOrWhiteSpace(cardId))
@@ -437,45 +439,6 @@ namespace Project333.Runtime.Application.Accounts
                 {
                     ClearActiveRunState();
                 }
-            }
-        }
-
-        public static void ApplySyncLocalRunRecordResponse(SyncLocalRunRecordResponse response)
-        {
-            if (response == null)
-            {
-                return;
-            }
-
-            var account = response.ResolvedAccount;
-            var wallet = response.ResolvedWallet;
-            var run = response.ResolvedRun;
-
-            if (account != null)
-            {
-                AccountId = account.ResolvedId ?? AccountId;
-                DisplayName = account.ResolvedDisplayName ?? DisplayName;
-            }
-
-            if (wallet != null)
-            {
-                ResourceGold = wallet.ResolvedResourceGold;
-                Tickets = wallet.ResolvedTickets;
-            }
-
-            if (run == null)
-            {
-                return;
-            }
-
-            ApplyLatestRunSummary(run);
-            if (string.Equals(run.ResolvedStatus, "completed", System.StringComparison.OrdinalIgnoreCase))
-            {
-                ClearActiveRunState();
-            }
-            else
-            {
-                ApplyRunSummary(run, clearWhenMissing: false);
             }
         }
 

@@ -145,7 +145,7 @@ namespace Project333.Runtime.Presentation.Hand
             ConfigureHandCardViews(_handCardViews);
         }
 
-        public void Present(HandState handState)
+        public void Present(HandState handState, int spellPower = 0)
         {
             EnsureCardRegistry();
 
@@ -163,7 +163,8 @@ namespace Project333.Runtime.Presentation.Hand
                 handCardView.Present(
                     handCard?.CardId,
                     handCard?.RuntimeId,
-                    handCard?.IsTemporaryReplicate == true);
+                    handCard?.IsTemporaryReplicate == true,
+                    spellPower);
             }
 
             if (!UnityEngine.Application.isPlaying)

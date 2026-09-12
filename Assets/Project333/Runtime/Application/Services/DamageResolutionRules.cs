@@ -23,7 +23,8 @@ namespace Project333.Runtime.Application.Services
         public static int ResolveIncomingDamage(
             OccupantState recipient,
             int damage,
-            DamageType damageType)
+            DamageType damageType,
+            bool halveForFlying = false)
         {
             if (recipient == null)
             {
@@ -40,12 +41,20 @@ namespace Project333.Runtime.Application.Services
                 return 0;
             }
 
-            return ResolveIncomingDamage(
+            var resolvedDamage = ResolveIncomingDamage(
                 damage,
                 damageType,
                 recipient.IsDrained,
                 recipient.PhysicalDefense,
                 recipient.MagicDefense);
+            return halveForFlying ? resolvedDamage / 2 : resolvedDamage;
+        }
+
+        public static bool ShouldHalveForFlying(OccupantState attacker, OccupantState target)
+        {
+            return attacker != null && target != null &&
+                   attacker.AttackType == AttackType.Melee &&
+                   !attacker.HasActiveFlying && target.HasActiveFlying;
         }
 
         public static int ResolveIncomingDamage(
@@ -87,9 +96,10 @@ namespace Project333.Runtime.Application.Services
         public static int ApplyAttackDamage(
             OccupantState recipient,
             int damage,
-            DamageType damageType)
+            DamageType damageType,
+            bool halveForFlying = false)
         {
-            return ApplyDamage(recipient, damage, damageType, allowEndure: true);
+            return ApplyDamage(recipient, damage, damageType, allowEndure: true, halveForFlying: halveForFlying);
         }
 
         public static int ApplyEffectDamage(
@@ -98,6 +108,12 @@ namespace Project333.Runtime.Application.Services
             DamageType damageType)
         {
             return ApplyDamage(recipient, damage, damageType, allowEndure: true);
+        }
+
+        // Shielder overflow has already passed through the original target's mitigation.
+        public static int ApplyResolvedAttackDamage(OccupantState recipient, int resolvedDamage)
+        {
+            return ApplyResolvedDamage(recipient, resolvedDamage, allowEndure: true);
         }
 
         public static int ProjectEffectDamageTaken(
@@ -182,6 +198,16 @@ namespace Project333.Runtime.Application.Services
             OccupantState recipient,
             int damage,
             DamageType damageType,
+            bool allowEndure,
+            bool halveForFlying = false)
+        {
+            var resolvedDamage = ResolveIncomingDamage(recipient, damage, damageType, halveForFlying);
+            return ApplyResolvedDamage(recipient, resolvedDamage, allowEndure);
+        }
+
+        private static int ApplyResolvedDamage(
+            OccupantState recipient,
+            int resolvedDamage,
             bool allowEndure)
         {
             if (recipient == null)
@@ -189,13 +215,17 @@ namespace Project333.Runtime.Application.Services
                 throw new ArgumentNullException(nameof(recipient));
             }
 
-            if (recipient.IsSealbound)
+            if (resolvedDamage < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(resolvedDamage));
+            }
+
+            if (recipient.IsSealbound || recipient.IsInvincible)
             {
                 return 0;
             }
 
             var hpBefore = recipient.CurrentHp;
-            var resolvedDamage = ResolveIncomingDamage(recipient, damage, damageType);
             recipient.CurrentHp -= resolvedDamage;
 
             if (allowEndure && recipient.CurrentHp <= 0 && recipient.CanTriggerEndure)

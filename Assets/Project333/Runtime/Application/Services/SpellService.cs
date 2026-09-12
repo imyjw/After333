@@ -728,6 +728,7 @@ namespace Project333.Runtime.Application.Services
 
             var upgradeLevel = _cardUpgradeLevelProvider.GetUpgradeLevel(casterId, definition.CardId);
             var effectDamage = CardLevelSpellRules.ApplyDamageBonus(definition.Damage, upgradeLevel);
+            var capturedSpellPower = SpellPowerRules.Capture(battleState, casterId, definition.DamageType);
             battleState.PersistentEffects.Add(new PersistentEffectState(
                 sourceCardId: cardId,
                 ownerId: casterId,
@@ -738,7 +739,8 @@ namespace Project333.Runtime.Application.Services
                 remainingTriggers: definition.TriggerCount,
                 effectDamage: effectDamage,
                 effectDamageType: definition.DamageType,
-                targetStartColumn: targetCoord.Column));
+                targetStartColumn: targetCoord.Column,
+                capturedSpellPower: capturedSpellPower));
         }
 
         private static void CastImmediateResourceSpell(

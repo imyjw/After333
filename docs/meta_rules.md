@@ -122,13 +122,16 @@ Confirmed temporary rules:
   - `Lv.1 -> Lv.2`: Resource Gold `6`, card copies `6`
   - `Lv.12 -> Lv.13`: Resource Gold `39`, card copies `39`
 - Cards at `Lv.13` cannot be upgraded further.
-- Card level stat bonuses are cumulative:
-  - Most level gains grant `HP +1`.
-  - Reaching `Lv.3`, `Lv.6`, `Lv.9`, and `Lv.13` grants `ATK +1` instead of `HP +1`.
-- Therefore, a `Lv.13` card has total bonuses of `ATK +4` and `HP +9`.
-- Unit and Building cards are upgradeable.
+- Upgrade stat gains are card-specific. These are the currently implemented schedules, not defaults to assign to a new card:
+  - Standard schedule: ATK +1 at Lv.3/6/9/13; HP +1 at every other level (Lv.13 total ATK +4 / HP +9).
+  - A-212 and Cerberus: HP +1 at Lv.1 through Lv.12; ATK +1 only at Lv.13 (total ATK +1 / HP +12).
+  - Mana Pond, Robot Factory, Gaebang Branch, Merchant Caravan, Inn, Power Plant and Nuclear Power Plant: HP +1 at every level Lv.1 through Lv.13 (total HP +13; no ATK gain).
+  - Demon King and Hero: ATK +1 at Lv.3/6/9, ATK +3 at Lv.13, and HP +1 at every other level (total ATK +6 / HP +9).
+- Confirmed 2026-09-12: Cerberus reaches ATK 10 / HP 78 at Lv.13; Mana Pond reaches ATK 0 / HP 33. Card costs, production and other effects do not change under these schedules.
+- For every new card, ask the user for upgrade eligibility and the exact per-level gains before implementing upgrade behavior. Do not infer a schedule from its card type, rarity, attack capability, similar cards or a shared-code fallback. An explicitly supplied schedule may group levels if every level 1 through 13 is covered; do not ask again when that card's schedule has already been supplied.
+- All currently registered Unit and Building cards are upgradeable; new cards still require the user-supplied eligibility and schedule above.
 - Firebolt (`firebolt`), Firewall (`Firewall`), Timed Bomb (`TimedBomb`), and Biochemical Bomb (`BiochemicalBomb`) are upgradeable Spell cards; each level adds `+1` to their direct or stored damage.
-- Microreactor (`Microreactor`, 초소형 발전기), Cheonra Jimang (`CheonraJimang`, 천라지망), Daehwandan (`Daehwandan`, 대환단), and Ten Thousand Year Snow Ginseng (`TenThousandYearSnowGinseng`, 영약: 만년설삼) are not upgradeable.
+- The other ten current spells are not upgradeable: CheonraJimang, Daehwandan, TenThousandYearSnowGinseng, Gu, HuanShu, RobotFusion, Microreactor, PowerBank, ManaStone and ManaStoneBundle.
 - Cards marked non-upgradeable are excluded from random run card rewards.
 
 ### Ticket
@@ -140,8 +143,12 @@ Current temporary rules:
 - A player cannot start another run while a resumable run exists or completed-run rewards remain unclaimed.
 - One ticket can be purchased for `3` Resource Gold.
 - Ticket balance and ticket purchases are server-authoritative and persisted to the account wallet.
+- Ticket purchases and card upgrades require a non-empty UUID RequestId. A repeated account/request pair returns its committed result without another charge. Reusing that pair for different input or a different operation is rejected.
+- Upgrade requests also include the displayed ExpectedUpgradeLevel. A different current level rejects the request before spending, even with a new request ID.
+- Success receipts, wallet/collection changes and the account transaction ledger commit together. Receipts persist across server restarts and are not automatically expired.
+- Replayed results preserve the original operation cost while returning current wallet and collection state. Unity retains uncertain requests across scene changes and restarts until the matching response or a definitive rejection is received.
 - A completed, server-verified rewarded video grants `1` ticket.
-- Rewarded video tickets are temporarily limited to `3` per account per UTC day with a `60`-second reward cooldown.
+- Rewarded video tickets are temporarily limited to `10` per account per UTC day with a `30`-second reward cooldown.
 - Unity cannot grant an ad ticket directly; the wallet changes only after a valid provider server-to-server callback.
 - Provider event IDs are idempotent, so callback retries cannot grant duplicate tickets.
 - See [rewarded_ads.md](./rewarded_ads.md) for the integration and security contract.
@@ -152,6 +159,13 @@ Current temporary rules:
 - Unity may cache session and display data but is not authoritative for progression.
 - Closing and reopening the game restores the latest resumable run from the authenticated account.
 - PvE and PvP results use the same persisted run win/loss counters.
+- Only results resolved by a server battle may advance account run wins/losses or unlock run rewards. Client-reported or offline results never update account progression.
+- At battle start, the server fixes each participant's account, seat, run, deck contents and card upgrade levels. Rejoining or reconnecting restores this binding and cannot change the run receiving the result.
+- Run-result persistence must match the bound account and the run's completed deck. A battle started without a run cannot attach one after it starts.
+- Every battle has a server-generated result ID, retained by recovery snapshots. A committed result ID can never increment a run again.
+- Result receipts, both participants' run counters, and any persisted PvP match completion commit in one DB transaction. Draws complete the match without incrementing wins or losses.
+- The server durably queues terminal results before sending battle-end responses. Failed DB delivery remains pending for background retries and process-restart replay; client result uploads remain prohibited.
+- Unity refreshes server run data through /me while awaiting result persistence; it must not upload local win/loss totals as a fallback.
 
 ## Relationship to Other Documents
 

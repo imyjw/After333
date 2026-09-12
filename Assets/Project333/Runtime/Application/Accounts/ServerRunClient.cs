@@ -55,20 +55,15 @@ namespace Project333.Runtime.Application.Accounts
                 throw new InvalidOperationException("Server session token is missing.");
             }
 
-            var request = new PurchaseTicketRequest
-            {
-                TicketCount = 1
-            };
-            var response = await PostJsonAsync<PurchaseTicketRequest, PurchaseTicketResponse>(
-                "/wallet/purchase-ticket",
-                request,
-                sessionToken,
-                cancellationToken);
+            using var operation = PendingAccountOperation.Begin(_baseUrl, "ticket_purchase");
+            var request = new PurchaseTicketRequest { TicketCount = 1, RequestId = operation.RequestId };
+            var response = await operation.PostAsync<PurchaseTicketRequest, PurchaseTicketResponse>(
+                _baseUrl, "/wallet/purchase-ticket", sessionToken, request, BuildErrorMessage, cancellationToken);
             if (response == null || response.ResolvedWallet == null)
             {
                 throw new InvalidOperationException("Server did not return an updated wallet.");
             }
-
+            operation.Complete(response.ResolvedRequestId, response.ResolvedAccount?.ResolvedId);
             return response;
         }
 
@@ -258,49 +253,6 @@ namespace Project333.Runtime.Application.Accounts
             return response;
         }
 
-        public async Task<SyncLocalRunRecordResponse> SyncLocalRunRecordAsync(
-            string sessionToken,
-            string runId,
-            string deckId,
-            int wins,
-            int losses,
-            CancellationToken cancellationToken)
-        {
-            if (string.IsNullOrWhiteSpace(sessionToken))
-            {
-                throw new InvalidOperationException("Server session token is missing.");
-            }
-
-            if (string.IsNullOrWhiteSpace(runId))
-            {
-                throw new InvalidOperationException("Server draft run id is missing.");
-            }
-
-            if (string.IsNullOrWhiteSpace(deckId))
-            {
-                throw new InvalidOperationException("Server draft deck id is missing.");
-            }
-
-            var request = new SyncLocalRunRecordRequest
-            {
-                RunId = runId,
-                DeckId = deckId,
-                Wins = wins,
-                Losses = losses
-            };
-            var response = await PostJsonAsync<SyncLocalRunRecordRequest, SyncLocalRunRecordResponse>(
-                "/runs/sync-local-record",
-                request,
-                sessionToken,
-                cancellationToken);
-            if (response == null || response.ResolvedRun == null)
-            {
-                throw new InvalidOperationException("Server did not return a synced run record.");
-            }
-
-            return response;
-        }
-
         private async Task<TResponse> PostJsonAsync<TRequest, TResponse>(
             string path,
             TRequest request,
@@ -324,14 +276,7 @@ namespace Project333.Runtime.Application.Accounts
 
         private static async Task SendAsync(UnityWebRequest webRequest, CancellationToken cancellationToken)
         {
-            var operation = webRequest.SendWebRequest();
-            while (!operation.isDone)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                await Task.Yield();
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
+            await AccountHttpTransport.SendAsync(webRequest, cancellationToken);
 
             if (webRequest.result != UnityWebRequest.Result.Success)
             {
@@ -455,18 +400,10 @@ namespace Project333.Runtime.Application.Accounts
     }
 
     [Serializable]
-    public sealed class SyncLocalRunRecordRequest
-    {
-        public string RunId;
-        public string DeckId;
-        public int Wins;
-        public int Losses;
-    }
-
-    [Serializable]
     public sealed class PurchaseTicketRequest
     {
         public int TicketCount;
+        public string RequestId;
     }
 
     [Serializable]
@@ -494,6 +431,12 @@ namespace Project333.Runtime.Application.Accounts
     [Serializable]
     public sealed class PurchaseTicketResponse
     {
+        public string RequestId;
+        public string requestId;
+        public bool Replayed;
+        public bool replayed;
+        public string ResolvedRequestId => RequestId ?? requestId;
+        public bool ResolvedReplayed => Replayed || replayed;
         public AuthAccountDto Account;
         public WalletDto Wallet;
         public int TicketCount;
@@ -618,22 +561,6 @@ namespace Project333.Runtime.Application.Accounts
         public WalletDto ResolvedWallet => Wallet ?? wallet;
         public RunSummaryDto ResolvedRun => Run ?? run;
         public RewardGrantDto ResolvedReward => Reward ?? reward;
-    }
-
-    [Serializable]
-    public sealed class SyncLocalRunRecordResponse
-    {
-        public AuthAccountDto Account;
-        public WalletDto Wallet;
-        public RunSummaryDto Run;
-
-        public AuthAccountDto account;
-        public WalletDto wallet;
-        public RunSummaryDto run;
-
-        public AuthAccountDto ResolvedAccount => Account ?? account;
-        public WalletDto ResolvedWallet => Wallet ?? wallet;
-        public RunSummaryDto ResolvedRun => Run ?? run;
     }
 
     [Serializable]

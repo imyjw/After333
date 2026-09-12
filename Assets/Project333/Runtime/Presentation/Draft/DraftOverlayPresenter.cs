@@ -100,8 +100,8 @@ namespace Project333.Runtime.Presentation.Draft
         [Header("Option Stat Overlay")]
         [SerializeField] private bool _showOptionStatOverlay = true;
         [SerializeField] private Vector2 _optionStatTextSize = new Vector2(128f, 84f);
-        [SerializeField] private Vector2 _optionAttackStatNormalizedPosition = new Vector2(0.09f, 0.07f);
-        [SerializeField] private Vector2 _optionHpStatNormalizedPosition = new Vector2(0.92f, 0.07f);
+        [SerializeField] private Vector2 _optionAttackStatNormalizedPosition = HandCardStatOverlayLayout.DefaultAttackPosition;
+        [SerializeField] private Vector2 _optionHpStatNormalizedPosition = HandCardStatOverlayLayout.DefaultHpPosition;
         [SerializeField] private int _optionStatFontSize = 52;
         [SerializeField] private Color _optionStatTextColor = Color.white;
         [SerializeField] private Color _optionStatOutlineColor = new Color(0f, 0f, 0f, 0.95f);
@@ -253,28 +253,24 @@ namespace Project333.Runtime.Presentation.Draft
             if (!_showOptionStatOverlay ||
                 optionView == null ||
                 string.IsNullOrWhiteSpace(cardAsset?.CardId) ||
-                !TryResolveCardStats(cardAsset, out var baseAttack, out var baseHp))
+                !TryResolveCardStats(cardAsset, out var stats))
             {
                 SetOptionStatOverlayVisible(optionView, false);
                 return;
             }
 
-            var upgradeLevel = AccountSessionState.GetOwnedCardUpgradeLevel(cardAsset.CardId);
-            var attack = CardLevelStatRules.ApplyAttackBonus(cardAsset.CardId, baseAttack, upgradeLevel);
-            var hp = CardLevelStatRules.ApplyHpBonus(cardAsset.CardId, baseHp, upgradeLevel);
-
             if (optionView.AttackText != null)
             {
-                optionView.AttackText.text = attack.ToString();
+                optionView.AttackText.text = stats.Attack.ToString();
             }
 
             if (optionView.HpText != null)
             {
-                optionView.HpText.text = hp.ToString();
+                optionView.HpText.text = stats.HasHp ? stats.Hp.ToString() : string.Empty;
             }
 
             RefreshOptionStatLayout(optionView);
-            SetOptionStatOverlayVisible(optionView, true);
+            SetOptionStatOverlayVisible(optionView, true, stats.HasHp);
         }
 
         private void EnsureOptionStatTexts(DraftOptionView optionView)
@@ -362,52 +358,30 @@ namespace Project333.Runtime.Presentation.Draft
             }
 
             var artworkRect = optionView.ArtworkImage.rectTransform;
-            var containerRect = artworkRect.rect;
-            var spriteRect = optionView.ArtworkImage.sprite.rect;
-            var renderedSpriteRect = HandCardStatOverlayLayout.CalculateRenderedSpriteRect(
-                containerRect,
-                new Vector2(spriteRect.width, spriteRect.height),
-                optionView.ArtworkImage.preserveAspect);
+            var renderedSpriteRect = HandCardStatOverlayLayout.CalculateRenderedSpriteRect(optionView.ArtworkImage);
 
             PositionOptionStatText(
                 optionView.AttackText,
-                containerRect,
+                artworkRect,
                 renderedSpriteRect,
                 _optionAttackStatNormalizedPosition);
             PositionOptionStatText(
                 optionView.HpText,
-                containerRect,
+                artworkRect,
                 renderedSpriteRect,
                 _optionHpStatNormalizedPosition);
         }
 
-        private static void PositionOptionStatText(
-            Text text,
-            Rect containerRect,
-            Rect renderedSpriteRect,
-            Vector2 normalizedPosition)
+        private static void PositionOptionStatText(Text text, RectTransform artworkRectTransform,
+            Rect renderedSpriteRect, Vector2 normalizedPosition)
         {
-            if (text == null)
-            {
-                return;
-            }
-
-            var localPoint = HandCardStatOverlayLayout.CalculateRenderedSpritePoint(
-                renderedSpriteRect,
-                normalizedPosition);
-            var anchor = HandCardStatOverlayLayout.CalculateContainerAnchor(containerRect, localPoint);
-            var rectTransform = text.rectTransform;
-            rectTransform.anchorMin = anchor;
-            rectTransform.anchorMax = anchor;
-            rectTransform.anchoredPosition = Vector2.zero;
-            rectTransform.localScale = Vector3.one;
-            rectTransform.localRotation = Quaternion.identity;
+            HandCardStatOverlayLayout.PositionStatText(text?.rectTransform, artworkRectTransform,
+                renderedSpriteRect, normalizedPosition);
         }
 
-        private static bool TryResolveCardStats(CardDefinitionAsset cardAsset, out int attack, out int hp)
+        private static bool TryResolveCardStats(CardDefinitionAsset cardAsset, out CardStatDisplay stats)
         {
-            attack = 0;
-            hp = 0;
+            stats = default;
 
             if (cardAsset == null)
             {
@@ -416,22 +390,8 @@ namespace Project333.Runtime.Presentation.Draft
 
             try
             {
-                var definition = cardAsset.ToDefinition();
-                switch (definition)
-                {
-                    case UnitCardDefinition unit:
-                        attack = unit.Attack;
-                        hp = unit.Health;
-                        return true;
-
-                    case BuildingCardDefinition building:
-                        attack = building.Attack;
-                        hp = building.Health;
-                        return true;
-
-                    default:
-                        return false;
-                }
+                return CardStatDisplay.TryCreate(cardAsset.ToDefinition(),
+                    AccountSessionState.GetOwnedCardUpgradeLevel(cardAsset.CardId), out stats);
             }
             catch (Exception)
             {
@@ -439,7 +399,7 @@ namespace Project333.Runtime.Presentation.Draft
             }
         }
 
-        private static void SetOptionStatOverlayVisible(DraftOptionView optionView, bool visible)
+        private static void SetOptionStatOverlayVisible(DraftOptionView optionView, bool visible, bool showHp = true)
         {
             if (optionView?.AttackText != null)
             {
@@ -448,7 +408,7 @@ namespace Project333.Runtime.Presentation.Draft
 
             if (optionView?.HpText != null)
             {
-                optionView.HpText.enabled = visible;
+                optionView.HpText.enabled = visible && showHp;
             }
         }
 

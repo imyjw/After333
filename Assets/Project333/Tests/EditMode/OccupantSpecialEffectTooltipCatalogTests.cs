@@ -108,6 +108,9 @@ namespace Project333.Tests.EditMode
             Assert.That(
                 entries.Single(entry => entry.Title == "불굴").Description,
                 Is.EqualTo("처음 받는 치명적인 피해를 버티고 HP 1로 생존합니다."));
+            Assert.That(
+                entries.Single(entry => entry.Title == "비행").Description,
+                Is.EqualTo("비행이 없는 근접 공격자의 일반 공격·관통 피해를 방어력 적용 후 절반만 받습니다(소수점 버림, 반격 제외). 전열 차단을 무시하며, 전열 차단을 하지 않습니다."));
         }
 
         [Test]

@@ -956,7 +956,7 @@ namespace Project333.Runtime.Presentation.Startup
         {
             if (_ticketText != null)
             {
-                _ticketText.text = BuildTicketText();
+                AccountWalletView.ShowSession(_ticketText);
             }
 
             if (_startGameButton != null)
@@ -1365,16 +1365,6 @@ namespace Project333.Runtime.Presentation.Startup
             _runStartCancellation.Cancel();
             _runStartCancellation.Dispose();
             _runStartCancellation = null;
-        }
-
-        private string BuildTicketText()
-        {
-            if (!AccountSessionState.IsAuthenticated)
-            {
-                return "Server Tickets: -     GOLD: -";
-            }
-
-            return $"Server Tickets: {AccountSessionState.Tickets}     GOLD: {AccountSessionState.ResourceGold}";
         }
 
         private string BuildReconnectPvpButtonLabel()

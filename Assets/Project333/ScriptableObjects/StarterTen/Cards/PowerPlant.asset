@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: af1424162e09842478be1b42c237e249, type: 3}
+  m_Name: PowerPlant
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.BuildingCardDefinitionAsset
+  _cardId: PowerPlant
+  _displayName: "\uBC1C\uC804\uC18C"
+  _rarity: 0
+  _cost:
+    _mana: 0
+    _qi: 0
+    _power: 1
+    _gold: 0
+  _affiliation: 2
+  _chargeTileFootprint: 1
+  _effectText: "\uB0B4 \uD134 \uC2DC\uC791 \uC2DC \uACE8\uB4DC 1\uC744 \uC9C0\uBD88\uD558\uACE0
+    \uC804\uB825 2\uB97C \uC5BB\uB294\uB2E4."
+  _specialEffectText: 
+  _hasReplicate: 0
+  _boardSprite: {fileID: 4723107735738678597, guid: 191ba45e11242364686208ca2c25cbcd, type: 3}
+  _boardAnimatorController: {fileID: 9100000, guid: fb20739b139e1174eb519ddd106d0fa3, type: 2}
+  _canAttack: 0
+  _damageType: 0
+  _attack: 0
+  _health: 30
+  _physicalDefense: 0
+  _magicDefense: 0
+  _turnStartResourceGain:
+    _mana: 0
+    _qi: 0
+    _power: 0
+    _gold: 0
+  _sciencePowerUpkeep: 0
+  _canAttackOnSummon: 0
+  _sealboundOwnerTurnStarts: 0
+  _hasFlying: 0
+  _hasPiercing: 0
+  _spellPower: 0
+  _invincibleDuration: 0
+  _invincibleOwnerTurns: 0

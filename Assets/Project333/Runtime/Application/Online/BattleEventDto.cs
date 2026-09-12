@@ -61,6 +61,8 @@ namespace Project333.Runtime.Application.Online
 
         public int CardMaxHp { get; set; }
 
+        public int? CardSpellDamage { get; set; }
+
         public int AttackBonus { get; set; }
 
         public int HpBonus { get; set; }

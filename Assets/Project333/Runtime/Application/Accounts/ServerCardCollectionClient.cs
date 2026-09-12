@@ -1,5 +1,4 @@
 using System;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -33,75 +32,18 @@ namespace Project333.Runtime.Application.Accounts
                 throw new InvalidOperationException("강화할 카드가 선택되지 않았습니다.");
             }
 
-            var request = new UpgradeCardRequest
-            {
-                CardId = cardId
-            };
-            var response = await PostJsonAsync<UpgradeCardRequest, UpgradeCardResponse>(
-                "/cards/upgrade",
-                request,
-                sessionToken,
-                cancellationToken);
-            if (response == null || response.ResolvedUpgradedCard == null)
+            using var operation = PendingAccountOperation.Begin(_baseUrl, "card_upgrade", cardId,
+                AccountSessionState.GetOwnedCardUpgradeLevel(cardId));
+            var request = new UpgradeCardRequest { CardId = cardId, RequestId = operation.RequestId,
+                ExpectedUpgradeLevel = operation.ExpectedUpgradeLevel };
+            var response = await operation.PostAsync<UpgradeCardRequest, UpgradeCardResponse>(
+                _baseUrl, "/cards/upgrade", sessionToken, request, BuildErrorMessage, cancellationToken);
+            if (response == null || response.ResolvedUpgradedCard == null || response.ResolvedWallet == null || response.ResolvedCollectionSummary == null)
             {
                 throw new InvalidOperationException("서버가 강화 결과를 반환하지 않았습니다.");
             }
 
-            return response;
-        }
-
-        private async Task<TResponse> PostJsonAsync<TRequest, TResponse>(
-            string path,
-            TRequest request,
-            string sessionToken,
-            CancellationToken cancellationToken)
-        {
-            var json = JsonUtility.ToJson(request);
-            var bodyRaw = Encoding.UTF8.GetBytes(json);
-            using var webRequest = new UnityWebRequest($"{_baseUrl}{path}", UnityWebRequest.kHttpVerbPOST)
-            {
-                uploadHandler = new UploadHandlerRaw(bodyRaw),
-                downloadHandler = new DownloadHandlerBuffer()
-            };
-            webRequest.SetRequestHeader("Content-Type", "application/json");
-            webRequest.SetRequestHeader("Accept", "application/json");
-            webRequest.SetRequestHeader("Authorization", $"Bearer {sessionToken}");
-
-            await SendAsync(webRequest, cancellationToken);
-            return DeserializeResponse<TResponse>(webRequest);
-        }
-
-        private static async Task SendAsync(UnityWebRequest webRequest, CancellationToken cancellationToken)
-        {
-            var operation = webRequest.SendWebRequest();
-            while (!operation.isDone)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                await Task.Yield();
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (webRequest.result != UnityWebRequest.Result.Success)
-            {
-                throw new InvalidOperationException(BuildErrorMessage(webRequest));
-            }
-        }
-
-        private static TResponse DeserializeResponse<TResponse>(UnityWebRequest webRequest)
-        {
-            var json = webRequest.downloadHandler?.text;
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                throw new InvalidOperationException("Server returned an empty response.");
-            }
-
-            var response = JsonUtility.FromJson<TResponse>(json);
-            if (response == null)
-            {
-                throw new InvalidOperationException("Failed to parse server response.");
-            }
-
+            operation.Complete(response.ResolvedRequestId, response.ResolvedAccount?.ResolvedId);
             return response;
         }
 
@@ -118,6 +60,8 @@ namespace Project333.Runtime.Application.Accounts
                     {
                         switch (resolvedError.ResolvedCode)
                         {
+                            case "card_upgrade_conflict":
+                                return "카드 레벨이 변경되었습니다. 목록을 새로고침한 뒤 강화해주세요.";
                             case "card_not_owned":
                                 return "보유하지 않은 카드는 강화할 수 없습니다.";
                             case "max_level_reached":
@@ -151,6 +95,8 @@ namespace Project333.Runtime.Application.Accounts
     public sealed class UpgradeCardRequest
     {
         public string CardId;
+        public string RequestId;
+        public int ExpectedUpgradeLevel;
     }
 
     [Serializable]
@@ -175,6 +121,12 @@ namespace Project333.Runtime.Application.Accounts
     [Serializable]
     public sealed class UpgradeCardResponse
     {
+        public string RequestId;
+        public string requestId;
+        public bool Replayed;
+        public bool replayed;
+        public string ResolvedRequestId => RequestId ?? requestId;
+        public bool ResolvedReplayed => Replayed || replayed;
         public AuthAccountDto Account;
         public WalletDto Wallet;
         public CollectionSummaryDto CollectionSummary;

@@ -1,6 +1,5 @@
 using System;
 using System.Threading;
-using System.Threading.Tasks;
 using Project333.Runtime.Application.Accounts;
 using Project333.Runtime.Application.Ads;
 using Project333.Runtime.Presentation.Shop;
@@ -31,8 +30,6 @@ namespace Project333.Runtime.Presentation.Ads
 
         [Header("Server")]
         [SerializeField] private string _accountServerUrl = Project333ServerEndpointSettings.LocalHttpUrl;
-        [SerializeField] private float _verificationTimeoutSeconds = 30f;
-        [SerializeField] private float _verificationPollSeconds = 1f;
 
         [Header("Editable UI")]
         [SerializeField] private RectTransform _uiParent;
@@ -54,10 +51,10 @@ namespace Project333.Runtime.Presentation.Ads
         private IRewardedAdService _adService;
         private CancellationTokenSource _cancellation;
         private string _providerUserId = string.Empty;
-        private string _activeAttemptId = string.Empty;
         private string _lastStatusMessage = string.Empty;
         private bool _isRequestingAttempt;
-        private bool _isVerifyingReward;
+        private float _nextUiRefresh;
+        private string _displayOwner;
         private bool _buttonNeedsDefaultLayout;
         private bool _buttonLabelNeedsDefaultLayout;
         private bool _statusNeedsDefaultLayout;
@@ -106,8 +103,7 @@ namespace Project333.Runtime.Presentation.Ads
             _providerUserId = LoadOrCreateProviderUserId();
             _adService = RewardedAdServiceRegistry.Shared;
             _adService.StateChanged += HandleAdStateChanged;
-            _adService.Rewarded += HandleAdRewarded;
-            _adService.Closed += HandleAdClosed;
+            RewardedAdRecovery.Resolved += HandleAdResolved;
             _adService.Initialize(_levelPlayAppKey, _providerUserId, _rewardedAdUnitId);
             RefreshUi();
         }
@@ -224,10 +220,10 @@ namespace Project333.Runtime.Presentation.Ads
             }
 
             var authenticated = AccountSessionState.IsAuthenticated;
-            var busy = _isRequestingAttempt || _isVerifyingReward || (_adService?.IsShowing ?? false);
+            var busy = _isRequestingAttempt || PendingRewardedAd.IsBlocking(AccountServerUrl, AccountSessionState.AccountId) || (_adService?.IsShowing ?? false);
             _watchAdButton.gameObject.SetActive(true);
             _watchAdButton.interactable = IsConfigured && authenticated && !busy && (_adService?.IsReady ?? false);
-            _watchAdButtonLabel.text = BuildButtonLabel(authenticated, busy);
+            _watchAdButtonLabel.text = BuildButtonLabel(authenticated);
 
             if (_rewardedAdStatusText != null)
             {
@@ -269,180 +265,109 @@ namespace Project333.Runtime.Presentation.Ads
             EnsureEditableHierarchy();
         }
 
+        private void Update()
+        {
+            if (Time.unscaledTime < _nextUiRefresh) return;
+            _nextUiRefresh = Time.unscaledTime + 0.5f;
+            if (_displayOwner != AccountSessionState.AccountId)
+            {
+                _displayOwner = AccountSessionState.AccountId;
+                _lastStatusMessage = string.Empty;
+            }
+            RefreshUi();
+        }
+
         public async void WatchRewardedAdFromUi()
         {
-            if (_isRequestingAttempt || _isVerifyingReward || (_adService?.IsShowing ?? false))
-            {
-                return;
-            }
-
+            if (_isRequestingAttempt || (_adService?.IsShowing ?? false) ||
+                PendingRewardedAd.IsBlocking(AccountServerUrl, AccountSessionState.AccountId)) return;
             if (!AccountSessionState.IsAuthenticated)
             {
                 SetStatus("로그인 후 광고 보상을 받을 수 있습니다.");
                 return;
             }
-
-            if (!IsConfigured)
+            if (!IsConfigured || _adService == null || !_adService.IsReady)
             {
-                SetStatus("Inspector에 LevelPlay App Key와 Rewarded Ad Unit ID를 입력해 주세요.");
+                SetStatus("광고가 아직 준비되지 않았습니다.");
                 return;
             }
-
-            if (_adService == null || !_adService.IsReady)
-            {
-                SetStatus(_adService?.StatusMessage ?? "광고가 아직 준비되지 않았습니다.");
-                return;
-            }
-
             var cancellation = _cancellation;
-            if (cancellation == null)
-            {
-                return;
-            }
-
-            var cancellationToken = cancellation.Token;
-
+            if (cancellation == null) return;
+            var ct = cancellation.Token;
+            var owner = AccountSessionState.AccountId;
+            var token = AccountSessionState.SessionToken;
+            var url = AccountServerUrl;
             _isRequestingAttempt = true;
-            SetStatus("광고 보상 가능 여부를 확인하는 중입니다.");
+            SetStatus(string.Empty);
             try
             {
-                var client = new RewardedTicketClient(AccountServerUrl);
-                var attempt = await client.CreateAttemptAsync(
-                    AccountSessionState.SessionToken,
-                    _providerUserId,
-                    cancellationToken);
-
+                var client = new RewardedTicketClient(url);
+                var previous = PendingRewardedAd.Load(url, owner);
+                if (previous != null)
+                {
+                    // A skipped/failed display may be tried again, but never replay a granted ad.
+                    var state = await client.GetAttemptAsync(token, previous.AttemptId, ct);
+                    if (!IsCurrentRequest()) return;
+                    if (state.ResolvedAttemptId != previous.AttemptId || state.ResolvedStatus != "pending" ||
+                        PendingRewardedAd.IsBlocking(url, owner) ||
+                        PendingRewardedAd.Load(url, owner)?.AttemptId != previous.AttemptId)
+                    {
+                        RewardedAdRecovery.RequestCheck();
+                        return;
+                    }
+                }
+                var attempt = await client.CreateAttemptAsync(token, _providerUserId, ct);
+                if (!IsCurrentRequest()) return;
                 if (attempt.ResolvedWallet != null)
                 {
                     AccountSessionState.ApplyRewardedAdWallet(attempt.ResolvedWallet);
                     RefreshHostWalletUi();
                 }
-
                 if (!attempt.ResolvedCanShow)
                 {
                     SetStatus(BuildEligibilityMessage(attempt));
                     return;
                 }
-
-                _activeAttemptId = attempt.ResolvedAttemptId;
-                var placement = string.IsNullOrWhiteSpace(attempt.ResolvedPlacement)
-                    ? _placementName
-                    : attempt.ResolvedPlacement;
-                if (!_adService.TryShow(
-                        placement,
-                        attempt.ResolvedDynamicUserId,
-                        out var errorMessage))
+                // Save before entering the SDK: process death or a scene change must not lose this attempt.
+                PendingRewardedAd.Remember(url, owner, attempt.ResolvedAttemptId);
+                var id = PendingRewardedAd.Load(url, owner).AttemptId;
+                RewardedAdRecovery.ObserveShow(_adService, url, owner, id);
+                var placement = string.IsNullOrWhiteSpace(attempt.ResolvedPlacement) ? _placementName : attempt.ResolvedPlacement;
+                if (!_adService.TryShow(placement, attempt.ResolvedDynamicUserId, out var errorMessage))
                 {
-                    _activeAttemptId = string.Empty;
+                    PendingRewardedAd.Clear(url, owner, id); // SDK confirmed that display never began.
                     SetStatus(errorMessage);
                     return;
                 }
-
                 SetStatus("광고 재생 중입니다.");
             }
-            catch (OperationCanceledException)
-            {
-            }
+            catch (OperationCanceledException) { }
             catch (Exception ex)
             {
                 Debug.LogWarning($"After333 rewarded ad attempt failed: {ex.Message}");
-                SetStatus(BuildAttemptFailureMessage(ex.Message));
+                if (IsCurrentRequest() && !PendingRewardedAd.IsBlocking(url, owner))
+                    SetStatus(BuildAttemptFailureMessage(ex.Message));
             }
             finally
             {
-                _isRequestingAttempt = false;
-                RefreshUi();
+                if (_cancellation == cancellation) { _isRequestingAttempt = false; RefreshUi(); }
             }
+
+            bool IsCurrentRequest() => !ct.IsCancellationRequested && _cancellation == cancellation &&
+                AccountSessionState.AccountId == owner && AccountSessionState.SessionToken == token && AccountServerUrl == url;
         }
 
-        private void HandleAdStateChanged()
+        private void HandleAdStateChanged() => RefreshUi();
+
+        private void HandleAdResolved(string url, string owner, RewardedAdAttemptDto attempt)
         {
-            RefreshUi();
+            if (url != AccountServerUrl || owner != AccountSessionState.AccountId) return;
+            RefreshHostWalletUi();
+            SetStatus(attempt.ResolvedStatus == "granted"
+                ? $"티켓 +{Mathf.Max(1, attempt.ResolvedRewardTicketCount)} 지급 완료!"
+                : "광고 보상이 지급되지 않았습니다.");
         }
-
-        private void HandleAdRewarded()
-        {
-            BeginRewardVerification();
-        }
-
-        private void HandleAdClosed()
-        {
-            if (!string.IsNullOrWhiteSpace(_activeAttemptId))
-            {
-                BeginRewardVerification();
-            }
-            else
-            {
-                RefreshUi();
-            }
-        }
-
-        private async void BeginRewardVerification()
-        {
-            if (_isVerifyingReward ||
-                string.IsNullOrWhiteSpace(_activeAttemptId) ||
-                _cancellation == null)
-            {
-                return;
-            }
-
-            _isVerifyingReward = true;
-            SetStatus("광고 보상을 확인하는 중입니다.");
-            var attemptId = _activeAttemptId;
-            var cancellationToken = _cancellation.Token;
-            try
-            {
-                var timeout = Mathf.Max(5f, _verificationTimeoutSeconds);
-                var pollDelay = Mathf.Max(0.25f, _verificationPollSeconds);
-                var deadline = Time.realtimeSinceStartup + timeout;
-                var client = new RewardedTicketClient(AccountServerUrl);
-
-                while (Time.realtimeSinceStartup < deadline)
-                {
-                    var attempt = await client.GetAttemptAsync(
-                        AccountSessionState.SessionToken,
-                        attemptId,
-                        cancellationToken);
-                    var status = attempt.ResolvedStatus;
-                    if (string.Equals(status, "granted", StringComparison.OrdinalIgnoreCase))
-                    {
-                        AccountSessionState.ApplyRewardedAdWallet(attempt.ResolvedWallet);
-                        RefreshHostWalletUi();
-                        SetStatus($"티켓 +{Mathf.Max(1, attempt.ResolvedRewardTicketCount)} 지급 완료!");
-                        return;
-                    }
-
-                    if (string.Equals(status, "rejected", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(status, "expired", StringComparison.OrdinalIgnoreCase))
-                    {
-                        SetStatus(BuildEligibilityMessage(attempt));
-                        return;
-                    }
-
-                    await Task.Delay(
-                        TimeSpan.FromSeconds(pollDelay),
-                        cancellationToken);
-                }
-
-                SetStatus("광고 완료 정보가 아직 서버에 도착하지 않았습니다. LevelPlay S2S 콜백 설정을 확인해 주세요.");
-            }
-            catch (OperationCanceledException)
-            {
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"After333 rewarded ad verification failed: {ex.Message}");
-                SetStatus("광고 보상 확인에 실패했습니다. 잠시 후 다시 확인해 주세요.");
-            }
-            finally
-            {
-                _activeAttemptId = string.Empty;
-                _isVerifyingReward = false;
-                RefreshUi();
-            }
-        }
-
-        private string BuildButtonLabel(bool authenticated, bool busy)
+        private string BuildButtonLabel(bool authenticated)
         {
             if (!IsConfigured)
             {
@@ -454,12 +379,7 @@ namespace Project333.Runtime.Presentation.Ads
                 return "로그인 후 광고 시청";
             }
 
-            if (_isVerifyingReward)
-            {
-                return "보상 확인 중...";
-            }
-
-            if (busy)
+            if (_adService?.IsShowing ?? false)
             {
                 return "광고 재생 중...";
             }
@@ -469,6 +389,7 @@ namespace Project333.Runtime.Presentation.Ads
 
         private string BuildStatusText(bool authenticated)
         {
+            if (!(_adService?.IsShowing ?? false) && PendingRewardedAd.HasPending(AccountServerUrl, AccountSessionState.AccountId)) return string.Empty;
             if (!string.IsNullOrWhiteSpace(_lastStatusMessage))
             {
                 return _lastStatusMessage;
@@ -737,14 +658,13 @@ namespace Project333.Runtime.Presentation.Ads
 
         private void UnsubscribeAdService()
         {
+            RewardedAdRecovery.Resolved -= HandleAdResolved;
             if (_adService == null)
             {
                 return;
             }
 
             _adService.StateChanged -= HandleAdStateChanged;
-            _adService.Rewarded -= HandleAdRewarded;
-            _adService.Closed -= HandleAdClosed;
             _adService = null;
         }
 
@@ -754,8 +674,6 @@ namespace Project333.Runtime.Presentation.Ads
             _cancellation?.Dispose();
             _cancellation = null;
             _isRequestingAttempt = false;
-            _isVerifyingReward = false;
-            _activeAttemptId = string.Empty;
         }
 
         private static void RegisterCreatedObject(GameObject gameObject)

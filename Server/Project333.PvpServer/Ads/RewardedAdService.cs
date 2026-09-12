@@ -11,8 +11,8 @@ public sealed class RewardedAdService
 {
     public const string ProviderName = "levelplay";
     public const string DefaultPlacementName = "start_ticket_reward";
-    public const int DefaultDailyLimit = 3;
-    public const int DefaultCooldownSeconds = 60;
+    public const int DefaultDailyLimit = 10;
+    public const int DefaultCooldownSeconds = 30;
     public const int DefaultRewardTicketCount = 1;
     public const int DefaultAttemptTtlMinutes = 30;
 
