@@ -24,6 +24,7 @@ namespace Project333.Runtime.Presentation.Battle
                 $"Opponent Resources: {FormatResources(battleState.AI.Resources)}",
                 $"Player Hand/Deck/Discard: {battleState.Player.Hand.Count}/{battleState.Player.Deck.Count}/{battleState.Player.Discard.Count}",
                 $"Opponent Hand/Deck/Discard: {battleState.AI.Hand.Count}/{battleState.AI.Deck.Count}/{battleState.AI.Discard.Count}",
+                $"낙진 전장 중첩: 내 전장 {battleState.PlayerBoard.FalloutStacks} / 상대 전장 {battleState.AIBoard.FalloutStacks}",
                 $"Persistent Effects: {battleState.PersistentEffects.Count}",
                 $"Battle Ended: {battleState.IsEnded}");
         }

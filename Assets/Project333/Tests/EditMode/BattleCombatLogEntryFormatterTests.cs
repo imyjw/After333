@@ -37,8 +37,8 @@ namespace Project333.Tests.EditMode
                 Is.EqualTo("상대방이 로봇 공장으로 카드 1장을 획득"));
         }
 
-        [TestCase(13, 0, "플레이어의 용사가 ATK +13을 얻음")]
-        [TestCase(0, 13, "상대방의 용사가 HP +13을 얻음")]
+        [TestCase(33, 0, "플레이어의 용사가 ATK +33을 얻음")]
+        [TestCase(0, 33, "상대방의 용사가 HP +33을 얻음")]
         public void Format_HeroGrowth_ShowsGainedStat(
             int attackBonus,
             int hpBonus,

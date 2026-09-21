@@ -36,6 +36,7 @@ MonoBehaviour:
   _hasBerserker: 0
   _hasEndure: 0
   _hasGuard: 0
+  _races: 09000000
   _canMove: 1
   _isScience: 0
   _sciencePowerUpkeep: 0

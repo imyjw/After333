@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Security.Cryptography;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Cards;
 
@@ -12,16 +11,15 @@ namespace Project333.Runtime.Application.Services
         private const string RedDragonCardId = "RedDragon";
         private const int BlueDragonHealAmount = 33;
         private const int RedDragonDamageAmount = 33;
-        private readonly Random _random;
 
         public EndTurnService()
-            : this(CreateRandom())
         {
         }
 
         public EndTurnService(Random random)
         {
-            _random = random ?? throw new ArgumentNullException(nameof(random));
+            // Retain the seeded-constructor contract used by AI simulations; turn end has no random effects.
+            if (random == null) throw new ArgumentNullException(nameof(random));
         }
 
         public void EndTurn(BattleState battleState)
@@ -43,48 +41,23 @@ namespace Project333.Runtime.Application.Services
 
             battleState.GetPlayer(battleState.ActivePlayerId).Hand.RemoveTemporaryReplicates();
 
+            var endingPlayerId = battleState.ActivePlayerId;
             ResolveEndTurnOccupantEffects(battleState);
+            // Turn-end Magic effects still benefit; the next turn's damage must not.
+            foreach (var effect in battleState.PersistentEffects)
+            {
+                if (effect.OwnerId == endingPlayerId &&
+                    string.Equals(effect.EffectId, MagicAmplificationCircleRules.EffectId, StringComparison.Ordinal))
+                    effect.Expire();
+            }
             if (battleState.IsEnded)
             {
                 return;
             }
 
-            ResolveHeroGrowthEffects(battleState);
-
-            var endingPlayerId = battleState.ActivePlayerId;
             battleState.ResolveInvincibleTurnEnd(endingPlayerId);
             battleState.SetPhase(PhaseType.TurnEnd);
             battleState.StartNextTurn(GetNextPlayerId(endingPlayerId));
-        }
-
-        private void ResolveHeroGrowthEffects(BattleState battleState)
-        {
-            ResolveHeroGrowthEffects(battleState.PlayerBoard);
-            ResolveHeroGrowthEffects(battleState.AIBoard);
-        }
-
-        private void ResolveHeroGrowthEffects(Project333.Runtime.Domain.Board.BoardState board)
-        {
-            var occupants = new List<OccupantState>(board.EnumerateOccupants());
-            foreach (var occupant in occupants)
-            {
-                if (!HeroRules.IsHero(occupant) ||
-                    !occupant.IsAlive ||
-                    occupant.EffectsSuppressed ||
-                    board.GetOccupant(occupant.Position) != occupant)
-                {
-                    continue;
-                }
-
-                if (_random.Next(2) == 0)
-                {
-                    occupant.IncreaseBaseAttack(HeroRules.GrowthAmount);
-                }
-                else
-                {
-                    occupant.IncreaseMaxHpAndCurrentHp(HeroRules.GrowthAmount);
-                }
-            }
         }
 
         private static void ResolveEndTurnOccupantEffects(BattleState battleState)
@@ -172,6 +145,7 @@ namespace Project333.Runtime.Application.Services
         {
             var enemyBoard = battleState.GetOpponentBoard(ownerId);
             var damagedOccupants = new List<OccupantState>(enemyBoard.EnumerateOccupants());
+            var damage = SpellPowerRules.ApplyCurrent(battleState, ownerId, RedDragonDamageAmount, DamageType.Magic);
 
             foreach (var occupant in damagedOccupants)
             {
@@ -187,7 +161,7 @@ namespace Project333.Runtime.Application.Services
 
                 var actualDamage = DamageResolutionRules.ApplyEffectDamage(
                     occupant,
-                    RedDragonDamageAmount,
+                    damage,
                     DamageType.Magic);
                 BattleValuePopupRecorder.RecordDamage(
                     battleState,
@@ -210,15 +184,5 @@ namespace Project333.Runtime.Application.Services
                 : PlayerId.Player;
         }
 
-        private static Random CreateRandom()
-        {
-            var seedBytes = new byte[sizeof(int)];
-            using (var randomNumberGenerator = RandomNumberGenerator.Create())
-            {
-                randomNumberGenerator.GetBytes(seedBytes);
-            }
-
-            return new Random(BitConverter.ToInt32(seedBytes, 0));
-        }
     }
 }

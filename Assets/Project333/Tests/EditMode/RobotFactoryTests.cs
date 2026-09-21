@@ -242,7 +242,7 @@ namespace Project333.Tests.EditMode
                 canMove: true,
                 isScience: true,
                 sciencePowerUpkeep: 0,
-                hasRobot: true,
+                races: new[] { UnitRace.Human, UnitRace.Robot },
                 includeInDraft: includeInDraft);
         }
 

@@ -29,6 +29,8 @@ namespace Project333.Runtime.Presentation.Battle
                           $"ATK {occupant.Attack} / HP {occupant.CurrentHp}/{occupant.MaxHp}";
 
             var statusLabels = new List<string>();
+            if (occupant.FalloutStacks > 0) statusLabels.Add($"낙진 {occupant.FalloutStacks}");
+
             if (occupant.IsDrained)
             {
                 statusLabels.Add("Drained");

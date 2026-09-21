@@ -97,7 +97,7 @@ namespace Project333.Runtime.Application.Services
                 damageType: definition.DamageType,
                 physicalDefense: definition.PhysicalDefense,
                 magicDefense: definition.MagicDefense,
-                hasRobot: definition.HasRobot,
+                races: definition.Races,
                 hasRush: definition.HasRush,
                 hasHiding: definition.HasHiding,
                 hasFlying: definition.HasFlying,
@@ -110,6 +110,8 @@ namespace Project333.Runtime.Application.Services
                 throw new InvalidOperationException("The selected hand card could not be consumed.");
             }
 
+            // Sealbound summons must already be protected when entering a contaminated board.
+            if (definition.SealboundOwnerTurnStarts > 0) unit.EnterSealbound(definition.SealboundOwnerTurnStarts);
             _summonService.Summon(battleState, playerId, unit, targetCoord);
 
             if (definition.SealboundOwnerTurnStarts > 0)
@@ -165,6 +167,7 @@ namespace Project333.Runtime.Application.Services
                 throw new InvalidOperationException("The selected hand card could not be consumed.");
             }
 
+            if (definition.SealboundOwnerTurnStarts > 0) building.EnterSealbound(definition.SealboundOwnerTurnStarts);
             _summonService.Summon(battleState, playerId, building, targetCoord);
 
             if (definition.SealboundOwnerTurnStarts > 0)

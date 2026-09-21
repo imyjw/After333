@@ -1,7 +1,10 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$ServerOutput,
-    [string]$PostgresBin = 'C:\Program Files\PostgreSQL\18\bin'
+    [string]$PostgresBin = 'C:\Program Files\PostgreSQL\18\bin',
+    [ValidateRange(0,7200)][int]$SoakSeconds = 0,
+    [ValidateRange(0,600)][int]$SettleSeconds = 300,
+    [ValidateRange(2,20)][int]$MaxMatches = 20
 )
 
 $ErrorActionPreference = 'Stop'
@@ -50,6 +53,9 @@ $environment = @{
     PROJECT333_RUN_REWARD_CARD_REWARDS = '{}'
     PROJECT333_RUN_REWARD_PACK_REWARDS = '{}'
     PROJECT333_AUDIT_LOG_DIR = (Join-Path $runRoot 'Audit')
+    AFTER333_SOAK_SECONDS = [string]$SoakSeconds
+    AFTER333_SETTLE_SECONDS = [string]$SettleSeconds
+    AFTER333_MAX_MATCHES = [string]$MaxMatches
     PROJECT333_ACCOUNT_RATE_LIMIT_PER_WINDOW = '100000'
     PROJECT333_AUTH_RATE_LIMIT_PER_WINDOW = '100000'
     PROJECT333_BATTLE_CONNECT_RATE_LIMIT_PER_WINDOW = '100000'
@@ -123,13 +129,13 @@ try {
     $null = $harness.Handle
     $harnessTimer = [Diagnostics.Stopwatch]::StartNew()
     while (-not $harness.WaitForExit(20000)) {
-        if ($harnessTimer.Elapsed.TotalSeconds -ge 480) {
+        if ($harnessTimer.Elapsed.TotalSeconds -ge ($SoakSeconds + $SettleSeconds + 900)) {
             Stop-Process -Id $harness.Id
             throw 'Run authority checks exceeded the bounded execution time.'
         }
     }
     $harness.Refresh()
-    if ($harness.ExitCode -ne 0) { throw 'Run authority checks failed. See checks.log and checks.err.log.' }
+    if ($harness.ExitCode -ne 0) { throw 'Load checks failed. See checks.log and checks.err.log.' }
     Get-Content -LiteralPath (Join-Path $runRoot 'checks.log')
 
 } finally {

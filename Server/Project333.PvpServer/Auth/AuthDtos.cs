@@ -129,4 +129,7 @@ public sealed record PvpReconnectStatusResponse(
     string? SeatId,
     string? OnlineSeatId,
     int RemainingSeconds,
-    string? ReconnectDeadlineUtc);
+    string? ReconnectDeadlineUtc,
+    string BattleMode = "pvp",
+    string GameMode = "run",
+    string? AiChallengeAttemptId = null);

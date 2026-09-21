@@ -18,10 +18,33 @@ This document is the source of truth for battle setup, tile notation, actions, t
 
 - Human players use a persisted `33`-card run deck created through draft.
 - Online PvE opponents use one of ten fixed 33-card decks, selected uniformly at each new battle and shuffled normally. Each contains Legendary 1, Unique 5, Rare 9, Uncommon 11, Common 7; only draft-enabled cards, at most 3 copies per card. See [pve_ai_decks.md](./pve_ai_decks.md).
-- The same battle rules are resolved by the server for PvE and account-matched 1:1 PvP.
+- The same battle rules are resolved by the server for human and AI opponents. Normal matchmaking and the separate daily AI challenge use different progression/reward rules; see [battle_modes.md](./battle_modes.md).
 - PvP clients send intended commands only; the server validates commands, mutates battle state, and publishes `StateView` and `BattleEvents`.
 - Battle results are persisted into the owning account's current run.
 - A run continues across battles until it reaches `33` wins or `3` losses.
+
+## Client Disconnection and Reconnect
+
+User-confirmed 2026-09-13: PvE uses the same `60`-second reconnect grace as PvP while the server remains running.
+
+- When the server detects a disconnected participant in an unfinished battle, reserve that account's original seat for `60` seconds. The server owns the deadline and the remaining reconnect time.
+- An authenticated reconnect within that deadline restores the same battle, participant, run, deck and battle state. Restarting the app must not start a new PvE battle or choose a new AI opponent in place of the interrupted battle.
+- If the participant does not return before the deadline and the battle is still unfinished, the server records the disconnect forfeit once against that battle's mode: normal run result or AI challenge loss. An AI challenge loss does not alter run scores or refund the consumed attempt. A reconnect does not itself change run results, tickets or account resources.
+- Existing turn deadlines and AI progression continue; disconnect/reconnect does not pause or reset the turn timer. If the battle ends before reconnection, its actual server result remains authoritative.
+- Reconnect-status queries and duplicate old-connection cleanup do not renew the grace period. A successful reconnect cancels the old disconnect reservation; its delayed timeout callback must not forfeit the restored connection.
+- The same account cannot start a second PvE battle or enter the other battle mode while it already has an active battle or an unexpired reconnect reservation.
+- This grace applies to client disconnection only. A server interruption follows the cancellation policy below instead.
+
+## Server Interruption Policy
+
+User-confirmed 2026-09-13:
+
+- If the server stops while a PvP or PvE battle is unfinished, cancel that battle without a win, loss, or draw result. Do not resume that battle from a saved snapshot after restart.
+- Keep the existing run, deck, prior win/loss record, tickets, and other account resources unchanged. The same run/deck can start another battle; cancellation does not create a new run or refund its original entry tickets.
+- For a daily AI challenge canceled by the server, restore its consumed attempt against its original KST date. Do not grant extra attempts to a later date. Normal app disconnection does not authorize this refund.
+- A result already finalized and durably recorded before the interruption remains valid, including a pending result journal awaiting DB delivery. Deliver these results before canceling unfinished DB matches.
+- Normal client disconnection while the server continues running still uses the existing reconnect/grace/forfeit behavior. A missing session alone never authorizes the client to invent a defeat.
+- Server shutdown must stop new actions, AI actions, turn-timeout resolution, and pending disconnect forfeits for unfinished battles. Restart cleanup clears stale queue, connection, and seat reservations without writing participant results.
 
 ## Battle Objective
 
@@ -117,14 +140,13 @@ Each turn follows this sequence:
 
 1. Resolve early scripted turn-start effects, including Timed Bomb countdown/detonation
 2. Gain base resources and active occupant resources
-3. Resolve active Power Plant gold-to-power effects
-4. Resolve power-upkeep payment
-5. Resolve active Robot Factory effects
-6. Resolve Firewall and Biochemical Bomb turn-start effects together in cast order
-7. Resolve the base draw
-8. Resolve Sealbound countdown/release
-9. Main phase
-10. Turn end
+3. Resolve power-upkeep payment
+4. Resolve active Robot Factory effects
+5. Resolve Firewall and Biochemical Bomb turn-start effects together in cast order
+6. Resolve the base draw
+7. Resolve Sealbound countdown/release
+8. Main phase (including optional occupant active effects)
+9. Turn end
 
 ## Draw and Resource Gain
 
@@ -160,7 +182,7 @@ Each turn follows this sequence:
 ## Power-Upkeep Payment
 
 - Any unit with `sciencePowerUpkeep > 0`, plus an explicitly defined building such as Robot Factory, requires power payment at turn start.
-- Power payment happens after the turn-start resource gain and Power Plant steps, and before Robot Factory, Firewall/Biochemical Bomb effects, and the base draw.
+- Power payment happens after the turn-start resource gain step, and before Robot Factory, Firewall/Biochemical Bomb effects, and the base draw.
 - Payment is attempted automatically in a fixed tile order.
 - The fixed order is:
 
@@ -202,7 +224,7 @@ Erasure (`망각`) may affect Units, Buildings, and Master Units. It lasts until
 - The original summon baseline remains: printed stats plus the account upgrade level used at summon. Current HP is never healed when a max-HP bonus is removed and is clamped only when it exceeds the restored maximum.
 - Buffs and debuffs applied after Erasure take effect normally. Reapplying Erasure removes the modifiers that exist at that later application time.
 - Base attack type, damage type, movement permission, tile size, baseline ATK/HP, baseline defenses, and account upgrade stats remain.
-- Robot classification is suppressed for battle searches, so an Erasure Robot cannot be counted or selected by Robot Fusion.
+- Unit races persist through Erasure. An Erasure Robot remains eligible for Robot Fusion unless excluded by another rule such as Sealbound.
 - Erasure does not set defenses to `0`, multiply incoming damage, or remove front-row blocking. Shielder is suppressed and therefore cannot redirect, but an ordinary front-row Erasure occupant still blocks.
 - Sealbound is a separate state and is not removed by Erasure.
 - Reconnect state stores `IsErasure` and the original combat-stat baseline. Legacy snapshots containing `IsDisabled` are migrated to `IsErasure` when restored.
@@ -392,7 +414,7 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 
 ### Repeated Hits
 
-- Double Attack and Triple Attack resolve as separate sequential hits.
+- Every active `hitsPerAttack: n` effect resolves as separate sequential hits in both a normal attack and an eligible counterattack, regardless of CardId.
 - The matching defense and drained multiplier are applied separately to every hit.
 - Damage popups and LifeSteal use each hit's actual HP loss after this calculation.
 
@@ -470,7 +492,7 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 - Firewall does not deal damage immediately when cast.
 - It triggers at the next two global turn starts: normally once at the opponent's next turn start and once at the caster's following turn start.
 - Each trigger occurs after base resources, occupant resources, power-upkeep payment, and Robot Factory effects, but before the base draw.
-- Each trigger deals its stored Magic damage to every current occupant in the selected row, including allied or enemy units, buildings, and the Master Unit.
+- Each trigger adds the caster's current SpellPower to its stored base Magic damage and deals it to every current occupant in the selected row, including allied or enemy units, buildings, and the Master Unit.
 - If Firewall defeats its caster's Master, the opposing player wins.
 - Firewall is an area effect, so Shielder does not redirect it. Every occupant in the row resolves defense and drained multiplication independently.
 - All damage from one Firewall instance is applied before defeated units/buildings are removed and Master defeat is checked.
@@ -516,35 +538,44 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 Only melee-versus-melee combat causes a counterattack.
 An occupant with `0` ATK cannot counterattack.
 
+- Counterattack eligibility and the initial counterattacker are unchanged: melee-versus-melee only, using the initial Shielder when the declared target is protected. The protected occupant does not also counterattack.
+- Each declared attack causes at most one counterattack sequence. Its hit count is the counterattacker's own effective `hitsPerAttack`, not the attacker's hit count. A 3-hit attacker against a 2-hit counterattacker deals 3 attack hits and receives 2 counterattack hits, not 6.
+- Capture each participant's effective hit count and per-hit ATK at the start of the attack action. Damage during that action does not recalculate its already captured Berserker ATK or add more hits.
+- Resolve every counterattack hit as a separate damage packet with the counterattacker's own damage type. Apply the recipient's matching defense, Drained modifier, Invincible, and Endure to each packet independently.
+- Erasure suppresses multi-hit, leaving one hit in an otherwise eligible counterattack. Drained and Sealbound prevent counterattack entirely. Ranged combat still causes no counterattack.
+
 ### Resolution Matrix
 
 | Attacker | Defender | Defender takes damage | Attacker takes damage |
 | --- | --- | --- | --- |
-| Melee attacker | Melee attacker | Yes, equal to attacker's ATK | Yes, equal to defender's ATK |
-| Melee attacker | Ranged attacker | Yes, equal to attacker's ATK | No |
-| Ranged attacker | Melee attacker | Yes, equal to attacker's ATK | No |
-| Ranged attacker | Ranged attacker | Yes, equal to attacker's ATK | No |
+| Melee attacker | Melee attacker | Attacker's own hit count, each using its ATK | Eligible counterattacker's own hit count, each using its ATK |
+| Melee attacker | Ranged attacker | Attacker's own hit count, each using its ATK | No |
+| Ranged attacker | Melee attacker | Attacker's own hit count, each using its ATK | No |
+| Ranged attacker | Ranged attacker | Attacker's own hit count, each using its ATK | No |
+
+The matrix lists damage before mitigation; each hit uses the defenses and effects above. Shielder may change the initial counterattacker according to the existing redirection rule.
 
 ### Simultaneous Damage Rule
 
 - Melee-versus-melee damage is simultaneous.
 - Both participants deal their damage when the attack resolves.
 - Both participants can be destroyed by the same combat.
-- The melee counterattack still applies even if one side would be destroyed by the same exchange.
+- The attacker's final melee hit and the entire counterattack sequence form one simultaneous exchange. The initially eligible counterattacker completes its captured hit count even if either participant reaches `0` HP during the attack action; defeat removal follows the existing attack-resolution boundary.
 - If both Master Units are defeated by the exchange, the higher final HP wins; equal final HP produces a draw.
 
 ### LifeSteal
 
 - A LifeSteal occupant heals by the actual HP it removes with an attack or counterattack after defense, drained multiplication, and remaining-HP limits are applied.
 - LifeSteal does not trigger while the occupant's effects are suppressed.
-- In melee-versus-melee combat, both attack and counterattack damage are applied first, then occupants at `0` or less HP are treated as defeated, then surviving LifeSteal occupants heal.
+- In the final melee exchange, the final attack hit (including Piercing) and every counterattack hit are applied before LifeSteal. Sum the actual HP removed by that participant during this exchange; occupants at `0` or less HP cannot heal, and only surviving LifeSteal occupants recover that total. Earlier attack hits retain their existing per-hit LifeSteal timing.
 - If a LifeSteal attacker or counterattacker is defeated by the same melee exchange, it does not heal from that exchange.
 
-### Robot Tag
+### Unit Races and Robot Fusion
 
-- `Robot` is a unit classification tag used by Robot searches.
-- A Robot unit remains eligible while Drained, but Erasure suppresses its Robot classification for battle-rule searches.
-- The Robot tag has no standalone stat or combat effect.
+- Unit cards have zero or more races, separate from special effects; Buildings, Spells and Master Units do not have the unit race field. See [confirmed assignments](unit_races.md).
+- Races persist through Erasure, Drained and Sealbound. Sealbound still excludes an occupant from Robot Fusion targeting.
+- Robot is a race, not a special effect, and has no standalone stat or combat effect.
+- A Robot unit remains eligible while Drained or under Erasure.
 - Robot Fusion is playable when its owner controls at least two living Robot units.
 - This count is based on living Robot unit instances, not distinct CardIds. Two living copies of the same Robot card satisfy the condition.
 - Casting Robot Fusion pays its listed cost, discards the spell, and enters an ordered friendly-Robot selection mode.
@@ -552,16 +583,16 @@ An occupant with `0` ATK cannot counterattack.
 - The selected Robot with the highest science power upkeep survives. If upkeep ties, the Robot selected earlier survives.
 - Every other selected Robot contributes its current ATK and current HP to the survivor as permanent ATK and max/current HP increases.
 - A damaged Robot contributes only its remaining current HP, so fusion never restores the donor's missing HP for free.
-- Special effects, attacks per turn, damage type, science power upkeep, Drained state, and Erasure state are not transferred. The survivor retains its own values and states.
+- Races, special effects, attacks per turn, damage type, science power upkeep, Drained state, and Erasure state are not transferred. The survivor retains its own values and states.
 - Absorbed Robots leave the board as fusion materials and are not treated as defeated occupants.
 
 ### Robot Factory
 
 - Robot Factory is a Rare, non-attacking `1x1` Science Civilization building with cost `1 Power`, ATK `0`, HP `50`, defense `0/0`, DamageType `None`, and `sciencePowerUpkeep 1`.
-- Robot Factory itself does not have the Robot tag.
+- Robot Factory is a Building and has no unit race field.
 - It starts triggering on its owner's next turn start after it is summoned; it never triggers immediately on summon.
 - After power upkeep resolves, every living Robot Factory whose effects are not suppressed generates one card in fixed tile order `(0,0), (0,1), ... (4,1)`.
-- The candidate pool contains only Unit definitions where `hasRobot == true` and `includeInDraft == true`.
+- The candidate pool contains only Unit definitions where `races` includes `Robot` and `includeInDraft == true`.
 - Every eligible Robot definition has equal selection probability. Selection is server-authoritative.
 - Multiple active factories each generate one independently selected card.
 - The generated card is added directly to its owner's hand and does not come from the deck.
@@ -571,16 +602,25 @@ An occupant with `0` ATK cannot counterattack.
 - The owner sees the generated card identity in combat history. The opponent sees only that Robot Factory generated one card, while the owner's public hand count increases normally.
 - Robot Factory upgrades grant HP `+1` at every level and never grant the normal milestone ATK bonus.
 
+### Active Effects
+
+- An active effect is an explicitly invoked occupant special effect, described as `액티브: 효과 내용`.
+- Active effects are own-turn-only by default. Opponent-turn activation is an exception only when explicitly stated in the card description; Power Plant has no such exception. A future exception requires an explicit shared-service/command handler and tests, not only description text.
+- During the owner Main phase, clicking an eligible friendly occupant shows a small Active button on its tile image. Pressing it sends an intent through the battle gateway. Selecting the tile does not spend resources.
+- Dead, Erasure, Drained and Sealbound occupants cannot activate. Pending Robot Fusion, battle end and the opponent turn block activation.
+- Insufficient resources do not hide or disable an otherwise eligible active button. Clicking it shows the cost failure (Power Plant: "골드가 부족합니다") without spending resources or consuming usage. The button remains available for retry after gaining resources. AI still requires affordability.
+- The server/shared service validates the actor, source runtime identity, cost and per-occupant turn limit. Invalid/duplicate requests change neither resources nor usage state.
+- Usage survives state projection, reconnect, AI simulation and server snapshots. It does not consume ordinary attack/movement actions.
+- Individual active mechanics require an implemented handler; display text alone is not executable. Current supported active: PowerPlant. See [details](active_effects.md).
+
 ### Power Plant
 
 - Power Plant is a Common, non-attacking `1x1` Science Civilization building with cost `1 Power`, ATK `0`, HP `30`, defense `0/0`, DamageType `None`, and no power upkeep.
-- It starts triggering on its owner's next turn start after it is summoned; it never triggers immediately on summon.
-- After base and active-occupant resource gain, but before power upkeep, each living Power Plant whose effects are not suppressed automatically pays exactly `1 Gold` and grants `2 Power`.
-- Gold is the effect's explicit payment, not a substitute payment. If `1 Gold` is unavailable, that Power Plant skips its trigger with no partial payment or debt.
-- Multiple active Power Plants resolve independently in fixed tile order `(0,0), (0,1), ... (4,1)`.
-- Drained, Erasure, and Sealbound suppress this effect. It resumes on a later owner turn start after suppression ends.
-- Power Plant upgrades grant HP `+1` at every level and never grant the normal milestone ATK bonus.
-- Power Plant is enabled in draft offers and random card rewards.
+- Text: `액티브: 1턴에 1번, 골드를 1 소모해서 전력을 2 얻는다.`
+- Usable immediately on the summon turn, once per owner turn per Power Plant. Pay exactly 1 Gold and gain 2 Power together.
+- No automatic turn-start conversion occurs. The player may keep Gold; other resources cannot substitute for the 1 Gold cost.
+- Multiple plants have independent usage limits. A restored view does not refresh them; the next owner turn does.
+- Power Plant upgrades grant HP `+1` at every level; cost, conversion and draft/reward eligibility remain unchanged.
 
 ### Nuclear Power Plant
 
@@ -608,7 +648,7 @@ An occupant with `0` ATK cannot counterattack.
 - An active Rush trait is the only exception: a non-suppressed Rush Unit receives its normal attack allowance immediately after control changes. Drained, Erasure, or Sealbound suppression prevents this Rush exception.
 - Movement availability is preserved and continues to follow the Unit's normal movement rules.
 - The transfer is not destruction, defeat, summon, or resurrection. It does not trigger removal/death semantics.
-- StateView and server-restart snapshots serialize the Unit under its new owner and board while preserving its RuntimeId and occupant state.
+- StateView and stored diagnostic snapshots serialize the Unit under its new owner and board while preserving its RuntimeId and occupant state.
 - Gu is not redirected by Shielder, gains no SpellPower, and cannot be upgraded. It is enabled in draft offers and excluded from random rewards.
 
 ### HuanShu
@@ -630,7 +670,7 @@ An occupant with `0` ATK cannot counterattack.
 - Sealbound does not remove an existing HuanShu. A new HuanShu cast cannot target a Sealbound Unit.
 - Gu preserves HuanShu when ownership changes.
 - Robot Fusion does not transfer HuanShu from absorbed materials. A surviving afflicted Robot keeps its own HuanShu status.
-- Server-authoritative random selection is included in synchronized battle events. StateView and server-restart snapshots preserve the active status through compatibility fields; positive legacy remaining-turn values restore permanent HuanShu. Reconnect never rerolls a completed attack.
+- Server-authoritative random selection is included in synchronized battle events. StateView and stored diagnostic snapshots preserve the active status through compatibility fields; positive legacy remaining-turn values restore permanent HuanShu. Reconnect never rerolls a completed attack.
 - Both players see only a small purple HuanShu status icon on the occupant. Long-pressing the occupant shows the permanent HuanShu explanation without a turn counter.
 - HuanShu cannot be upgraded. It is enabled in draft offers and excluded from random rewards.
 
@@ -705,7 +745,7 @@ An occupant with `0` ATK cannot counterattack.
 - A hidden Shielder does not redirect attacks or effects. Shielder becomes active after Hiding is removed if no other state suppresses it.
 - `HasHiding` and `HidingRevealed` are separate values. Entering Drained or Erasure permanently sets `HidingRevealed`; clearing Drained never restores Hiding, and Erasure itself remains for the occupant's time on the field.
 - If a Unit has both Sealbound and Hiding, Sealbound rules take priority while sealed. It becomes hidden when released unless Hiding was already permanently revealed by a separate legal rule.
-- StateView and reconnect snapshots preserve both the immutable `HasHiding` trait and `HidingRevealed` so the current state survives reconnection and server restoration.
+- StateView and reconnect snapshots preserve both the immutable `HasHiding` trait and `HidingRevealed` so the current state survives reconnection within the running server.
 - Hiding is implemented. Existing cards remain unaffected while `hasHiding` is omitted or `false`.
 
 ### Flying
@@ -746,27 +786,27 @@ An occupant with `0` ATK cannot counterattack.
 - LifeSteal includes actual HP lost to the Piercing packet by its recipients, including a redirecting Shielder and any overflow recipient, after defense and prevention. On the final melee hit, direct and opposite-row damage resolve before the counterattack, then a surviving attacker heals from the combined actual HP loss.
 - When HuanShu redirects an attack, Piercing uses the actual random target's row and column rather than the originally selected target.
 - Drained and Sealbound prevent an occupant from attacking through their normal rules. Erasure suppresses Piercing even if the immutable `HasPiercing` trait remains stored.
-- StateView and server-restart snapshots preserve `HasPiercing` for Units, Buildings, and Master Units.
+- StateView and stored diagnostic snapshots preserve `HasPiercing` for Units, Buildings, and Master Units.
 - Piercing is implemented. Existing cards remain unaffected while `hasPiercing` is omitted or `false`.
 
 ### SpellPower
 
-- `SpellPower +n` uses the reserved future occupant value `spellPower: n`. Units, Buildings, and Master Units may provide SpellPower; `0` means none and negative values are invalid.
-- SpellPower applies only to Magic-damage packets produced by cards whose card type is Spell, including delayed or persistent Spell-card effects.
+- `SpellPower +n` uses the occupant value `spellPower: n`. Units, Buildings, and Master Units may provide SpellPower; `0` means none and negative values are invalid.
+- SpellPower applies to all Magic damage: normal attacks, counterattacks, Unit/Building/Master effects, and immediate, delayed, or persistent Spell effects.
 - Physical and Fixed damage packets never receive SpellPower, even when their source card is a Spell.
-- Magic normal attacks and Magic-damage effects originating from Units, Buildings, or Master Units do not receive SpellPower.
+- Use the damage source owner's current allied SpellPower immediately before resolving that damage, including damage to allies.
 - If one Spell produces mixed damage types, only its Magic packets receive the bonus.
-- Sum every living, active allied occupant's SpellPower with no maximum. Drained, Erasure, and Sealbound occupants provide none; Hiding and Flying do not suppress SpellPower.
-- Resolve raw Magic Spell damage as `card-level-adjusted damage + total SpellPower`, then apply Magic Defense, Drained multiplication, Shielder, Endure, removal, and victory rules in their normal order.
-- Area Magic Spell damage receives the full SpellPower bonus separately for every target.
-- Multi-hit Magic Spell damage receives the full SpellPower bonus on every hit.
-- A persistent or delayed Magic-damage Spell captures the caster's total SpellPower when the server accepts the play from hand. Later gains, losses, state changes, or removal of SpellPower sources do not alter that effect.
-- Every persistent trigger and every target uses the captured value. StateView and reconnect snapshots preserve it as `CapturedSpellPower`.
-- Every separately played Replicate copy calculates SpellPower again at its own accepted cast time.
-- SpellPower applies when a Magic-damage Spell legally targets its caster's own occupant as well as an enemy occupant.
+- Sum every living, active allied occupant's SpellPower and the owner's unexpired Magic Amplification Circle bonuses with no maximum. Drained, Erasure, and Sealbound occupants provide none; Hiding and Flying do not suppress SpellPower.
+- Resolve raw Magic damage as `base damage after applicable upgrades/buffs + current total SpellPower`, then apply defense and existing damage rules. Add the bonus once to the original packet; Shielder redirection and overflow do not add it again. This is one increased damage packet, not a separate extra hit.
+- Area Magic damage receives the full current bonus for every target. One simultaneous area effect reads the total before any target loses HP; later effects recalculate after the earlier effect finishes.
+- Multi-hit Magic damage receives the full bonus on every hit. A normal hit and its Piercing target share that hit's current bonus. Existing simultaneous final melee hit/counterattack resolution reads each side's total before applying that exchange; it does not make counterattacks sequential.
+- Persistent or delayed Magic damage does not capture SpellPower at cast time. Every trigger uses the effect owner's current allied total, including sources summoned, killed, suppressed, or reactivated after casting.
+- Reconnect preserves occupants and their current states. `CapturedSpellPower` is retained only as a legacy wire/snapshot field and is ignored by damage resolution; new effects leave it at zero.
+- Every separately played Replicate copy also uses the owner's current SpellPower whenever its Magic damage resolves.
+- Tooltip: `마법 데미지를 입힐 때, 주문력만큼의 추가 마법 데미지를 준다.`
 - Destroy, remove, set-HP, or other effects that do not calculate a Magic damage amount receive no SpellPower bonus.
 - Robot Fusion does not transfer SpellPower from absorbed materials. Card-level upgrades do not increase an occupant's SpellPower unless a future card-specific rule explicitly says so.
-- SpellPower is implemented. Existing cards remain unaffected while `spellPower` is omitted or `0`.
+- SpellPower is implemented. Omitting `spellPower` or setting it to `0` means that occupant provides no bonus; its Magic damage can still benefit from other active allied sources.
 
 ### Invincible
 
@@ -789,17 +829,16 @@ An occupant with `0` ATK cannot counterattack.
 - StateView and reconnect snapshots preserve every active Invincible effect's duration condition, start context, and remaining owner-turn count.
 - Invincible is implemented. Existing cards remain unaffected while `invincibleDuration` is omitted or `None`.
 
-### Hero Growth
+### Hero Attack Kill Bonus
 
-- `Hero` is a movable `1x1` Fantasy Unit with melee Fixed damage, base `3 ATK / 3 HP`, `0 / 0` Physical/Magic Defense, and a cost of `3 mana`.
-- On summon, Hero gains `GlobalTurnEnds(3)` Invincible. The summon turn's ending changes the count `3 -> 2`; the next opponent turn ending changes it `2 -> 1`; the next turn ending changes it `1 -> 0` and removes Invincible.
-- At every global turn end, each living Hero independently gains either permanent `Base ATK +13` or permanent `Max HP +13` with equal probability.
-- An HP growth also heals `Current HP +13`, so the Hero keeps the same amount of existing damage rather than being fully healed.
-- Hero growth has no stack limit. Multiple Heroes resolve independently in deterministic board order: Player board first, AI board second, then `(0,0), (0,1), (1,0), ... (4,1)` within each board.
-- Drained, Erasure, and Sealbound suppress Hero growth. Suppression does not pause the separate Invincible countdown.
-- Card-level upgrades are applied before battle. Hero gains ATK +1 at Lv.3, Lv.6, and Lv.9, ATK +3 at Lv.13, and HP +1 at every other level.
-- The authoritative server chooses each growth result. StateView and reconnect snapshots preserve the resulting base ATK, maximum/current HP, and remaining Invincible count; reconnect never rerolls completed growth.
-- Hero remains excluded from draft offers and random rewards until its card art is ready.
+- Hero is a Human, Unique 1x1 Fantasy Unit: melee Fixed damage, base 33 ATK / 33 HP, defense 0/0, cost 3 mana, movable, with Rush.
+- No innate Invincible and no turn-end growth. Special-effect text is 속공; card effect text is 상대방 소환물을 공격해 파괴할 때마다 공격력 또는 체력+33.
+- After its own normal attack and simultaneous counterattack resolve, a living, unsuppressed Hero gains either permanent Base ATK +33 or Max/Current HP +33 with equal 50% probability per enemy non-Master occupant killed by that attack. Units and buildings both qualify. Each destroyed occupant counts once even for multiple hits; attack damage redirected to a Shielder and Piercing damage qualify.
+- Counterattack kills, friendly kills under HuanShu, Master kills, spells, and collateral deaths from destruction effects do not qualify. A Hero killed in simultaneous combat cannot revive itself with this bonus.
+- HP bonuses preserve existing damage by raising maximum and current HP equally. Bonuses have no stack cap; Erasure follows existing stat-reset rules and suppresses further bonuses.
+- The authoritative server chooses each result. Reconnect restores resulting stats without rerolling. Combat logs record bonuses on attack resolution.
+- Existing upgrade schedule remains: ATK +1 at Lv.3/6/9, ATK +3 at Lv.13, HP +1 at other levels. Lv.13 before combat bonuses is ATK 39 / HP 42.
+- Draft and random rewards remain disabled.
 
 ### Shielder Damage Transfer
 
@@ -858,3 +897,21 @@ An occupant with `0` ATK cannot counterattack.
 
 > TBD: Full civilization roster and any civilization rules beyond the confirmed science power-upkeep rule
 
+### Nuclear and Fallout
+
+Confirmed 2026-09-21: Nuclear (Legendary Science spell, 10 Power, no upgrades/draft/rewards) destroys all non-Master, non-Sealbound occupants on both boards at once. Invincible and Endure do not prevent destruction; normal active destruction/revival triggers still resolve. Each cast permanently adds one Fallout exposure to the opponent board, including future summons. Fallout deals one Fixed packet of 10 times stacks at every global turn start, after upkeep/factory and before area damage/draw. Standard damage protections and Drained multiplier apply. Erasure and ownership transfer do not remove acquired Fallout. Per-board exposure history prevents reapplication on transfer/reconnect; Sealbound defers new exposure until release. Masters are excluded. See [complete rules](nuclear_fallout.md).
+
+### Magic Amplification Circle
+
+- MagicAmplificationCircle: Common Fantasy spell, mana 1, no upgrade, excluded from draft/rewards.
+- No target. Each successful cast grants its owner SpellPower +10 until the end of their turn; multiple casts add together. This player-owned bonus is independent of occupant suppression or death.
+- Apply it to all Magic damage through the usual live SpellPower total. Retain it during owner turn-end effects, then expire it before the next turn starts. Thus Red Dragon benefits, but next-turn Firewall does not.
+- Existing persistent-effect snapshot/view/AI paths preserve owner, stacks and expiry. See [card details](magic_amplification_circle.md).
+
+## Occupant Hold Preview Status Tooltips (2026-09-21)
+
+- Hold-preview shows innate card rules at the left/right, current occupant buffs/debuffs below, and applicable player/field influences above. Release hides all regions.
+- Permanent combat stat gains retain their source card (Hero, RobotFusion, Daehwandan, DemonKing) and applied amounts. Same-source gains aggregate. Erasure clears existing records; DemonKing revival rebuilds records from its reset stats. Ownership transfer preserves records. This is attribution, not an additional stat bonus.
+- Snapshots, viewer state projections and AI clones preserve this attribution. Older snapshots without it show unattributed baseline differences; ordinary HP damage and account upgrade stats are not buffs.
+- Below/above panels show only effect names and applicable current stat/damage values. Omit descriptions, category prefixes and duration/counter explanations; attached statuses such as Fallout and Invincible show their names only. Preserve effect presence, expiry, relevant tile filtering and all battle rules. Innate left/right explanations remain detailed. Player SpellPower and field damage effects are influences, not an occupant receiving that ability.
+- Full display definitions: [occupant_status_tooltips.md](occupant_status_tooltips.md).

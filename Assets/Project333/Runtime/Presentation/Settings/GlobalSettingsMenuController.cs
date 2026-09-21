@@ -68,6 +68,7 @@ namespace Project333.Runtime.Presentation.Settings
         [SerializeField] private Button _confirmationAcceptButton;
         [SerializeField] private Text _confirmationAcceptButtonLabel;
 
+        private Text _buildInfoText;
         private Action _pendingConfirmationAction;
         private string _sceneName = string.Empty;
         private bool _isHandlingSceneBackNavigation;
@@ -425,6 +426,11 @@ namespace Project333.Runtime.Presentation.Settings
                 out _quitButtonLabel);
             ConfigureLabel(_quitButtonLabel, "게임 종료", 28);
 
+            if (UnityEngine.Application.isPlaying)
+            {
+                EnsureBuildInfoLabel();
+            }
+
             EnsureAudioPanel();
             EnsureConfirmationPanel();
 
@@ -432,6 +438,24 @@ namespace Project333.Runtime.Presentation.Settings
             {
                 _modalRoot.gameObject.SetActive(false);
             }
+        }
+
+        private void EnsureBuildInfoLabel()
+        {
+            _buildInfoText = ResolveOrCreateText(
+                _buildInfoText,
+                "BuildInfoText",
+                _mainPanel,
+                new Vector2(0.5f, 0f),
+                new Vector2(0.5f, 0f),
+                new Vector2(540f, 80f),
+                new Vector2(0f, 20f),
+                18,
+                FontStyle.Normal,
+                Project333ClientBuildInfo.BuildDisplayText);
+            _buildInfoText.text = Project333ClientBuildInfo.BuildDisplayText;
+            _buildInfoText.color = new Color(0.7f, 0.78f, 0.82f, 1f);
+            _buildInfoText.supportRichText = false;
         }
 
         private void EnsureAudioPanel()

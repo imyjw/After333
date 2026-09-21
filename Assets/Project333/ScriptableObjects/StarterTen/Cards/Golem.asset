@@ -37,6 +37,7 @@ MonoBehaviour:
   _hasEndure: 0
   _hasGuard: 0
   _hasLifeSteal: 0
+  _races:
   _canMove: 1
   _isScience: 0
   _sciencePowerUpkeep: 0

@@ -157,7 +157,7 @@ Set-Project333Env "PROJECT333_GOOGLE_DESKTOP_CLIENT_ID" $GoogleDesktopClientId
 Set-Project333Env "PROJECT333_GOOGLE_DESKTOP_CLIENT_SECRET" $GoogleDesktopClientSecret
 Set-Project333Env "PROJECT333_DEV_MIN_TICKETS" ""
 Set-Project333Env "PROJECT333_TICKET_PURCHASE_GOLD_COST" "$TicketPurchaseGoldCost"
-Set-Project333Env "PROJECT333_ENABLE_PVP_STARTUP_RECOVERY" $(if ($DisableStartupRecovery) { "0" } else { "1" })
+# Legacy startup-recovery switches are retained for command compatibility; unfinished battles always cancel.
 Set-Project333Env "PROJECT333_VERBOSE_TRANSPORT_LOGS" $(if ($VerboseTransportLogs) { "1" } else { "0" })
 Set-Project333Env "PROJECT333_RATE_LIMIT_ENABLED" "1"
 Set-Project333Env "PROJECT333_RATE_LIMIT_WINDOW_SECONDS" "$RateLimitWindowSeconds"
@@ -173,7 +173,7 @@ Write-Host "  PublicUrl:       $(if ([string]::IsNullOrWhiteSpace($env:PROJECT33
 Write-Host "  Database:        $(Format-MaskedConnectionString $env:PROJECT333_DB_CONNECTION)"
 Write-Host "  Client:          required=$env:PROJECT333_REQUIRED_CLIENT_VERSION recommended=$env:PROJECT333_RECOMMENDED_CLIENT_VERSION cardDb=$env:PROJECT333_CARD_DEFINITION_VERSION"
 Write-Host "  Tickets:         devMinimum=<disabled> purchaseGoldCost=$env:PROJECT333_TICKET_PURCHASE_GOLD_COST"
-Write-Host "  Recovery:        startup=$env:PROJECT333_ENABLE_PVP_STARTUP_RECOVERY verboseTransport=$env:PROJECT333_VERBOSE_TRANSPORT_LOGS"
+Write-Host "  Restart policy: cancel unfinished battles without win/loss; verboseTransport=$env:PROJECT333_VERBOSE_TRANSPORT_LOGS"
 Write-Host "  RateLimits:      enabled=$env:PROJECT333_RATE_LIMIT_ENABLED window=${env:PROJECT333_RATE_LIMIT_WINDOW_SECONDS}s auth=$env:PROJECT333_AUTH_RATE_LIMIT_PER_WINDOW account=$env:PROJECT333_ACCOUNT_RATE_LIMIT_PER_WINDOW battleConnect=$env:PROJECT333_BATTLE_CONNECT_RATE_LIMIT_PER_WINDOW"
 Write-Host "  Environment:     $env:ASPNETCORE_ENVIRONMENT"
 Write-Host "  Logs:            $LogDirectory retention=$(if ($LogRetentionDays -eq 0) { 'forever' } else { "${LogRetentionDays}d" })"

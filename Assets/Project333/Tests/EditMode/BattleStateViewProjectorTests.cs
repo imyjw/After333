@@ -97,7 +97,7 @@ namespace Project333.Tests.EditMode
                 CurrentHp = 12,
                 MaxHp = 15,
                 CanMove = true,
-                HasRobot = true,
+                Races = new[] { UnitRace.Robot },
                 RemainingAttacksThisTurn = 1,
             });
 
@@ -109,7 +109,7 @@ namespace Project333.Tests.EditMode
             Assert.That(occupant.PhysicalDefense, Is.EqualTo(4));
             Assert.That(occupant.MagicDefense, Is.EqualTo(6));
             Assert.That(occupant, Is.TypeOf<UnitState>());
-            Assert.That(((UnitState)occupant).HasRobot, Is.True);
+            Assert.That(((UnitState)occupant).HasRace(UnitRace.Robot), Is.True);
         }
 
         [Test]
@@ -147,7 +147,7 @@ namespace Project333.Tests.EditMode
                 CanMove = true,
                 IsDrained = true,
                 IsErasure = true,
-                HasRobot = true,
+                Races = new[] { UnitRace.Robot },
                 RemainingAttacksThisTurn = 1,
             });
 

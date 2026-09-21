@@ -22,6 +22,8 @@ namespace Project333.Runtime.Infrastructure.Data
             "robot_fusion",
             BiochemicalBombRules.EffectId,
             TimedBombRules.EffectId,
+            NuclearRules.EffectId,
+            MagicAmplificationCircleRules.EffectId,
             PowerBankRules.EffectId,
             ManaStoneRules.EffectId,
             ManaStoneBundleRules.EffectId,
@@ -168,6 +170,8 @@ namespace Project333.Runtime.Infrastructure.Data
 
         private static void ValidateRawPropertyName(string propertyName, string cardId, CardDatabaseValidationResult result)
         {
+            if (string.Equals(propertyName, "hasRobot", StringComparison.OrdinalIgnoreCase))
+                result.AddError($"Card '{cardId}' uses removed hasRobot field. Use unit races instead.");
             if (string.Equals(propertyName, RemovedAttributeFieldName, StringComparison.OrdinalIgnoreCase))
             {
                 result.AddError($"Card '{cardId}' contains removed field '{RemovedAttributeFieldName}'. Remove it from cards.json.");
@@ -208,6 +212,20 @@ namespace Project333.Runtime.Infrastructure.Data
             if (string.IsNullOrWhiteSpace(card.DisplayName))
             {
                 result.AddError($"Card '{id}' is missing displayName.");
+            }
+
+            if (card.DefinitionType != JsonCardDefinitionKind.Unit && card.Races != null)
+                result.AddError($"Card '{id}' is not a Unit and must not define races.");
+            if (card.Races != null)
+            {
+                var seenRaces = new HashSet<UnitRace>();
+                foreach (var race in card.Races)
+                {
+                    if (!Enum.IsDefined(typeof(UnitRace), race))
+                        result.AddError($"Card '{id}' has unknown race '{race}'.");
+                    if (!seenRaces.Add(race))
+                        result.AddError($"Card '{id}' repeats race '{race}'.");
+                }
             }
 
             ValidateResourceSet(card.Cost, result, id, "cost", allowPositiveOnly: false);
@@ -409,6 +427,28 @@ namespace Project333.Runtime.Infrastructure.Data
                 ValidateDemonKing(card, result);
             }
 
+            if (string.Equals(card.Id, MagicAmplificationCircleRules.CardId, StringComparison.Ordinal))
+            {
+                if (card.DefinitionType != JsonCardDefinitionKind.ScriptedSpell || card.Rarity != CardRarity.Common ||
+                    card.Affiliation != CardAffiliation.Fantasy || card.ChargeTileFootprint != ChargeTileFootprint.None ||
+                    card.EffectId != MagicAmplificationCircleRules.EffectId ||
+                    card.EffectText != MagicAmplificationCircleRules.EffectDescription ||
+                    card.Cost == null || card.Cost.Mana != MagicAmplificationCircleRules.ManaCost ||
+                    card.Cost.Power != 0 || card.Cost.Qi != 0 || card.Cost.Gold != 0 ||
+                    card.IncludeInDraft || card.IncludeInRewards)
+                    result.AddError("MagicAmplificationCircle must be an unreleased Common Fantasy spell costing 1 mana with its confirmed effect.");
+            }
+
+            if (string.Equals(card.Id, NuclearRules.CardId, StringComparison.Ordinal))
+            {
+                if (card.DefinitionType != JsonCardDefinitionKind.ScriptedSpell || card.Rarity != CardRarity.Legendary ||
+                    card.Affiliation != CardAffiliation.ScienceCivilization || card.ChargeTileFootprint != ChargeTileFootprint.None ||
+                    card.EffectId != NuclearRules.EffectId || card.EffectText != NuclearRules.EffectDescription ||
+                    card.Cost == null || card.Cost.Power != 10 || card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Gold != 0 ||
+                    card.IncludeInDraft || card.IncludeInRewards)
+                    result.AddError("Nuclear must be an unreleased Legendary Science spell costing 10 power with its confirmed effect.");
+            }
+
             if (string.Equals(card.Id, HeroRules.CardId, StringComparison.Ordinal))
             {
                 ValidateHero(card, result);
@@ -442,13 +482,13 @@ namespace Project333.Runtime.Infrastructure.Data
                 card.MagicDefense != HeroRules.MagicDefense ||
                 !card.CanMove)
             {
-                result.AddError("Hero must use melee Fixed ATK 3, HP 3, DEF 0/0, and be movable.");
+                result.AddError("Hero must use melee Fixed ATK 33, HP 33, DEF 0/0, and be movable.");
             }
 
-            if (card.InvincibleDuration != InvincibleDurationType.GlobalTurnEnds ||
-                card.InvincibleOwnerTurns != HeroRules.InvincibleTurnEnds)
+            if (!card.HasRush || card.InvincibleDuration != InvincibleDurationType.None ||
+                card.InvincibleOwnerTurns != 0)
             {
-                result.AddError("Hero must gain Invincible for exactly three global turn endings when summoned.");
+                result.AddError("Hero must have Rush and no innate Invincible.");
             }
 
             if (card.IncludeInDraft || card.IncludeInRewards)
@@ -456,13 +496,9 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError("Hero must stay disabled in draft and rewards until its art is ready.");
             }
 
-            if (string.IsNullOrWhiteSpace(card.EffectText) ||
-                !card.EffectText.Contains(HeroRules.InvincibleTurnEnds.ToString()) ||
-                !card.EffectText.Contains(HeroRules.GrowthAmount.ToString()) ||
-                !card.EffectText.Contains("ATK") ||
-                !card.EffectText.Contains("HP"))
+            if (card.EffectText != HeroRules.EffectDescription || card.SpecialEffectText != "속공")
             {
-                result.AddError("Hero effectText must describe three global turn endings of Invincible and random ATK/HP +13 growth.");
+                result.AddError("Hero must describe its normal-attack kill bonus and only list Rush as its special effect.");
             }
         }
 
@@ -1033,14 +1069,9 @@ namespace Project333.Runtime.Infrastructure.Data
             }
 
 
-            if (string.IsNullOrWhiteSpace(card.EffectText) ||
-                !card.EffectText.Contains("골드") ||
-                !card.EffectText.Contains(PowerPlantRules.TriggerGoldCost.ToString()) ||
-                !card.EffectText.Contains("전력") ||
-                !card.EffectText.Contains(PowerPlantRules.PowerGain.ToString()))
-            {
-                result.AddError("PowerPlant effectText must describe paying 1 gold to gain 2 power at turn start.");
-            }
+            if (!string.Equals(card.SpecialEffectText, "액티브: " + ActiveEffectService.PowerPlantDescription, StringComparison.Ordinal))
+                result.AddError("PowerPlant specialEffectText must describe its once-per-turn active gold-to-power effect.");
+
         }
 
         private static void ValidateNuclearPowerPlant(
@@ -1128,11 +1159,6 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError("RobotFactory must use sciencePowerUpkeep 1.");
             }
 
-            if (card.HasRobot)
-            {
-                result.AddError("RobotFactory itself must not have the Robot tag.");
-            }
-
             if (card.IncludeInDraft || card.IncludeInRewards)
             {
                 result.AddError("RobotFactory must stay disabled in draft and rewards until its art is ready.");
@@ -1158,7 +1184,7 @@ namespace Project333.Runtime.Infrastructure.Data
                 }
 
                 if (card.DefinitionType == JsonCardDefinitionKind.Unit &&
-                    card.HasRobot &&
+                    UnitRaceCollection.Contains(card.Races, UnitRace.Robot) &&
                     card.IncludeInDraft)
                 {
                     eligibleRobotCount += 1;
@@ -1450,13 +1476,6 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError($"Card '{id}' has LifeSteal but specialEffectText does not contain 'LifeSteal' or '흡혈'.");
             }
 
-            if (card.HasRobot &&
-                !ContainsToken(text, "Robot") &&
-                !text.Contains("로봇"))
-            {
-                result.AddError($"Card '{id}' has Robot but specialEffectText does not contain 'Robot' or '로봇'.");
-            }
-
             if (hasRush &&
                 !ContainsToken(text, "Rush") &&
                 !text.Contains("속공"))
@@ -1503,9 +1522,9 @@ namespace Project333.Runtime.Infrastructure.Data
             }
 
 
-            if ((ContainsToken(text, "Robot") || text.Contains("로봇")) && !card.HasRobot)
+            if (ContainsToken(text, "Robot") || text.Contains("로봇"))
             {
-                result.AddError($"Card '{id}' specialEffectText contains Robot/로봇 but hasRobot is false.");
+                result.AddError($"Card '{id}' specialEffectText contains removed Robot/로봇 effect. Configure unit races instead.");
             }
 
 

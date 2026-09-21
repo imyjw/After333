@@ -79,7 +79,7 @@ namespace Project333.Tests.EditMode
         public void ReleasedRobots_IncludeA301AlongsideA111()
         {
             var robots = Database().ToDefinitions().OfType<UnitCardDefinition>()
-                .Where(c => c.HasRobot && c.IncludeInDraft).Select(c => c.CardId);
+                .Where(c => c.HasRace(UnitRace.Robot) && c.IncludeInDraft).Select(c => c.CardId);
             Assert.That(robots, Is.EquivalentTo(new[] { "A-111", "A-212", "A-301" }));
         }
 

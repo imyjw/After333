@@ -14,7 +14,7 @@
 
 ## 1. 카드 규칙 먼저 확정
 
-새 카드의 효과가 이미 구현된 효과인지 먼저 확인한다.
+새 카드의 효과가 이미 구현된 효과인지 먼저 확인한다. 새 유닛은 종족값(없음·복수 포함)을 사용자에게 확인하고 지정값을 기록한다. 강화 가능 여부와 Lv.1–13 증가량 확인도 기존대로 수행한다.
 
 현재 바로 재사용 가능한 대표 효과:
 
@@ -25,12 +25,12 @@
 - 엔듀어: `hasEndure: true`, `specialEffectText`에 `Endure`
 - 쉴더: `hasShielder: true`, `specialEffectText`에 `쉴더` 또는 `Shielder` (`hasGuard`는 구버전 JSON 읽기 전용 호환 필드)
 - 흡혈: `hasLifeSteal: true`, `specialEffectText`에 `LifeSteal`
-- 로봇: `hasRobot: true`, `specialEffectText`에 `로봇` 또는 `Robot`
 - 속공: `hasRush: true`, `specialEffectText`에 `속공` 또는 `Rush`; 손패에서 소환한 턴의 공격 제한만 해제
 - 복제: `hasReplicate: true`, `specialEffectText`에 `복제` 또는 `Replicate`; 성공적으로 사용하면 그 턴에만 유지되는 원본 비용의 사본 생성
 - 로봇 합체: `definitionType: "ScriptedSpell"`, `effectId: "robot_fusion"`; 같은 CardId도 각각 한 기로 세며 살아 있는 아군 로봇 유닛 2기 이상 필요
-- 로봇 공장: `Building`, `sciencePowerUpkeep: 1`; `hasRobot && includeInDraft`인 유닛 중 하나를 서버가 동일 확률로 생성
-- 발전소: `Building`, CardId `PowerPlant`; 전력 1로 소환, 일반 자원 획득 후 유지비 전에 골드 1을 자동 지불하고 전력 2 획득
+- 로봇 공장: `Building`, `sciencePowerUpkeep: 1`; `races에 Robot 포함 && includeInDraft`인 유닛 중 하나를 서버가 동일 확률로 생성
+- 액티브: `specialEffectText`를 `액티브: 효과 내용` 형식으로 작성한다. 기본 사용 시점은 자신의 턴이며, 상대 턴 발동은 카드 설명에 명시한 경우에만 허용한다. 예외 카드에는 별도 조건과 검증을 구현한다. 문구만으로 동작하지 않으므로 ActiveEffectService에 해당 CardId의 조건·비용·처리를 구현하고 명령·UI·서버·AI·재접속을 검증한다. [상세 규칙](active_effects.md)
+- 발전소: `Building`, CardId `PowerPlant`; 소환한 턴부터 내 행동 턴에 타일의 액티브 버튼으로 발전소마다 1회 골드 1을 소모해 전력 2 획득. 턴 시작 자동 교환 없음.
 - 원자력 발전소: `Building`, CardId `NuclearPowerPlant`; 턴 시작 전력 +3은 `turnStartResourceGain`, 파괴 시 양쪽 전장 물리 피해 30은 `OccupantDestructionService`에서 처리
 - 보조배터리: `definitionType: "ScriptedSpell"`, `effectId: "power_bank"`; 골드 3 지불 후 즉시 전력 +6
 - 마정석: `definitionType: "ScriptedSpell"`, `effectId: "mana_stone"`; 골드 2 지불 후 즉시 마나 +3
@@ -40,7 +40,8 @@
 - 상단: `Building`, CardId `MerchantCaravan`; 소유자의 턴 시작 자원 획득 단계에 골드 +3
 - 객잔: `Building`, CardId `Inn`; 소유자의 턴 시작 자원 획득 단계에 골드 +1
 - 웨어울프: `Unit`, CardId `Werewolf`; 현재 같은 아군 필드의 다른 살아 있는 웨어울프마다 ATK +10을 실시간 계산하며, 효과를 받는 자신은 방전·망각·봉인 상태가 아니어야 한다. 셀 때는 방전·망각 웨어울프를 포함하고 봉인·사망 웨어울프를 제외한다.
-- 용사: `Unit`, CardId `Hero`; 소환 시 `GlobalTurnEnds(3)` 무적을 얻고, 매 전역 턴 종료마다 서버가 ATK +13 또는 HP +13 중 하나를 같은 확률로 영구 부여한다.
+- 용사: `Unit`, CardId `Hero`; 기본 33/33·속공. 일반공격으로 상대 소환물을 파괴할 때마다 ATK +33 또는 최대/현재 HP +33을 각각 50% 확률로 부여한다. 반격·마스터·아군·파괴 효과 연쇄 사망 제외. 기존 무적·턴 종료 성장 제거.
+- 뉴클리어: Nuclear, 과학문명 레전더리 마법, 전력 10, 강화 불가·드래프트/보상 제외. 봉인·마스터 제외 전체 파괴 및 상대 전장 영구 낙진 중첩. [세부 규칙](nuclear_fallout.md)
 - 관통: `hasPiercing: true`, `specialEffectText`에 `관통` 또는 `Piercing`; 일반공격의 각 타격 후 같은 열 반대 행에 별도 피해; 쉴더 이전 적용
 - 더블/트리플 어택: `hitsPerAttack: 2` 또는 `3`, `specialEffectText`에 `Double Attack` 또는 `Triple Attack`
 - 스크립트 마법: `definitionType: "ScriptedSpell"`, 지원 중인 `effectId`만 사용
@@ -203,7 +204,7 @@ Assets/Project333/Resources/Project333/Data/cards.json
   "canMove": true,
   "hasRush": false,
   "hasReplicate": false,
-  "hasRobot": false,
+  "races": [],
   "sealboundOwnerTurnStarts": 0,
   "hasHiding": false,
   "hasFlying": false,
@@ -227,13 +228,20 @@ Assets/Project333/Resources/Project333/Data/cards.json
 
 관통(`Piercing`)은 구현되어 있다. 유닛 또는 공격 가능한 건물에 `hasPiercing: true`를 사용하고 `specialEffectText`에는 `관통` 또는 `Piercing`을 반드시 적는다. 실제 일반공격 대상이 전열이면 후열에, 후열이면 전열에 각 타격 후 같은 열 반대 행으로 공격자의 동일한 타격 ATK와 데미지 유형의 별도 피해를 준다. 관통은 Shielder가 대신 받을 수 있지만 추가 반격이나 재귀 관통은 발생하지 않는다. 일반공격·관통은 원래 보호 대상의 방어력·상태·비행 감소를 먼저 적용하고 Shielder의 방어력·상태를 적용한다. 초과분에는 원래 대상의 피해 감소를 중복 적용하지 않는다. 단일 대상 마법은 기존 Shielder 우선 처리 순서를 유지한다. Invincible·Endure·Sealbound 판정은 정상 적용한다. 다단히트는 매 타격마다 발동하고 반대 행 피해의 실제 HP 감소량(대신 받은 Shielder와 초과분 포함)도 LifeSteal에 포함한다. HuanShu는 원래 클릭 대상이 아니라 서버가 확정한 실제 대상의 열을 사용한다. Erasure 중에는 관통이 무효화된다. 마스터의 관통은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
 
-주문력(`SpellPower`)은 구현되어 있다. 유닛 또는 건물에 `spellPower: n`을 사용하며 `0` 또는 필드 생략은 주문력 없음이다. `specialEffectText`에는 `주문력` 또는 `SpellPower`를 반드시 적는다. 살아 있고 효과가 활성화된 아군 소환물의 주문력을 합산해 Spell 카드가 만드는 Magic 피해에 더한다. Physical/Fixed 피해, 일반공격, 유닛·건물 효과에는 적용하지 않는다. 광역은 대상마다, 다단히트는 타격마다 전체 보너스를 적용하고, 지속마법은 손패에서 사용한 순간의 주문력을 고정한다. Drained·Erasure·Sealbound 상태에서는 제공하지 않지만 Hiding·Flying은 주문력을 억제하지 않는다. 마스터 주문력은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
+주문력(`SpellPower`)은 구현되어 있다. 유닛 또는 건물에 `spellPower: n`을 사용하며 `0` 또는 필드 생략은 주문력 없음이다. `specialEffectText`에는 `주문력` 또는 `SpellPower`를 반드시 적는다. 마스터 주문력은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
 
-무적(`Invincible`)은 구현되어 있다. 유닛 또는 건물에 `invincibleDuration`을 사용하고 `specialEffectText`에는 `무적` 또는 `Invincible`을 반드시 적는다. 지원 값은 `Always`, `SummonTurn`, `OwnerTurnOnly`, `OpponentTurnOnly`, `UntilTurnEnd`, `OwnerTurns`, `GlobalTurnEnds`이며, 무적이 없으면 `None` 또는 필드 생략이다. `OwnerTurns`와 `GlobalTurnEnds`를 사용할 때 `invincibleOwnerTurns: n`에 `1` 이상의 값을 넣는다. `OwnerTurns`는 소유자의 턴 종료 때만 감소하고 카드 문구는 `내 n턴 동안 무적`처럼 작성한다. `GlobalTurnEnds`는 어느 플레이어의 턴이든 끝날 때 감소하며 현재 용사의 소환 후 3회 무적에 사용한다. 다른 지속 방식에서는 `invincibleOwnerTurns`를 `0`으로 둔다. 무적은 물리·마법·고정 피해로 인한 HP 감소를 막지만 대상 지정과 비피해 제거 효과는 막지 않는다. Drained와 Erasure는 무적을 억제하지만 지속 시간은 계속 흐르며, 재접속 시 각 무적 효과의 지속 방식과 남은 횟수가 복원된다. 마스터 무적은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
+- **모든 Magic 피해**에 피해 소유자의 살아 있는 활성 아군 주문력 합계를 더한다. 일반 공격·반격, 유닛·건물·마스터 효과, 즉시·지속·지연 마법 피해를 포함한다. Physical/Fixed 피해에는 적용하지 않는다.
+- 합계는 **피해 발생 시점**에 계산한다. 파이어월 시전 후 제공자를 소환하면 다음 발동부터 반영하고, 제공자가 사라지거나 억제되면 이후 발동에서 제외한다. 시전 시 주문력을 저장하지 않는다.
+- 광역은 각 대상, 다단히트는 각 타격에 전액 적용한다. 기존 광역·근접 반격의 동시 처리 규칙을 유지하며, 쉴더 전달·넘치는 피해에서 주문력을 중복 가산하지 않는다.
+- Drained·Erasure·Sealbound 상태에서는 제공하지 않지만 Hiding·Flying은 주문력을 억제하지 않는다.
+- 툴팁: `마법 데미지를 입힐 때, 주문력만큼의 추가 마법 데미지를 준다.`
+- 새 카드의 강화로 주문력 자체가 증가하는지는 사용자에게 별도로 확인한다. 카드 종류를 근거로 증가 규칙을 임의로 정하지 않는다.
 
-`hasRobot`은 로봇 유닛만 `true`로 둔다. 로봇 합체와 로봇 공장이 검색하는 분류 태그이며, Drained 중에는 유지되지만 Erasure 중에는 전투 규칙상 무효화된다.
+무적(`Invincible`)은 구현되어 있다. 유닛 또는 건물에 `invincibleDuration`을 사용하고 `specialEffectText`에는 `무적` 또는 `Invincible`을 반드시 적는다. 지원 값은 `Always`, `SummonTurn`, `OwnerTurnOnly`, `OpponentTurnOnly`, `UntilTurnEnd`, `OwnerTurns`, `GlobalTurnEnds`이며, 무적이 없으면 `None` 또는 필드 생략이다. `OwnerTurns`와 `GlobalTurnEnds`를 사용할 때 `invincibleOwnerTurns: n`에 `1` 이상의 값을 넣는다. `OwnerTurns`는 소유자의 턴 종료 때만 감소하고 카드 문구는 `내 n턴 동안 무적`처럼 작성한다. `GlobalTurnEnds`는 어느 플레이어의 턴이든 끝날 때 감소하며 용사의 기존 소환 무적은 제거되었지만 공용 지속 방식으로 계속 지원한다. 다른 지속 방식에서는 `invincibleOwnerTurns`를 `0`으로 둔다. 무적은 물리·마법·고정 피해로 인한 HP 감소를 막지만 대상 지정과 비피해 제거 효과는 막지 않는다. Drained와 Erasure는 무적을 억제하지만 지속 시간은 계속 흐르며, 재접속 시 각 무적 효과의 지속 방식과 남은 횟수가 복원된다. 마스터 무적은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
 
-로봇 공장의 후보군은 `hasRobot: true`만으로 충분하지 않다. 반드시 `definitionType: "Unit"`이고 `includeInDraft: true`여야 한다. 효과 개발 중이라 `includeInDraft: false`인 로봇은 공장에서도 생성되지 않는다.
+유닛은 `races` 배열을 설정한다. 여러 종족을 허용하며 종족이 없으면 `[]`이다. 건물·마법에는 필드를 넣지 않는다. 망각·방전에도 종족은 유지된다. 로봇은 특수효과가 아니므로 `hasRobot`이나 특수효과 문구로 추가하지 않는다. Unity 유닛 자산의 Unit Races도 일치시킨다. [종족 목록과 규칙](unit_races.md)을 따른다.
+
+로봇 공장의 후보군은 `races: ["Robot"]`(또는 여러 종족 중 Robot 포함)만으로 충분하지 않다. 반드시 `definitionType: "Unit"`이고 `includeInDraft: true`여야 한다. 효과 개발 중이라 `includeInDraft: false`인 로봇은 공장에서도 생성되지 않는다.
 
 건물 예시:
 
@@ -312,6 +320,8 @@ Assets/Project333/Resources/Project333/Data/cards.json
 | A-111 | A-111 | Unit | 강화 가능 | 유닛 |
 | A-212 | A-212 | Unit | 강화 가능 | Lv.1~12 HP +1, Lv.13 ATK +1; Lv.13 ATK/HP 7/34; 드래프트·보상 On |
 | A-301 | A-301 | Unit | 강화 가능 | 3·6·9·13레벨 ATK +1, 나머지 레벨 HP +1, 드래프트·보상 On |
+| MagicAmplificationCircle | 마법 증폭진 | ScriptedSpell | 강화 불가 | 판타지 커먼, 마나 1, 내 턴 종료까지 주문력 +10, 중첩 가능, 드래프트·보상 Off |
+| Nuclear | 뉴클리어 | ScriptedSpell | 강화 불가 | 전력 10, 전장 파괴·영구 낙진 중첩, 과학문명 레전더리, 드래프트·보상 Off |
 | BiochemicalBomb | 생화학폭탄 | ScriptedSpell | 강화 가능 | 카드 레벨당 4회 지속 고정 피해 +1 (기본 25), 방어력·주문력 미적용, 드래프트·보상 On |
 | BlueDragon | 블루 드래곤 | Unit | 강화 가능 | 기본 ATK/HP 40/50, 표준 강화 (Lv.13: 44/59) |
 | Cerberus | 케르베로스 | Unit | 강화 가능 | Lv.1~12 HP +1, Lv.13 ATK +1; Lv.13 ATK/HP 10/78 |
@@ -323,7 +333,7 @@ Assets/Project333/Resources/Project333/Data/cards.json
 | Golem | 골렘 | Unit | 강화 가능 | 유닛 |
 | Gwangma | 광마 | Unit | 강화 가능 | 유닛 |
 | Inn | 객잔 | Building | 강화 가능 | 매 레벨 HP +1, 이미지 준비 전 드래프트·보상 제외 |
-| ManaPond | 마나의 샘 | Building | 강화 가능 | Lv.1~13 HP +1, ATK 증가 없음; Lv.13 ATK/HP 0/33 |
+| ManaPond | 마나의 샘 | Building | 강화 가능 | 마나 5, 주문력 +20; Lv.1~13 HP +1, ATK 증가 없음; Lv.13 ATK/HP 0/33, 주문력 20 유지 |
 | ManaWeaver | 마나 위버 | Unit | 강화 가능 | 유닛 |
 | RedDragon | 레드 드래곤 | Unit | 강화 가능 | 기본 ATK/HP 40/40, 표준 강화 (Lv.13: 44/49) |
 | Shaolin_1st_Disciple | 소림 1대 제자 | Unit | 강화 가능 | 유닛 |

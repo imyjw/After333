@@ -38,7 +38,7 @@ MonoBehaviour:
   _hasEndure: 0
   _hasShielder: 1
   _hasLifeSteal: 0
-  _hasRobot: 0
+  _races: 03000000
   _canMove: 1
   _sealboundOwnerTurnStarts: 0
   _hasHiding: 0

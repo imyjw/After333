@@ -21,6 +21,8 @@ namespace Project333.Runtime.Application.Online
 
         public string CardId { get; set; } = string.Empty;
 
+        public string OccupantRuntimeId { get; set; } = string.Empty;
+
         public string HandCardRuntimeId { get; set; } = string.Empty;
 
         public bool HasTarget { get; set; }

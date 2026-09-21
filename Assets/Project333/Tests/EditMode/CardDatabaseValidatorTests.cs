@@ -20,7 +20,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void CurrentCardsJson_ManaPondUsesNerfedHealth()
+        public void CurrentCardsJson_ManaPondHasFiveManaCostAndTwentySpellPower()
         {
             var path = Path.Combine(Application.dataPath, "Project333/Resources/Project333/Data/cards.json");
             var provider = JsonCardDefinitionDatabase.FromJson(File.ReadAllText(path)).CreateProvider();
@@ -28,6 +28,15 @@ namespace Project333.Tests.EditMode
 
             Assert.That(manaPond, Is.Not.Null);
             Assert.That(manaPond.Health, Is.EqualTo(20));
+            Assert.That(manaPond.Cost.Mana, Is.EqualTo(5));
+            Assert.That(manaPond.SpellPower, Is.EqualTo(20));
+            Assert.That(manaPond.TurnStartResourceGain.Mana, Is.EqualTo(3));
+            var asset = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingCardDefinitionAsset>(
+                "Assets/Project333/ScriptableObjects/StarterTen/Cards/ManaPond.asset");
+            var assetDefinition = (BuildingCardDefinition)asset.ToDefinition();
+            Assert.That(assetDefinition.Cost.Mana, Is.EqualTo(5));
+            Assert.That(assetDefinition.SpellPower, Is.EqualTo(20));
+            Assert.That(asset.SpecialEffectText, Does.Contain("주문력 +20"));
         }
 
         [Test]
@@ -82,15 +91,15 @@ namespace Project333.Tests.EditMode
 
             var a111 = provider.GetRequired("A-111") as UnitCardDefinition;
             Assert.That(a111, Is.Not.Null);
-            Assert.That(a111.HasRobot, Is.True);
+            Assert.That(a111.HasRace(UnitRace.Robot), Is.True);
             Assert.That(a111.HasRush, Is.True);
 
             var a111Record = JsonCardDefinitionDatabase.FromJson(File.ReadAllText(path)).Cards
                 .Find(card => card.Id == "A-111");
             Assert.That(a111Record, Is.Not.Null);
-            Assert.That(a111Record.HasRobot, Is.True);
+            Assert.That(UnitRaceCollection.Contains(a111Record.Races, UnitRace.Robot), Is.True);
             Assert.That(a111Record.HasRush, Is.True);
-            Assert.That(a111Record.SpecialEffectText, Does.Contain("로봇"));
+            Assert.That(a111Record.SpecialEffectText, Does.Not.Contain("로봇"));
             Assert.That(a111Record.SpecialEffectText, Does.Contain("속공"));
 
             var a301 = provider.GetRequired("A-301") as UnitCardDefinition;
@@ -104,7 +113,7 @@ namespace Project333.Tests.EditMode
             Assert.That(a301.IsScience, Is.True);
             Assert.That(a301.SciencePowerUpkeep, Is.EqualTo(1));
             Assert.That(a301.HasFlying, Is.True);
-            Assert.That(a301.HasRobot, Is.True);
+            Assert.That(a301.HasRace(UnitRace.Robot), Is.True);
             Assert.That(a301.HasRush, Is.False);
             Assert.That(a301.HasReplicate, Is.True);
 
@@ -118,7 +127,7 @@ namespace Project333.Tests.EditMode
             Assert.That(a301Record.HasRush, Is.False);
             Assert.That(a301Record.HasReplicate, Is.True);
             Assert.That(a301Record.SpecialEffectText, Does.Contain("비행"));
-            Assert.That(a301Record.SpecialEffectText, Does.Contain("로봇"));
+            Assert.That(a301Record.SpecialEffectText, Does.Not.Contain("로봇"));
             Assert.That(a301Record.SpecialEffectText, Does.Contain("전력 -1"));
             Assert.That(a301Record.SpecialEffectText, Does.Contain("복제"));
             Assert.That(a301Record.SpecialEffectText, Does.Not.Contain("속공"));
@@ -178,8 +187,9 @@ namespace Project333.Tests.EditMode
             Assert.That(hero.PhysicalDefense, Is.EqualTo(HeroRules.PhysicalDefense));
             Assert.That(hero.MagicDefense, Is.EqualTo(HeroRules.MagicDefense));
             Assert.That(hero.CanMove, Is.True);
-            Assert.That(hero.InvincibleDuration, Is.EqualTo(InvincibleDurationType.GlobalTurnEnds));
-            Assert.That(hero.InvincibleOwnerTurns, Is.EqualTo(HeroRules.InvincibleTurnEnds));
+            Assert.That(hero.HasRush, Is.True);
+            Assert.That(hero.InvincibleDuration, Is.EqualTo(InvincibleDurationType.None));
+            Assert.That(hero.InvincibleOwnerTurns, Is.Zero);
 
             var heroRecord = JsonCardDefinitionDatabase.FromJson(File.ReadAllText(path)).Cards
                 .Find(card => card.Id == HeroRules.CardId);
@@ -188,7 +198,8 @@ namespace Project333.Tests.EditMode
             Assert.That(heroRecord.Affiliation, Is.EqualTo(CardAffiliation.Fantasy));
             Assert.That(heroRecord.IncludeInDraft, Is.False);
             Assert.That(heroRecord.IncludeInRewards, Is.False);
-            Assert.That(heroRecord.EffectText, Does.Contain("13"));
+            Assert.That(heroRecord.EffectText, Is.EqualTo(HeroRules.EffectDescription));
+            Assert.That(heroRecord.SpecialEffectText, Is.EqualTo("속공"));
 
             var blueDragon = provider.GetRequired("BlueDragon") as UnitCardDefinition;
             Assert.That(blueDragon, Is.Not.Null);
@@ -978,25 +989,25 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Validate_RobotFlagWithoutRobotText_Fails()
+        public void Validate_RobotRaceWithoutRobotText_Passes()
         {
             var card = CreateUnitRecord("robot-without-text");
-            card.HasRobot = true;
+            card.Races = new[] { UnitRace.Robot };
 
             var result = CardDatabaseValidator.Validate(CreateDraftCompatibleDatabase(card));
 
-            Assert.That(result.Errors, Has.Some.Contains("has Robot"));
+            Assert.That(result.Errors, Is.Empty);
         }
 
         [Test]
-        public void Validate_RobotTextWithoutRobotFlag_Fails()
+        public void Validate_RemovedRobotSpecialEffectText_Fails()
         {
             var card = CreateUnitRecord("robot-text-without-flag");
             card.SpecialEffectText = "로봇";
 
             var result = CardDatabaseValidator.Validate(CreateDraftCompatibleDatabase(card));
 
-            Assert.That(result.Errors, Has.Some.Contains("hasRobot is false"));
+            Assert.That(result.Errors, Has.Some.Contains("removed Robot/로봇 effect"));
         }
 
         [Test]

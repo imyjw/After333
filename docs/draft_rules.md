@@ -125,3 +125,11 @@ See [pve_ai_decks.md](./pve_ai_decks.md) for all ten lists and maintenance rules
 > TBD: Future PvE difficulty tiers or win-count-based encounter selection
 
 > TBD: Any future draft preview or undo feature beyond the current immediate-save flow
+
+## Deck List Card Preview
+
+- In both Draft and DeckBuilding, hold a card entry in the player's deck list for 0.4 seconds to show its card artwork at the center of the screen.
+- The preview uses the battle card artwork and the account's current upgrade level for displayed stats.
+- Releasing the mouse button or touch hides the preview immediately. Leaving the entry, scrolling/dragging, hiding the list, or switching away from the app cancels the hold.
+- A quick tap does not open a preview. Deck summaries, section headings, and empty space are not card entries.
+- Grouped duplicates and wrapped card names resolve to the displayed card ID. Existing list scrolling remains available.

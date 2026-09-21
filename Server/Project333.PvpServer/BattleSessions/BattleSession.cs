@@ -26,6 +26,11 @@ public sealed class BattleSession
     private const string CheonraJimangEffectId = "cheonra_jimang";
 
     private readonly object _gate = new();
+    private bool _serverShutdown;
+    private bool _serverAiLoopRunning;
+    private bool _aiFallbackPromotionPending;
+    private volatile bool _useServerAiOpponent;
+    private OnlineBattleSeatId _serverAiHumanOnlineSeat = OnlineBattleSeatId.PlayerA;
     private readonly Dictionary<string, BattleClientConnection> _connections = new();
     private readonly Dictionary<PlayerIdDto, PendingDisconnectReservation> _pendingDisconnectReservations = new();
     private readonly Dictionary<PlayerIdDto, BattleSeatMetadata> _seatMetadata = new();
@@ -52,17 +57,77 @@ public sealed class BattleSession
         string matchId,
         bool useServerAiOpponent,
         RandomFirstPlayerSelector? firstPlayerSelector = null,
-        BattleResultOutbox? resultOutbox = null)
+        BattleResultOutbox? resultOutbox = null,
+        Guid? aiChallengeAttemptId = null)
     {
         MatchId = matchId;
-        UseServerAiOpponent = useServerAiOpponent;
+        _useServerAiOpponent = useServerAiOpponent;
+        if (aiChallengeAttemptId == Guid.Empty || (aiChallengeAttemptId.HasValue && !useServerAiOpponent))
+            throw new ArgumentException("An AI challenge requires a valid attempt ID and a server AI opponent.", nameof(aiChallengeAttemptId));
+        AiChallengeAttemptId = aiChallengeAttemptId;
         _firstPlayerSelector = firstPlayerSelector ?? new RandomFirstPlayerSelector();
         _resultOutbox = resultOutbox;
     }
 
     public string MatchId { get; }
 
-    public bool UseServerAiOpponent { get; }
+    public bool UseServerAiOpponent => _useServerAiOpponent;
+
+    public Guid? AiChallengeAttemptId { get; }
+
+    public string GameMode => AiChallengeAttemptId.HasValue ? "ai_challenge" : "run";
+
+    public string OpponentKind => UseServerAiOpponent ? "ai" : "human";
+
+    // The database claim and a late disconnect may overlap, but a second socket must not
+    // enter memory while the one-human session is being converted to a server AI battle.
+    internal bool TryReserveServerAiFallback(out BattleClientConnection? waitingConnection)
+    {
+        lock (_gate)
+        {
+            waitingConnection = null;
+            if (_serverShutdown || UseServerAiOpponent || _aiFallbackPromotionPending ||
+                AiChallengeAttemptId.HasValue || _battleFlowController?.CurrentBattleState != null ||
+                _pendingDisconnectReservations.Count != 0 || _connections.Count != 1)
+                return false;
+            var candidate = _connections.Values.Single();
+            if (!candidate.IsOpen || !candidate.HasAssignedSeat || candidate.MatchmakingJoinPending ||
+                string.IsNullOrWhiteSpace(candidate.AccountId)) return false;
+            _aiFallbackPromotionPending = true;
+            waitingConnection = candidate;
+            return true;
+        }
+    }
+
+    internal void ReleaseServerAiFallbackReservation()
+    {
+        lock (_gate) _aiFallbackPromotionPending = false;
+    }
+
+    internal bool TryActivateServerAiFallback(BattleClientConnection expectedConnection, out string message)
+    {
+        lock (_gate)
+        {
+            message = "Waiting player disconnected before the AI battle could start.";
+            if (!_aiFallbackPromotionPending || _serverShutdown || UseServerAiOpponent ||
+                _battleFlowController?.CurrentBattleState != null || _connections.Count != 1 ||
+                !_connections.TryGetValue(expectedConnection.ConnectionId, out var registered) ||
+                !ReferenceEquals(registered, expectedConnection) || !registered.IsOpen || registered.MatchmakingJoinPending)
+                return false;
+
+            // The planner controls runtime AI. If the original PlayerA left while waiting,
+            // retain this human's online PlayerB seat and move only its pre-battle runtime slot.
+            _serverAiHumanOnlineSeat = registered.AssignedOnlineSeatId;
+            if (registered.AssignedSeatId != PlayerIdDto.Player)
+            {
+                _seatMetadata.Clear();
+                registered.AssignedSeatId = PlayerIdDto.Player;
+                RecordConnectionMetadata(registered);
+            }
+            _useServerAiOpponent = true;
+            return TryStartBattleIfReady(out message);
+        }
+    }
 
     public int RequiredHumanConnections => UseServerAiOpponent ? 1 : 2;
 
@@ -110,6 +175,29 @@ public sealed class BattleSession
         }
     }
 
+    public bool TryBeginServerAiLoop()
+    {
+        lock (_gate)
+        {
+            if (_serverShutdown || !UseServerAiOpponent || _serverAiLoopRunning) return false;
+            _serverAiLoopRunning = true;
+            return true;
+        }
+    }
+
+    public void EndServerAiLoop()
+    {
+        lock (_gate) _serverAiLoopRunning = false;
+    }
+    public void CancelForServerShutdown()
+    {
+        lock (_gate)
+        {
+            _serverShutdown = true;
+            _pendingDisconnectReservations.Clear();
+            // Do not call EndBattle/EndBattleAsDraw: cancellation produces no result.
+        }
+    }
     public IReadOnlyList<BattleClientConnection> SnapshotConnections()
     {
         lock (_gate)
@@ -122,6 +210,7 @@ public sealed class BattleSession
     {
         lock (_gate)
         {
+            if (_serverShutdown) { message = "Server is shutting down."; return false; }
             if (_battleFlowController?.CurrentBattleState != null)
             {
                 message = "Battle is already running.";
@@ -185,7 +274,7 @@ public sealed class BattleSession
         {
             var battleEvents = new List<BattleEventDto>();
 
-            if (_aiPlanning || !UseServerAiOpponent ||
+            if (_serverShutdown || _aiPlanning || !UseServerAiOpponent ||
                 _battleFlowController?.CurrentBattleState == null ||
                 _battleFlowController.CurrentBattleState.IsEnded ||
                 _battleFlowController.CurrentBattleState.ActivePlayerId != PlayerId.AI)
@@ -245,7 +334,7 @@ public sealed class BattleSession
             {
                 var battleEvents = new List<BattleEventDto>();
                 var current = _battleFlowController?.CurrentBattleState;
-                if (!ReferenceEquals(current, expectedState) || current == null || current.IsEnded ||
+                if (_serverShutdown || !ReferenceEquals(current, expectedState) || current == null || current.IsEnded ||
                     current.ActivePlayerId != PlayerId.AI || current.Phase != PhaseType.Main ||
                     AiBattleStateCopy.PositionKey(current) != expectedPosition) return battleEvents;
                 var combatLogBeforeSnapshot = CaptureBattleSnapshot(current);
@@ -281,6 +370,7 @@ public sealed class BattleSession
         lock (_gate)
         {
             var battleEvents = new List<BattleEventDto>();
+            if (_serverShutdown) throw new InvalidOperationException("Battle canceled because the server is shutting down.");
 
             if (_battleFlowController?.CurrentBattleState == null)
             {
@@ -413,6 +503,11 @@ public sealed class BattleSession
                     break;
                 }
 
+                case ServerOnlineBattleCommandType.ActivateEffect:
+                    _battleFlowController.ExecuteCommand(ToRuntimePlayerId(command.ActorId),
+                        new ActivateEffectCommand(ToTileCoord(command.SourceCoord, "source"), command.OccupantRuntimeId));
+                    break;
+
                 case ServerOnlineBattleCommandType.MoveOccupant:
                 {
                     var beforeSnapshot = CaptureBattleSnapshot(_battleFlowController.CurrentBattleState);
@@ -521,6 +616,9 @@ public sealed class BattleSession
             {
                 MessageType = OnlineBattleMessageType.StateView,
                 MatchId = MatchId,
+                UseServerAiOpponent = UseServerAiOpponent,
+                GameMode = GameMode,
+                AiChallengeAttemptId = AiChallengeAttemptId?.ToString() ?? string.Empty,
                 PlayerToken = connection.PlayerToken,
                 AccountId = connection.AccountId,
                 ConnectionId = connection.ConnectionId,
@@ -570,7 +668,7 @@ public sealed class BattleSession
                     pair.Value.AccountId, pair.Value.RunId, pair.Value.DeckId,
                     pair.Value.DeckCardIds.ToArray(),
                     new Dictionary<string, int>(pair.Value.CardUpgradeLevels))).ToArray(),
-                _resultId, _resultEndedReason);
+                _resultId, _resultEndedReason, AiChallengeAttemptId, _serverAiHumanOnlineSeat.ToString());
         }
     }
 
@@ -589,6 +687,11 @@ public sealed class BattleSession
                 return false;
             }
 
+            if (snapshot.AiChallengeAttemptId != AiChallengeAttemptId)
+                throw new InvalidOperationException("Snapshot game mode does not match the battle session.");
+            if (Enum.TryParse<OnlineBattleSeatId>(snapshot.ServerAiHumanOnlineSeat, out var humanSeat) &&
+                humanSeat is OnlineBattleSeatId.PlayerA or OnlineBattleSeatId.PlayerB)
+                _serverAiHumanOnlineSeat = humanSeat;
             RestoreSeatMetadata(snapshot);
             // Legacy active snapshots use a stable server-derived ID on repeated recovery.
             // Already-ended legacy snapshots have no receipt history; do not replay them.
@@ -735,6 +838,7 @@ public sealed class BattleSession
         lock (_gate)
         {
             envelope = null;
+            if (_serverShutdown) return false;
 
             var battleFlowController = _battleFlowController;
             var battleState = battleFlowController?.CurrentBattleState;
@@ -781,6 +885,9 @@ public sealed class BattleSession
                 {
                     MessageType = OnlineBattleMessageType.BattleEvents,
                     MatchId = MatchId,
+                    UseServerAiOpponent = UseServerAiOpponent,
+                    GameMode = GameMode,
+                    AiChallengeAttemptId = AiChallengeAttemptId?.ToString() ?? string.Empty,
                     ConnectionCount = ConnectionCount
                 };
 
@@ -839,6 +946,9 @@ public sealed class BattleSession
             {
                 MessageType = OnlineBattleMessageType.BattleEvents,
                 MatchId = MatchId,
+                UseServerAiOpponent = UseServerAiOpponent,
+                GameMode = GameMode,
+                AiChallengeAttemptId = AiChallengeAttemptId?.ToString() ?? string.Empty,
                 ConnectionCount = ConnectionCount
             };
 
@@ -855,7 +965,9 @@ public sealed class BattleSession
     {
         lock (_gate)
         {
-            if (_connections.Count >= MaximumConnections || _connections.Values.Any(c =>
+            if (_serverShutdown) { errorMessage = "Server is shutting down."; return false; }
+            if ((_aiFallbackPromotionPending && !connection.MatchmakingReservationId.HasValue) ||
+                _connections.Count >= RequiredHumanConnections || _connections.Count >= MaximumConnections || _connections.Values.Any(c =>
                 string.Equals(GetReconnectIdentityKey(c), GetReconnectIdentityKey(connection), StringComparison.Ordinal)))
             {
                 errorMessage = $"Match {MatchId} is full.";
@@ -994,7 +1106,7 @@ public sealed class BattleSession
             }
             _finalResult = new BattleResult(_resultId, MatchId, UseServerAiOpponent, state.Result.IsDraw,
                 state.Result.IsDraw ? OnlineBattleSeatId.None : ToOnlineSeatId(state.Result.Winner),
-                _resultEndedReason, records).ValidatedCopy();
+                _resultEndedReason, records) { AiChallengeAttemptId = AiChallengeAttemptId }.ValidatedCopy();
             return _finalResult;
         }
     }
@@ -1089,7 +1201,7 @@ public sealed class BattleSession
             reconnectIdentityKey = GetReconnectIdentityKey(disconnectedConnection);
             reconnectDeadlineUtc = DateTimeOffset.UtcNow;
 
-            if (disconnectedConnection.IsSuperseded ||
+            if (_serverShutdown || disconnectedConnection.IsSuperseded ||
                 !_connections.TryGetValue(disconnectedConnection.ConnectionId, out var currentConnection) ||
                 !ReferenceEquals(currentConnection, disconnectedConnection) ||
                 !disconnectedConnection.HasAssignedSeat ||
@@ -1117,6 +1229,9 @@ public sealed class BattleSession
             {
                 MessageType = OnlineBattleMessageType.BattleEvents,
                 MatchId = MatchId,
+                UseServerAiOpponent = UseServerAiOpponent,
+                GameMode = GameMode,
+                AiChallengeAttemptId = AiChallengeAttemptId?.ToString() ?? string.Empty,
                 ConnectionCount = Math.Max(0, _connections.Count - 1),
                 BattleEvents =
                 {
@@ -1144,6 +1259,7 @@ public sealed class BattleSession
         lock (_gate)
         {
             envelope = null;
+            if (_serverShutdown || DateTimeOffset.UtcNow < reconnectDeadlineUtc) return false;
 
             if (_battleFlowController?.CurrentBattleState == null ||
                 _battleFlowController.CurrentBattleState.IsEnded ||
@@ -1170,6 +1286,9 @@ public sealed class BattleSession
             {
                 MessageType = OnlineBattleMessageType.BattleEvents,
                 MatchId = MatchId,
+                UseServerAiOpponent = UseServerAiOpponent,
+                GameMode = GameMode,
+                AiChallengeAttemptId = AiChallengeAttemptId?.ToString() ?? string.Empty,
                 ConnectionCount = _connections.Count,
                 BattleEvents =
                 {
@@ -1229,7 +1348,7 @@ public sealed class BattleSession
 
         lock (_gate)
         {
-            if (UseServerAiOpponent ||
+            if (_serverShutdown ||
                 _battleFlowController?.CurrentBattleState == null ||
                 _battleFlowController.CurrentBattleState.IsEnded)
             {
@@ -1256,7 +1375,10 @@ public sealed class BattleSession
                     reservation.SeatId,
                     reservation.OnlineSeatId,
                     remainingSeconds,
-                    reservation.ReconnectDeadlineUtc);
+                    reservation.ReconnectDeadlineUtc,
+                    UseServerAiOpponent,
+                    GameMode,
+                    AiChallengeAttemptId?.ToString() ?? string.Empty);
                 return true;
             }
 
@@ -1288,6 +1410,9 @@ public sealed class BattleSession
         {
             MessageType = OnlineBattleMessageType.BattleEvents,
             MatchId = MatchId,
+            UseServerAiOpponent = UseServerAiOpponent,
+            GameMode = GameMode,
+            AiChallengeAttemptId = AiChallengeAttemptId?.ToString() ?? string.Empty,
             PlayerToken = connection.PlayerToken,
             AccountId = connection.AccountId,
             ConnectionId = connection.ConnectionId,
@@ -1329,6 +1454,9 @@ public sealed class BattleSession
         {
             MessageType = OnlineBattleMessageType.BattleEvents,
             MatchId = MatchId,
+            UseServerAiOpponent = UseServerAiOpponent,
+            GameMode = GameMode,
+            AiChallengeAttemptId = AiChallengeAttemptId?.ToString() ?? string.Empty,
             PlayerToken = sender.PlayerToken,
             AccountId = sender.AccountId,
             ConnectionId = sender.ConnectionId,
@@ -1367,6 +1495,9 @@ public sealed class BattleSession
         {
             MessageType = OnlineBattleMessageType.BattleEvents,
             MatchId = MatchId,
+            UseServerAiOpponent = UseServerAiOpponent,
+            GameMode = GameMode,
+            AiChallengeAttemptId = AiChallengeAttemptId?.ToString() ?? string.Empty,
             ConnectionCount = ConnectionCount,
             BattleEvents =
             {
@@ -1385,6 +1516,9 @@ public sealed class BattleSession
         {
             MessageType = OnlineBattleMessageType.BattleEvents,
             MatchId = MatchId,
+            UseServerAiOpponent = UseServerAiOpponent,
+            GameMode = GameMode,
+            AiChallengeAttemptId = AiChallengeAttemptId?.ToString() ?? string.Empty,
             ConnectionCount = ConnectionCount,
             BattleEvents =
             {
@@ -1579,6 +1713,10 @@ public sealed class BattleSession
                 AppendBattleEndedEventIfNeeded(battleEvents);
                 break;
             }
+
+            case ActivateEffectCommand active:
+                _battleFlowController.ExecuteCommand(actorId, active);
+                break;
 
             case MoveOccupantCommand moveOccupantCommand:
             {
@@ -2407,7 +2545,7 @@ public sealed class BattleSession
     private OnlineBattleSeatId ToOnlineSeatId(PlayerId playerId)
     {
         return playerId == PlayerId.Player
-            ? OnlineBattleSeatId.PlayerA
+            ? (UseServerAiOpponent ? _serverAiHumanOnlineSeat : OnlineBattleSeatId.PlayerA)
             : UseServerAiOpponent
                 ? OnlineBattleSeatId.ServerAI
                 : OnlineBattleSeatId.PlayerB;
@@ -2416,7 +2554,7 @@ public sealed class BattleSession
     private OnlineBattleSeatId ToOnlineSeatId(PlayerIdDto seatId)
     {
         return seatId == PlayerIdDto.Player
-            ? OnlineBattleSeatId.PlayerA
+            ? (UseServerAiOpponent ? _serverAiHumanOnlineSeat : OnlineBattleSeatId.PlayerA)
             : UseServerAiOpponent
                 ? OnlineBattleSeatId.ServerAI
                 : OnlineBattleSeatId.PlayerB;
@@ -2527,7 +2665,7 @@ public sealed class BattleSession
             board.EnumerateOccupants()
                 .Where(occupant => occupant != null)
                 .Select(CreateOccupantSnapshot)
-                .ToList());
+                .ToList(), board.FalloutStacks);
     }
 
     private static BattleSessionOccupantSnapshot CreateOccupantSnapshot(OccupantState occupant)
@@ -2564,7 +2702,7 @@ public sealed class BattleSession
             occupant.DamageType.ToString(),
             occupant.PhysicalDefense,
             occupant.MagicDefense,
-            unit?.HasRobot == true,
+            false, // Legacy Robot flag is no longer written.
             occupant.OriginalAttack,
             occupant.OriginalMaxHp,
             occupant.OriginalPhysicalDefense,
@@ -2592,7 +2730,16 @@ public sealed class BattleSession
             DemonKingRevivalTurnStartsRemaining: occupant.DemonKingRevivalTurnStartsRemaining,
             DemonKingRevivalCountdownPlayerId: occupant.DemonKingRevivalCountdownPlayerId.ToString(),
             DemonKingRevivalEligibleAfterTurnNumber: occupant.DemonKingRevivalEligibleAfterTurnNumber,
-            DemonKingRevivalCount: occupant.DemonKingRevivalCount);
+            DemonKingRevivalCount: occupant.DemonKingRevivalCount,
+            Races: unit != null && occupant.Kind == OccupantKind.Unit ? UnitRaceCollection.ToArray(unit.Races) : null,
+            LastActiveEffectTurnNumber: occupant.LastActiveEffectTurnNumber,
+            FalloutPlayerStacks: occupant.FalloutPlayerStacks,
+            FalloutAiStacks: occupant.FalloutAiStacks,
+            CombatStatBuffs: occupant.CombatStatBuffs
+                .Select(buff => new BattleSessionCombatStatBuffSnapshot(
+                    buff.SourceCardId, buff.AttackBonus, buff.MaxHpBonus,
+                    buff.PhysicalDefenseBonus, buff.MagicDefenseBonus))
+                .ToList());
     }
 
     private static BattleSessionPersistentEffectSnapshot CreatePersistentEffectSnapshot(PersistentEffectState effect)
@@ -2631,6 +2778,8 @@ public sealed class BattleSession
     {
         var playerBoard = new BoardState();
         var aiBoard = new BoardState();
+        playerBoard.RestoreFalloutStacks(snapshot.PlayerBoard?.FalloutStacks ?? 0);
+        aiBoard.RestoreFalloutStacks(snapshot.AIBoard?.FalloutStacks ?? 0);
         var player = RestorePlayer(
             snapshot.Player,
             snapshot.PlayerBoard,
@@ -2851,7 +3000,7 @@ public sealed class BattleSession
                     damageType,
                     snapshot.PhysicalDefense,
                     snapshot.MagicDefense,
-                    snapshot.HasRobot,
+                    snapshot.Races ?? (snapshot.HasRobot ? new[] { UnitRace.Robot } : Array.Empty<UnitRace>()),
                     snapshot.HasRush,
                     snapshot.HasHiding,
                     snapshot.HasFlying,
@@ -2859,6 +3008,13 @@ public sealed class BattleSession
                     snapshot.HasPiercing);
 
         occupant.CurrentHp = snapshot.CurrentHp;
+        occupant.RestoreFallout(snapshot.FalloutPlayerStacks, snapshot.FalloutAiStacks);
+        occupant.RestoreActiveEffectUsage(snapshot.LastActiveEffectTurnNumber);
+        occupant.RestoreCombatStatBuffs(
+            (snapshot.CombatStatBuffs ?? Array.Empty<BattleSessionCombatStatBuffSnapshot>())
+                .Select(buff => new CombatStatBuffState(
+                    buff.SourceCardId, buff.AttackBonus, buff.MaxHpBonus,
+                    buff.PhysicalDefenseBonus, buff.MagicDefenseBonus)));
         occupant.EndureUsed = snapshot.EndureUsed;
         occupant.RestoreOriginalCombatStats(
             snapshot.OriginalAttack ?? snapshot.BaseAttack,
@@ -3156,6 +3312,7 @@ public sealed class BattleSession
         if (attackEvent != null)
         {
             AppendAttackCombatLogs(attackEvent, battleEvents, beforeSnapshot);
+            AppendHeroGrowthCombatLogs(beforeSnapshot, afterSnapshot);
         }
         else if (spellEvent != null)
         {
@@ -3185,7 +3342,6 @@ public sealed class BattleSession
                 candidate => candidate.ValueCause == BattleValueChangeCause.BlueDragon ||
                              candidate.ValueCause == BattleValueChangeCause.RedDragon);
             AppendCardDrawCombatLogs(battleEvents);
-            AppendHeroGrowthCombatLogs(beforeSnapshot, afterSnapshot);
         }
 
         if (turnStartedEvent != null)
@@ -3206,6 +3362,7 @@ public sealed class BattleSession
                 candidate => candidate.ValueCause == BattleValueChangeCause.DeckExhaustion ||
                              candidate.ValueCause == BattleValueChangeCause.Firewall ||
                              candidate.ValueCause == BattleValueChangeCause.BiochemicalBomb ||
+                             candidate.ValueCause == BattleValueChangeCause.Fallout ||
                              candidate.ValueCause == BattleValueChangeCause.Spell);
         }
 
@@ -3226,6 +3383,7 @@ public sealed class BattleSession
                              candidate.ValueCause != BattleValueChangeCause.Counterattack);
         }
 
+        AppendResourceChangeCombatLogs(); // Also covers occupant active commands; already consumed entries are empty.
         AppendUnaccountedRemovalCombatLogs(battleEvents, beforeSnapshot);
         AppendStatusChangeCombatLogs(beforeSnapshot, afterSnapshot);
 
@@ -4459,7 +4617,10 @@ public sealed record PendingReconnectStatusSnapshot(
     PlayerIdDto SeatId,
     OnlineBattleSeatId OnlineSeatId,
     int RemainingSeconds,
-    DateTimeOffset ReconnectDeadlineUtc);
+    DateTimeOffset ReconnectDeadlineUtc,
+    bool UseServerAiOpponent = false,
+    string GameMode = "run",
+    string AiChallengeAttemptId = "");
 
 public sealed record BattleSessionPersistenceSnapshot(
     string MatchId,
@@ -4476,7 +4637,9 @@ public sealed record BattleSessionPersistenceSnapshot(
     IReadOnlyList<BattleCombatLogEntryDto>? CombatLogEntries = null,
     IReadOnlyList<BattleSessionParticipantSnapshot>? Participants = null,
     Guid ResultId = default,
-    string ResultEndedReason = "normal");
+    string ResultEndedReason = "normal",
+    Guid? AiChallengeAttemptId = null,
+    string ServerAiHumanOnlineSeat = "PlayerA");
 
 public sealed record BattleSessionParticipantSnapshot(
     string RuntimeSeatId,
@@ -4538,7 +4701,8 @@ public sealed record BattleSessionHandCardSnapshot(
     bool IsTemporaryReplicate);
 
 public sealed record BattleSessionBoardSnapshot(
-    IReadOnlyList<BattleSessionOccupantSnapshot> Occupants);
+    IReadOnlyList<BattleSessionOccupantSnapshot> Occupants,
+    int FalloutStacks = 0);
 
 public sealed record BattleSessionOccupantSnapshot(
     string RuntimeId,
@@ -4570,6 +4734,7 @@ public sealed record BattleSessionOccupantSnapshot(
     string DamageType = "",
     int PhysicalDefense = 0,
     int MagicDefense = 0,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     bool HasRobot = false,
     int? OriginalAttack = null,
     int? OriginalMaxHp = null,
@@ -4597,7 +4762,20 @@ public sealed record BattleSessionOccupantSnapshot(
     int DemonKingRevivalCount = 0,
     [property: System.Text.Json.Serialization.JsonPropertyName("HasGuard")]
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-    bool LegacyHasGuard = false);
+    bool LegacyHasGuard = false,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    UnitRace[]? Races = null,
+    int LastActiveEffectTurnNumber = -1,
+    int FalloutPlayerStacks = 0,
+    int FalloutAiStacks = 0,
+    IReadOnlyList<BattleSessionCombatStatBuffSnapshot>? CombatStatBuffs = null);
+
+public sealed record BattleSessionCombatStatBuffSnapshot(
+    string SourceCardId,
+    int AttackBonus,
+    int MaxHpBonus,
+    int PhysicalDefenseBonus,
+    int MagicDefenseBonus);
 
 public sealed record BattleSessionInvincibleEffectSnapshot(
     string Duration,

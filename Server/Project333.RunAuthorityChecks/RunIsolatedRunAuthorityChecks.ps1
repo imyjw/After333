@@ -52,7 +52,7 @@ $environment = @{
     PROJECT333_AUDIT_LOG_DIR = (Join-Path $runRoot 'Audit')
     # Expanded synthetic-account suite; applies only to this isolated child server.
     PROJECT333_AUTH_RATE_LIMIT_PER_WINDOW = '60'
-    PROJECT333_ACCOUNT_RATE_LIMIT_PER_WINDOW = '600'
+    PROJECT333_ACCOUNT_RATE_LIMIT_PER_WINDOW = '2000'
     PROJECT333_BATTLE_CONNECT_RATE_LIMIT_PER_WINDOW = '100'
     PROJECT333_BATTLE_AUTH_TIMEOUT_SECONDS = '5'
     AFTER333_AUTHORITY_TEST_DATA = $pgData
@@ -67,6 +67,7 @@ foreach ($key in $environment.Keys) {
     $savedEnvironment[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
     [Environment]::SetEnvironmentVariable($key, $environment[$key], 'Process')
 }
+$restartClient = $null
 $server = $null
 $pgStarted = $false
 $pg = Join-Path $PostgresBin 'pg_ctl.exe'
@@ -149,12 +150,26 @@ try {
     if ($harness.ExitCode -ne 0) { throw 'Run authority checks failed. See checks.log and checks.err.log.' }
     Get-Content -LiteralPath (Join-Path $runRoot 'checks.log')
 
+    # Keep real PvP/PvE sockets connected while the isolated HTTP server is killed.
+    $restartClient = Start-Process dotnet -ArgumentList @('"' + $harnessDll + '"', '--server-restart-battles') -WindowStyle Hidden -PassThru `
+        -RedirectStandardOutput (Join-Path $runRoot 'restart-battles.log') -RedirectStandardError (Join-Path $runRoot 'restart-battles.err.log')
+    $null = $restartClient.Handle
+    $readyDeadline = [DateTime]::UtcNow.AddSeconds(25)
+    while (-not (Test-Path -LiteralPath (Join-Path $runRoot 'restart-battles.ready'))) {
+        if ($restartClient.HasExited -or [DateTime]::UtcNow -ge $readyDeadline) { throw 'Restart battle client did not become ready. See restart-battles logs.' }
+        Start-Sleep -Milliseconds 100
+    }
     # Stop/restart only our isolated process, then retry committed operations with
     # synthetic credentials saved by the harness. No live server or wallet is used.
     Stop-Process -Id $server.Id
     $server.WaitForExit()
     $server = Start-Process dotnet -ArgumentList @('"' + $serverDll + '"') -WorkingDirectory $serverOutputPath -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runRoot 'restart-server.out.log') -RedirectStandardError (Join-Path $runRoot 'restart-server.err.log')
     Wait-TestServer $server
+    Set-Content -LiteralPath (Join-Path $runRoot 'restart-battles.resume') -Value 'ready'
+    if (-not $restartClient.WaitForExit(45000)) { throw 'Restart battle verification timed out.' }
+    $restartClient.Refresh()
+    if ($restartClient.ExitCode -ne 0) { throw 'Restart battle verification failed. See restart-battles.err.log.' }
+    Get-Content -LiteralPath (Join-Path $runRoot 'restart-battles.log')
     & dotnet $harnessDll --replay-account-operations *> (Join-Path $runRoot 'restart-operation-checks.log')
     if ($LASTEXITCODE -ne 0) { throw 'Account operation replay after restart failed.' }
     Get-Content -LiteralPath (Join-Path $runRoot 'restart-operation-checks.log')
@@ -175,6 +190,7 @@ try {
     'PASS: four valid/malformed/empty uploads return the same HTTP 410 tombstone with no DB configured.' |
         Tee-Object -FilePath (Join-Path $runRoot 'no-db-checks.log')
 } finally {
+    if ($null -ne $restartClient -and -not $restartClient.HasExited) { Stop-Process -Id $restartClient.Id; $restartClient.WaitForExit() }
     if ($null -ne $server -and -not $server.HasExited) { Stop-Process -Id $server.Id; $server.WaitForExit() }
     if ($pgStarted) {
         $pgStop = Start-Process -FilePath $pg -ArgumentList @('-D', ('"' + $pgData + '"'), '-m', 'fast', '-w', '-t', '15', 'stop') `

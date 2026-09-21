@@ -62,10 +62,6 @@ namespace Project333.Runtime.Presentation.Draft
         [SerializeField] private int _battleModeButtonFontSize = 24;
         [SerializeField] private Color _pveBattleButtonColor = new Color(0.26f, 0.24f, 0.13f, 1f);
         [SerializeField] private Color _pvpBattleButtonColor = new Color(0.1f, 0.22f, 0.46f, 1f);
-        [SerializeField] private string _pveBattleButtonReadyLabel = "PVE 시작";
-        [SerializeField] private string _pvpBattleButtonReadyLabel = "PVP 매칭";
-        [SerializeField] private string _pveBattleButtonLockedLabelFormat = "PVE 잠김 ({0}/33)";
-        [SerializeField] private string _pvpBattleButtonLockedLabelFormat = "PVP 잠김 ({0}/33)";
         [SerializeField] private Vector2 _returnToStartButtonPosition = new Vector2(0f, -204f);
         [SerializeField] private Vector2 _returnToStartButtonSize = new Vector2(340f, 72f);
         [SerializeField] private Vector2 _returnToStartButtonLabelPadding = new Vector2(12f, 12f);
@@ -153,11 +149,18 @@ namespace Project333.Runtime.Presentation.Draft
         private Coroutine _completedRunServerSyncRetryCoroutine;
         private int _completedRunServerSyncAttempts;
         private bool _isWaitingForServerRunResultSync;
-        private bool _hasPvpReconnectableBattle;
-        private string _pvpReconnectMatchId = string.Empty;
-        private int _pvpReconnectRemainingSeconds;
-        private float _pvpReconnectDeadlineRealtime;
-        private int _lastPresentedPvpReconnectRemainingSeconds = -1;
+        private bool _isPreparingBattle;
+        private AiChallengeStatusResponse _aiChallengeStatus;
+        private PvpReconnectStatusResponse _battleReconnectStatus;
+        private bool _pendingAiChallengeReservation;
+        private bool _hasReconnectableBattle;
+        private DraftBattleLaunchMode _reconnectLaunchMode = DraftBattleLaunchMode.OnlineMatchmaking;
+        private bool _isPollingBattleReconnect;
+        private float _nextBattleReconnectPollRealtime;
+        private string _reconnectMatchId = string.Empty;
+        private int _reconnectRemainingSeconds;
+        private float _reconnectDeadlineRealtime;
+        private int _lastPresentedReconnectRemainingSeconds = -1;
         [SerializeField, HideInInspector] private DraftPvpMatchmakingOverlayView _pvpMatchmakingOverlay;
         private OnlineBattleSessionCoordinator _pvpSessionCoordinator;
         private bool _isPvpMatchmakingActive;
@@ -314,7 +317,8 @@ namespace Project333.Runtime.Presentation.Draft
         private void Update()
         {
             UpdateRewardClaimPopupClick();
-            UpdatePvpReconnectCountdown();
+            UpdateBattleReconnectCountdown();
+            PollBattleReconnectStatus();
             UpdatePvpMatchmakingState();
         }
 
@@ -332,28 +336,56 @@ namespace Project333.Runtime.Presentation.Draft
             }
         }
 
-        private void UpdatePvpReconnectCountdown()
+        private async void PollBattleReconnectStatus()
         {
-            if (!_hasPvpReconnectableBattle || _pvpReconnectDeadlineRealtime <= 0f)
+            if (_isPollingBattleReconnect || _accountRefreshCancellation != null ||
+                _isLoadingBattleScene || _isPvpMatchmakingActive ||
+                !AccountSessionState.IsAuthenticated || IsDeckBuildingScene() ||
+                UnityEngine.Time.unscaledTime < _nextBattleReconnectPollRealtime)
+            {
+                return;
+            }
+
+            _isPollingBattleReconnect = true;
+            _nextBattleReconnectPollRealtime = UnityEngine.Time.unscaledTime + 3f;
+            try
+            {
+                await RefreshBattleReconnectStatusAsync(new GuestAuthClient(AccountServerUrl),
+                    AccountSessionState.SessionToken, CancellationToken.None);
+                if (this != null)
+                {
+                    RefreshStaticUi();
+                }
+            }
+            finally
+            {
+                _isPollingBattleReconnect = false;
+            }
+        }
+
+        private void UpdateBattleReconnectCountdown()
+        {
+            if (!_hasReconnectableBattle || _reconnectDeadlineRealtime <= 0f)
             {
                 return;
             }
 
             var remainingSeconds = Mathf.Max(
                 0,
-                Mathf.CeilToInt(_pvpReconnectDeadlineRealtime - UnityEngine.Time.unscaledTime));
-            if (remainingSeconds == _lastPresentedPvpReconnectRemainingSeconds)
+                Mathf.CeilToInt(_reconnectDeadlineRealtime - UnityEngine.Time.unscaledTime));
+            if (remainingSeconds == _lastPresentedReconnectRemainingSeconds)
             {
                 return;
             }
 
-            _lastPresentedPvpReconnectRemainingSeconds = remainingSeconds;
-            _pvpReconnectRemainingSeconds = remainingSeconds;
+            _lastPresentedReconnectRemainingSeconds = remainingSeconds;
+            _reconnectRemainingSeconds = remainingSeconds;
 
             if (remainingSeconds <= 0)
             {
-                ClearPvpReconnectStatus();
-                SetStatus("PVP reconnect window expired. Start a new battle when ready.");
+                ClearBattleReconnectStatus();
+                SetStatus("재접속 가능 시간이 끝났습니다. 서버 전투 결과를 확인합니다.");
+                _ = RefreshServerAccountStateAsync();
             }
 
             RefreshStaticUi();
@@ -537,12 +569,12 @@ namespace Project333.Runtime.Presentation.Draft
 
         public void StartBattleFromUi()
         {
-            StartPveBattleFromUi();
+            StartPvpBattleFromUi();
         }
 
         public void StartPveBattleFromUi()
         {
-            StartBattleWithMode(ResolvePveBattleLaunchMode());
+            StartBattleWithMode(DraftBattleLaunchMode.OnlineAiChallenge);
         }
 
         public void StartPvpBattleFromUi()
@@ -552,80 +584,76 @@ namespace Project333.Runtime.Presentation.Draft
 
         private async void StartBattleWithMode(DraftBattleLaunchMode launchMode)
         {
-            if (_isLoadingBattleScene || _isPvpMatchmakingActive)
+            if (_isLoadingBattleScene || _isPvpMatchmakingActive || _isPreparingBattle) return;
+            _isPreparingBattle = true;
+            RefreshStaticUi();
+            try
             {
-                return;
+                if (!AccountSessionState.IsAuthenticated)
+                {
+                    SetStatus("서버 계정으로 로그인한 뒤 전투를 시작해 주세요.");
+                    return;
+                }
+                var isReconnectLaunch = _hasReconnectableBattle;
+                if (isReconnectLaunch && !await RefreshBattleReconnectBeforeLaunchAsync()) return;
+                isReconnectLaunch = _hasReconnectableBattle;
+                if (isReconnectLaunch) launchMode = _reconnectLaunchMode;
+                if (!DraftRunSessionState.HasDraftedDeckReady && !isReconnectLaunch)
+                {
+                    SetStatus("33장의 덱을 완성한 뒤 전투를 시작해 주세요.");
+                    return;
+                }
+                if (IsRunEndedForUi() && !isReconnectLaunch)
+                {
+                    SetStatus(BuildRunCompleteStatusText());
+                    return;
+                }
+                if (!isReconnectLaunch && !await EnsureCompletedDraftSavedAsync()) return;
+                DraftRunSessionState.ConfigureSceneNames(_draftSceneName, _battleSceneName);
+                DraftRunSessionState.SetServerRunDeckMetadata(AccountSessionState.ActiveRunId, AccountSessionState.ActiveDeckId);
+                var deckCardIds = ResolveVisibleDeckCardIds();
+                if (launchMode == DraftBattleLaunchMode.OnlineMatchmaking)
+                {
+                    BeginPvpMatchmakingInDraft(isReconnectLaunch, deckCardIds);
+                    return;
+                }
+                if (isReconnectLaunch && !_pendingAiChallengeReservation)
+                    DraftRunSessionState.QueueBattleReconnect(_battleReconnectStatus);
+                else if (launchMode == DraftBattleLaunchMode.OnlineAiChallenge)
+                {
+                    var client = new AiChallengeClient(AccountServerUrl);
+                    var accountId = AccountSessionState.AccountId;
+                    var attempt = _aiChallengeStatus?.PendingAttempt;
+                    if (attempt == null || attempt.IsFinished)
+                        attempt = await client.StartAsync(AccountSessionState.SessionToken,
+                            AccountSessionState.ActiveRunId, AccountSessionState.ActiveDeckId, CancellationToken.None);
+                    else client.AcknowledgePendingAttempt();
+                    if (this == null || accountId != AccountSessionState.AccountId) return;
+                    if (attempt.IsFinished)
+                    {
+                        SetStatus("이전 AI 도전이 종료되었습니다. 새로운 도전을 시작할 수 있습니다.");
+                        await RefreshAiChallengeStatusAsync(CancellationToken.None);
+                        return;
+                    }
+                    DraftRunSessionState.QueueAiChallengeBattleStart(attempt.MatchId, attempt.AttemptId);
+                }
+                else
+                {
+                    BeginPvpMatchmakingInDraft(false, deckCardIds);
+                    return;
+                }
+                _isLoadingBattleScene = true;
+                SetBattleModeButtonsInteractable(false);
+                SetStatus(isReconnectLaunch ? "전투에 재접속하는 중..." : "AI 도전을 시작합니다.");
+                SceneManager.LoadScene(_battleSceneName);
             }
-
-            var isPvpReconnectLaunch = launchMode == DraftBattleLaunchMode.OnlineMatchmaking &&
-                                       _hasPvpReconnectableBattle;
-
-            if (isPvpReconnectLaunch &&
-                !await RefreshPvpReconnectBeforeBattleLaunchAsync())
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { if (this != null) SetStatus(ex.Message); }
+            finally
             {
-                RefreshStaticUi();
-                return;
+                _isPreparingBattle = false;
+                if (this != null && !_isLoadingBattleScene) RefreshStaticUi();
             }
-
-            isPvpReconnectLaunch = launchMode == DraftBattleLaunchMode.OnlineMatchmaking &&
-                                   _hasPvpReconnectableBattle;
-
-            if (!DraftRunSessionState.HasDraftedDeckReady && !isPvpReconnectLaunch)
-            {
-                SetStatus("Complete the 33-card draft before starting a battle.");
-                RefreshStaticUi();
-                return;
-            }
-
-            if (launchMode == DraftBattleLaunchMode.OnlineMatchmaking &&
-                !AccountSessionState.IsAuthenticated)
-            {
-                SetStatus("PVP requires a server account login. Return to the start screen and log in first.");
-                RefreshStaticUi();
-                return;
-            }
-
-            if (IsRunEndedForUi())
-            {
-                SetStatus(BuildRunCompleteStatusText());
-                RefreshStaticUi();
-                return;
-            }
-
-            if (!isPvpReconnectLaunch && !await EnsureCompletedDraftSavedAsync())
-            {
-                RefreshStaticUi();
-                return;
-            }
-
-            DraftRunSessionState.ConfigureSceneNames(_draftSceneName, _battleSceneName);
-            DraftRunSessionState.SetServerRunDeckMetadata(
-                AccountSessionState.ActiveRunId,
-                AccountSessionState.ActiveDeckId);
-            var deckCardIds = ResolveVisibleDeckCardIds();
-            if (launchMode == DraftBattleLaunchMode.OnlineMatchmaking)
-            {
-                BeginPvpMatchmakingInDraft(isPvpReconnectLaunch, deckCardIds);
-                return;
-            }
-
-            if (isPvpReconnectLaunch)
-            {
-                DraftRunSessionState.QueuePvpReconnectBattleStart();
-            }
-            else
-            {
-                DraftRunSessionState.QueueBattleStart(launchMode);
-            }
-
-            Debug.Log(
-                $"[After333 Draft Launch] mode={launchMode} run={FormatLogValue(AccountSessionState.ActiveRunId)} deck={FormatLogValue(AccountSessionState.ActiveDeckId)} runStatus={FormatLogValue(AccountSessionState.ActiveRunStatus)} record={AccountSessionState.ActiveRunWins}-{AccountSessionState.ActiveRunLosses} deckCards={deckCardIds?.Count ?? 0} serverDeckCards={AccountSessionState.ActiveDeckCardCount} upgradedCardKinds={CountUpgradedCardKinds(deckCardIds)}");
-            _isLoadingBattleScene = true;
-            SetBattleModeButtonsInteractable(false);
-            SetStatus(launchMode == DraftBattleLaunchMode.OnlineMatchmaking
-                ? "Entering PvP matchmaking or reconnecting to an interrupted PvP battle..."
-                : "Starting battle...");
-            SceneManager.LoadScene(_battleSceneName);
         }
 
         private void BeginPvpMatchmakingInDraft(
@@ -679,7 +707,7 @@ namespace Project333.Runtime.Presentation.Draft
             {
                 _hasPresentedPvpMatchmakingFailure = true;
                 var message = _pvpSessionCoordinator.Phase == OnlineBattleSessionPhase.Ended
-                    ? "이전 PVP 전투가 이미 종료되었습니다."
+                    ? "이전 전투가 이미 종료되었습니다."
                     : _pvpSessionCoordinator.LastError;
                 SetStatus(message);
                 _pvpMatchmakingOverlay?.ShowFailure(message);
@@ -768,7 +796,7 @@ namespace Project333.Runtime.Presentation.Draft
                 return;
             }
 
-            SetStatus("PVP 매칭을 취소했습니다.");
+            SetStatus("매칭을 취소했습니다.");
             RefreshStaticUi();
         }
 
@@ -791,37 +819,37 @@ namespace Project333.Runtime.Presentation.Draft
             _pvpMatchmakingOverlay.BindCancel(CancelPvpMatchmakingFromUi);
         }
 
-        private async Task<bool> RefreshPvpReconnectBeforeBattleLaunchAsync()
+        private async Task<bool> RefreshBattleReconnectBeforeLaunchAsync()
         {
             var previousWins = DraftRunSessionState.Wins;
             var previousLosses = DraftRunSessionState.Losses;
 
-            SetStatus("PVP 전투 재접속 가능 여부를 확인하는 중입니다.");
+            SetStatus("전투 재접속 가능 여부를 확인하는 중입니다.");
             RefreshStaticUi();
 
             var client = new GuestAuthClient(AccountServerUrl);
-            await RefreshPvpReconnectStatusAsync(
+            await RefreshBattleReconnectStatusAsync(
                 client,
                 AccountSessionState.SessionToken,
                 CancellationToken.None);
-            if (_hasPvpReconnectableBattle)
+            if (_hasReconnectableBattle)
             {
                 return true;
             }
 
             await RefreshServerAccountStateAsync();
-            if (_hasPvpReconnectableBattle)
+            if (_hasReconnectableBattle)
             {
                 return true;
             }
 
-            var finishedStatus = BuildFinishedPvpReconnectStatusText(previousWins, previousLosses);
+            var finishedStatus = BuildFinishedBattleReconnectStatusText(previousWins, previousLosses);
             SetStatus(finishedStatus);
             SimpleNoticeToast.Show("DraftNoticeToastCanvas", finishedStatus);
             return false;
         }
 
-        private static string BuildFinishedPvpReconnectStatusText(int previousWins, int previousLosses)
+        private static string BuildFinishedBattleReconnectStatusText(int previousWins, int previousLosses)
         {
             var currentWins = AccountSessionState.HasResumableRun
                 ? AccountSessionState.ActiveRunWins
@@ -840,7 +868,7 @@ namespace Project333.Runtime.Presentation.Draft
                 return "이전 전투에서 패배했습니다.";
             }
 
-            return "이전 PVP 전투가 이미 종료되었습니다.";
+            return "이전 전투가 종료되었거나 취소되었습니다.";
         }
 
         public void ReturnToStartSceneFromUi()
@@ -1093,17 +1121,19 @@ namespace Project333.Runtime.Presentation.Draft
 
             if (_deckListText != null)
             {
-                var deckListText = BuildDeckListText(visibleDeckCardIds);
-                _deckListText.text = deckListText;
+                DeckListCardHoldPreview.Configure(
+                    _deckListText, visibleDeckCardIds, ResolveCardAsset, "No drafted deck yet.", "•  ");
 
                 if (_runtimeDeckListDisplayText != null)
                 {
-                    _runtimeDeckListDisplayText.text = deckListText;
+                    DeckListCardHoldPreview.Configure(
+                        _runtimeDeckListDisplayText, visibleDeckCardIds, ResolveCardAsset, "No drafted deck yet.", "•  ");
                 }
 
                  if (_runtimeDeckPanelText != null)
                  {
-                     _runtimeDeckPanelText.text = deckListText;
+                     DeckListCardHoldPreview.Configure(
+                         _runtimeDeckPanelText, visibleDeckCardIds, ResolveCardAsset, "No drafted deck yet.", "•  ");
                  }
 
                 if (_runtimeDeckSummaryText != null)
@@ -1119,10 +1149,14 @@ namespace Project333.Runtime.Presentation.Draft
                                  !isDeckBuildingScene &&
                                  !isRunEndedForUi &&
                                  !_isPvpMatchmakingActive &&
+                                 !_isPreparingBattle &&
                                  !IsServerDraftSaveBlockingBattle() &&
                                  !IsServerRunResultSyncBlockingBattle();
-            var canStartPvpBattle = !_isPvpMatchmakingActive &&
-                                    (canStartBattle || CanReconnectPvpBattle(isDeckBuildingScene, isRunEndedForUi));
+            var canStartPveBattle = !_isPreparingBattle && !_hasReconnectableBattle &&
+                                    canStartBattle && _aiChallengeStatus != null &&
+                                    _aiChallengeStatus.PendingAttempt == null && _aiChallengeStatus.RemainingAttempts > 0;
+            var canStartPvpBattle = !_isPreparingBattle && !_isPvpMatchmakingActive &&
+                                    (canStartBattle || CanReconnectBattle(isDeckBuildingScene, isRunEndedForUi));
             RefreshDevelopmentSmokePanel(visibleDeckCount, isRunEndedForUi, canStartBattle);
             if (isDeckBuildingScene)
             {
@@ -1138,14 +1172,14 @@ namespace Project333.Runtime.Presentation.Draft
 
             RefreshBattleModeButton(
                 _startPveBattleButton,
-                _pveBattleButtonReadyLabel,
-                BuildBattleModeLockedLabel(_pveBattleButtonLockedLabelFormat, visibleDeckCount),
+                BuildAiChallengeButtonLabel(),
+                hasDraftDeck ? BuildAiChallengeButtonLabel() : $"AI 도전 ({visibleDeckCount}/33)",
                 _startPveBattleButtonLabel,
-                canStartBattle);
+                canStartPveBattle);
             RefreshBattleModeButton(
                 _startPvpBattleButton,
-                BuildPvpBattleButtonReadyLabel(),
-                BuildBattleModeLockedLabel(_pvpBattleButtonLockedLabelFormat, visibleDeckCount),
+                BuildBattleButtonReadyLabel(DraftBattleLaunchMode.OnlineMatchmaking, "전투"),
+                BuildBattleModeLockedLabel("전투 ({0}/33)", visibleDeckCount),
                 _startPvpBattleButtonLabel,
                 canStartPvpBattle);
             if (_startPveBattleButton != null)
@@ -1298,7 +1332,7 @@ namespace Project333.Runtime.Presentation.Draft
 
             if (canStartBattle)
             {
-                return "Click PVE or PVP to start a battle.";
+                return "전투 또는 AI 도전을 선택해 주세요.";
             }
 
             return "Review status text; battle start is currently blocked.";
@@ -1927,7 +1961,7 @@ namespace Project333.Runtime.Presentation.Draft
                     return false;
                 }
 
-                SetStatus("Draft complete. Server deck verified (33/33). Press PVE or PVP when you are ready.");
+                SetStatus("Draft complete. Server deck verified (33/33). 전투 또는 AI 도전을 선택해 주세요.");
                 return true;
             }
             catch (OperationCanceledException)
@@ -2388,16 +2422,16 @@ namespace Project333.Runtime.Presentation.Draft
                         $"[After333 Draft Sync] /me has no active run. localBefore={localWinsBeforeSync}-{localLossesBeforeSync} localDeckBefore={localDeckCountBeforeSync}");
                 }
 
-                await RefreshPvpReconnectStatusAsync(
+                await RefreshBattleReconnectStatusAsync(
                     client,
                     AccountSessionState.SessionToken,
                     _accountRefreshCancellation.Token);
-                if (_hasPvpReconnectableBattle &&
+                if (_hasReconnectableBattle &&
                     DraftRunSessionState.HasDraftedDeckReady &&
                     !IsRunEndedForUi())
                 {
                     SetStatus(
-                        $"Interrupted PVP battle found. Press PVP to reconnect ({_pvpReconnectRemainingSeconds}s left).");
+                        $"진행 중인 전투에 재접속할 수 있습니다. ({_reconnectRemainingSeconds}초)");
                 }
             }
             catch (OperationCanceledException)
@@ -2417,13 +2451,11 @@ namespace Project333.Runtime.Presentation.Draft
             }
         }
 
-        private async Task RefreshPvpReconnectStatusAsync(
+        private async Task RefreshBattleReconnectStatusAsync(
             GuestAuthClient client,
             string sessionToken,
             CancellationToken cancellationToken)
         {
-            ClearPvpReconnectStatus();
-
             if (client == null || string.IsNullOrWhiteSpace(sessionToken))
             {
                 return;
@@ -2431,25 +2463,49 @@ namespace Project333.Runtime.Presentation.Draft
 
             try
             {
-                var response = await client.GetPvpReconnectStatusAsync(sessionToken, cancellationToken);
+                var response = await client.GetBattleReconnectStatusAsync(sessionToken, cancellationToken);
+                if (response == null || !response.ResolvedHasReconnectableBattle)
+                    await RefreshAiChallengeStatusAsync(cancellationToken);
+                if (this == null || !string.Equals(sessionToken, AccountSessionState.SessionToken, StringComparison.Ordinal))
+                {
+                    return;
+                }
+                _pendingAiChallengeReservation = false;
                 if (response == null || !response.ResolvedHasReconnectableBattle)
                 {
-                    return;
+                    var pending = _aiChallengeStatus?.PendingAttempt;
+                    if (pending == null || !string.Equals(pending.Status, "reserved", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ClearBattleReconnectStatus();
+                        return;
+                    }
+                    _pendingAiChallengeReservation = true;
+                    response = new PvpReconnectStatusResponse
+                    {
+                        HasReconnectableBattle = true, MatchId = pending.MatchId, RemainingSeconds = 60,
+                        BattleMode = "pve", GameMode = "ai_challenge", AiChallengeAttemptId = pending.AttemptId
+                    };
                 }
+                _battleReconnectStatus = response;
 
                 var remainingSeconds = Math.Max(0, response.ResolvedRemainingSeconds);
-                if (remainingSeconds <= 0)
+                if (remainingSeconds <= 0 || string.IsNullOrWhiteSpace(response.ResolvedMatchId))
                 {
+                    ClearBattleReconnectStatus();
                     return;
                 }
 
-                _hasPvpReconnectableBattle = true;
-                _pvpReconnectMatchId = response.ResolvedMatchId ?? string.Empty;
-                _pvpReconnectRemainingSeconds = remainingSeconds;
-                _pvpReconnectDeadlineRealtime = UnityEngine.Time.unscaledTime + _pvpReconnectRemainingSeconds;
-                _lastPresentedPvpReconnectRemainingSeconds = _pvpReconnectRemainingSeconds;
-                Debug.Log(
-                    $"[After333 Draft Sync] PVP reconnect available: match={FormatLogValue(_pvpReconnectMatchId)} remaining={_pvpReconnectRemainingSeconds}s seat={FormatLogValue(response.ResolvedOnlineSeatId)}");
+                _hasReconnectableBattle = true;
+                _reconnectLaunchMode = response.ResolvedIsAiChallenge
+                    ? DraftBattleLaunchMode.OnlineAiChallenge
+                    : response.ResolvedIsServerAiBattle
+                        ? DraftBattleLaunchMode.OnlineServerAi : DraftBattleLaunchMode.OnlineMatchmaking;
+                _reconnectMatchId = response.ResolvedMatchId ?? string.Empty;
+                _reconnectRemainingSeconds = _pendingAiChallengeReservation ? 0 : remainingSeconds;
+                _reconnectDeadlineRealtime = _pendingAiChallengeReservation
+                    ? 0f : UnityEngine.Time.unscaledTime + _reconnectRemainingSeconds;
+                _lastPresentedReconnectRemainingSeconds = _reconnectRemainingSeconds;
+
             }
             catch (OperationCanceledException)
             {
@@ -2457,17 +2513,49 @@ namespace Project333.Runtime.Presentation.Draft
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"After333 PVP reconnect status refresh failed: {ex.Message}");
+                Debug.LogWarning($"After333 battle reconnect status refresh failed: {ex.Message}");
             }
         }
 
-        private void ClearPvpReconnectStatus()
+        private async Task RefreshAiChallengeStatusAsync(CancellationToken cancellationToken)
         {
-            _hasPvpReconnectableBattle = false;
-            _pvpReconnectMatchId = string.Empty;
-            _pvpReconnectRemainingSeconds = 0;
-            _pvpReconnectDeadlineRealtime = 0f;
-            _lastPresentedPvpReconnectRemainingSeconds = -1;
+            var sessionToken = AccountSessionState.SessionToken;
+            try
+            {
+                var client = new AiChallengeClient(AccountServerUrl);
+                var status = await client.GetStatusAsync(sessionToken, cancellationToken);
+                if (this == null || sessionToken != AccountSessionState.SessionToken) return;
+                _aiChallengeStatus = status;
+                var resultAttemptId = DraftRunSessionState.PendingAiChallengeResultAttemptId;
+                if (!string.IsNullOrWhiteSpace(resultAttemptId))
+                {
+                    var receipt = await client.GetAttemptAsync(sessionToken, resultAttemptId, cancellationToken);
+                    if (receipt != null && receipt.IsFinished)
+                    {
+                        var account = await new GuestAuthClient(AccountServerUrl).GetMeAsync(sessionToken, cancellationToken);
+                        if (this == null || sessionToken != AccountSessionState.SessionToken) return;
+                        AccountSessionState.ApplyMeResponse(account);
+                        DraftRunSessionState.ApplyAiChallengeReceipt(receipt);
+                    }
+                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) { Debug.LogWarning("After333 AI challenge status refresh failed: " + ex.Message); }
+        }
+
+        private string BuildAiChallengeButtonLabel() => _aiChallengeStatus == null
+            ? "AI 도전 확인 중..." : $"AI 도전 ({Math.Max(0, _aiChallengeStatus.RemainingAttempts)}/3)";
+
+        private void ClearBattleReconnectStatus()
+        {
+            _hasReconnectableBattle = false;
+            _battleReconnectStatus = null;
+            _pendingAiChallengeReservation = false;
+            _reconnectLaunchMode = DraftBattleLaunchMode.OnlineMatchmaking;
+            _reconnectMatchId = string.Empty;
+            _reconnectRemainingSeconds = 0;
+            _reconnectDeadlineRealtime = 0f;
+            _lastPresentedReconnectRemainingSeconds = -1;
         }
 
         private static bool IsServerRunRecordBehindLocal(
@@ -2638,22 +2726,23 @@ namespace Project333.Runtime.Presentation.Draft
             return FormatLockedBattleModeLabel(labelFormat, visibleDeckCount);
         }
 
-        private string BuildPvpBattleButtonReadyLabel()
+        private string BuildBattleButtonReadyLabel(DraftBattleLaunchMode launchMode, string readyLabel)
         {
-            if (!_hasPvpReconnectableBattle)
+            if (!_hasReconnectableBattle)
             {
-                return _pvpBattleButtonReadyLabel;
+                return readyLabel;
             }
 
-            var remainingText = _pvpReconnectRemainingSeconds > 0
-                ? $" ({_pvpReconnectRemainingSeconds}초)"
+            if (_pendingAiChallengeReservation) return "전투 이어하기";
+            var remainingText = _reconnectRemainingSeconds > 0
+                ? $" ({_reconnectRemainingSeconds}초)"
                 : string.Empty;
-            return $"PVP 재접속{remainingText}";
+            return $"전투 재접속{remainingText}";
         }
 
-        private bool CanReconnectPvpBattle(bool isDeckBuildingScene, bool isRunEndedForUi)
+        private bool CanReconnectBattle(bool isDeckBuildingScene, bool isRunEndedForUi)
         {
-            return _hasPvpReconnectableBattle &&
+            return _hasReconnectableBattle &&
                    !isDeckBuildingScene &&
                    !isRunEndedForUi &&
                    AccountSessionState.IsAuthenticated;

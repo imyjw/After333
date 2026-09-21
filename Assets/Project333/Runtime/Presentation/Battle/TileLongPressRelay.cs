@@ -10,7 +10,7 @@ namespace Project333.Runtime.Presentation.Battle
         private TileView _tileView;
         private bool _pointerDown;
         private bool _previewShown;
-        private bool _suppressNextClick;
+        private bool _suppressCurrentPressClick;
         private float _pointerDownStartedAt;
 
         public void Initialize(TileTextView owner, TileView tileView)
@@ -34,13 +34,15 @@ namespace Project333.Runtime.Presentation.Battle
             if (_owner.TryShowCurrentCardPreview())
             {
                 _previewShown = true;
-                _suppressNextClick = true;
-                _tileView?.SuppressNextClick();
+                _suppressCurrentPressClick = true;
             }
         }
 
         public void OnPointerDown(PointerEventData eventData)
         {
+            // A canceled/long press must never suppress a later, independent press.
+            _suppressCurrentPressClick = false;
+
             if (_owner == null || !_owner.CanShowCurrentCardPreview())
             {
                 return;
@@ -73,9 +75,9 @@ namespace Project333.Runtime.Presentation.Battle
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (_suppressNextClick)
+            if (_suppressCurrentPressClick)
             {
-                _suppressNextClick = false;
+                _suppressCurrentPressClick = false;
                 return;
             }
 
@@ -94,6 +96,8 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void ResetState()
         {
+            // Keep click suppression until this press clicks or a new press begins.
+            // PointerUp/Exit can precede the release click of a long press.
             _pointerDown = false;
             _previewShown = false;
             _pointerDownStartedAt = 0f;

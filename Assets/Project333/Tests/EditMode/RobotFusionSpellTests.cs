@@ -42,7 +42,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void CanBegin_DoesNotCountErasureRobot()
+        public void CanBegin_CountsErasureRobotByRace()
         {
             var battleState = CreateBattleState();
             var activeRobot = CreateRobot("active", "A-111", new TileCoord(0, 0), upkeep: 1);
@@ -51,8 +51,8 @@ namespace Project333.Tests.EditMode
             battleState.PlayerBoard.Place(activeRobot.Position, activeRobot);
             battleState.PlayerBoard.Place(erasedRobot.Position, erasedRobot);
 
-            Assert.That(RobotFusionRules.CountLivingRobots(battleState.PlayerBoard), Is.EqualTo(1));
-            Assert.That(RobotFusionRules.CanBegin(battleState, PlayerId.Player), Is.False);
+            Assert.That(RobotFusionRules.CountLivingRobots(battleState.PlayerBoard), Is.EqualTo(2));
+            Assert.That(RobotFusionRules.CanBegin(battleState, PlayerId.Player), Is.True);
         }
 
         [Test]
@@ -212,7 +212,7 @@ namespace Project333.Tests.EditMode
                 isScience: true,
                 sciencePowerUpkeep: upkeep,
                 damageType: damageType,
-                hasRobot: true);
+                races: new[] { UnitRace.Robot });
         }
 
         private static BattleState CreateBattleState()

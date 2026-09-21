@@ -174,7 +174,7 @@ namespace Project333.Runtime.Infrastructure.Data
 
         public bool HasLifeSteal { get; set; }
 
-        public bool HasRobot { get; set; }
+        public UnitRace[] Races { get; set; }
 
         public int SealboundOwnerTurnStarts { get; set; }
 
@@ -205,6 +205,8 @@ namespace Project333.Runtime.Infrastructure.Data
         public CardDefinition ToDefinition()
         {
             ValidateCoreFields();
+            if (DefinitionType != JsonCardDefinitionKind.Unit && Races != null)
+                throw new InvalidOperationException($"Only Unit cards may define races: '{Id}'.");
 
             switch (DefinitionType)
             {
@@ -230,7 +232,7 @@ namespace Project333.Runtime.Infrastructure.Data
                         DamageType,
                         PhysicalDefense,
                         MagicDefense,
-                        HasRobot,
+                        Races,
                         IncludeInDraft,
                         HasRush || CanAttackOnSummon,
                         HasReplicate,

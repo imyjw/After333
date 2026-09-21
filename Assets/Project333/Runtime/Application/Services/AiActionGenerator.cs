@@ -43,6 +43,8 @@ namespace Project333.Runtime.Application.Services
             }
             foreach (var source in Coordinates)
             {
+                if (ActiveEffectService.CanActivate(state, PlayerId.AI, source))
+                    actions.Add(new AiAction(80, new ActivateEffectCommand(source, state.AIBoard.GetOccupant(source).RuntimeId)));
                 var unit = state.AIBoard.GetOccupant(source);
                 if (unit == null || !unit.IsAlive || unit.CannotAttack || unit.HasSummoningSickness ||
                     unit.RemainingAttacksThisTurn <= 0 || unit.Attack <= 0) continue;
@@ -193,7 +195,7 @@ namespace Project333.Runtime.Application.Services
         {
             var robots = new List<TileCoord>();
             foreach (var coord in Coordinates)
-                if (state.AIBoard.GetOccupant(coord) is UnitState { HasActiveRobot: true, IsAlive: true }) robots.Add(coord);
+                if (RobotFusionRules.IsEligibleRobot(state.AIBoard.GetOccupant(coord))) robots.Add(coord);
             // Ordered pairs cover equal-upkeep survivor choices; whole groups cover larger fusions without factorial search.
             foreach (var first in robots)
             {

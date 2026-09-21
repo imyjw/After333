@@ -14,86 +14,54 @@ public sealed partial class PvpMatchmakingService
 
     public bool IsDatabaseConfigured => _connectionFactory.IsConfigured;
 
-    public async Task<PvpMatchmakingStartupRecoveryResult> MarkRecoverableMatchesReconnectGraceOnServerStartupAsync(
-        TimeSpan reconnectGracePeriod,
+    // Called once before accepting connections, after durable completed results are replayed.
+    // A server restart cancels unfinished battles; it never awards either participant a result.
+    public async Task<PvpMatchmakingStartupCancellationResult> CancelInterruptedMatchesOnServerStartupAsync(
         CancellationToken cancellationToken)
     {
-        if (!IsDatabaseConfigured)
-        {
-            return new PvpMatchmakingStartupRecoveryResult(0, 0, 0);
-        }
-
-        var safeGraceSeconds = Math.Max(1, (int)Math.Ceiling(reconnectGracePeriod.TotalSeconds));
-
+        if (!IsDatabaseConfigured) return new(0, 0, 0);
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            with recoverable_matches as (
-                update pvp_matches matches
-                set match_status = 'reconnect_grace',
-                    updated_at = now()
-                where matches.match_status in ('active', 'reconnect_grace')
-                  and matches.completed_at is null
-                returning matches.id
-            ),
-            closed_connections as (
-                update pvp_match_connections connections
-                set connection_status = 'closed',
-                    disconnected_at = coalesce(connections.disconnected_at, now()),
-                    last_seen_at = now()
-                where connections.match_id in (select id from recoverable_matches)
-                  and connections.connection_status = 'active'
-                returning connections.id
-            ),
-            disconnected_players as (
-                update pvp_match_players players
-                set player_status = 'disconnected',
-                    disconnected_at = coalesce(players.disconnected_at, now()),
-                    reconnect_deadline_at = case
-                        when players.reconnect_deadline_at is not null and players.reconnect_deadline_at > now()
-                            then players.reconnect_deadline_at
-                        else now() + (@grace_seconds * interval '1 second')
-                    end,
-                    last_seen_at = now()
-                where players.match_id in (select id from recoverable_matches)
-                  and (
-                      players.player_status = 'active' or
-                      (
-                          players.player_status = 'disconnected' and
-                          (
-                              players.reconnect_deadline_at is null or
-                              players.reconnect_deadline_at > now()
-                          )
-                      )
-                  )
-                  and players.final_result is null
-                returning players.match_id, players.seat
+            with canceled_matches as (
+                update pvp_matches
+                set match_status='canceled', ended_reason='server_cancel', winner_account_id=null,
+                    completed_at=now(), updated_at=now()
+                where match_status in ('waiting','active','reconnect_grace') and completed_at is null
+                returning id
+            ), closed_connections as (
+                update pvp_match_connections
+                set connection_status='closed', disconnected_at=coalesce(disconnected_at,now()), last_seen_at=now()
+                where connection_status='active'
+                returning id
+            ), canceled_players as (
+                update pvp_match_players
+                set player_status='disconnected', reconnect_deadline_at=null,
+                    disconnected_at=coalesce(disconnected_at,now()), last_seen_at=now(), final_result=null
+                where match_id in (select id from canceled_matches)
+                returning match_id
+            ), canceled_queue as (
+                update pvp_match_queue set queue_status='canceled', canceled_at=now(), updated_at=now()
+                where queue_status in ('queued','matched')
+                returning id
+            ), cleared_reservations as (
+                delete from pvp_match_reservations returning id
             )
-            select
-                (select count(*) from recoverable_matches),
-                (select count(*) from closed_connections),
-                (select count(*) from disconnected_players);
+            select (select count(*) from canceled_matches),
+                   (select count(*) from closed_connections),
+                   (select count(*) from canceled_players);
             """;
-        command.Parameters.AddWithValue("grace_seconds", safeGraceSeconds);
-
-        var result = new PvpMatchmakingStartupRecoveryResult(0, 0, 0);
+        PvpMatchmakingStartupCancellationResult result;
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
         {
-            if (await reader.ReadAsync(cancellationToken))
-            {
-                result = new PvpMatchmakingStartupRecoveryResult(
-                    reader.GetInt64(0),
-                    reader.GetInt64(1),
-                    reader.GetInt64(2));
-            }
+            await reader.ReadAsync(cancellationToken);
+            result = new(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2));
         }
-
         await transaction.CommitAsync(cancellationToken);
         return result;
     }
-
     public async Task<PvpMatchmakingReconnectStatus?> GetReconnectStatusForAccountAsync(
         string accountId,
         CancellationToken cancellationToken)
@@ -106,7 +74,8 @@ public sealed partial class PvpMatchmakingService
             select matches.match_id,
                    players.runtime_player_id,
                    players.seat,
-                   players.reconnect_deadline_at
+                   players.reconnect_deadline_at,
+                   matches.opponent_kind
             from pvp_match_players players
             join pvp_matches matches on matches.id = players.match_id
             where players.account_id = @account_id
@@ -140,7 +109,8 @@ public sealed partial class PvpMatchmakingService
                 runtimePlayerId,
                 onlineSeatId,
                 remainingSeconds,
-                reconnectDeadlineUtc);
+                reconnectDeadlineUtc,
+                reader.GetString(4) == "ai");
     }
 
     public async Task RecordConnectionJoinedAsync(
@@ -302,12 +272,12 @@ public sealed partial class PvpMatchmakingService
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            with winner as (
-                select match_id, account_id
-                from pvp_match_players
-                where match_id = (select id from pvp_matches where match_id = @match_id)
-                  and seat = @winner_seat
-                limit 1
+            with target_match as (
+                select id from pvp_matches where match_id=@match_id
+                  and match_status not in ('completed','canceled') limit 1
+            ), winner as (
+                select match_id, account_id from pvp_match_players
+                where match_id=(select id from target_match) and seat=@winner_seat limit 1
             ),
             update_players as (
                 update pvp_match_players players
@@ -316,7 +286,9 @@ public sealed partial class PvpMatchmakingService
                     reconnect_deadline_at = null,
                     disconnected_at = null,
                     last_seen_at = now()
-                where players.match_id = (select match_id from winner)
+                where players.match_id = (select id from target_match)
+                  and exists (select 1 from pvp_matches m where m.id=players.match_id
+                      and (m.opponent_kind='human' or m.ai_fallback_account_id=players.account_id))
                 returning players.match_id
             ),
             closed_connections as (
@@ -324,7 +296,7 @@ public sealed partial class PvpMatchmakingService
                 set connection_status = 'closed',
                     disconnected_at = coalesce(connections.disconnected_at, now()),
                     last_seen_at = now()
-                where connections.match_id = (select match_id from winner)
+                where connections.match_id = (select id from target_match)
                   and connections.connection_status = 'active'
                 returning connections.id
             )
@@ -334,7 +306,7 @@ public sealed partial class PvpMatchmakingService
                 ended_reason = @ended_reason,
                 completed_at = coalesce(completed_at, now()),
                 updated_at = now()
-            where matches.id = (select match_id from winner);
+            where matches.id = (select id from target_match);
             """;
         command.Parameters.AddWithValue("match_id", matchId.Trim());
         command.Parameters.AddWithValue("winner_seat", winnerSeat.Trim());
@@ -360,7 +332,7 @@ public sealed partial class PvpMatchmakingService
             with target_match as (
                 select id
                 from pvp_matches
-                where match_id = @match_id
+                where match_id = @match_id and match_status not in ('completed','canceled')
                 limit 1
             ),
             update_players as (
@@ -371,6 +343,8 @@ public sealed partial class PvpMatchmakingService
                     disconnected_at = null,
                     last_seen_at = now()
                 where players.match_id = (select id from target_match)
+                  and exists (select 1 from pvp_matches m where m.id=players.match_id
+                      and (m.opponent_kind='human' or m.ai_fallback_account_id=players.account_id))
                 returning players.match_id
             ),
             closed_connections as (
@@ -816,17 +790,18 @@ public sealed record PvpMatchmakingQueueRequest(
     string ClientVersion,
     string ConnectionId);
 
-public sealed record PvpMatchmakingStartupRecoveryResult(
+public sealed record PvpMatchmakingStartupCancellationResult(
     long MatchCount,
     long ClosedConnectionCount,
-    long ReconnectablePlayerCount);
+    long CanceledPlayerCount);
 
 public sealed record PvpMatchmakingReconnectStatus(
     string MatchId,
     string RuntimePlayerId,
     string OnlineSeatId,
     int RemainingSeconds,
-    DateTimeOffset ReconnectDeadlineUtc);
+    DateTimeOffset ReconnectDeadlineUtc,
+    bool UseServerAiOpponent = false);
 
 public sealed record PvpMatchmakingMatchAssignment(
     string MatchId,

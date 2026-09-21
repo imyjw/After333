@@ -38,6 +38,9 @@ namespace Project333.Runtime.Application.Online
 
         public OnlineBattleSeatId WinnerOnlineSeatId { get; set; }
 
+        public int PlayerFalloutStacks { get; set; }
+        public int OpponentFalloutStacks { get; set; }
+
         public BattlePlayerViewDto Player { get; set; }
 
         public BattlePlayerViewDto Opponent { get; set; }
@@ -184,6 +187,9 @@ namespace Project333.Runtime.Application.Online
         public List<InvincibleEffectViewDto> InvincibleEffects { get; set; } =
             new List<InvincibleEffectViewDto>();
 
+        public List<CombatStatBuffViewDto> CombatStatBuffs { get; set; } =
+            new List<CombatStatBuffViewDto>();
+
         public bool HasShielder
         {
             get => _hasShielder;
@@ -207,7 +213,24 @@ namespace Project333.Runtime.Application.Online
 
         public bool HasLifeSteal { get; set; }
 
+#if UNITY_5_3_OR_NEWER
+        [Newtonsoft.Json.JsonProperty(NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+#else
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+#endif
+        public Project333.Runtime.Domain.Cards.UnitRace[] Races { get; set; }
+#if UNITY_5_3_OR_NEWER
+        [Newtonsoft.Json.JsonProperty("HasRobot", DefaultValueHandling = Newtonsoft.Json.DefaultValueHandling.Ignore)]
+#else
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+#endif
+        // Read-only compatibility with older views; new writers send Races.
         public bool HasRobot { get; set; }
+
+        public int FalloutPlayerStacks { get; set; }
+        public int FalloutAiStacks { get; set; }
+
+        public int LastActiveEffectTurnNumber { get; set; } = -1;
 
         public bool EndureUsed { get; set; }
 
@@ -216,6 +239,15 @@ namespace Project333.Runtime.Application.Online
         public bool HasSummoningSickness { get; set; }
 
         public int RemainingAttacksThisTurn { get; set; }
+    }
+
+    public sealed class CombatStatBuffViewDto
+    {
+        public string SourceCardId { get; set; } = string.Empty;
+        public int AttackBonus { get; set; }
+        public int MaxHpBonus { get; set; }
+        public int PhysicalDefenseBonus { get; set; }
+        public int MagicDefenseBonus { get; set; }
     }
 
     public sealed class InvincibleEffectViewDto

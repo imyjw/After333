@@ -178,6 +178,8 @@ namespace Project333.Runtime.Presentation.Startup
         private bool _ownedCardsButtonLabelNeedsDefaultLayout;
         private bool _reconnectPvpButtonNeedsDefaultLayout;
         private bool _reconnectPvpButtonLabelNeedsDefaultLayout;
+        private PvpReconnectStatusResponse _battleReconnectStatus;
+        private bool _pendingAiChallengeReservation;
         private bool _hasPvpReconnectableBattle;
         private string _pvpReconnectMatchId = string.Empty;
         private int _pvpReconnectRemainingSeconds;
@@ -254,6 +256,7 @@ namespace Project333.Runtime.Presentation.Startup
             ApplyServerSettingsPanelVisual();
             BindAccountLoginGate();
             EnsureDevelopmentSmokePanel();
+            GiftInboxController.EnsureForScene(gameObject.scene)?.ConfigureEndpoint(_accountServerUrl);
             DraftRunSessionState.ConfigureSceneNames(_draftSceneName, _battleSceneName);
             RefreshUi();
         }
@@ -327,7 +330,7 @@ namespace Project333.Runtime.Presentation.Startup
             if (remainingSeconds <= 0)
             {
                 ClearPvpReconnectStatus();
-                SetStatus("PVP 재접속 시간이 만료되었습니다. 새 전투를 시작해 주세요.");
+                SetStatus("전투 재접속 시간이 만료되었습니다. 새 전투를 시작해 주세요.");
             }
 
             RefreshUi();
@@ -788,7 +791,7 @@ namespace Project333.Runtime.Presentation.Startup
         {
             if (!CanReconnectPvpBattle())
             {
-                const string status = "이전 PVP 전투가 이미 종료되었습니다.";
+                const string status = "이전 전투가 이미 종료되었습니다.";
                 SetStatus(status);
                 SimpleNoticeToast.Show("GameStartNoticeToastCanvas", status);
                 RefreshUi();
@@ -800,7 +803,7 @@ namespace Project333.Runtime.Presentation.Startup
             CancelRunStart();
             _runStartCancellation = new CancellationTokenSource();
             _isStartingRun = true;
-            SetStatus("PVP 전투 재접속 가능 여부를 확인하는 중입니다.");
+            SetStatus("전투 재접속 가능 여부를 확인하는 중입니다.");
             RefreshUi();
 
             var canLaunchBattleScene = false;
@@ -856,8 +859,12 @@ namespace Project333.Runtime.Presentation.Startup
             }
 
             DraftRunSessionState.ConfigureSceneNames(_draftSceneName, _battleSceneName);
-            DraftRunSessionState.QueuePvpReconnectBattleStart();
-            SetStatus("끊긴 PVP 전투에 재접속합니다.");
+            if (_pendingAiChallengeReservation)
+                DraftRunSessionState.QueueAiChallengeBattleStart(
+                    _battleReconnectStatus.ResolvedMatchId, _battleReconnectStatus.ResolvedAiChallengeAttemptId);
+            else
+                DraftRunSessionState.QueueBattleReconnect(_battleReconnectStatus);
+            SetStatus("끊긴 전투에 재접속합니다.");
             RefreshUi();
             SceneManager.LoadScene(battleSceneName);
         }
@@ -899,7 +906,7 @@ namespace Project333.Runtime.Presentation.Startup
                 return "이전 전투에서 패배했습니다.";
             }
 
-            return "이전 PVP 전투가 이미 종료되었습니다.";
+            return "이전 전투가 이미 종료되었습니다.";
         }
 
         private void LoadDeckBuildingSceneOrDraftFallback()
@@ -1369,10 +1376,11 @@ namespace Project333.Runtime.Presentation.Startup
 
         private string BuildReconnectPvpButtonLabel()
         {
+            if (_pendingAiChallengeReservation) return "전투 이어하기";
             var remainingText = _pvpReconnectRemainingSeconds > 0
                 ? $" ({_pvpReconnectRemainingSeconds}초)"
                 : string.Empty;
-            return $"PVP 전투 재접속{remainingText}";
+            return $"전투 재접속{remainingText}";
         }
 
         private string BuildStartButtonLabel()
@@ -2070,13 +2078,23 @@ namespace Project333.Runtime.Presentation.Startup
 
             try
             {
-                var response = await client.GetPvpReconnectStatusAsync(
+                var response = await client.GetBattleReconnectStatusAsync(
                     AccountSessionState.SessionToken,
                     cancellationToken);
                 if (response == null || !response.ResolvedHasReconnectableBattle)
                 {
-                    return;
+                    var challenge = await new AiChallengeClient(AccountServerUrl).GetStatusAsync(
+                        AccountSessionState.SessionToken, cancellationToken);
+                    var pending = challenge?.PendingAttempt;
+                    if (pending == null || !string.Equals(pending.Status, "reserved", StringComparison.OrdinalIgnoreCase)) return;
+                    _pendingAiChallengeReservation = true;
+                    response = new PvpReconnectStatusResponse
+                    {
+                        HasReconnectableBattle = true, MatchId = pending.MatchId, RemainingSeconds = 60,
+                        BattleMode = "pve", GameMode = "ai_challenge", AiChallengeAttemptId = pending.AttemptId
+                    };
                 }
+                _battleReconnectStatus = response;
 
                 var remainingSeconds = Math.Max(0, response.ResolvedRemainingSeconds);
                 if (remainingSeconds <= 0)
@@ -2086,8 +2104,9 @@ namespace Project333.Runtime.Presentation.Startup
 
                 _hasPvpReconnectableBattle = true;
                 _pvpReconnectMatchId = response.ResolvedMatchId ?? string.Empty;
-                _pvpReconnectRemainingSeconds = remainingSeconds;
-                _pvpReconnectDeadlineRealtime = UnityEngine.Time.unscaledTime + _pvpReconnectRemainingSeconds;
+                _pvpReconnectRemainingSeconds = _pendingAiChallengeReservation ? 0 : remainingSeconds;
+                _pvpReconnectDeadlineRealtime = _pendingAiChallengeReservation
+                    ? 0f : UnityEngine.Time.unscaledTime + _pvpReconnectRemainingSeconds;
                 _lastPresentedPvpReconnectRemainingSeconds = _pvpReconnectRemainingSeconds;
                 Debug.Log(
                     $"[After333 Start] PVP reconnect available: match={FormatLogValue(_pvpReconnectMatchId)} remaining={_pvpReconnectRemainingSeconds}s");
@@ -2105,6 +2124,8 @@ namespace Project333.Runtime.Presentation.Startup
         private void ClearPvpReconnectStatus()
         {
             _hasPvpReconnectableBattle = false;
+            _battleReconnectStatus = null;
+            _pendingAiChallengeReservation = false;
             _pvpReconnectMatchId = string.Empty;
             _pvpReconnectRemainingSeconds = 0;
             _pvpReconnectDeadlineRealtime = 0f;

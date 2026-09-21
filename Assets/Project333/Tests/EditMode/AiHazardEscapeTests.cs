@@ -43,7 +43,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Firewall_EscapesAffectedRowUsingCapturedSpellDamage()
+        public void Firewall_EscapesAffectedRowUsingCurrentSpellDamage()
         {
             var state = State();
             var unit = Unit(state, 26);
@@ -183,10 +183,14 @@ namespace Project333.Tests.EditMode
             return effect;
         }
 
-        private static void Firewall(BattleState state) => state.PersistentEffects.Add(new PersistentEffectState(
+        private static void Firewall(BattleState state)
+        {
+            state.PlayerBoard.Place(new TileCoord(4, 0), new UnitState("power", "power", PlayerId.Player, new TileCoord(4, 0), AttackType.Melee, 0, 100, true, false, 0, spellPower: 7));
+            state.PersistentEffects.Add(new PersistentEffectState(
             "firewall", PlayerId.Player, "firewall", state.TurnNumber, "After three global turn starts",
             new ResourceSet(), targetRow: 0, remainingTriggers: 3, effectDamage: 20,
             effectDamageType: DamageType.Magic, capturedSpellPower: 7));
+        }
 
         private static void NextTurn(BattleState state)
         {

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
@@ -114,6 +115,106 @@ namespace Project333.Tests.EditMode
 
             Assert.That(controller.SelectedCardId, Is.EqualTo("sample_firebolt"));
             Assert.That(controller.SelectedSlotIndex, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ActiveButton_ClickingPlantShowsButton_ActivationConsumesOnceAndHides()
+        {
+            var controller = CreateControllerWithBoardAndBootstrapper(out var tile);
+            var bootstrapper = (BattleBootstrapper)typeof(BattlePlayerInputController)
+                .GetField("_battleBootstrapper", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(controller);
+            tile.Configure(PlayerId.Player,0,0);
+            var state=bootstrapper.CurrentBattleState;
+            var plant=new Project333.Runtime.Domain.Cards.BuildingState("active-plant","PowerPlant",
+                PlayerId.Player,new TileCoord(0,0),false,0,30);
+            state.PlayerBoard.Place(plant.Position,plant);
+            tile.NotifyClicked();
+            var button=tile.GetComponentInChildren<Button>(true);
+            Assert.That(button,Is.Not.Null);
+            Assert.That(button.gameObject.activeSelf,Is.True);
+            Assert.That(button.GetComponentInChildren<Text>().text,Is.EqualTo("액티브"));
+            var before=state.Player.Resources.Gold;
+            button.onClick.Invoke();
+            Assert.That(state.Player.Resources.Gold,Is.EqualTo(before-1));
+            Assert.That(state.Player.Resources.Power,Is.EqualTo(2));
+            Assert.That(button.gameObject.activeSelf,Is.False);
+            tile.NotifyClicked();
+            Assert.That(button.gameObject.activeSelf,Is.False);
+            state.RestoreRuntimeState(state.TurnNumber+2,PlayerId.Player,PhaseType.Main);
+            tile.NotifyClicked();
+            Assert.That(button.gameObject.activeSelf,Is.True);
+            plant.ApplyErasure();
+            InvokePrivateMethod(controller,"RefreshActiveEffectButton");
+            Assert.That(button.gameObject.activeSelf,Is.False);
+        }
+
+        [TestCase(false)][TestCase(true)]
+        public void ActiveButton_NoGoldShowsWarningAndCanRetryAfterGainingGold(bool loseGoldAfterSelection)
+        {
+            var controller = CreateControllerWithBoardAndBootstrapper(out var tile);
+            var bootstrapper = (BattleBootstrapper)typeof(BattlePlayerInputController)
+                .GetField("_battleBootstrapper", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(controller);
+            tile.Configure(PlayerId.Player, 0, 0);
+            var state = bootstrapper.CurrentBattleState;
+            var plant = new Project333.Runtime.Domain.Cards.BuildingState("no-gold-plant", "PowerPlant",
+                PlayerId.Player, tile.Coord, false, 0, 30);
+            state.PlayerBoard.Place(tile.Coord, plant);
+            if (loseGoldAfterSelection) tile.NotifyClicked();
+            state.Player.Resources.Spend(state.Player.Resources.Clone());
+            if (!loseGoldAfterSelection) tile.NotifyClicked();
+            InvokePrivateMethod(controller, "RefreshActiveEffectButton");
+            var button = tile.GetComponentInChildren<Button>(true);
+            Assert.That(button, Is.Not.Null);
+            Assert.That(button.gameObject.activeSelf && button.interactable, Is.True);
+            button.onClick.Invoke();
+            Assert.That(controller.InteractionStatus, Is.EqualTo("골드가 부족합니다"));
+            var toast = (Text)typeof(BattleBootstrapper).GetField("_onlineErrorToastText", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(bootstrapper);
+            Assert.That(toast.text, Does.Contain("골드가 부족합니다"));
+            Assert.That(button.gameObject.activeSelf && button.interactable, Is.True);
+            Assert.That(plant.LastActiveEffectTurnNumber, Is.EqualTo(-1));
+            Assert.That(state.Player.Resources.Power, Is.Zero);
+            state.Player.Resources.Add(new Project333.Runtime.Domain.Resources.ResourceSet(0, 0, 0, 1));
+            button.onClick.Invoke();
+            Assert.That(state.Player.Resources.Gold, Is.Zero);
+            Assert.That(state.Player.Resources.Power, Is.EqualTo(2));
+            Assert.That(button.gameObject.activeSelf, Is.False);
+        }
+
+        [Test]
+        public void RealBattleScene_ActiveButtonUsesTileImageRectAndClickableCanvas()
+        {
+            var scene=UnityEditor.SceneManagement.EditorSceneManager.OpenPreviewScene("Assets/Battle_VSlice.unity");
+            try
+            {
+                var controllers=scene.GetRootGameObjects().SelectMany(r=>r.GetComponentsInChildren<BattlePlayerInputController>(true));
+                var controller=controllers.First();
+                var bootstrapper=scene.GetRootGameObjects().SelectMany(r=>r.GetComponentsInChildren<BattleBootstrapper>(true)).First();
+                var board=scene.GetRootGameObjects().SelectMany(r=>r.GetComponentsInChildren<BoardPresenter>(true)).First();
+                var flow=CreateFlowControllerInMainPhase();
+                SetPrivateField(bootstrapper,"_battleFlowController",flow);
+                SetPrivateField(bootstrapper,"_battleGateway",new LocalBattleGateway(flow));
+                SetPrivateField(controller,"_battleBootstrapper",bootstrapper);
+                SetPrivateField(controller,"_boardPresenter",board);
+                controller.RebindViews();
+                var tile=board.PlayerTileViews.First(t=>t.Coord==new TileCoord(0,0));
+                flow.CurrentBattleState.PlayerBoard.Place(tile.Coord,new Project333.Runtime.Domain.Cards.BuildingState(
+                    "real-plant","PowerPlant",PlayerId.Player,tile.Coord,false,0,30));
+                tile.NotifyClicked();
+                var anchor=tile.GetComponent<TileTextView>().ActiveEffectButtonAnchor;
+                Assert.That(anchor,Is.Not.Null);
+                var button=anchor.GetComponentInChildren<Button>();
+                Assert.That(button,Is.Not.Null);
+                Assert.That(button.transform.parent,Is.SameAs(anchor));
+                Assert.That(button.GetComponent<Canvas>().overrideSorting,Is.True);
+                Assert.That(button.GetComponent<GraphicRaycaster>(),Is.Not.Null);
+                Canvas.ForceUpdateCanvases();
+                var rect=(RectTransform)button.transform;
+                Assert.That(rect.rect.width,Is.GreaterThan(0));
+                Assert.That(rect.rect.height,Is.GreaterThan(0));
+                button.onClick.Invoke();
+                Assert.That(flow.CurrentBattleState.Player.Resources.Power,Is.EqualTo(2));
+            }
+            finally { UnityEditor.SceneManagement.EditorSceneManager.ClosePreviewScene(scene); }
         }
 
         private BattlePlayerInputController CreateControllerWithHand(out HandCardView handCardView)

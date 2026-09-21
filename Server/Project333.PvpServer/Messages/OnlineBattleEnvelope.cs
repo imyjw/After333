@@ -22,6 +22,10 @@ public sealed class OnlineBattleEnvelope
 
     public bool UseServerAiOpponent { get; set; } = true;
 
+    public string GameMode { get; set; } = "run";
+
+    public string AiChallengeAttemptId { get; set; } = string.Empty;
+
     public bool UseMatchmakingQueue { get; set; }
 
     public bool IsReconnectAttempt { get; set; }

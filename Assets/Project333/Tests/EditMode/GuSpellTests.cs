@@ -297,7 +297,7 @@ namespace Project333.Tests.EditMode
                 damageType: DamageType.Magic,
                 physicalDefense: 4,
                 magicDefense: 5,
-                hasRobot: true,
+                races: new[] { UnitRace.Robot },
                 hasRush: hasRush,
                 hasHiding: hasHiding,
                 hasFlying: true,

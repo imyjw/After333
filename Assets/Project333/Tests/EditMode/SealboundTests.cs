@@ -131,7 +131,7 @@ namespace Project333.Tests.EditMode
                 hasShielder: true,
                 physicalDefense: 2,
                 magicDefense: 3,
-                hasRobot: true);
+                races: new[] { UnitRace.Robot });
             unit.CurrentHp = 10;
             unit.EnterSealbound(2);
             battleState.PlayerBoard.Place(unit.Position, unit);
@@ -165,7 +165,7 @@ namespace Project333.Tests.EditMode
             Assert.That(attachedEffect.IsExpired, Is.False,
                 "An Erasure attempt on a Sealbound occupant must not remove attached effects.");
             Assert.That(unit.HasActiveShielder, Is.False);
-            Assert.That(unit.HasActiveRobot, Is.False);
+            Assert.That(RobotFusionRules.IsEligibleRobot(unit), Is.False);
             Assert.That(RobotFusionRules.CountLivingRobots(battleState.PlayerBoard), Is.Zero);
             Assert.Throws<InvalidOperationException>(() =>
                 new MoveService().Move(battleState, PlayerId.Player, unit.Position, new TileCoord(1, 0)));

@@ -83,9 +83,9 @@ internal static class PveAiDeckChecks
         Reject(root => root["decks"]![0]!["cards"]!.AsArray().Add(
             root["decks"]![0]!["cards"]![1]!.DeepClone()));
 
-        using var socketA = new ClientWebSocket();
-        using var socketB = new ClientWebSocket();
-        // These sockets are never connected: session setup needs only connection metadata.
+        using var socketA = new DeckCheckSocket();
+        using var socketB = new DeckCheckSocket();
+        // Open-state test doubles satisfy live-seat admission without any network connection.
         var player = new BattleClientConnection("deck-check-player", socketA) { PlayerToken = "player" };
         player.PlayerDeckCardIds.AddRange(Enumerable.Repeat("Goblin", 33));
         var pve = new BattleSession("deck-check-pve", true);
@@ -136,4 +136,19 @@ internal static class PveAiDeckChecks
         catch (InvalidOperationException) { return; }
         throw new Exception("Invalid deck input was accepted.");
     }
+}
+
+// Session readiness rejects sockets that are not open; no network is used in these checks.
+internal sealed class DeckCheckSocket : WebSocket
+{
+    public override WebSocketCloseStatus? CloseStatus => null;
+    public override string? CloseStatusDescription => null;
+    public override string? SubProtocol => null;
+    public override WebSocketState State => WebSocketState.Open;
+    public override void Abort() { }
+    public override void Dispose() { }
+    public override Task CloseAsync(WebSocketCloseStatus status, string? description, CancellationToken token) => Task.CompletedTask;
+    public override Task CloseOutputAsync(WebSocketCloseStatus status, string? description, CancellationToken token) => Task.CompletedTask;
+    public override Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken token) => throw new NotSupportedException("No wire traffic in deck checks.");
+    public override Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType type, bool endOfMessage, CancellationToken token) => throw new NotSupportedException("No wire traffic in deck checks.");
 }

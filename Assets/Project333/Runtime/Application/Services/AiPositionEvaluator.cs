@@ -41,6 +41,8 @@ namespace Project333.Runtime.Application.Services
             var board = state.GetBoard(owner);
             double value = player.Master.CurrentHp * 1.3 - 2000.0 / (Math.Max(0, player.Master.CurrentHp) + 10);
             value += ResourceValue(player.Resources);
+            // Permanent exposure also affects units not yet played, with diminishing marginal pressure.
+            value -= 18 * Math.Log(1 + board.FalloutStacks);
             foreach (var card in player.Hand.Cards) value += card.IsTemporaryReplicate ? 3 : 7;
             foreach (var unit in board.EnumerateOccupants())
             {
@@ -71,6 +73,8 @@ namespace Project333.Runtime.Application.Services
                     if (unit.CardId == "Hero" || unit.CardId == "DemonKing") material += 18;
                 }
                 if (unit.IsUnderHuanShu) material *= 0.6;
+                if (unit.FalloutStacks > 0 && !unit.IsSealbound && !unit.IsInvincible)
+                    material -= Math.Min(material * 0.5, (double)unit.FalloutStacks * NuclearRules.FalloutDamage);
                 value += material;
                 value += owner == PlayerId.AI && projectedAiBoard != null
                     ? BackRowProtectionValue(projectedAiBoard.GetOccupant(unit.Position), projectedAiBoard)

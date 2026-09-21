@@ -52,3 +52,6 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Project_333\Server\Pr
 - 미반영 전투 결과의 파일 저널(`PROJECT333_BATTLE_RESULT_OUTBOX_DIR`)은 PostgreSQL 덤프에 들어 있지 않다. 복구 DB와 같은 시점의 저널 보존·재처리 정책을 확인해야 한다. 이번 임시 서버에는 새 빈 저널 디렉터리를 사용했다.
 - 진행 중 전투의 실시간 상태·클라이언트 재접속 복구는 별도 검증 과제다. 이번 DB/HTTP 재시작 성공을 진행 중 PvP 전투 복구 성공으로 해석하지 않는다.
 - 원격 호스트 복구, PostgreSQL 역할/권한 전체 복구, 백업 예약·별도 장소 보관·시점 복구(PITR)는 이번 검증 범위가 아니다.
+## 2026-09-21 추가 검증
+
+MYBOX 웹에서 독립 다운로드한 암호화 백업의 실제 복원과 DB 재시작 검증도 완료했다. 이 검사는 위 9월 12일 배포 백업 비교 훈련과 별도이며, 새 도구·명령·검증 범위는 [MYBOX 백업 문서](mybox_database_backup.md)를 따른다. 이번에는 게임 서버 API를 복원 DB에 연결하지 않았다.

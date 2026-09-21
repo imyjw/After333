@@ -61,7 +61,7 @@ namespace Project333.Runtime.Application.Services
                     return false;
             }
 
-            damage = SpellPowerRules.ApplyCaptured(
+            damage = SpellPowerRules.AddBonus(
                 CardLevelSpellRules.ApplyDamageBonus(baseDamage, upgradeLevel), damageType, spellPower);
             return true;
         }

@@ -22,9 +22,8 @@ MonoBehaviour:
     _gold: 0
   _affiliation: 2
   _chargeTileFootprint: 1
-  _effectText: "\uB0B4 \uD134 \uC2DC\uC791 \uC2DC \uACE8\uB4DC 1\uC744 \uC9C0\uBD88\uD558\uACE0
-    \uC804\uB825 2\uB97C \uC5BB\uB294\uB2E4."
-  _specialEffectText: 
+  _effectText:
+  _specialEffectText: "액티브: 1턴에 1번, 골드를 1 소모해서 전력을 2 얻는다."
   _hasReplicate: 0
   _boardSprite: {fileID: 4723107735738678597, guid: 191ba45e11242364686208ca2c25cbcd, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: fb20739b139e1174eb519ddd106d0fa3, type: 2}

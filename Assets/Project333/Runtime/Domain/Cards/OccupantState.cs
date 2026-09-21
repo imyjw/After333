@@ -11,6 +11,7 @@ namespace Project333.Runtime.Domain.Cards
         private const int ActiveHuanShuStateMarker = 1;
         private bool _isDrained;
         private List<InvincibleEffectState> _invincibleEffects = new List<InvincibleEffectState>();
+        private List<CombatStatBuffState> _combatStatBuffs = new List<CombatStatBuffState>();
         private BoardState _currentBoard;
         private PlayerId _currentActivePlayerId;
         private int _currentBattleTurnNumber;
@@ -96,6 +97,27 @@ namespace Project333.Runtime.Domain.Cards
             RemainingAttacksThisTurn = maxAttacksPerTurn;
         }
 
+        // Exposure is keyed by battlefield owner, so ownership transfer never clears or duplicates it.
+        public int FalloutPlayerStacks { get; private set; }
+        public int FalloutAiStacks { get; private set; }
+        public int FalloutStacks => FalloutPlayerStacks + FalloutAiStacks;
+        public void RestoreFallout(int playerStacks, int aiStacks)
+        {
+            FalloutPlayerStacks = Kind == OccupantKind.Master ? 0 : Math.Max(0, playerStacks);
+            FalloutAiStacks = Kind == OccupantKind.Master ? 0 : Math.Max(0, aiStacks);
+        }
+        internal void ApplyFalloutExposure(int stacks)
+        {
+            if (Kind == OccupantKind.Master || IsSealbound) return;
+            if (OwnerId == PlayerId.Player) FalloutPlayerStacks = Math.Max(FalloutPlayerStacks, stacks);
+            else FalloutAiStacks = Math.Max(FalloutAiStacks, stacks);
+        }
+        private void RefreshFalloutExposure() => ApplyFalloutExposure(_currentBoard?.FalloutStacks ?? 0);
+
+        // Global turn number: reconnect and movement must not reset per-turn active use.
+        public int LastActiveEffectTurnNumber { get; private set; } = -1;
+        public void RestoreActiveEffectUsage(int turnNumber) => LastActiveEffectTurnNumber = turnNumber;
+
         public string RuntimeId { get; }
         public string CardId { get; }
         public PlayerId OwnerId { get; private set; }
@@ -104,6 +126,7 @@ namespace Project333.Runtime.Domain.Cards
         public AttackType AttackType { get; protected set; }
         public int OriginalAttack { get; private set; }
         public int BaseAttack { get; protected set; }
+        public IReadOnlyList<CombatStatBuffState> CombatStatBuffs => _combatStatBuffs;
         public int Attack => GetAttackForCurrentState() +
                              WerewolfRules.CalculatePackAttackBonus(this, _currentBoard);
         public int OriginalMaxHp { get; private set; }
@@ -218,6 +241,8 @@ namespace Project333.Runtime.Domain.Cards
             copy.TurnStartResourceGain = TurnStartResourceGain.Clone();
             copy._invincibleEffects = new List<InvincibleEffectState>();
             foreach (var effect in _invincibleEffects) copy._invincibleEffects.Add(effect.Clone());
+            copy._combatStatBuffs = new List<CombatStatBuffState>();
+            foreach (var buff in _combatStatBuffs) copy._combatStatBuffs.Add(buff.Clone());
             return copy;
         }
 
@@ -321,6 +346,7 @@ namespace Project333.Runtime.Domain.Cards
             _isDrained = false;
             BaseAttack = OriginalAttack;
             MaxHp = OriginalMaxHp;
+            _combatStatBuffs.Clear();
             CurrentHp = Math.Min(CurrentHp, MaxHp);
             PhysicalDefense = OriginalPhysicalDefense;
             MagicDefense = OriginalMagicDefense;
@@ -436,6 +462,7 @@ namespace Project333.Runtime.Domain.Cards
             }
 
             IsSealbound = false;
+            RefreshFalloutExposure();
             var canAttackOnReleaseTurn = HasRush && !EffectsSuppressed;
             HasSummoningSickness = !canAttackOnReleaseTurn;
             RemainingAttacksThisTurn = canAttackOnReleaseTurn ? EffectiveMaxAttacksPerTurn : 0;
@@ -500,6 +527,7 @@ namespace Project333.Runtime.Domain.Cards
             _isDrained = false;
             HidingRevealed = false;
             EndureUsed = false;
+            RefreshFalloutExposure();
 
             BaseAttack = DemonKingRules.CalculateRevivedStat(
                 OriginalAttack,
@@ -508,6 +536,9 @@ namespace Project333.Runtime.Domain.Cards
                 OriginalMaxHp,
                 DemonKingRevivalCount);
             CurrentHp = MaxHp;
+            _combatStatBuffs.Clear();
+            RecordCombatStatBuff(new CombatStatBuffState(
+                DemonKingRules.CardId, BaseAttack - OriginalAttack, MaxHp - OriginalMaxHp));
             PhysicalDefense = OriginalPhysicalDefense;
             MagicDefense = OriginalMagicDefense;
             WasSummonedThisTurn = true;
@@ -570,6 +601,58 @@ namespace Project333.Runtime.Domain.Cards
             OriginalMaxHp = originalMaxHp;
             OriginalPhysicalDefense = originalPhysicalDefense;
             OriginalMagicDefense = originalMagicDefense;
+        }
+
+        /// <summary>Applies a stat bonus and keeps its source for inspection and reconnect.</summary>
+        public void ApplyCombatStatBuff(
+            string sourceCardId,
+            int attackBonus = 0,
+            int maxHpBonus = 0,
+            int physicalDefenseBonus = 0,
+            int magicDefenseBonus = 0)
+        {
+            var buff = new CombatStatBuffState(
+                sourceCardId, attackBonus, maxHpBonus, physicalDefenseBonus, magicDefenseBonus);
+            if (IsSealbound) return;
+
+            IncreaseBaseAttack(attackBonus);
+            IncreaseMaxHpAndCurrentHp(maxHpBonus);
+            IncreasePhysicalDefense(physicalDefenseBonus);
+            IncreaseMagicDefense(magicDefenseBonus);
+            RecordCombatStatBuff(buff);
+        }
+
+        /// <summary>
+        /// Restores attribution only; serialized combat stats have already been restored.
+        /// Old snapshots without records retain an unattributed stat difference for the UI.
+        /// </summary>
+        public void RestoreCombatStatBuffs(IEnumerable<CombatStatBuffState> buffs)
+        {
+            var restored = new List<CombatStatBuffState>();
+            if (buffs != null)
+                foreach (var buff in buffs)
+                    if (buff != null) restored.Add(buff.Clone());
+            _combatStatBuffs.Clear();
+            foreach (var buff in restored) RecordCombatStatBuff(buff);
+        }
+
+        private void RecordCombatStatBuff(CombatStatBuffState buff)
+        {
+            if (buff.AttackBonus == 0 && buff.MaxHpBonus == 0 &&
+                buff.PhysicalDefenseBonus == 0 && buff.MagicDefenseBonus == 0) return;
+            for (var index = 0; index < _combatStatBuffs.Count; index++)
+            {
+                var existing = _combatStatBuffs[index];
+                if (!string.Equals(existing.SourceCardId, buff.SourceCardId, StringComparison.Ordinal)) continue;
+                _combatStatBuffs[index] = new CombatStatBuffState(
+                    buff.SourceCardId,
+                    existing.AttackBonus + buff.AttackBonus,
+                    existing.MaxHpBonus + buff.MaxHpBonus,
+                    existing.PhysicalDefenseBonus + buff.PhysicalDefenseBonus,
+                    existing.MagicDefenseBonus + buff.MagicDefenseBonus);
+                return;
+            }
+            _combatStatBuffs.Add(buff);
         }
 
         public void IncreaseBaseAttack(int amount)

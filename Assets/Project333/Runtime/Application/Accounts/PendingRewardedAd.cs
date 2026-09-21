@@ -54,11 +54,16 @@ namespace Project333.Runtime.Application.Accounts
             Save(url, owner, record);
         }
 
-        internal static void MarkClosed(string url, string owner, string id)
+        internal static void MarkClosed(string url, string owner, string id, bool previousProcess = false)
         {
             var record = Load(url, owner);
             if (record?.AttemptId != id) return;
-            // A close without a completion signal may be retried only after a server check.
+            // Only recovery may pass previousProcess, after a matching pending server response.
+            // A previous process cannot deliver more SDK callbacks. Its presentation-only
+            // completion flag must not lock a server-unpaid attempt until expiry.
+            // Keep the attempt ID so a late verified S2S reward is still recoverable.
+            if (previousProcess) record.Rewarded = false;
+            // Live-process completion signals continue to block replay until resolution.
             record.CanReplay = !record.Rewarded;
             Save(url, owner, record);
         }

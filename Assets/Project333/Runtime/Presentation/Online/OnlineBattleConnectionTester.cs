@@ -56,6 +56,10 @@ namespace Project333.Runtime.Presentation.Online
             new List<BattleCombatLogEntryDto>();
         private string _joinRunId = string.Empty;
         private string _joinDeckId = string.Empty;
+        private string _joinGameMode = "run";
+        private string _joinAiChallengeAttemptId = string.Empty;
+        public bool IsAiChallenge => string.Equals(_joinGameMode, "ai_challenge", StringComparison.OrdinalIgnoreCase);
+        public string AiChallengeAttemptId => _joinAiChallengeAttemptId;
         private bool _joinUseServerAiOpponent = true;
         private bool _joinUseMatchmakingQueue;
 
@@ -73,6 +77,7 @@ namespace Project333.Runtime.Presentation.Online
         private NetworkReachability _lastInternetReachability;
         private bool _isDestroying;
         private bool _isAutomaticReconnectActive;
+        private bool _isResumingBattleFromDraft;
         private bool _isAutomaticReconnectAttemptInProgress;
         private bool _receivedLocalReconnectCancellation;
         private float _automaticReconnectDeadlineRealtime;
@@ -182,6 +187,8 @@ namespace Project333.Runtime.Presentation.Online
             SetJoinPlayerDeck(null);
             SetJoinRunDeckMetadata(null, null);
             ConfigureJoinMode(useServerAiOpponent: true, useMatchmakingQueue: false);
+            _joinGameMode = "run";
+            _joinAiChallengeAttemptId = string.Empty;
             ResetPresentationStateForNewConnection();
             await ConnectAsync();
         }
@@ -190,7 +197,11 @@ namespace Project333.Runtime.Presentation.Online
             string serverUrl,
             string matchId,
             string playerToken,
-            IReadOnlyList<string> playerDeckCardIds)
+            IReadOnlyList<string> playerDeckCardIds,
+            bool isReconnectAttempt = false,
+            int reconnectRemainingSeconds = 60,
+            string gameMode = "run",
+            string aiChallengeAttemptId = null)
         {
             if (!EnsurePlayMode("connect to the PvP server AI battle"))
             {
@@ -207,9 +218,17 @@ namespace Project333.Runtime.Presentation.Online
             SetJoinPlayerDeck(playerDeckCardIds);
             SetJoinRunDeckMetadata(AccountSessionState.ActiveRunId, AccountSessionState.ActiveDeckId);
             ConfigureJoinMode(useServerAiOpponent: true, useMatchmakingQueue: false);
+            _joinGameMode = gameMode ?? "run";
+            _joinAiChallengeAttemptId = aiChallengeAttemptId ?? string.Empty;
             _currentProjectedBattleState = null;
             ResetPresentationStateForNewConnection();
             await DisconnectAsync();
+            if (isReconnectAttempt)
+            {
+                BeginPveReconnectFromDraft(reconnectRemainingSeconds);
+                return;
+            }
+
             await ConnectAsync();
         }
 
@@ -234,6 +253,8 @@ namespace Project333.Runtime.Presentation.Online
             SetJoinPlayerDeck(playerDeckCardIds);
             SetJoinRunDeckMetadata(AccountSessionState.ActiveRunId, AccountSessionState.ActiveDeckId);
             ConfigureJoinMode(useServerAiOpponent: false, useMatchmakingQueue: true);
+            _joinGameMode = "run";
+            _joinAiChallengeAttemptId = string.Empty;
             _currentProjectedBattleState = null;
             _matchmakingFailureMessage = string.Empty;
             ResetPresentationStateForNewConnection();
@@ -523,7 +544,9 @@ namespace Project333.Runtime.Presentation.Online
                     sessionToken,
                     accountId,
                     _isAutomaticReconnectActive,
-                    _automaticReconnectPreviousConnectionId);
+                    _automaticReconnectPreviousConnectionId,
+                    _joinGameMode,
+                    _joinAiChallengeAttemptId);
                 _nextClientHeartbeatRealtime = UnityEngine.Time.unscaledTime +
                                                Mathf.Max(1f, _clientHeartbeatIntervalSeconds);
                 SetStatus($"Connected to {resolvedServerUrl}. Joining match {_matchId} with run={FormatLogValue(_joinRunId)}, deck={FormatLogValue(_joinDeckId)}.");
@@ -988,7 +1011,8 @@ namespace Project333.Runtime.Presentation.Online
                 return;
             }
 
-            if (_currentProjectedBattleState == null || _currentProjectedBattleState.IsEnded)
+            if ((!_isResumingBattleFromDraft && _currentProjectedBattleState == null) ||
+                (_currentProjectedBattleState != null && _currentProjectedBattleState.IsEnded))
             {
                 StopAutomaticReconnect(hideStatus: true);
                 return;
@@ -1032,6 +1056,17 @@ namespace Project333.Runtime.Presentation.Online
             {
                 AttemptAutomaticReconnectAsync();
             }
+        }
+
+        private void BeginPveReconnectFromDraft(int remainingSeconds)
+        {
+            _isResumingBattleFromDraft = true;
+            _isAutomaticReconnectActive = true;
+            _automaticReconnectGeneration += 1;
+            _automaticReconnectDeadlineRealtime = UnityEngine.Time.unscaledTime + Mathf.Max(0, remainingSeconds);
+            _nextAutomaticReconnectAttemptRealtime = UnityEngine.Time.unscaledTime;
+            _lastPresentedAutomaticReconnectSeconds = -1;
+            PresentAutomaticReconnectStatus();
         }
 
         private bool CanAutomaticallyRecoverCurrentBattle()
@@ -1156,27 +1191,24 @@ namespace Project333.Runtime.Presentation.Online
                    string.Equals(code, "battle_reconnect_expired", StringComparison.Ordinal);
         }
 
-        private bool IsExpiredPveReconnectError(string code)
+        public static bool IsUnavailableBattleError(string code)
         {
-            return IsExpiredPveReconnect(code, _isAutomaticReconnectActive, _joinUseServerAiOpponent, _joinUseMatchmakingQueue);
+            return string.Equals(code, "battle_cancelled", StringComparison.Ordinal) ||
+                   string.Equals(code, "battle_reconnect_expired", StringComparison.Ordinal);
         }
 
-        private void FinishExpiredPveReconnectAsDefeat()
+        private void FinishUnavailableBattleWithoutLocalResult()
         {
             StopPresentationQueue();
             StopAutomaticReconnect(hideStatus: true);
+            _automaticallyReconnectDuringBattle = false;
             CleanupSender();
-            if (_currentProjectedBattleState != null && !_currentProjectedBattleState.IsEnded)
-            {
-                _currentProjectedBattleState.EndBattle(PlayerId.AI);
-                PresentProjectedStateToBattleScreen();
-            }
-
-            const string message = "PVE 전투 재접속 시간이 만료되어 패배 처리되었습니다.";
+            // The server alone decides whether a battle ended or was canceled.
+            // Never synthesize a defeat/draw from a missing session.
+            const string message = "전투가 종료되었거나 취소되어 덱 화면으로 돌아갑니다.";
             SetStatus(message);
-            ShowOnlineErrorToast(message);
+            _battleBootstrapper?.ReturnFromUnavailableOnlineBattle();
         }
-
         private void CompleteAutomaticReconnect(bool battleEnded)
         {
             if (!_isAutomaticReconnectActive)
@@ -1194,6 +1226,11 @@ namespace Project333.Runtime.Presentation.Online
 
         private void FailAutomaticReconnect()
         {
+            if (_isResumingBattleFromDraft)
+            {
+                FinishUnavailableBattleWithoutLocalResult();
+                return;
+            }
             StopAutomaticReconnect(hideStatus: true);
             CleanupSender();
             const string message = "서버 연결에 실패했습니다. 나중에 다시 시도해주세요.";
@@ -1204,6 +1241,7 @@ namespace Project333.Runtime.Presentation.Online
         private void StopAutomaticReconnect(bool hideStatus)
         {
             _isAutomaticReconnectActive = false;
+            _isResumingBattleFromDraft = false;
             _isAutomaticReconnectAttemptInProgress = false;
             _automaticReconnectGeneration += 1;
             _automaticReconnectDeadlineRealtime = 0f;
@@ -1315,9 +1353,24 @@ namespace Project333.Runtime.Presentation.Online
 
                 case OnlineBattleMessageType.Error:
                     var errorCode = envelope.Error?.Code ?? string.Empty;
-                    if (IsExpiredPveReconnectError(errorCode))
+                    if (!_hasReceivedFirstStateView && !_isAutomaticReconnectActive &&
+                        (string.Equals(errorCode, "battle_reconnect_required", StringComparison.Ordinal) ||
+                         string.Equals(errorCode, "already_in_pve_match", StringComparison.Ordinal)))
                     {
-                        FinishExpiredPveReconnectAsDefeat();
+                        StopPresentationQueue();
+                        _automaticallyReconnectDuringBattle = false;
+                        CleanupSender();
+                        SetStatus(FormatUserFacingServerError(errorCode, envelope.Error?.Message));
+                        _battleBootstrapper?.ReturnFromUnavailableOnlineBattle();
+                        return 0f;
+                    }
+                    if (IsUnavailableBattleError(errorCode) ||
+                        (IsAiChallenge && (errorCode == "ai_challenge_not_available" ||
+                                           errorCode == "ai_challenge_not_found")))
+                    {
+                        if (IsAiChallenge)
+                            Project333.Runtime.Presentation.Draft.DraftRunSessionState.QueueAiChallengeReceiptRefresh();
+                        FinishUnavailableBattleWithoutLocalResult();
                         return 0f;
                     }
 
@@ -1388,6 +1441,11 @@ namespace Project333.Runtime.Presentation.Online
             }
 
             _assignedConnectionId = envelope.ConnectionId ?? string.Empty;
+            _joinUseServerAiOpponent = envelope.UseServerAiOpponent;
+            _joinGameMode = envelope.GameMode ?? "run";
+            _joinAiChallengeAttemptId = envelope.AiChallengeAttemptId ?? string.Empty;
+            Project333.Runtime.Presentation.Draft.DraftRunSessionState.ApplyAuthoritativeBattleMode(
+                _joinGameMode, _joinAiChallengeAttemptId);
             _localPlayerId = envelope.AssignedSeatId;
             _localOnlineSeatId = envelope.AssignedOnlineSeatId;
             _hasAssignedSeat = true;
@@ -1700,6 +1758,10 @@ namespace Project333.Runtime.Presentation.Online
         {
             switch (code)
             {
+                case "battle_reconnect_required":
+                    return "진행 중인 전투가 있습니다. 덱 화면에서 재접속해 주세요.";
+                case "already_in_pve_match":
+                    return "이미 진행 중인 PVE 전투가 있습니다. 기존 전투 창을 닫은 뒤 재접속해 주세요.";
                 case "already_in_pvp_match":
                     return "이미 이 계정으로 진행 중인 PVP 전투 연결이 있습니다. 기존 전투 창을 닫거나 잠시 후 다시 시도해 주세요.";
                 case "battle_deck_required":

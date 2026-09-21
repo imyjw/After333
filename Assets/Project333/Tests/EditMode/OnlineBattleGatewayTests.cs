@@ -423,6 +423,21 @@ namespace Project333.Tests.EditMode
             };
         }
 
+        [TestCase(PlayerId.Player)]
+        [TestCase(PlayerId.AI)]
+        public void ActivateEffect_SendsIntentAndPreservesSourceIdentity(PlayerId seat)
+        {
+            var sender=new RecordingSender();
+            var gateway=new OnlineBattleGateway("match-active","token",seat,sender);
+            gateway.ExecuteCommand(PlayerId.Player,new ActivateEffectCommand(new TileCoord(1,0),"plant-runtime"));
+            var message=sender.Messages[0];
+            Assert.That(message.CommandType,Is.EqualTo(OnlineBattleCommandType.ActivateEffect));
+            Assert.That(message.ActorId,Is.EqualTo(seat));
+            Assert.That(message.OccupantRuntimeId,Is.EqualTo("plant-runtime"));
+            Assert.That(message.SourceCoord.Column,Is.EqualTo(1));
+            Assert.That(OnlineBattleMessageSerializer.SerializeClientCommand(message),Does.Contain("ActivateEffect"));
+        }
+
         private sealed class RecordingSender : IOnlineBattleMessageSender
         {
             public List<ClientBattleCommandMessage> Messages { get; } = new List<ClientBattleCommandMessage>();

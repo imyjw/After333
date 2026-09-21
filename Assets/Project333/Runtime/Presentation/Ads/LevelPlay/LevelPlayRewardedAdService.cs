@@ -252,6 +252,7 @@ namespace Project333.Runtime.Presentation.Ads.LevelPlayIntegration
         private void SetState(string message)
         {
             _statusMessage = message ?? string.Empty;
+            Debug.Log($"After333 rewarded ad SDK: initialized={_initialized}, loading={_isLoading}, ready={_isReady}, showing={_isShowing}, status={_statusMessage}");
             StateChanged?.Invoke();
         }
     }

@@ -222,6 +222,7 @@ namespace Project333.Runtime.Presentation.Battle
                 BattleValueChangeCause.Firewall => "파이어월 효과로",
                 BattleValueChangeCause.Piercing => "관통 효과로",
                 BattleValueChangeCause.NuclearPowerPlant => "원자력 발전소 폭발로",
+                BattleValueChangeCause.Fallout => "낙진으로",
                 BattleValueChangeCause.BiochemicalBomb => "생화학폭탄 효과로",
                 BattleValueChangeCause.DeckExhaustion => "덱 고갈로",
                 BattleValueChangeCause.Spell => $"{sourceName} 효과로",

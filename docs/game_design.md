@@ -12,7 +12,7 @@ This document defines the high-level game design, shared terminology, and the bo
 
 - Public game name: `After333`
 - Genre: 2.5D mobile landscape turn-based card game
-- Current play modes: server-backed PvE versus AI and account-matched 1:1 PvP
+- Current play modes: normal matchmaking (human opponent first; fallback AI after 20 seconds) and a separate daily AI challenge. Both use the current run deck. See [battle_modes.md](./battle_modes.md).
 - Field size: each player owns a 5x2 tile field
 - Core deck concept: build a 33-card deck through a 3-choose-1 draft
 - Full game long-term goal: reach 33 cumulative wins before 3 cumulative losses
@@ -35,7 +35,7 @@ The current implemented loop is:
 1. Login with a server-backed guest, Game ID, or Google account
 2. Spend `3` tickets to start a run
 3. Build and persist a `33`-card deck through draft
-4. Play server-backed PvE or account-matched 1:1 PvP battles
+4. Play normal matchmaking battles against a human or fallback AI; optionally play daily AI challenges for separate Resource Gold
 5. Persist run wins and losses until `33` wins or `3` losses
 6. Claim run-end Resource Gold and random card-copy rewards
 7. Spend Resource Gold and matching card copies to upgrade eligible cards
@@ -53,7 +53,7 @@ The current prototype does not yet implement:
 
 ### Match Unit
 
-- A battle is one PvE or PvP match and is the atomic gameplay unit inside a run.
+- A normal battle advances the run and may have a human or AI opponent. A daily AI challenge uses the run deck but has separate attempts and rewards; it does not advance or end the run.
 - A run is the atomic progression unit for the full game design.
 
 ### Protected Leader

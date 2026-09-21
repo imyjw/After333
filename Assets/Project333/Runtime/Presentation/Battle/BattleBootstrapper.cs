@@ -567,6 +567,12 @@ namespace Project333.Runtime.Presentation.Battle
                 : message;
         }
 
+        public void ReturnFromUnavailableOnlineBattle()
+        {
+            // Bypass ReturnToDraftSceneAfterDelay: there is no local battle result to record.
+            DraftRunSessionState.PrepareForUnavailableBattleReturn();
+            SceneManager.LoadScene(DraftRunSessionState.DraftSceneName);
+        }
         public async void CancelPvpMatchmakingFromUi()
         {
             if (!_isPvpMatchmakingOverlayVisible || _isCancellingPvpMatchmaking)
@@ -1459,7 +1465,9 @@ namespace Project333.Runtime.Presentation.Battle
 
         public void StartOnlineServerAiBattleWithDeckCardIds(IReadOnlyList<string> playerDeckCardIds)
         {
-            if (playerDeckCardIds == null || playerDeckCardIds.Count == 0)
+            var isReconnectLaunch = DraftRunSessionState.TryConsumeLastPveReconnect(
+                out var reconnectMatchId, out var reconnectRemainingSeconds);
+            if (!isReconnectLaunch && (playerDeckCardIds == null || playerDeckCardIds.Count == 0))
             {
                 throw new InvalidOperationException("Drafted player deck card ids must be provided before starting the online battle.");
             }
@@ -1470,7 +1478,9 @@ namespace Project333.Runtime.Presentation.Battle
             _hasQueuedDraftSceneReturn = false;
             ClearCombatLog();
 
-            _runtimePlayerDeckCardIdsOverride = new List<string>(playerDeckCardIds);
+            _runtimePlayerDeckCardIdsOverride = playerDeckCardIds != null
+                ? new List<string>(playerDeckCardIds)
+                : new List<string>();
             _runtimeAIDeckCardIdsOverride = Array.Empty<string>();
 
             var resolvedConfig = ResolveStartConfig();
@@ -1484,7 +1494,7 @@ namespace Project333.Runtime.Presentation.Battle
             var tester = ResolveOrCreateOnlineConnectionTester();
             ConfigureOnlineInput(tester, sendPlayerActionsToOnlineGateway: true);
 
-            var matchId = CreateOnlineDraftMatchId();
+            var matchId = isReconnectLaunch ? reconnectMatchId : CreateOnlineDraftMatchId();
             _lastInteractionStatus = "Connecting to server AI battle.";
             Debug.Log($"[After333 Battle Launch] {BuildOnlineLaunchTrace("PVE", matchId, _runtimePlayerDeckCardIdsOverride)}");
             AddCombatLogEntry($"Connecting to server AI battle: {matchId} ({FormatShortRunDeckTrace()})");
@@ -1492,7 +1502,11 @@ namespace Project333.Runtime.Presentation.Battle
                 OnlineServerUrl,
                 matchId,
                 _onlinePlayerToken,
-                _runtimePlayerDeckCardIdsOverride);
+                _runtimePlayerDeckCardIdsOverride,
+                isReconnectLaunch && DraftRunSessionState.ActiveBattleIsReconnect,
+                reconnectRemainingSeconds,
+                DraftRunSessionState.ActiveBattleGameMode,
+                DraftRunSessionState.ActiveAiChallengeAttemptId);
             RefreshPresenter();
         }
 
@@ -1672,7 +1686,8 @@ namespace Project333.Runtime.Presentation.Battle
                     {
                         StartOnlineMatchmakingBattleWithDeckCardIds(draftedDeckCardIds);
                     }
-                    else if (launchMode == DraftBattleLaunchMode.OnlineServerAi)
+                    else if (launchMode == DraftBattleLaunchMode.OnlineServerAi ||
+                             launchMode == DraftBattleLaunchMode.OnlineAiChallenge)
                     {
                         StartOnlineServerAiBattleWithDeckCardIds(draftedDeckCardIds);
                     }
@@ -2747,6 +2762,31 @@ namespace Project333.Runtime.Presentation.Battle
             return true;
         }
 
+        public bool TryActivatePlayerEffect(TileCoord coord, string runtimeId, out string message)
+        {
+            EnsureBattleStarted();
+            if (IsBusy) { message = BusyMessage; return false; }
+            if (ActiveEffectService.CanOfferActivation(CurrentBattleState, PlayerId.Player, coord))
+            {
+                var costFailure = ActiveEffectService.GetCostFailureMessage(CurrentBattleState, PlayerId.Player, coord);
+                if (!string.IsNullOrEmpty(costFailure))
+                    return FailPlayerCardUse(costFailure, out message);
+            }
+            var command = new ActivateEffectCommand(coord, runtimeId);
+            if (ShouldRoutePlayerActionsOnline())
+                return TrySendOnlinePlayerCommand(command, "액티브 사용 요청", out message);
+            try
+            {
+                _battleGateway.ExecuteCommand(PlayerId.Player, command);
+                message = "액티브: 골드 -1, 전력 +2";
+                _lastInteractionStatus = message;
+                AddCombatLogEntry(message);
+                RefreshPresenter();
+                return true;
+            }
+            catch (Exception ex) { return FailPlayerCardUse(ex.Message, out message); }
+        }
+
         public bool TryMovePlayerOccupant(TileCoord fromCoord, TileCoord toCoord, out string message)
         {
             EnsureBattleStarted();
@@ -3065,6 +3105,8 @@ namespace Project333.Runtime.Presentation.Battle
                 else if (definition is ScriptedSpellCardDefinition scriptedSpellDefinition &&
                          (string.Equals(scriptedSpellDefinition.EffectId, "daehwandan", StringComparison.Ordinal) ||
                           string.Equals(scriptedSpellDefinition.EffectId, TimedBombRules.EffectId, StringComparison.Ordinal) ||
+                          string.Equals(scriptedSpellDefinition.EffectId, NuclearRules.EffectId, StringComparison.Ordinal) ||
+                          string.Equals(scriptedSpellDefinition.EffectId, MagicAmplificationCircleRules.EffectId, StringComparison.Ordinal) ||
                           string.Equals(scriptedSpellDefinition.EffectId, PowerBankRules.EffectId, StringComparison.Ordinal) ||
                           string.Equals(scriptedSpellDefinition.EffectId, ManaStoneRules.EffectId, StringComparison.Ordinal) ||
                           string.Equals(scriptedSpellDefinition.EffectId, ManaStoneBundleRules.EffectId, StringComparison.Ordinal)))
@@ -3622,7 +3664,12 @@ namespace Project333.Runtime.Presentation.Battle
                     succeeded => syncedServerRunRecord = succeeded);
             }
 
-            if (isDraw)
+            if (string.Equals(DraftRunSessionState.ActiveBattleGameMode, "ai_challenge", StringComparison.Ordinal))
+            {
+                // A challenge has its own server receipt; it never changes the current run record.
+                DraftRunSessionState.RecordAiChallengeOutcome(playerWon, isDraw);
+            }
+            else if (isDraw)
             {
                 DraftRunSessionState.RecordBattleDraw();
             }
@@ -3942,6 +3989,13 @@ namespace Project333.Runtime.Presentation.Battle
                 var targetOwnerId = battleEvent.TargetOwnerId;
                 var targetCoord = battleEvent.TargetCoord.ToDomain();
                 var targetsAttacker = IsSameTarget(targetOwnerId, targetCoord, attackerOwnerId, attackerCoord);
+                if (targetsAttacker &&
+                    battleEvent.ValueCause == BattleValueChangeCause.Counterattack &&
+                    (battleEvent.EventType == BattleEventType.DamageApplied ||
+                     battleEvent.EventType == BattleEventType.InvinciblePrevented))
+                {
+                    request.DefenderCounterattacked = true;
+                }
 
                 switch (battleEvent.EventType)
                 {
@@ -3949,7 +4003,6 @@ namespace Project333.Runtime.Presentation.Battle
                         if (targetsAttacker)
                         {
                             request.AttackerTookDamage = true;
-                            request.DefenderCounterattacked = true;
                         }
                         else
                         {

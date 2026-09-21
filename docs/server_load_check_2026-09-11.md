@@ -37,3 +37,6 @@
 최종 자료: TempBuild/LoadChecks_20260911의 metrics.json, load-summary.json, load-memory.json, passed-checks.log.
 검증 서버 SHA256: CB9317CA982CE4C7CA2F99E64FFDEA39C9F2CBA9B80FDA56EDFC2BD78C234893.
 초기 검사 도구의 컴파일/응답 필터 문제는 최종 실행 전에 고쳤으며 서버 장애로 집계하지 않았다.
+## 후속 검사 — 2026-09-12
+
+30분 혼합 PvP/PvE 부하와 5분 종료 관찰을 완료했다. 최대 20경기, 총 3,239경기 및 별도 복잡 효과 4,320개를 검증했다. 위 9월 11일 수치는 당시 단기 실행의 기록으로 유지한다. 최신 결과·한계와 전투 기록 용량 개선점은 [장시간 검증 보고서](./server_soak_check_2026-09-12.md)를 참조한다.

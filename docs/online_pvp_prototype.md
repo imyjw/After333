@@ -27,7 +27,7 @@ Required future storage:
 - PvP match rows
 - PvP match-player rows
 - connection/reconnect state rows
-- battle snapshot and/or command-log rows for reconnect/server-restart recovery
+- battle snapshot and command-log rows for diagnostics; live reconnect uses the current process session
 
 Current persistence progress:
 
@@ -42,16 +42,32 @@ Current persistence progress:
 - `PvpBattlePersistenceService` records accepted and rejected client commands into `pvp_battle_command_log`, including the command payload, sender identity, and produced battle events when available.
 - Battle snapshots now include a restorable domain-state payload, not only player-facing `StateView` data.
 - Battle snapshots retain the latest 33 structured combat-log records. A new or reconnecting connection receives the retained history; later `StateView` messages carry sequence-numbered increments.
-- If `/pvp/reconnect-status` finds a persisted reconnect-grace match but the live in-memory session is missing, it now reports reconnect availability only when a restorable latest battle snapshot exists.
-- When a reconnecting PvP client joins a match that is no longer in memory, the server attempts to restore the `BattleSession` from the latest persisted battle snapshot before seating the reconnecting account.
-- Server-startup battle recovery is available but disabled by default for the current graduation-project development flow.
-- Set `PROJECT333_ENABLE_PVP_STARTUP_RECOVERY=1` to make server startup move persisted `active` or `reconnect_grace` PvP matches into reconnect-grace recovery because previous WebSocket connections belonged to the old server process.
-- When enabled, startup recovery closes stale persisted active connections and marks recoverable player seats as disconnected with the configured reconnect grace period, while preserving still-valid existing reconnect deadlines.
-- After one account restores a match from snapshot, later reconnecting accounts can import their persisted reconnect reservation into the already-restored in-memory `BattleSession`.
-- The runtime `BattleSession` still owns live command execution after restoration.
+- User policy (2026-09-13): server interruption cancels unfinished PvP/PvE battles without recording wins, losses or draws. The existing run/deck, tickets and account resources remain unchanged.
+- Before opening HTTP/WebSocket endpoints, startup replays durable completed-result journals, then cancels unfinished DB matches and clears old connections, queues and reservations. Unreadable or undeliverable result journals block startup rather than silently discarding already-finalized outcomes.
+- Startup cancellation is mandatory. `PROJECT333_ENABLE_PVP_STARTUP_RECOVERY` no longer enables snapshot restoration; old launcher recovery switches are accepted for command compatibility only. `/server/status` reports `StartupRecoveryEnabled=false` and `InterruptedBattlePolicy=cancel_without_result`.
+- Missing sessions are not restored from snapshots. A PvP reconnect with no current session returns `battle_cancelled` without fresh matchmaking. PvE uses `battle_reconnect_expired` when its session no longer exists. Updated clients return to the draft/run screen without synthesizing a local result; server run data remains authoritative.
+- Normal client disconnect in PvP and PvE reserves the authenticated participant for 60 seconds within the running server. Existing turn deadlines and AI progression continue. On server shutdown, unfinished sessions suppress actions, AI, turn timers and pending forfeits; already-finalized results remain valid.
+- Snapshot serialization remains available for diagnostic tools and format checks; its existence does not enable user battle continuation across server restarts.
 - The laptop-hosted development server can now run behind Cloudflare Tunnel at `https://api.after333.com`, while ASP.NET remains bound to `http://127.0.0.1:7333`.
 - `PROJECT333_PUBLIC_SERVER_URL` separates the public client endpoint from the internal listen address, and `/server/status` reports both values plus `Deployment.Mode=ReverseProxy` for this setup.
 - The next practical verification step is a two-account external-network PvP smoke test through HTTPS/WSS; VPS hosting and managed PostgreSQL remain deferred until the project is closer to release.
+
+## Battle Modes and Common Reconnect (2026-09-13)
+
+- [battle_modes.md](./battle_modes.md) defines normal human-first matchmaking with server AI after 20 seconds and the independent daily AI challenge.
+- GameMode (run/ai_challenge) and opponent type are distinct. AI fallback advances the regular run; AI challenge results only settle that attempt and its separate gold reward.
+- Start and draft screens use one mode-neutral reconnect label and the server's original match/admission.
+
+## PvE/PvP Reconnect Discovery (2026-09-13)
+
+- `GET /battle/reconnect-status` requires account authentication and returns the existing match ID, runtime/online seat, server remaining seconds, deadline, and `BattleMode` (`pve` or `pvp`). PvE discovery uses the live server session and account-bound reservation. PvP discovery still requires matching live and persisted reservations.
+- The legacy `GET /pvp/reconnect-status` remains PvP-only. Old apps cannot receive a PvE match and accidentally launch its reconnect as PvP. A legacy response with no mode is interpreted as PvP by the updated DTO.
+- After app restart, both start and draft/run screens query the shared endpoint and display a common reconnect action with the server's remaining time. The response also supplies GameMode and AiChallengeAttemptId. PvE reuses the returned `MatchId` and reconnect intent; it does not generate a fresh room ID or restart a local 60-second allowance.
+- Join restores the original account/seat/run/deck/upgrades and rejects another account or an expired reservation. An ended or missing PvE session returns `battle_reconnect_expired`; the client does not synthesize a loss.
+- Authenticated joins are serialized per account through session lookup and registration. Same-account simultaneous PvE starts cannot create two playable rooms, and active/reconnectable PvE and PvP cannot overlap for one account. Other accounts can join independently.
+- A reconnect can request continuation of server AI, but each session permits only one AI orchestration loop at a time. Its lifetime belongs to the server, not the old client socket. A reconnect cannot duplicate AI planning/broadcast loops or stop AI merely by canceling the previous connection.
+- Grace expiry uses the authoritative deadline and verifies the exact current reservation before applying one forfeit. A stale timeout from a replaced/reconnected socket cannot end the new connection's battle.
+- Source and isolated regression verification are complete; deployment status and client installation are tracked separately in [pve_reconnect_2026-09-13.md](./pve_reconnect_2026-09-13.md). The user builds the updated app. This work adds no turn-clock pause and no battle restoration after server restart.
 
 ## Current Milestone
 

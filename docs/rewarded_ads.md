@@ -168,6 +168,38 @@ The client saves the server attempt ID per account/server before entering the ad
 
 Only server `granted` with a wallet updates the displayed balance. Server `expired`/`rejected` releases the pending record without a reward. Unknown, malformed or failed responses retain it. Account/session/endpoint changes and mismatched attempt IDs prevent stale response application.
 
-A completion-marked attempt blocks another viewing while unresolved. An ad closed without a completion signal retains its ID but can be retried explicitly after checking server status; a terminal server result is resolved instead of replaying it. A late completion signal blocks replay. A process exit before the SDK reports either completion or close remains ambiguous and waits for server grant/rejection/expiry. No local timer pretends to cancel a server attempt.
+A completion-marked attempt blocks another viewing while unresolved. An ad closed without a completion signal retains its ID but can be retried explicitly after checking server status; a terminal server result is resolved instead of replaying it. A late completion signal blocks replay. After a process exit without either SDK callback, a matching server pending response now permits an explicit retry when no ad is showing and no completion was recorded. The saved attempt is retained for late rewards, and the normal show path checks the server again before reusing it. An ad that starts during the status request or a completion callback racing with that request must remain blocked. No local timer pretends to cancel a server attempt.
 
 Verification is automatic, with no previous-result button or reconnect instruction. This source change has passed 11 isolated client recovery groups and Unity runtime compilation; actual provider callbacks and physical-device checks of the new client remain separate. [Implementation and evidence](C:/Project_333/TempBuild/RewardedAdRecovery_20260912/README.md)
+## Interrupted ad relaunch fix (2026-09-12)
+
+A physical-device report confirmed one completed ad paid one ticket, but force-closing the app during an ad left the button disabled on relaunch. The saved non-replayable state required a Closed callback that process death cannot deliver. Recovery now restores retry eligibility only after a matching pending server response and while no SDK display is active; it retains the same attempt ID and never grants a local reward. Completed attempts still wait for server resolution. No new button or recovery message was added.
+
+The new process-death regression failed against the previous code. The fixed code passes14 client recovery groups (including late reward/display races) and1043 Unity EditMode tests. Device relaunch verification of this fix requires a new client build; no server change or redeployment is needed. [Evidence](../TempBuild/AdInterruptedRecovery_20260912/README.md).
+
+## Device follow-up and previous-process completion marker (2026-09-12)
+
+The user reproduced the disabled button with the first fix installed. Read-only device/DB checks observed that the button enabled when the unpaid attempt expired at23:23:24 KST, rather than on initial recovery. Installed private metadata could not be read, so its exact flags are not claimed as confirmed.
+
+A further source regression was reproduced: a completion signal persisted by a previous app process continued to block retry after a matching server pending response. Recovery now releases that previous-process presentation marker only after verified pending status and with no current-process SDK observer. The original attempt ID remains for late S2S payment; live-process completion and callback races remain protected. Server-only grants and attempt idempotency are unchanged.
+
+The new test failed before this change;15 isolated recovery groups pass afterward. Added application diagnostics distinguish pending lock, SDK readiness, HTTP failures and recovery outcomes without logging credentials or account/attempt IDs. The revised client still requires user build/install and real-device interruption verification. No server redeployment is required. Evidence: TempBuild/AdRecoveryDeviceDiagnosis_20260912/README.md.
+Unity verification of this follow-up:1043 EditMode tests passed (0 failures/skips) in the isolated project copy; this does not replace Android ad/kill/relaunch verification.
+
+Device follow-up23:49 KST: user selected ironSource Bidding + Rewarded and Test ads for the registered phone (network/format had been empty). The same installed app/process then logged ready=True and enabled=True, pending=False/blocked=False. No code or build change was needed to resolve this no-fill episode. The original ad interruption/relaunch verification remains pending.
+
+## Single test-ad interruption retest passed (2026-09-12,23:54 KST)
+
+The user repeated ad start → app close before completion → relaunch and confirmed the button re-enabled. New-process logs show pending=True/blocked=True at shop entry, a matching pending recovery response with replay=True, then SDK ready=True and button enabled=True at23:54:01.791 (about6 seconds after recovery-worker startup). Read-only DB verification confirms the interrupted attempt was still pending, expired only at00:23:20, and had no reward timestamp or callback. Thus this reproduction recovers without waiting for30-minute expiry, retains the original server attempt, and records no unverified reward. The original reported interruption/relaunch button defect is verified resolved for this tested device scenario. Evidence: TempBuild/AdRecoveryDeviceDiagnosis_20260912/device-interruption-retest.log and RecentAdStates-retest.json.
+## Repeated real-ad interruption and hidden no-fill status (2026-09-13)
+
+The user reset Test devices targeting and repeated interruption/relaunch with real ads. The earlier single test-ad retest does not establish that real ads remain available on repeated attempts.
+
+Device logs separate two states: saved-attempt verification and SDK readiness. At00:07:52 KST, pending recovery set replay=True and the button reported blocked=False; repeated509/no-fill loads kept ready=False. At00:11:49 the SDK loaded an ad and the button immediately enabled while the pending attempt remained saved. After the next interruption, recovery again unlocked at00:14:26, but SDK loads continued failing through00:28:19. The automatic load retries were running. This observed disabled state was SDK unavailability rather than an unresolved client lock.
+
+A client UI bug hid the explanation: BuildStatusText returned empty for every saved pending attempt, including attempts already eligible for replay. The guard now checks IsBlocking instead of HasPending. Thus replayable attempts show SDK loading/no-fill/retry/ready status while retaining the attempt for late S2S rewards. Current server eligibility/request errors remain visible. Playback text is supplied by SDK state instead of cached after TryShow, so a closed ad cannot leave a stale playback notice. Blocking verification remains automatic and silent; no recovery button or reconnect instruction is introduced.
+
+This source fix corrects missing status text; it cannot guarantee real ad inventory. The exact cause of repeated real-ad no-fill still requires provider/network configuration and serving diagnostics. Do not infer a punishment for force-closing, a fixed waiting time, or a changed reward threshold from these logs. Official guidance: https://docs.unity.com/en-us/grow/levelplay/sdk/unity/troubleshoot-no-ads-displaying
+
+Evidence and focused regression results: TempBuild/AdRealInterruption_20260913/README.md. Actual APK display requires the user's next build/install; test-ad success alone is not a production-fill acceptance test.
+Validation: new status regressions reproduced7 failures before the fix;13 focused Unity tests and15 existing recovery groups pass after the fix. No APK build/install was performed.

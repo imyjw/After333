@@ -77,7 +77,9 @@ namespace Project333.Runtime.Application.Online
             string sessionToken = null,
             string accountId = null,
             bool isReconnectAttempt = false,
-            string previousConnectionId = null)
+            string previousConnectionId = null,
+            string gameMode = "run",
+            string aiChallengeAttemptId = null)
         {
             var envelope = new OnlineBattleEnvelope
             {
@@ -91,7 +93,9 @@ namespace Project333.Runtime.Application.Online
                 UseServerAiOpponent = useServerAiOpponent,
                 UseMatchmakingQueue = useMatchmakingQueue,
                 IsReconnectAttempt = isReconnectAttempt,
-                PreviousConnectionId = previousConnectionId ?? string.Empty
+                PreviousConnectionId = previousConnectionId ?? string.Empty,
+                GameMode = string.IsNullOrWhiteSpace(gameMode) ? "run" : gameMode,
+                AiChallengeAttemptId = aiChallengeAttemptId ?? string.Empty
             };
 
             if (playerDeckCardIds != null)

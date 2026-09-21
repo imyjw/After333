@@ -12,6 +12,12 @@ namespace Project333.Runtime.Application.Services
         public const string EffectId = "robot_fusion";
         public const int MinimumRobotCount = 2;
 
+        public static bool IsEligibleRobot(OccupantState occupant)
+        {
+            return occupant is UnitState unit && unit.Kind == OccupantKind.Unit &&
+                   unit.IsAlive && !unit.IsSealbound && unit.HasRace(UnitRace.Robot);
+        }
+
         public static int CountLivingRobots(BoardState board)
         {
             if (board == null)
@@ -22,7 +28,7 @@ namespace Project333.Runtime.Application.Services
             var count = 0;
             foreach (var occupant in board.EnumerateOccupants())
             {
-                if (occupant is UnitState { HasActiveRobot: true, IsAlive: true })
+                if (IsEligibleRobot(occupant))
                 {
                     count += 1;
                 }
@@ -63,7 +69,8 @@ namespace Project333.Runtime.Application.Services
                     throw new InvalidOperationException("Robot Fusion cannot select the same Robot more than once.");
                 }
 
-                if (board.GetOccupant(coord) is not UnitState { HasActiveRobot: true, IsAlive: true } robot)
+                var robot = board.GetOccupant(coord) as UnitState;
+                if (!IsEligibleRobot(robot))
                 {
                     throw new InvalidOperationException(
                         $"Robot Fusion target {coord} must be a living Robot unit on the caster's field.");
@@ -97,8 +104,7 @@ namespace Project333.Runtime.Application.Services
                 absorbedRuntimeIds.Add(robot.RuntimeId);
             }
 
-            survivor.IncreaseBaseAttack(attackBonus);
-            survivor.IncreaseMaxHpAndCurrentHp(hpBonus);
+            survivor.ApplyCombatStatBuff(CardId, attackBonus: attackBonus, maxHpBonus: hpBonus);
 
             for (var index = 0; index < selectedRobots.Count; index += 1)
             {

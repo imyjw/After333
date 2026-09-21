@@ -48,6 +48,10 @@ namespace Project333.Runtime.Presentation.Battle
         private static RectTransform s_previewTooltipRoot;
         private static readonly List<PreviewTooltipPanel> PreviewTooltipPanels =
             new List<PreviewTooltipPanel>();
+        private static readonly List<PreviewTooltipPanel> PreviewAttachedPanels =
+            new List<PreviewTooltipPanel>();
+        private static readonly List<PreviewTooltipPanel> PreviewInfluencePanels =
+            new List<PreviewTooltipPanel>();
         private static RectTransform s_spellEffectOverlayRoot;
         private static RectTransform s_valuePopupOverlayRoot;
         private static Sprite s_cheonraJimangMarkSprite;
@@ -203,8 +207,16 @@ namespace Project333.Runtime.Presentation.Battle
         private RectTransform _interactionSurfaceRoot;
         private Image _interactionSurfaceImage;
         private string _previewOccupantRuntimeId;
-        private int _previewTooltipCount;
         private Vector2 _previewLayoutSize;
+        private IReadOnlyList<OccupantSpecialEffectTooltip> _previewAbilityEntries =
+            Array.Empty<OccupantSpecialEffectTooltip>();
+        private IReadOnlyList<OccupantSpecialEffectTooltip> _previewAttachedEntries =
+            Array.Empty<OccupantSpecialEffectTooltip>();
+        private IReadOnlyList<OccupantSpecialEffectTooltip> _previewInfluenceEntries =
+            Array.Empty<OccupantSpecialEffectTooltip>();
+        private OccupantState _previewBoundOccupant;
+        private BattleState _previewBoundBattle;
+        private float _nextPreviewTooltipRefreshTime;
 
         public float LongPressPreviewHoldSeconds => Mathf.Max(0.05f, _longPressPreviewHoldSeconds);
 
@@ -239,6 +251,15 @@ namespace Project333.Runtime.Presentation.Battle
             ApplyVisualLayout();
             ApplyStatBarLayout();
             ApplyInteractionSurfaceLayout();
+        }
+
+        public RectTransform ActiveEffectButtonAnchor
+        {
+            get
+            {
+                if (_text == null) return null;
+                return _text.rectTransform.parent?.Find("TileBackground") as RectTransform ?? _text.rectTransform;
+            }
         }
 
         private void LateUpdate()
@@ -1390,10 +1411,14 @@ namespace Project333.Runtime.Presentation.Battle
                 s_previewHpText = null;
                 s_previewTooltipRoot = null;
                 PreviewTooltipPanels.Clear();
+                PreviewAttachedPanels.Clear();
+                PreviewInfluencePanels.Clear();
             }
             else if (s_previewTooltipRoot == null)
             {
                 PreviewTooltipPanels.Clear();
+                PreviewAttachedPanels.Clear();
+                PreviewInfluencePanels.Clear();
             }
 
             if (s_previewOverlayRoot != null &&
@@ -1402,7 +1427,7 @@ namespace Project333.Runtime.Presentation.Battle
                 s_previewTooltipRoot != null)
             {
                 EnsurePreviewStatTexts();
-                ApplyPreviewOverlayLayout(0);
+                ApplyPreviewOverlayLayout();
                 return;
             }
 
@@ -1504,7 +1529,7 @@ namespace Project333.Runtime.Presentation.Battle
             s_previewTooltipRoot.SetAsLastSibling();
 
             EnsurePreviewStatTexts();
-            ApplyPreviewOverlayLayout(0);
+            ApplyPreviewOverlayLayout();
             s_previewOverlayRoot.gameObject.SetActive(false);
         }
 
@@ -1561,9 +1586,15 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
+            var battle = _battleBootstrapper == null ? null : _battleBootstrapper.CurrentBattleState;
+            if (_previewBoundOccupant != _tileView.CurrentOccupant || _previewBoundBattle != battle ||
+                !UnityEngine.Application.isPlaying || Time.unscaledTime >= _nextPreviewTooltipRefreshTime)
+            {
+                ShowCurrentSpecialEffectTooltips(false);
+            }
             if (_previewLayoutSize != s_previewOverlayRoot.rect.size)
             {
-                ApplyPreviewOverlayLayout(_previewTooltipCount);
+                ApplyPreviewOverlayLayout();
             }
 
             RefreshPreviewStats();
@@ -1615,241 +1646,245 @@ namespace Project333.Runtime.Presentation.Battle
             }
         }
 
-        private void ShowCurrentSpecialEffectTooltips()
+        private void ShowCurrentSpecialEffectTooltips(bool force = true)
         {
             var occupant = _tileView == null ? null : _tileView.CurrentOccupant;
             if (occupant == null || s_previewTooltipRoot == null)
             {
                 HideSpecialEffectTooltips();
-                ApplyPreviewOverlayLayout(0);
+                ApplyPreviewOverlayLayout();
                 return;
             }
 
             CardDefinition definition = null;
             AutoAssignBootstrapper();
             _battleBootstrapper?.TryGetCardDefinition(occupant.CardId, out definition);
-            var entries = OccupantSpecialEffectTooltipCatalog.Build(definition, occupant);
-
-            EnsurePreviewTooltipPanelCount(entries.Count);
-            var font = ResolvePreviewTooltipFont();
-            for (var index = 0; index < PreviewTooltipPanels.Count; index++)
+            var battle = _battleBootstrapper == null ? null : _battleBootstrapper.CurrentBattleState;
+            var abilities = OccupantSpecialEffectTooltipCatalog.Build(definition, occupant);
+            var attached = OccupantStatusTooltipCatalog.BuildAttached(definition, occupant, battle);
+            var influences = OccupantStatusTooltipCatalog.BuildInfluences(definition, occupant, battle);
+            _previewBoundOccupant = occupant;
+            _previewBoundBattle = battle;
+            _nextPreviewTooltipRefreshTime = Time.unscaledTime + 0.15f;
+            if (!force && SameTooltipEntries(_previewAbilityEntries, abilities) &&
+                SameTooltipEntries(_previewAttachedEntries, attached) &&
+                SameTooltipEntries(_previewInfluenceEntries, influences))
             {
-                var panel = PreviewTooltipPanels[index];
-                var visible = index < entries.Count;
-                panel.Root.gameObject.SetActive(visible);
-                if (!visible)
-                {
-                    continue;
-                }
+                return;
+            }
 
+            _previewAbilityEntries = abilities;
+            _previewAttachedEntries = attached;
+            _previewInfluenceEntries = influences;
+            BindPreviewTooltipPanels(PreviewTooltipPanels, AutoPreviewTooltipPanelPrefix, abilities);
+            BindPreviewTooltipPanels(PreviewAttachedPanels, "AttachedEffectTooltip", attached);
+            BindPreviewTooltipPanels(PreviewInfluencePanels, "InfluenceTooltip", influences);
+            s_previewTooltipRoot.gameObject.SetActive(abilities.Count + attached.Count + influences.Count > 0);
+            ApplyPreviewOverlayLayout();
+        }
+
+        private static bool SameTooltipEntries(
+            IReadOnlyList<OccupantSpecialEffectTooltip> previous,
+            IReadOnlyList<OccupantSpecialEffectTooltip> current)
+        {
+            if (previous.Count != current.Count) return false;
+            for (var index = 0; index < previous.Count; index++)
+            {
+                if (previous[index].Title != current[index].Title ||
+                    previous[index].Description != current[index].Description ||
+                    previous[index].Kind != current[index].Kind) return false;
+            }
+            return true;
+        }
+
+        private void BindPreviewTooltipPanels(List<PreviewTooltipPanel> panels, string prefix,
+            IReadOnlyList<OccupantSpecialEffectTooltip> entries)
+        {
+            while (panels.Count < entries.Count)
+                panels.Add(FindOrCreatePreviewTooltipPanel(prefix, panels.Count));
+            var font = ResolvePreviewTooltipFont();
+            for (var index = 0; index < panels.Count; index++)
+            {
+                var panel = panels[index];
+                panel.Root.gameObject.SetActive(index < entries.Count);
+                if (index >= entries.Count) continue;
                 var entry = entries[index];
+                var color = ResolvePreviewTooltipKindColor(entry.Kind);
                 panel.Background.color = _cardPreviewTooltipPanelColor;
-                panel.Outline.effectColor = _cardPreviewTooltipBorderColor;
+                panel.Background.raycastTarget = false;
+                panel.Outline.effectColor = entry.Kind == OccupantTooltipKind.Ability
+                    ? _cardPreviewTooltipBorderColor : color;
                 panel.Outline.effectDistance = new Vector2(2f, -2f);
                 panel.Title.text = entry.Title;
-                panel.Title.color = _cardPreviewTooltipTitleColor;
+                panel.Title.color = color;
                 panel.Title.fontStyle = FontStyles.Bold;
-                panel.Title.fontSize = Mathf.Max(10, _cardPreviewTooltipTitleFontSize);
-                panel.Title.fontSizeMax = Mathf.Max(10, _cardPreviewTooltipTitleFontSize);
-                panel.Title.fontSizeMin = Mathf.Max(8, _cardPreviewTooltipTitleFontSize * 0.58f);
+                panel.Title.enableAutoSizing = false;
+                panel.Title.textWrappingMode = TextWrappingModes.Normal;
+                panel.Title.overflowMode = TextOverflowModes.Overflow;
+                panel.Title.raycastTarget = false;
                 panel.Description.text = entry.Description;
+                panel.Description.gameObject.SetActive(!string.IsNullOrWhiteSpace(entry.Description));
                 panel.Description.color = _cardPreviewTooltipDescriptionColor;
                 panel.Description.fontStyle = FontStyles.Normal;
-                panel.Description.fontSize = Mathf.Max(9, _cardPreviewTooltipDescriptionFontSize);
-                panel.Description.fontSizeMax = Mathf.Max(9, _cardPreviewTooltipDescriptionFontSize);
-                panel.Description.fontSizeMin = Mathf.Max(7, _cardPreviewTooltipDescriptionFontSize * 0.56f);
+                panel.Description.enableAutoSizing = false;
+                panel.Description.textWrappingMode = TextWrappingModes.Normal;
+                panel.Description.overflowMode = TextOverflowModes.Overflow;
+                panel.Description.raycastTarget = false;
                 if (font != null)
                 {
                     panel.Title.font = font;
                     panel.Description.font = font;
                 }
             }
+        }
 
-            s_previewTooltipRoot.gameObject.SetActive(entries.Count > 0);
-            ApplyPreviewOverlayLayout(entries.Count);
+        private Color ResolvePreviewTooltipKindColor(OccupantTooltipKind kind)
+        {
+            switch (kind)
+            {
+                case OccupantTooltipKind.Buff: return new Color(0.58f, 1f, 0.66f, 1f);
+                case OccupantTooltipKind.Debuff: return new Color(1f, 0.62f, 0.59f, 1f);
+                case OccupantTooltipKind.State: return new Color(0.60f, 0.82f, 1f, 1f);
+                case OccupantTooltipKind.Influence: return new Color(1f, 0.88f, 0.50f, 1f);
+                default: return _cardPreviewTooltipTitleColor;
+            }
         }
 
         private void HideSpecialEffectTooltips()
         {
-            for (var index = 0; index < PreviewTooltipPanels.Count; index++)
-            {
-                if (PreviewTooltipPanels[index]?.Root != null)
-                {
-                    PreviewTooltipPanels[index].Root.gameObject.SetActive(false);
-                }
-            }
-
-            if (s_previewTooltipRoot != null)
-            {
-                s_previewTooltipRoot.gameObject.SetActive(false);
-            }
+            HideTooltipPanels(PreviewTooltipPanels);
+            HideTooltipPanels(PreviewAttachedPanels);
+            HideTooltipPanels(PreviewInfluencePanels);
+            _previewAbilityEntries = Array.Empty<OccupantSpecialEffectTooltip>();
+            _previewAttachedEntries = Array.Empty<OccupantSpecialEffectTooltip>();
+            _previewInfluenceEntries = Array.Empty<OccupantSpecialEffectTooltip>();
+            _previewBoundOccupant = null;
+            _previewBoundBattle = null;
+            if (s_previewTooltipRoot != null) s_previewTooltipRoot.gameObject.SetActive(false);
         }
 
-        private void EnsurePreviewTooltipPanelCount(int count)
+        private static void HideTooltipPanels(List<PreviewTooltipPanel> panels)
         {
-            if (s_previewTooltipRoot == null)
-            {
-                return;
-            }
-
-            for (var index = PreviewTooltipPanels.Count; index < count; index++)
-            {
-                PreviewTooltipPanels.Add(FindOrCreatePreviewTooltipPanel(index));
-            }
+            foreach (var panel in panels)
+                if (panel?.Root != null) panel.Root.gameObject.SetActive(false);
         }
 
-        private PreviewTooltipPanel FindOrCreatePreviewTooltipPanel(int index)
+        private PreviewTooltipPanel FindOrCreatePreviewTooltipPanel(string prefix, int index)
         {
-            var panelName = $"{AutoPreviewTooltipPanelPrefix}_{index:00}";
+            var panelName = $"{prefix}_{index:00}";
             var existingRoot = s_previewTooltipRoot.Find(panelName) as RectTransform;
             if (existingRoot != null)
             {
-                var existingBackground = existingRoot.GetComponent<Image>();
-                var existingOutline = existingRoot.GetComponent<Outline>();
+                var existingBackground = existingRoot.GetComponent<UnityEngine.UI.Image>();
+                var existingOutline = existingRoot.GetComponent<UnityEngine.UI.Outline>();
                 var existingTitle = existingRoot.Find(AutoPreviewTooltipTitleName)?.GetComponent<TMP_Text>();
                 var existingDescription = existingRoot.Find(AutoPreviewTooltipDescriptionName)?.GetComponent<TMP_Text>();
-                if (existingBackground != null &&
-                    existingOutline != null &&
-                    existingTitle != null &&
-                    existingDescription != null)
-                {
-                    return new PreviewTooltipPanel(
-                        existingRoot,
-                        existingBackground,
-                        existingOutline,
-                        existingTitle,
-                        existingDescription);
-                }
+                if (existingBackground != null && existingOutline != null &&
+                    existingTitle != null && existingDescription != null)
+                    return new PreviewTooltipPanel(existingRoot, existingBackground,
+                        existingOutline, existingTitle, existingDescription);
             }
 
-            var panelObject = new GameObject(panelName, typeof(RectTransform), typeof(Image), typeof(Outline));
+            var panelObject = new GameObject(panelName, typeof(RectTransform),
+                typeof(UnityEngine.UI.Image), typeof(UnityEngine.UI.Outline));
             panelObject.transform.SetParent(s_previewTooltipRoot, false);
             var panelRoot = panelObject.GetComponent<RectTransform>();
-            var background = panelObject.GetComponent<Image>();
-            var outline = panelObject.GetComponent<Outline>();
+            var background = panelObject.GetComponent<UnityEngine.UI.Image>();
+            var outline = panelObject.GetComponent<UnityEngine.UI.Outline>();
             background.raycastTarget = false;
-
-            var titleObject = new GameObject(
-                AutoPreviewTooltipTitleName,
-                typeof(RectTransform),
-                typeof(TextMeshProUGUI));
-            titleObject.transform.SetParent(panelRoot, false);
-            var title = titleObject.GetComponent<TextMeshProUGUI>();
-            title.alignment = TextAlignmentOptions.MidlineLeft;
-            title.enableAutoSizing = true;
-            title.textWrappingMode = TextWrappingModes.NoWrap;
-            title.overflowMode = TextOverflowModes.Ellipsis;
-            title.raycastTarget = false;
-
-            var descriptionObject = new GameObject(
-                AutoPreviewTooltipDescriptionName,
-                typeof(RectTransform),
-                typeof(TextMeshProUGUI));
-            descriptionObject.transform.SetParent(panelRoot, false);
-            var description = descriptionObject.GetComponent<TextMeshProUGUI>();
-            description.alignment = TextAlignmentOptions.TopLeft;
-            description.enableAutoSizing = true;
-            description.textWrappingMode = TextWrappingModes.Normal;
-            description.overflowMode = TextOverflowModes.Ellipsis;
-            description.raycastTarget = false;
-
-            return new PreviewTooltipPanel(panelRoot, background, outline, title, description);
+            TMP_Text CreateText(string name, TextAlignmentOptions alignment)
+            {
+                var textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+                textObject.transform.SetParent(panelRoot, false);
+                var text = textObject.GetComponent<TextMeshProUGUI>();
+                text.alignment = alignment;
+                text.enableAutoSizing = false;
+                text.textWrappingMode = TextWrappingModes.Normal;
+                text.overflowMode = TextOverflowModes.Overflow;
+                text.raycastTarget = false;
+                return text;
+            }
+            return new PreviewTooltipPanel(panelRoot, background, outline,
+                CreateText(AutoPreviewTooltipTitleName, TextAlignmentOptions.TopLeft),
+                CreateText(AutoPreviewTooltipDescriptionName, TextAlignmentOptions.TopLeft));
         }
 
-        private void ApplyPreviewOverlayLayout(int tooltipCount)
+        private void ApplyPreviewOverlayLayout()
         {
-            if (s_previewOverlayRoot == null || s_previewCardImage == null)
-            {
-                return;
-            }
-
+            if (s_previewOverlayRoot == null || s_previewCardImage == null) return;
             Canvas.ForceUpdateCanvases();
-            _previewTooltipCount = tooltipCount;
             _previewLayoutSize = s_previewOverlayRoot.rect.size;
-            var overlaySize = s_previewOverlayRoot.rect.size;
+            var overlaySize = _previewLayoutSize;
             if (overlaySize.x <= 1f || overlaySize.y <= 1f)
-            {
                 overlaySize = new Vector2(1920f, 1080f);
-            }
+            var layout = CardPreviewTooltipLayout.Calculate(overlaySize.x, overlaySize.y,
+                _cardPreviewSize.x, _cardPreviewSize.y, _previewAbilityEntries.Count,
+                _previewAttachedEntries.Count, _previewInfluenceEntries.Count,
+                MeasurePreviewTooltip, _cardPreviewTooltipSize.x, _cardPreviewTooltipSize.y,
+                _cardPreviewTooltipEdgePadding, _cardPreviewTooltipSideGap, _cardPreviewTooltipVerticalGap);
+            SetPreviewRect(s_previewCardImage.rectTransform, layout.Card);
+            ApplyPreviewTooltipGroupLayout(PreviewTooltipPanels, layout.Abilities, layout.TextScale);
+            ApplyPreviewTooltipGroupLayout(PreviewAttachedPanels, layout.Attached, layout.TextScale);
+            ApplyPreviewTooltipGroupLayout(PreviewInfluencePanels, layout.Influences, layout.TextScale);
+        }
 
-            var edgePadding = Mathf.Max(0f, _cardPreviewTooltipEdgePadding);
-            var sideGap = Mathf.Max(0f, _cardPreviewTooltipSideGap);
-            var verticalGap = Mathf.Max(0f, _cardPreviewTooltipVerticalGap);
-            var baseCardSize = new Vector2(
-                Mathf.Max(1f, _cardPreviewSize.x),
-                Mathf.Max(1f, _cardPreviewSize.y));
-            var minimumPanelWidth = Mathf.Min(210f, Mathf.Max(120f, _cardPreviewTooltipSize.x));
-            var maximumCardWidth = Mathf.Max(
-                baseCardSize.x * 0.45f,
-                overlaySize.x - ((minimumPanelWidth + sideGap + edgePadding) * 2f));
-            var maximumCardHeight = Mathf.Max(baseCardSize.y * 0.45f, overlaySize.y - (edgePadding * 2f));
-            var cardScale = Mathf.Min(
-                1f,
-                maximumCardWidth / baseCardSize.x,
-                maximumCardHeight / baseCardSize.y);
-            cardScale = Mathf.Max(0.45f, cardScale);
-            var resolvedCardSize = baseCardSize * cardScale;
-            s_previewCardImage.rectTransform.sizeDelta = resolvedCardSize;
+        private float MeasurePreviewTooltip(CardPreviewTooltipZone zone, int index, float width, float scale)
+        {
+            var panel = zone == CardPreviewTooltipZone.Ability ? PreviewTooltipPanels[index] :
+                zone == CardPreviewTooltipZone.Attached ? PreviewAttachedPanels[index] : PreviewInfluencePanels[index];
+            ApplyPreviewTooltipFontSize(panel, scale);
+            var textWidth = Mathf.Max(1f, width - 24f * scale);
+            var titleHeight = panel.Title.GetPreferredValues(panel.Title.text, textWidth, Mathf.Infinity).y;
+            if (!panel.Description.gameObject.activeSelf)
+                return titleHeight + 16f * scale;
+            var bodyHeight = panel.Description.GetPreferredValues(panel.Description.text, textWidth, Mathf.Infinity).y;
+            return Mathf.Max(_cardPreviewTooltipSize.y * scale, titleHeight + bodyHeight + 24f * scale);
+        }
 
-            if (tooltipCount <= 0 || s_previewTooltipRoot == null)
+        private void ApplyPreviewTooltipGroupLayout(List<PreviewTooltipPanel> panels,
+            IReadOnlyList<CardPreviewTooltipRect> boxes, float scale)
+        {
+            for (var index = 0; index < boxes.Count; index++)
             {
-                return;
-            }
-
-            var leftCount = OccupantSpecialEffectTooltipCatalog.GetLeftColumnCount(tooltipCount);
-            var rightCount = tooltipCount - leftCount;
-            var largestColumnCount = Mathf.Max(1, Mathf.Max(leftCount, rightCount));
-            var sideAvailableWidth = Mathf.Max(
-                120f,
-                ((overlaySize.x - resolvedCardSize.x) * 0.5f) - sideGap - edgePadding);
-            var panelWidth = Mathf.Min(
-                Mathf.Max(120f, _cardPreviewTooltipSize.x),
-                sideAvailableWidth);
-            var availableColumnHeight = Mathf.Max(
-                90f,
-                overlaySize.y - (edgePadding * 2f) - (verticalGap * (largestColumnCount - 1)));
-            var panelHeight = Mathf.Min(
-                Mathf.Max(80f, _cardPreviewTooltipSize.y),
-                availableColumnHeight / largestColumnCount);
-            var stride = panelHeight + verticalGap;
-            var horizontalPosition = (resolvedCardSize.x * 0.5f) + sideGap + (panelWidth * 0.5f);
-
-            for (var index = 0; index < tooltipCount; index++)
-            {
-                var panel = PreviewTooltipPanels[index];
-                var isLeft = index < leftCount;
-                var localIndex = isLeft ? index : index - leftCount;
-                var columnCount = isLeft ? leftCount : rightCount;
-                var y = ((columnCount - 1) * stride * 0.5f) - (localIndex * stride);
-
-                panel.Root.anchorMin = new Vector2(0.5f, 0.5f);
-                panel.Root.anchorMax = new Vector2(0.5f, 0.5f);
-                panel.Root.pivot = new Vector2(0.5f, 0.5f);
-                panel.Root.anchoredPosition = new Vector2(isLeft ? -horizontalPosition : horizontalPosition, y);
-                panel.Root.sizeDelta = new Vector2(panelWidth, panelHeight);
-                panel.Root.localScale = Vector3.one;
-
-                ApplyPreviewTooltipTextLayout(panel, panelHeight);
+                var panel = panels[index];
+                var box = boxes[index];
+                SetPreviewRect(panel.Root, box);
+                ApplyPreviewTooltipFontSize(panel, scale);
+                var horizontalPadding = 12f * scale;
+                var verticalPadding = 8f * scale;
+                var titleHeight = panel.Title.GetPreferredValues(panel.Title.text,
+                    Mathf.Max(1f, box.Width - 2f * horizontalPadding), Mathf.Infinity).y;
+                if (!panel.Description.gameObject.activeSelf)
+                    verticalPadding = Mathf.Max(verticalPadding, (box.Height - titleHeight) * 0.5f);
+                var titleRect = panel.Title.rectTransform;
+                titleRect.anchorMin = new Vector2(0f, 1f);
+                titleRect.anchorMax = Vector2.one;
+                titleRect.pivot = new Vector2(0.5f, 1f);
+                titleRect.offsetMin = new Vector2(horizontalPadding, -verticalPadding - titleHeight);
+                titleRect.offsetMax = new Vector2(-horizontalPadding, -verticalPadding);
+                if (!panel.Description.gameObject.activeSelf) continue;
+                var descriptionRect = panel.Description.rectTransform;
+                descriptionRect.anchorMin = Vector2.zero;
+                descriptionRect.anchorMax = Vector2.one;
+                descriptionRect.offsetMin = new Vector2(horizontalPadding, verticalPadding);
+                descriptionRect.offsetMax = new Vector2(-horizontalPadding, -verticalPadding - titleHeight - 6f * scale);
             }
         }
 
-        private static void ApplyPreviewTooltipTextLayout(PreviewTooltipPanel panel, float panelHeight)
+        private void ApplyPreviewTooltipFontSize(PreviewTooltipPanel panel, float scale)
         {
-            var horizontalPadding = Mathf.Clamp(panelHeight * 0.11f, 10f, 16f);
-            var verticalPadding = Mathf.Clamp(panelHeight * 0.07f, 6f, 10f);
-            var titleRatio = 0.29f;
+            panel.Title.fontSize = Mathf.Max(18f, _cardPreviewTooltipTitleFontSize) * scale;
+            panel.Description.fontSize = Mathf.Max(14f, _cardPreviewTooltipDescriptionFontSize) * scale;
+        }
 
-            var titleRect = panel.Title.rectTransform;
-            titleRect.anchorMin = new Vector2(0f, 1f - titleRatio);
-            titleRect.anchorMax = Vector2.one;
-            titleRect.offsetMin = new Vector2(horizontalPadding, 0f);
-            titleRect.offsetMax = new Vector2(-horizontalPadding, -verticalPadding);
-
-            var descriptionRect = panel.Description.rectTransform;
-            descriptionRect.anchorMin = Vector2.zero;
-            descriptionRect.anchorMax = new Vector2(1f, 1f - titleRatio);
-            descriptionRect.offsetMin = new Vector2(horizontalPadding, verticalPadding);
-            descriptionRect.offsetMax = new Vector2(-horizontalPadding, 0f);
+        private static void SetPreviewRect(RectTransform rect, CardPreviewTooltipRect box)
+        {
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(box.X, box.Y);
+            rect.sizeDelta = new Vector2(box.Width, box.Height);
+            rect.localScale = Vector3.one;
         }
 
         private TMP_FontAsset ResolvePreviewTooltipFont()

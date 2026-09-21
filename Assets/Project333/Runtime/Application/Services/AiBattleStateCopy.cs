@@ -63,6 +63,7 @@ namespace Project333.Runtime.Application.Services
         private static BoardState CopyBoard(BoardState source, MasterState originalMaster, MasterState master)
         {
             var board = new BoardState();
+            board.RestoreFalloutStacks(source.FalloutStacks);
             foreach (var occupant in source.EnumerateOccupants())
                 board.Place(occupant.Position, ReferenceEquals(occupant, originalMaster) ? master : occupant.CloneDetached());
             return board;
@@ -82,36 +83,14 @@ namespace Project333.Runtime.Application.Services
                     .Append(player.Resources.Mana).Append(',').Append(player.Resources.Qi).Append(',')
                     .Append(player.Resources.Power).Append(',').Append(player.Resources.Gold).Append(':')
                     .Append(player.Deck.Count).Append(',').Append(player.FailedDrawCount).Append(',').Append(player.MaxHandSize);
+                key.Append(':').Append(state.GetBoard(id).FalloutStacks);
                 key.Append(':').Append(player.Hand.Count);
                 if (id == PlayerId.AI)
                     foreach (var card in player.Hand.Cards)
                         key.Append(';').Append(card.CardId).Append(',').Append(card.IsTemporaryReplicate);
                 foreach (var o in state.GetBoard(id).EnumerateOccupants())
                 {
-                    key.Append(';').Append(o.Position).Append(':').Append(o.CardId).Append(',').Append(o.BaseAttack)
-                        .Append(',').Append(o.CurrentHp).Append(',').Append(o.MaxHp).Append(',').Append(o.RemainingAttacksThisTurn)
-                        .Append(',').Append(o.HasSummoningSickness).Append(',').Append(o.WasSummonedThisTurn)
-                        .Append(',').Append(o.IsDrained).Append(',').Append(o.IsErasure).Append(',').Append(o.IsSealbound)
-                        .Append(',').Append(o.SealboundOwnerTurnStartsRemaining).Append(',').Append(o.EndureUsed)
-                        .Append(',').Append(o.HidingRevealed).Append(',').Append(o.IsUnderHuanShu)
-                        .Append(',').Append(o.HuanShuEligibleAfterTurnNumber).Append(',').Append(o.PhysicalDefense)
-                        .Append(',').Append(o.MagicDefense).Append(',').Append(o.DemonKingRevivalCount)
-                        .Append(',').Append(o.DemonKingRevivalTurnStartsRemaining).Append(',').Append(o.OwnerId)
-                        .Append(',').Append(o.AttackType).Append(',').Append(o.DamageType).Append(',').Append(o.CanMove)
-                        .Append(',').Append(o.MaxAttacksPerTurn).Append(',').Append(o.HitsPerAttack)
-                        .Append(',').Append(o.HasBerserker).Append(',').Append(o.HasEndure).Append(',').Append(o.HasShielder)
-                        .Append(',').Append(o.HasLifeSteal).Append(',').Append(o.HasRush).Append(',').Append(o.HasHiding)
-                        .Append(',').Append(o.HasFlying).Append(',').Append(o.HasPiercing).Append(',').Append(o.SpellPower)
-                        .Append(',').Append(o.OriginalAttack).Append(',').Append(o.OriginalMaxHp)
-                        .Append(',').Append(o.OriginalPhysicalDefense).Append(',').Append(o.OriginalMagicDefense)
-                        .Append(',').Append(o.DemonKingRevivalCountdownPlayerId).Append(',').Append(o.DemonKingRevivalEligibleAfterTurnNumber)
-                        .Append(',').Append(o.TurnStartResourceGain.Mana).Append(',').Append(o.TurnStartResourceGain.Qi)
-                        .Append(',').Append(o.TurnStartResourceGain.Power).Append(',').Append(o.TurnStartResourceGain.Gold);
-                    if (o is UnitState u) key.Append(',').Append(u.HasRobot).Append(',').Append(u.SciencePowerUpkeep);
-                    if (o is BuildingState b) key.Append(',').Append(b.SciencePowerUpkeep).Append(',').Append(b.CanAttackAsBuilding);
-                    foreach (var effect in o.InvincibleEffects)
-                        key.Append('!').Append(effect.Duration).Append(',').Append(effect.OwnerTurnsRemaining)
-                            .Append(',').Append(effect.AppliedTurnNumber).Append(',').Append(effect.AppliedActivePlayerId);
+                    AppendOccupantKey(key, o, includePositionAndHp: true);
                 }
             }
             foreach (var effect in state.PersistentEffects)
@@ -124,6 +103,53 @@ namespace Project333.Runtime.Application.Services
                     .Append(',').Append(effect.TurnStartResourceGain.Mana).Append(',').Append(effect.TurnStartResourceGain.Qi)
                     .Append(',').Append(effect.TurnStartResourceGain.Power).Append(',').Append(effect.TurnStartResourceGain.Gold);
             return key.ToString();
+        }
+
+        // Share the search-state fields so focus targeting cannot silently ignore a new tracked status.
+        internal static string FocusTargetKey(OccupantState occupant)
+        {
+            var key = new StringBuilder();
+            AppendOccupantKey(key, occupant, includePositionAndHp: false);
+            key.Append(':').Append(occupant.Kind).Append(',').Append(occupant.Attack)
+                .Append(',').Append(occupant.IsInvincible).Append(',').Append(occupant.HuanShuOwnerTurnsRemaining)
+                .Append(',').Append(occupant.IsDemonKingRevivalPending);
+            return key.ToString();
+        }
+
+        private static void AppendOccupantKey(StringBuilder key, OccupantState o, bool includePositionAndHp)
+        {
+            if (includePositionAndHp) key.Append(';').Append(o.Position).Append(':');
+            key.Append(o.CardId).Append(',').Append(o.BaseAttack);
+            if (includePositionAndHp) key.Append(',').Append(o.CurrentHp);
+            key.Append(',').Append(o.MaxHp).Append(',').Append(o.RemainingAttacksThisTurn)
+                .Append(',').Append(o.HasSummoningSickness).Append(',').Append(o.WasSummonedThisTurn)
+                .Append(',').Append(o.IsDrained).Append(',').Append(o.IsErasure).Append(',').Append(o.IsSealbound)
+                .Append(',').Append(o.SealboundOwnerTurnStartsRemaining).Append(',').Append(o.EndureUsed)
+                .Append(',').Append(o.HidingRevealed).Append(',').Append(o.IsUnderHuanShu)
+                .Append(',').Append(o.HuanShuEligibleAfterTurnNumber).Append(',').Append(o.PhysicalDefense)
+                .Append(',').Append(o.MagicDefense).Append(',').Append(o.DemonKingRevivalCount)
+                .Append(',').Append(o.DemonKingRevivalTurnStartsRemaining).Append(',').Append(o.OwnerId)
+                .Append(',').Append(o.AttackType).Append(',').Append(o.DamageType).Append(',').Append(o.CanMove)
+                .Append(',').Append(o.MaxAttacksPerTurn).Append(',').Append(o.HitsPerAttack)
+                .Append(',').Append(o.HasBerserker).Append(',').Append(o.HasEndure).Append(',').Append(o.HasShielder)
+                .Append(',').Append(o.HasLifeSteal).Append(',').Append(o.HasRush).Append(',').Append(o.HasHiding)
+                .Append(',').Append(o.HasFlying).Append(',').Append(o.HasPiercing).Append(',').Append(o.SpellPower)
+                .Append(',').Append(o.OriginalAttack).Append(',').Append(o.OriginalMaxHp)
+                .Append(',').Append(o.OriginalPhysicalDefense).Append(',').Append(o.OriginalMagicDefense)
+                .Append(',').Append(o.DemonKingRevivalCountdownPlayerId).Append(',').Append(o.DemonKingRevivalEligibleAfterTurnNumber)
+                .Append(',').Append(o.FalloutPlayerStacks).Append(',').Append(o.FalloutAiStacks)
+                .Append(',').Append(o.LastActiveEffectTurnNumber)
+                .Append(',').Append(o.TurnStartResourceGain.Mana).Append(',').Append(o.TurnStartResourceGain.Qi)
+                .Append(',').Append(o.TurnStartResourceGain.Power).Append(',').Append(o.TurnStartResourceGain.Gold);
+            if (o is UnitState u) key.Append(',').Append(string.Join("|", u.Races)).Append(',').Append(u.SciencePowerUpkeep);
+            if (o is BuildingState b) key.Append(',').Append(b.SciencePowerUpkeep).Append(',').Append(b.CanAttackAsBuilding);
+            foreach (var buff in o.CombatStatBuffs)
+                key.Append('~').Append(buff.SourceCardId).Append(',').Append(buff.AttackBonus)
+                    .Append(',').Append(buff.MaxHpBonus).Append(',').Append(buff.PhysicalDefenseBonus)
+                    .Append(',').Append(buff.MagicDefenseBonus);
+            foreach (var effect in o.InvincibleEffects)
+                key.Append('!').Append(effect.Duration).Append(',').Append(effect.OwnerTurnsRemaining)
+                    .Append(',').Append(effect.AppliedTurnNumber).Append(',').Append(effect.AppliedActivePlayerId);
         }
     }
 }

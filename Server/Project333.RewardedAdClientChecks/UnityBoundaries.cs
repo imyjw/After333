@@ -10,6 +10,7 @@ namespace Project333.Runtime.Presentation
 }
 namespace UnityEngine
 {
+    public static class Debug { public static void Log(object value) { } public static void LogWarning(object value) { } }
     public class MonoBehaviour { protected static void DontDestroyOnLoad(object o){} }
     public class GameObject { public GameObject(string name){} public T AddComponent<T>() where T:new()=>new T(); }
     public enum RuntimeInitializeLoadType { BeforeSceneLoad }

@@ -76,6 +76,46 @@ static class BattleConnectionLimitChecks
         pass("20 concurrent account admissions grant two sockets; duplicate cleanup preserves replacements and removes idle registry entries");
     }
 
+    public static async Task CheckDeadlineWakeups(Action<string> pass, CancellationToken ct)
+    {
+        var settings = new BattleConnectionLimitSettings(AuthenticationTimeoutSeconds: 1);
+        var accounts = new BattleAccountConnections(2);
+        var clock = new TestClock();
+        using (var guard = new BattleConnectionGuard(settings, accounts, clock))
+        {
+            clock.Advance(TimeSpan.FromMilliseconds(999));
+            var wait = guard.WaitForAuthenticationExpiryAsync(ct);
+            // Real timer wakes repeatedly, but the authoritative monotonic clock is still early.
+            await Task.Delay(30, ct);
+            Require(!wait.IsCompleted, "An early timer wake must not finish deadline monitoring.");
+            Require(guard.TryAcceptMessage(), "Heartbeat remains legal before authentication expires.");
+            clock.Advance(TimeSpan.FromMilliseconds(1));
+            Require(await wait.WaitAsync(TimeSpan.FromSeconds(2), ct), "Deadline watcher did not retry after an early wake.");
+            Require(guard.Authenticate(Guid.NewGuid()) == BattleAuthenticationAdmission.Expired, "Timed-out authentication was accepted.");
+        }
+        foreach (var authenticate in new[] { true, false })
+        {
+            clock = new TestClock();
+            using var guard = new BattleConnectionGuard(settings, accounts, clock);
+            clock.Advance(TimeSpan.FromMilliseconds(999));
+            var wait = guard.WaitForAuthenticationExpiryAsync(ct);
+            if (authenticate)
+                Require(guard.Authenticate(Guid.NewGuid()) == BattleAuthenticationAdmission.Accepted, "Timely authentication failed.");
+            else guard.Dispose();
+            Require(!await wait.WaitAsync(TimeSpan.FromSeconds(2), ct), "Authenticated/disposed connection must not be expired.");
+        }
+        clock = new TestClock();
+        using (var guard = new BattleConnectionGuard(settings, accounts, clock))
+        using (var cancel = CancellationTokenSource.CreateLinkedTokenSource(ct))
+        {
+            var wait = guard.WaitForAuthenticationExpiryAsync(cancel.Token);
+            cancel.Cancel();
+            try { await wait; throw new InvalidOperationException("Watcher ignored connection cancellation."); }
+            catch (OperationCanceledException) when (cancel.IsCancellationRequested) { }
+        }
+        Require(accounts.TrackedAccountCount == 0, "Deadline checks leaked account admission.");
+        pass("early timer wakes keep authentication monitoring active; exact expiry, timely authentication, disposal and cancellation are preserved");
+    }
     public static async Task CheckNetwork(TestAccount account, NpgsqlConnection db, Action<string> pass, CancellationToken ct)
     {
         await Flood("{\"MessageType\":\"KeepAlive\"}", ct);
@@ -230,7 +270,7 @@ static class BattleConnectionLimitChecks
     {
         private long _ticks;
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
-        public override long GetTimestamp() => _ticks;
-        public void Advance(TimeSpan delta) => _ticks += delta.Ticks;
+        public override long GetTimestamp() => Interlocked.Read(ref _ticks);
+        public void Advance(TimeSpan delta) => Interlocked.Add(ref _ticks, delta.Ticks);
     }
 }

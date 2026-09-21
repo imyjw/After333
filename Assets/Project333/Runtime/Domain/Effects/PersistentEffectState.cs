@@ -72,6 +72,7 @@ namespace Project333.Runtime.Domain.Effects
 
         public bool TargetsOwnerBoard { get; }
 
+        // Legacy snapshot field only. Damage uses the owner's live SpellPower at resolution.
         public int CapturedSpellPower { get; }
 
         public int TargetStartColumn { get; }

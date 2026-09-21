@@ -99,15 +99,30 @@ namespace Project333.Runtime.Application.Services
 
             // A legal attack declaration reveals Hiding before any hit or counterattack resolves.
             attacker.RevealHiding();
-            ResolveCombat(
+            var combatResult = ResolveCombat(
                 battleState,
                 defenderBoard,
                 resolvedTarget.Coord,
                 attacker,
                 defender);
 
+            ResolveHeroAttackKillBonus(attacker, combatResult.AffectedDefenders);
             attacker.RemainingAttacksThisTurn -= 1;
             OccupantDestructionService.ResolveDefeatedOccupants(battleState);
+        }
+
+        private void ResolveHeroAttackKillBonus(OccupantState attacker, IReadOnlyCollection<OccupantState> affectedDefenders)
+        {
+            if (!HeroRules.IsHero(attacker) || !attacker.IsAlive || attacker.EffectsSuppressed) return;
+            // Resolve before destruction effects: only direct attack victims qualify, once per occupant.
+            foreach (var defeated in affectedDefenders)
+            {
+                if (defeated.IsAlive || defeated.Kind == OccupantKind.Master || defeated.OwnerId == attacker.OwnerId) continue;
+                var roll = _randomIndexSelector(2);
+                if (roll < 0 || roll > 1) throw new InvalidOperationException("Hero stat selector returned an invalid index.");
+                if (roll == 0) attacker.ApplyCombatStatBuff(HeroRules.CardId, attackBonus: HeroRules.GrowthAmount);
+                else attacker.ApplyCombatStatBuff(HeroRules.CardId, maxHpBonus: HeroRules.GrowthAmount);
+            }
         }
 
         private ResolvedAttackTarget ResolveAttackTarget(
@@ -255,6 +270,7 @@ namespace Project333.Runtime.Application.Services
                 : declaredDefender;
             var defenderCounterDamage = DamageResolutionRules.GetDamageAgainst(counterattacker, attacker);
             var defenderCounterDamageType = counterattacker.DamageType;
+            var defenderCounterHits = counterattacker.EffectiveHitsPerAttack;
             var defenderCanCounterattack =
                 attacker.AttackType == AttackType.Melee &&
                 counterattacker.AttackType == AttackType.Melee &&
@@ -285,6 +301,7 @@ namespace Project333.Runtime.Application.Services
                     attackerDamageType,
                     defenderCounterDamage,
                     defenderCounterDamageType,
+                    defenderCounterHits,
                     affectedDefenders);
                 return new CombatResolutionResult(affectedDefenders);
             }
@@ -313,6 +330,8 @@ namespace Project333.Runtime.Application.Services
             DamageType attackerDamageType,
             ISet<OccupantState> affectedDefenders)
         {
+            attackerDamagePerHit = SpellPowerRules.ApplyCurrent(
+                battleState, attacker.OwnerId, attackerDamagePerHit, attackerDamageType);
             var shielderInfo = ShielderService.ResolveForNormalAttack(
                 defenderBoard,
                 declaredTargetCoord,
@@ -425,8 +444,14 @@ namespace Project333.Runtime.Application.Services
             DamageType attackerDamageType,
             int defenderCounterDamage,
             DamageType defenderCounterDamageType,
+            int defenderCounterHits,
             ISet<OccupantState> affectedDefenders)
         {
+            // The final melee hit and counterattack are simultaneous: read both sides before HP changes.
+            attackerDamagePerHit = SpellPowerRules.ApplyCurrent(
+                battleState, attacker.OwnerId, attackerDamagePerHit, attackerDamageType);
+            defenderCounterDamage = SpellPowerRules.ApplyCurrent(
+                battleState, counterattacker.OwnerId, defenderCounterDamage, defenderCounterDamageType);
             var damageDealtByAttacker = ApplyAttackDamagePacketWithoutHitEffects(
                 battleState,
                 defenderBoard,
@@ -443,19 +468,27 @@ namespace Project333.Runtime.Application.Services
                 attackerDamagePerHit,
                 attackerDamageType,
                 affectedDefenders);
-            var counterattackDamage = DamageResolutionRules.ApplyAttackDamage(
-                attacker,
-                defenderCounterDamage,
-                defenderCounterDamageType);
-            BattleValuePopupRecorder.RecordDamage(
-                battleState,
-                attacker,
-                counterattackDamage,
-                BattleValueChangeCause.Counterattack,
-                defenderCounterDamageType,
-                counterattacker.OwnerId,
-                counterattacker.RuntimeId,
-                counterattacker.CardId);
+            var counterattackDamage = 0;
+            // The counterattacker's own hit count applies once per exchange, independently
+            // of the attacker's hit count. Keep separate packets for defense and Endure.
+            // As with the existing simultaneous exchange, defeat does not cancel these hits.
+            for (var hitIndex = 0; hitIndex < defenderCounterHits; hitIndex++)
+            {
+                var hitDamage = DamageResolutionRules.ApplyAttackDamage(
+                    attacker,
+                    defenderCounterDamage,
+                    defenderCounterDamageType);
+                counterattackDamage += hitDamage;
+                BattleValuePopupRecorder.RecordDamage(
+                    battleState,
+                    attacker,
+                    hitDamage,
+                    BattleValueChangeCause.Counterattack,
+                    defenderCounterDamageType,
+                    counterattacker.OwnerId,
+                    counterattacker.RuntimeId,
+                    counterattacker.CardId);
+            }
 
             ApplyAttackHitEffectsIfAlive(battleState, attacker, damageDealtByAttacker);
             ApplyAttackHitEffectsIfAlive(battleState, counterattacker, counterattackDamage);

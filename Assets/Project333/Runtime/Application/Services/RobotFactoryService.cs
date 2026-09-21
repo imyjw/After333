@@ -46,7 +46,7 @@ namespace Project333.Runtime.Application.Services
             foreach (var definition in cardDefinitionProvider.GetAll())
             {
                 if (definition is UnitCardDefinition unit &&
-                    unit.HasRobot &&
+                    unit.HasRace(UnitRace.Robot) &&
                     unit.IncludeInDraft)
                 {
                     _eligibleRobots.Add(unit);

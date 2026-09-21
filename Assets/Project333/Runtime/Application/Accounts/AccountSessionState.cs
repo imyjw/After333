@@ -244,6 +244,16 @@ namespace Project333.Runtime.Application.Accounts
             }
         }
 
+        public static bool ApplyGiftWallet(string expectedAccountId, string expectedSessionToken, WalletDto wallet)
+        {
+            if (wallet == null || string.IsNullOrWhiteSpace(expectedAccountId) || string.IsNullOrWhiteSpace(expectedSessionToken) ||
+                !string.Equals(AccountId, expectedAccountId, StringComparison.Ordinal) ||
+                !string.Equals(SessionToken, expectedSessionToken, StringComparison.Ordinal)) return false;
+            ResourceGold = wallet.ResolvedResourceGold;
+            Tickets = wallet.ResolvedTickets;
+            return true;
+        }
+
         public static void ApplyRewardedAdWallet(WalletDto wallet)
         {
             if (wallet == null)

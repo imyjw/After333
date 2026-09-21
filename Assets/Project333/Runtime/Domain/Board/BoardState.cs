@@ -11,6 +11,16 @@ namespace Project333.Runtime.Domain.Board
 
         private readonly OccupantState[,] _tiles = new OccupantState[ColumnCount, RowCount];
 
+        public int FalloutStacks { get; private set; }
+
+        public void RestoreFalloutStacks(int stacks) => FalloutStacks = Math.Max(0, stacks);
+
+        public void AddFalloutStack()
+        {
+            FalloutStacks++;
+            foreach (var occupant in EnumerateOccupants()) occupant.ApplyFalloutExposure(FalloutStacks);
+        }
+
         public bool IsInside(TileCoord coord)
         {
             return coord.Column >= 0 &&
@@ -49,6 +59,7 @@ namespace Project333.Runtime.Domain.Board
             _tiles[coord.Column, coord.Row] = occupant;
             occupant.Position = coord;
             occupant.AttachToBoard(this);
+            occupant.ApplyFalloutExposure(FalloutStacks);
         }
 
         public OccupantState Remove(TileCoord coord)

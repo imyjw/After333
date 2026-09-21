@@ -59,18 +59,18 @@ namespace Project333.Tests.EditMode
                     canMove: true,
                     isScience: true,
                     sciencePowerUpkeep: 1,
-                    hasRobot: true),
+                    races: new[] { UnitRace.Robot }),
             });
 
             var unit = service.PlayUnitCard(battleState, PlayerId.Player, "robot-unit", new TileCoord(0, 0));
 
-            Assert.That(unit.HasRobot, Is.True);
+            Assert.That(unit.HasRace(UnitRace.Robot), Is.True);
 
             unit.IsDrained = true;
             unit.ApplyErasure();
 
-            Assert.That(unit.HasRobot, Is.True, "The serialized card tag remains available for restoration and UI.");
-            Assert.That(unit.HasActiveRobot, Is.False, "Erasure suppresses the Robot classification in battle rules.");
+            Assert.That(unit.HasRace(UnitRace.Robot), Is.True, "The serialized card tag remains available for restoration and UI.");
+            Assert.That(RobotFusionRules.IsEligibleRobot(unit), Is.True, "Erasure does not change a unit race.");
             Assert.That(unit.IsDrained, Is.False, "Applying Erasure immediately clears Drained.");
         }
 

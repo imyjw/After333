@@ -367,6 +367,26 @@ namespace Project333.Runtime.Application.Services
                         handCardRuntimeId);
                     return;
 
+                case MagicAmplificationCircleRules.EffectId:
+                    if (hasTarget)
+                        throw new InvalidOperationException("Magic Amplification Circle does not use a board target.");
+                    ConsumeSpellCard(battleState.GetPlayer(casterId), cardId, definition.Cost, handCardRuntimeId);
+                    battleState.PersistentEffects.Add(new PersistentEffectState(
+                        sourceCardId: cardId,
+                        ownerId: casterId,
+                        effectId: MagicAmplificationCircleRules.EffectId,
+                        appliedTurn: battleState.TurnNumber,
+                        endConditionText: "내 턴 종료 시",
+                        turnStartResourceGain: new ResourceSet()));
+                    return;
+
+                case NuclearRules.EffectId:
+                    if (hasTarget) throw new InvalidOperationException("Nuclear does not use a board target.");
+                    ConsumeSpellCard(battleState.GetPlayer(casterId), cardId, definition.Cost, handCardRuntimeId);
+                    battleState.GetOpponentBoard(casterId).AddFalloutStack();
+                    OccupantDestructionService.DestroyUnsealedSummons(battleState);
+                    return;
+
                 case TimedBombRules.EffectId:
                     if (hasTarget)
                     {
@@ -520,7 +540,7 @@ namespace Project333.Runtime.Application.Services
         {
             var caster = battleState.GetPlayer(casterId);
             ConsumeSpellCard(caster, cardId, cost, handCardRuntimeId);
-            caster.Master.IncreaseBaseAttack(DaehwandanMasterAttackBonus);
+            caster.Master.ApplyCombatStatBuff(cardId, attackBonus: DaehwandanMasterAttackBonus);
 
             battleState.PersistentEffects.Add(new PersistentEffectState(
                 sourceCardId: cardId,
@@ -661,10 +681,6 @@ namespace Project333.Runtime.Application.Services
 
             var upgradeLevel = _cardUpgradeLevelProvider.GetUpgradeLevel(casterId, definition.CardId);
             var effectDamage = CardLevelSpellRules.ApplyDamageBonus(definition.Damage, upgradeLevel);
-            var capturedSpellPower = SpellPowerRules.Capture(
-                battleState,
-                casterId,
-                definition.DamageType);
             battleState.PersistentEffects.Add(new PersistentEffectState(
                 sourceCardId: cardId,
                 ownerId: casterId,
@@ -677,7 +693,7 @@ namespace Project333.Runtime.Application.Services
                 effectDamage: effectDamage,
                 effectDamageType: definition.DamageType,
                 targetsOwnerBoard: targetOwnerId == casterId,
-                capturedSpellPower: capturedSpellPower));
+                capturedSpellPower: 0));
         }
 
         private void CastTimedBomb(
@@ -728,7 +744,6 @@ namespace Project333.Runtime.Application.Services
 
             var upgradeLevel = _cardUpgradeLevelProvider.GetUpgradeLevel(casterId, definition.CardId);
             var effectDamage = CardLevelSpellRules.ApplyDamageBonus(definition.Damage, upgradeLevel);
-            var capturedSpellPower = SpellPowerRules.Capture(battleState, casterId, definition.DamageType);
             battleState.PersistentEffects.Add(new PersistentEffectState(
                 sourceCardId: cardId,
                 ownerId: casterId,
@@ -740,7 +755,7 @@ namespace Project333.Runtime.Application.Services
                 effectDamage: effectDamage,
                 effectDamageType: definition.DamageType,
                 targetStartColumn: targetCoord.Column,
-                capturedSpellPower: capturedSpellPower));
+                capturedSpellPower: 0));
         }
 
         private static void CastImmediateResourceSpell(

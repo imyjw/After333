@@ -99,12 +99,13 @@ namespace Project333.Tests.EditMode
 
         [TestCase(0, false, 0)]
         [TestCase(5, true, 4)]
-        public void Firewall_UsesCapturedSpellPowerAndSummonedUnitDefense(int magicDefense, bool shouldSummon, int expectedHp)
+        public void Firewall_UsesCurrentSpellPowerAndSummonedUnitDefense(int magicDefense, bool shouldSummon, int expectedHp)
         {
             var state = State();
             state.PersistentEffects.Add(new PersistentEffectState("firewall", PlayerId.Player, "firewall",
                 state.TurnNumber, "After three global turn starts", new ResourceSet(), targetRow: 1,
                 remainingTriggers: 3, effectDamage: 20, effectDamageType: DamageType.Magic, capturedSpellPower: 7));
+            state.PlayerBoard.Place(new TileCoord(4, 0), new UnitState("power", "power", PlayerId.Player, new TileCoord(4, 0), AttackType.Melee, 0, 100, true, false, 0, spellPower: 7));
             var card = Card("firewall-target", 26, magicDefense: magicDefense);
             var provider = GiveCard(state, card);
             var command = Planner(provider).GetNextCommand(state);

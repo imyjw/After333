@@ -19,6 +19,8 @@ namespace Project333.Runtime.Application.Online
 
             var playerBoard = new BoardState();
             var aiBoard = new BoardState();
+            playerBoard.RestoreFalloutStacks(view.PlayerFalloutStacks);
+            aiBoard.RestoreFalloutStacks(view.OpponentFalloutStacks);
 
             var playerMaster = CreateFallbackMaster(PlayerId.Player);
             var aiMaster = CreateFallbackMaster(PlayerId.AI);
@@ -207,7 +209,7 @@ namespace Project333.Runtime.Application.Online
                         damageType: view.DamageType,
                         physicalDefense: view.PhysicalDefense,
                         magicDefense: view.MagicDefense,
-                        hasRobot: view.HasRobot,
+                        races: view.Races ?? (view.HasRobot ? new[] { UnitRace.Robot } : System.Array.Empty<UnitRace>()),
                         hasRush: view.HasRush,
                         hasHiding: view.HasHiding,
                         hasFlying: view.HasFlying,
@@ -260,9 +262,25 @@ namespace Project333.Runtime.Application.Online
             }
 
             occupant.RestoreInvincibleEffects(invincibleEffects);
+            var combatStatBuffs = new List<CombatStatBuffState>();
+            if (view.CombatStatBuffs != null)
+            {
+                foreach (var buff in view.CombatStatBuffs)
+                {
+                    if (buff == null) continue;
+                    combatStatBuffs.Add(new CombatStatBuffState(
+                        buff.SourceCardId, buff.AttackBonus, buff.MaxHpBonus,
+                        buff.PhysicalDefenseBonus, buff.MagicDefenseBonus));
+                }
+            }
+            occupant.RestoreCombatStatBuffs(combatStatBuffs);
             occupant.WasSummonedThisTurn = view.WasSummonedThisTurn;
             occupant.HasSummoningSickness = view.HasSummoningSickness;
             occupant.RemainingAttacksThisTurn = view.RemainingAttacksThisTurn;
+            var viewerIsPlayer = stateView.ViewerId == PlayerId.Player;
+            occupant.RestoreFallout(viewerIsPlayer ? view.FalloutPlayerStacks : view.FalloutAiStacks,
+                viewerIsPlayer ? view.FalloutAiStacks : view.FalloutPlayerStacks);
+            occupant.RestoreActiveEffectUsage(view.LastActiveEffectTurnNumber);
             occupant.EndureUsed = view.EndureUsed;
             return occupant;
         }

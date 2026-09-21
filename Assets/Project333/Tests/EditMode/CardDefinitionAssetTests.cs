@@ -49,7 +49,7 @@ namespace Project333.Tests.EditMode
                 damageType: DamageType.Magic,
                 physicalDefense: 2,
                 magicDefense: 3,
-                hasRobot: true);
+                races: new[] { UnitRace.Robot });
 
             var definition = (UnitCardDefinition)asset.ToDefinition();
 
@@ -78,7 +78,7 @@ namespace Project333.Tests.EditMode
             Assert.That(definition.DamageType, Is.EqualTo(DamageType.Magic));
             Assert.That(definition.PhysicalDefense, Is.EqualTo(2));
             Assert.That(definition.MagicDefense, Is.EqualTo(3));
-            Assert.That(definition.HasRobot, Is.True);
+            Assert.That(definition.HasRace(UnitRace.Robot), Is.True);
             Assert.That(asset.SpecialEffectText, Does.Contain("속공"));
         }
 
@@ -126,7 +126,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void UnitCardDefinitionAsset_SpecialEffectText_WhenRobotFlagExists_AppendsRobotText()
+        public void UnitCardDefinitionAsset_SpecialEffectText_WhenRobotRaceExists_DoesNotAppendSpecialEffectText()
         {
             var asset = ScriptableObject.CreateInstance<UnitCardDefinitionAsset>();
             asset.ConfigureForTests(
@@ -139,9 +139,9 @@ namespace Project333.Tests.EditMode
                 turnStartResourceGain: new ResourceSetData(0, 0, 0, 0),
                 maxAttacksPerTurn: 1,
                 canAttackOnSummon: false,
-                hasRobot: true);
+                races: new[] { UnitRace.Robot });
 
-            Assert.That(asset.SpecialEffectText, Is.EqualTo("전력 -1" + System.Environment.NewLine + "로봇"));
+            Assert.That(asset.SpecialEffectText, Is.EqualTo("전력 -1"));
         }
 
         [Test]

@@ -9,6 +9,11 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <Compile Include="RunAuthorityChecks.cs" />
+    <Compile Include="ServerRestartCancellationChecks.cs" />
+    <Compile Include="PveReconnectChecks.cs" />
+    <Compile Include="AiChallengeChecks.cs" />
+    <Compile Include="AiFallbackChecks.cs" />
+    <Compile Include="PveReconnectConcurrencyChecks.cs" />
     <Compile Include="SavedDraftOfferChecks.cs" />
     <Compile Include="BattleParticipantChecks.cs" />
     <Compile Include="BattleBindingNetworkChecks.cs" />
@@ -17,6 +22,7 @@
     <Compile Include="BattleInputChecks.cs" />
     <Compile Include="RunStartAtomicityChecks.cs" />
     <Compile Include="AccountOperationChecks.cs" />
+    <Compile Include="GiftInboxChecks.cs" />
     <Compile Include="BattleConnectionLimitChecks.cs" />
     <Compile Include="MatchmakingReservationChecks.cs" />
     <Reference Include="Project333.PvpServer"><HintPath>$(ServerOutput)\Project333.PvpServer.dll</HintPath></Reference>

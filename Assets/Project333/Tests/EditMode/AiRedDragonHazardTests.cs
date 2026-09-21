@@ -61,8 +61,8 @@ namespace Project333.Tests.EditMode
         }
 
         [TestCase(100, 0, false)]
-        [TestCase(0, 1, true)]
-        public void EnemyRedDragon_UsesMagicDefenseAndDoesNotAddSpellPowerToItsTriggeredDamage(
+        [TestCase(0, 11, true)]
+        public void EnemyRedDragon_UsesMagicDefenseAndAddsCurrentSpellPowerToItsTriggeredDamage(
             int physicalDefense, int magicDefense, bool shouldSummon)
         {
             var state = State();

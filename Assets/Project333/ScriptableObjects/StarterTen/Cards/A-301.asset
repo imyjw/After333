@@ -23,7 +23,7 @@ MonoBehaviour:
   _affiliation: 2
   _chargeTileFootprint: 1
   _effectText: 
-  _specialEffectText: "\uBE44\uD589\n\uB85C\uBD07\n\uC804\uB825 -1\n\uBCF5\uC81C"
+  _specialEffectText: "비행, 전력 -1, 복제"
   _hasReplicate: 1
   _boardSprite: {fileID: 439316658, guid: d844383a5b27c4f428917c17331128b1, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: 46d9d6ef07bae8047b36b48d3ac244b6, type: 2}
@@ -38,7 +38,7 @@ MonoBehaviour:
   _hasEndure: 0
   _hasShielder: 0
   _hasLifeSteal: 0
-  _hasRobot: 1
+  _races: 01000000
   _canMove: 1
   _sealboundOwnerTurnStarts: 0
   _hasHiding: 0

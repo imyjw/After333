@@ -24,6 +24,14 @@ public sealed partial class PvpMatchmakingService
         await using var tx = await db.BeginTransactionAsync(ct);
         await LockMatchmakingAsync(db, tx, ct);
         await ExpireReservationsAsync(db, tx, ct);
+        await using (var challenge = new NpgsqlCommand("""
+            select exists(select 1 from ai_challenge_attempts where account_id=@account and status in ('reserved','active'));
+            """, db, tx))
+        {
+            challenge.Parameters.AddWithValue("account", account);
+            if ((bool)(await challenge.ExecuteScalarAsync(ct))!)
+                throw new InvalidOperationException("This account already has an active AI challenge.");
+        }
 
         // The same account cannot obtain several pending seats through parallel sockets.
         await using (var own = new NpgsqlCommand("""
@@ -77,7 +85,7 @@ public sealed partial class PvpMatchmakingService
                     union select r.seat from pvp_match_reservations r where r.match_id=m.id
                 ) s
             ) o
-            where m.match_status='waiting' and m.started_at is null and o.count=1
+            where m.match_status='waiting' and m.started_at is null and m.opponent_kind='human' and o.count=1
             order by m.created_at, m.id limit 1 for update of m;
             """, db, tx))
         {
@@ -157,7 +165,8 @@ public sealed partial class PvpMatchmakingService
                 delete from pvp_match_reservations r using pvp_matches m
                 where r.id=@id and r.match_id=@match and r.account_id=@account and r.connection_id=@connection
                   and r.seat=@seat and r.run_id is not distinct from @run and r.deck_id is not distinct from @deck
-                  and r.expires_at>clock_timestamp() and m.id=r.match_id and m.match_status='waiting' and m.started_at is null;
+                  and r.expires_at>clock_timestamp() and m.id=r.match_id and m.match_status='waiting' and m.started_at is null
+                  and m.opponent_kind='human';
                 """, db, tx);
             consume.Parameters.AddWithValue("id", record.ReservationId.Value);
             consume.Parameters.AddWithValue("match", matchId);
@@ -172,7 +181,11 @@ public sealed partial class PvpMatchmakingService
             select exists(select 1 from pvp_match_reservations where match_id=@match and (seat=@seat or account_id=@account))
                 or exists(select 1 from pvp_match_players p join pvp_match_connections c on c.match_id=p.match_id and c.account_id=p.account_id
                     where p.match_id=@match and p.seat=@seat and p.account_id<>@account and c.connection_status='active')
-                or exists(select 1 from pvp_matches where id=@match and match_status in ('completed','canceled'));
+                or exists(select 1 from pvp_matches where id=@match and match_status in ('completed','canceled'))
+                or exists(select 1 from pvp_matches m where m.id=@match and m.opponent_kind='ai'
+                    and not exists(select 1 from pvp_match_players p
+                        where p.match_id=m.id and p.account_id=@account and p.seat=@seat
+                          and p.account_id=m.ai_fallback_account_id));
             """, db, tx);
         check.Parameters.AddWithValue("match", matchId);
         check.Parameters.AddWithValue("account", accountId);

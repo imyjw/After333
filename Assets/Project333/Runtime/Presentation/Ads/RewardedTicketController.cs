@@ -55,6 +55,7 @@ namespace Project333.Runtime.Presentation.Ads
         private bool _isRequestingAttempt;
         private float _nextUiRefresh;
         private string _displayOwner;
+        private string _lastDiagnostic;
         private bool _buttonNeedsDefaultLayout;
         private bool _buttonLabelNeedsDefaultLayout;
         private bool _statusNeedsDefaultLayout;
@@ -224,6 +225,12 @@ namespace Project333.Runtime.Presentation.Ads
             _watchAdButton.gameObject.SetActive(true);
             _watchAdButton.interactable = IsConfigured && authenticated && !busy && (_adService?.IsReady ?? false);
             _watchAdButtonLabel.text = BuildButtonLabel(authenticated);
+            var diagnostic = $"configured={IsConfigured}, authenticated={authenticated}, requesting={_isRequestingAttempt}, pending={PendingRewardedAd.HasPending(AccountServerUrl, AccountSessionState.AccountId)}, blocked={PendingRewardedAd.IsBlocking(AccountServerUrl, AccountSessionState.AccountId)}, showing={_adService?.IsShowing ?? false}, ready={_adService?.IsReady ?? false}, enabled={_watchAdButton.interactable}";
+            if (_lastDiagnostic != diagnostic)
+            {
+                _lastDiagnostic = diagnostic;
+                Debug.Log($"After333 rewarded ad button: {diagnostic}");
+            }
 
             if (_rewardedAdStatusText != null)
             {
@@ -339,7 +346,8 @@ namespace Project333.Runtime.Presentation.Ads
                     SetStatus(errorMessage);
                     return;
                 }
-                SetStatus("광고 재생 중입니다.");
+                // Playback/loading status belongs to the SDK and must not survive a closed ad.
+                SetStatus(string.Empty);
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
@@ -389,7 +397,7 @@ namespace Project333.Runtime.Presentation.Ads
 
         private string BuildStatusText(bool authenticated)
         {
-            if (!(_adService?.IsShowing ?? false) && PendingRewardedAd.HasPending(AccountServerUrl, AccountSessionState.AccountId)) return string.Empty;
+            if (!(_adService?.IsShowing ?? false) && PendingRewardedAd.IsBlocking(AccountServerUrl, AccountSessionState.AccountId)) return string.Empty;
             if (!string.IsNullOrWhiteSpace(_lastStatusMessage))
             {
                 return _lastStatusMessage;

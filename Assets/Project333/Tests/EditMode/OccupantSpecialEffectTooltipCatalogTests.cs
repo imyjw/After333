@@ -26,7 +26,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Build_ListsCardTraitsAndStatusesInLockedOrderWithoutRobotTooltip()
+        public void Build_ListsCardTraitsWithoutAttachedStatuses()
         {
             var definition = new UnitCardDefinition(
                 "tooltip_unit",
@@ -44,7 +44,7 @@ namespace Project333.Tests.EditMode
                 hasEndure: true,
                 hasShielder: true,
                 hasLifeSteal: true,
-                hasRobot: true,
+                races: new[] { UnitRace.Robot },
                 hasRush: true,
                 hasReplicate: true,
                 sealboundOwnerTurnStarts: 2,
@@ -70,7 +70,7 @@ namespace Project333.Tests.EditMode
                 hasEndure: definition.HasEndure,
                 hasShielder: definition.HasShielder,
                 hasLifeSteal: definition.HasLifeSteal,
-                hasRobot: definition.HasRobot,
+                races: definition.Races,
                 hasRush: definition.HasRush,
                 hasHiding: definition.HasHiding,
                 hasFlying: definition.HasFlying,
@@ -94,7 +94,6 @@ namespace Project333.Tests.EditMode
                 "흡혈",
                 "속공",
                 "복제",
-                "방전",
                 "봉인 2",
                 "은신",
                 "비행",
@@ -102,6 +101,11 @@ namespace Project333.Tests.EditMode
                 "무적",
             }));
             Assert.That(titles, Does.Not.Contain("로봇"));
+            Assert.That(entries.Single(entry => entry.Title == "주문력 +4").Description,
+                Is.EqualTo("마법 데미지를 입힐 때, 주문력만큼의 추가 마법 데미지를 준다."));
+            Assert.That(
+                entries.Single(entry => entry.Title == "3연타").Description,
+                Is.EqualTo("공격하거나 반격할 때 각각 3회 타격합니다."));
             Assert.That(
                 entries.Single(entry => entry.Title == "관통").Description,
                 Is.EqualTo("대상을 일반공격 시 같은 열의 반대편 대상에게도 피해를 입힙니다."));
@@ -114,7 +118,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Build_ShowsErasureOnlyWhileCurrentOccupantHasErasure()
+        public void Build_LeavesErasureToAttachedCatalog()
         {
             var occupant = new UnitState(
                 "erasure-runtime",
@@ -136,7 +140,8 @@ namespace Project333.Tests.EditMode
 
             Assert.That(
                 OccupantSpecialEffectTooltipCatalog.Build(null, occupant).Select(entry => entry.Title),
-                Does.Contain("망각"));
+                Does.Not.Contain("망각"));
+            Assert.That(OccupantStatusTooltipCatalog.BuildAttached(null, occupant, null).Select(entry => entry.Title), Does.Contain("망각"));
         }
 
         [Test]
@@ -163,12 +168,13 @@ namespace Project333.Tests.EditMode
             var returnTooltip = entries.Single(entry => entry.Title == "마왕의 귀환");
 
             Assert.That(returnTooltip.Description, Does.Contain("ATK/HP +33"));
-            Assert.That(returnTooltip.Description, Does.Contain("남은 턴 시작: 2"));
+            Assert.That(returnTooltip.Description, Does.Not.Contain("남은 턴 시작"));
+            Assert.That(OccupantStatusTooltipCatalog.BuildAttached(null, occupant, null).Single(entry => entry.Title == "마왕 부활 대기").Description, Is.Empty);
             Assert.That(entries.Select(entry => entry.Title), Has.None.StartsWith("봉인 "));
         }
 
         [Test]
-        public void Build_Hero_ShowsGrowthAndRemainingGlobalTurnEnds()
+        public void Build_Hero_ShowsRushWithoutRemovedSpecialEffects()
         {
             var occupant = new UnitState(
                 "hero-runtime",
@@ -181,19 +187,12 @@ namespace Project333.Tests.EditMode
                 true,
                 false,
                 0,
-                damageType: DamageType.Fixed);
-            occupant.AddInvincibleEffect(
-                InvincibleDurationType.GlobalTurnEnds,
-                HeroRules.InvincibleTurnEnds);
+                damageType: DamageType.Fixed, hasRush: true);
 
             var entries = OccupantSpecialEffectTooltipCatalog.Build(null, occupant);
 
-            Assert.That(
-                entries.Single(entry => entry.Title == "용사의 성장").Description,
-                Does.Contain("ATK +13 또는 HP +13"));
-            Assert.That(
-                entries.Single(entry => entry.Title == "무적").Description,
-                Does.Contain("남은 턴 종료: 3"));
+            Assert.That(entries.Any(entry => entry.Title == "속공"), Is.True);
+            Assert.That(entries.Any(entry => entry.Title == "용사의 성장" || entry.Title == "무적"), Is.False);
         }
     }
 }

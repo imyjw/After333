@@ -217,6 +217,21 @@ namespace Project333.Runtime.Application.Accounts
                 cancellationToken);
         }
 
+        public async Task<PvpReconnectStatusResponse> GetBattleReconnectStatusAsync(
+            string sessionToken,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(sessionToken))
+            {
+                throw new InvalidOperationException("Server session token is missing.");
+            }
+
+            return await GetJsonAsync<PvpReconnectStatusResponse>(
+                "/battle/reconnect-status",
+                sessionToken,
+                cancellationToken);
+        }
+
         private async Task<TResponse> GetPublicJsonAsync<TResponse>(
             string path,
             CancellationToken cancellationToken)
@@ -515,6 +530,9 @@ namespace Project333.Runtime.Application.Accounts
         public string OnlineSeatId;
         public int RemainingSeconds;
         public string ReconnectDeadlineUtc;
+        public string BattleMode;
+        public string GameMode;
+        public string AiChallengeAttemptId;
 
         public bool hasReconnectableBattle;
         public string matchId;
@@ -522,8 +540,20 @@ namespace Project333.Runtime.Application.Accounts
         public string onlineSeatId;
         public int remainingSeconds;
         public string reconnectDeadlineUtc;
+        public string battleMode;
+        public string gameMode;
+        public string aiChallengeAttemptId;
 
         public bool ResolvedHasReconnectableBattle => HasReconnectableBattle || hasReconnectableBattle;
+        public string ResolvedBattleMode => string.IsNullOrWhiteSpace(BattleMode)
+            ? (string.IsNullOrWhiteSpace(battleMode) ? "pvp" : battleMode)
+            : BattleMode;
+        public string ResolvedGameMode => string.IsNullOrWhiteSpace(GameMode)
+            ? (string.IsNullOrWhiteSpace(gameMode) ? "run" : gameMode) : GameMode;
+        public string ResolvedAiChallengeAttemptId => string.IsNullOrWhiteSpace(AiChallengeAttemptId)
+            ? aiChallengeAttemptId : AiChallengeAttemptId;
+        public bool ResolvedIsAiChallenge => string.Equals(ResolvedGameMode, "ai_challenge", StringComparison.OrdinalIgnoreCase);
+        public bool ResolvedIsServerAiBattle => string.Equals(ResolvedBattleMode, "pve", StringComparison.OrdinalIgnoreCase);
         public string ResolvedMatchId => string.IsNullOrWhiteSpace(MatchId) ? matchId : MatchId;
         public string ResolvedSeatId => string.IsNullOrWhiteSpace(SeatId) ? seatId : SeatId;
         public string ResolvedOnlineSeatId => string.IsNullOrWhiteSpace(OnlineSeatId) ? onlineSeatId : OnlineSeatId;

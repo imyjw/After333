@@ -119,6 +119,57 @@ await new RewardedAdRecovery().RecoverAsync();
 Require(PendingRewardedAd.HasPending(url,owner),"Corrupt metadata was silently discarded.");
 Pass("corrupt saved metadata fails closed without losing the record or sending invalid identity");
 
+// Process death: durable attempt survives, but no Rewarded or Closed callback runs.
+Reset();PendingRewardedAd.Remember(url,owner,id);
+RewardedAdRecovery.ObserveShow(ad,url,owner,id);ad.TryShow("p","t",out _);
+var savedAtKill=System.Text.Json.JsonSerializer.Serialize(PlayerPrefs.Values);
+typeof(RewardedAdRecovery).GetMethod("Initialize",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Static)!.Invoke(null,null);
+RewardedAdRecovery.Resolved+=(_,_,_)=>notices++;
+ad.IsShowing=false;
+PlayerPrefs.Values=System.Text.Json.JsonSerializer.Deserialize<Dictionary<string,string>>(savedAtKill);
+Require(PendingRewardedAd.IsBlocking(url,owner),"Restart must wait for the server before allowing another ad.");
+UnityWebRequest.OnSend=r=>{RequireGet(r);r.result=UnityWebRequest.Result.ConnectionError;r.responseCode=503;r.error="offline";};
+await new RewardedAdRecovery().RecoverAsync();
+Require(PendingRewardedAd.IsBlocking(url,owner),"Failed verification unlocked an interrupted ad.");
+UnityWebRequest.OnSend=r=>{RequireGet(r);r.result=UnityWebRequest.Result.Success;r.downloadHandler.text=$"{{\"attemptId\":\"{Guid.NewGuid():D}\",\"status\":\"pending\"}}";};
+await new RewardedAdRecovery().RecoverAsync();
+Require(PendingRewardedAd.IsBlocking(url,owner),"Unrelated pending response unlocked an interrupted ad.");
+Reply("pending");
+await new RewardedAdRecovery().RecoverAsync();
+Require(!PendingRewardedAd.IsBlocking(url,owner),"App killed during ad stays blocked after matching server pending response.");
+Require(PendingRewardedAd.Load(url,owner).AttemptId==id && !PendingRewardedAd.Load(url,owner).Rewarded && AccountSessionState.Applied==0 && notices==0,"Interrupted recovery lost identity or invented a reward/terminal notice.");
+Reply("granted");await new RewardedAdRecovery().RecoverAsync();
+Require(!PendingRewardedAd.HasPending(url,owner)&&AccountSessionState.Applied==1,"Late server reward after interruption was lost.");
+Pass("process death without SDK callbacks unlocks only after matching server pending; retains identity and recovers a late grant");
+
+Reset();PendingRewardedAd.Remember(url,owner,id);
+Reply("pending",()=>{RewardedAdRecovery.ObserveShow(ad,url,owner,id);ad.TryShow("p","t",out _);});
+await new RewardedAdRecovery().RecoverAsync();
+Require(PendingRewardedAd.IsBlocking(url,owner),"A pending response unlocked an ad that began during the query.");
+ad.EmitReward();ad.EmitClose();
+Reply("pending");await new RewardedAdRecovery().RecoverAsync();
+Require(PendingRewardedAd.IsBlocking(url,owner)&&PendingRewardedAd.Load(url,owner).Rewarded,"Completed ad became replayable while server callback was pending.");
+Pass("new display during status query and completed-but-unconfirmed ads remain blocked");
+
+Reset();PendingRewardedAd.Remember(url,owner,id);RewardedAdRecovery.ObserveShow(ad,url,owner,id);
+Reply("pending",()=>ad.EmitReward());
+await new RewardedAdRecovery().RecoverAsync();
+Require(PendingRewardedAd.IsBlocking(url,owner)&&PendingRewardedAd.Load(url,owner).Rewarded,"Late SDK completion racing with pending response was overwritten.");
+Pass("SDK completion during pending query preserves the non-replayable completed state");
+Reset();PendingRewardedAd.Remember(url,owner,id);
+RewardedAdRecovery.ObserveShow(ad,url,owner,id);ad.EmitReward();
+typeof(RewardedAdRecovery).GetMethod("Initialize",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Static)!.Invoke(null,null);
+RewardedAdRecovery.Resolved+=(_,_,_)=>notices++;
+Require(PendingRewardedAd.IsBlocking(url,owner),"Previous-process completion must wait for server verification.");
+UnityWebRequest.OnSend=r=>{RequireGet(r);r.result=UnityWebRequest.Result.ConnectionError;r.responseCode=503;};
+await new RewardedAdRecovery().RecoverAsync();
+Require(PendingRewardedAd.IsBlocking(url,owner),"Offline recovery released a previous-process completion.");
+Reply("pending");await new RewardedAdRecovery().RecoverAsync();
+Require(!PendingRewardedAd.IsBlocking(url,owner),"Previous-process SDK completion blocks retry until 30-minute expiry despite server pending.");
+Require(PendingRewardedAd.Load(url,owner).AttemptId==id && AccountSessionState.Applied==0,"Restart retry lost the original attempt or granted locally.");
+Reply("granted");await new RewardedAdRecovery().RecoverAsync();
+Require(!PendingRewardedAd.HasPending(url,owner)&&AccountSessionState.Applied==1,"Late verified reward was lost after previous-process retry eligibility.");
+Pass("previous-process completion marker releases only after server pending, retains identity and accepts late verified reward");
 Console.WriteLine($"PASS: {passes} ad recovery groups; production storage/recovery/client/transport code, simulated Unity and SDK boundaries; no real ad, server or account used.");
 void Require(bool ok,string message){if(!ok)throw new Exception(message);}
 void Throws(Action action){try{action();}catch(InvalidOperationException){return;}throw new Exception("Expected rejection.");}

@@ -110,6 +110,24 @@ public sealed class BattleConnectionGuard : IDisposable
         lock (_gate) return !_disposed && ExpireAuthenticationCore();
     }
 
+    // Timer delays can finish before the monotonic deadline (timer resolution/rounding).
+    // Keep monitoring until authentication succeeds, the connection closes, or time is due.
+    public async Task<bool> WaitForAuthenticationExpiryAsync(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            TimeSpan remaining;
+            lock (_gate)
+            {
+                if (_disposed || _accountId.HasValue) return false;
+                if (ExpireAuthenticationCore()) return true;
+                remaining = _authenticationTimeout - _clock.GetElapsedTime(_started);
+            }
+            await Task.Delay(remaining > TimeSpan.FromMilliseconds(1)
+                ? remaining : TimeSpan.FromMilliseconds(1), cancellationToken);
+        }
+    }
     private bool ExpireAuthenticationCore()
     {
         if (_accountId.HasValue) return false;

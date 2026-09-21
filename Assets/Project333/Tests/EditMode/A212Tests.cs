@@ -30,7 +30,7 @@ namespace Project333.Tests.EditMode
             Assert.That(d.Cost.Power, Is.EqualTo(4));
             Assert.That(d.Cost.Mana + d.Cost.Qi + d.Cost.Gold, Is.Zero);
             Assert.That(d.HitsPerAttack, Is.EqualTo(4));
-            Assert.That(d.HasRobot, Is.True);
+            Assert.That(d.HasRace(UnitRace.Robot), Is.True);
             Assert.That(d.SciencePowerUpkeep, Is.EqualTo(2));
             Assert.That(d.AttackType, Is.EqualTo(AttackType.Melee));
             Assert.That(d.DamageType, Is.EqualTo(DamageType.Physical));

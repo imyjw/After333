@@ -184,6 +184,12 @@ namespace Project333.Runtime.Application.Gateways
                         castScriptedSpellCommand.TargetCoord,
                         true);
 
+                case ActivateEffectCommand active:
+                    var activeMessage = CreateBaseMessage(serverActorId, OnlineBattleCommandType.ActivateEffect);
+                    activeMessage.SourceCoord = TileCoordDto.FromDomain(active.SourceCoord);
+                    activeMessage.OccupantRuntimeId = active.OccupantRuntimeId;
+                    return activeMessage;
+
                 case MoveOccupantCommand moveOccupantCommand:
                     var moveMessage = CreateBaseMessage(serverActorId, OnlineBattleCommandType.MoveOccupant);
                     moveMessage.SourceCoord = TileCoordDto.FromDomain(moveOccupantCommand.From);

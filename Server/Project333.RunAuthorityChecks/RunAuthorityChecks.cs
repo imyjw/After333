@@ -14,8 +14,9 @@ using Project333.PvpServer.BattleResults;
 
 // This executable only accepts the runner's fresh, loopback-only synthetic cluster.
 // It never receives a live connection string or a real account/token as an argument.
-using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(6));
 var replayOnly = args.SequenceEqual(new[] { "--replay-results" });
+var restartBattles = args.SequenceEqual(new[] { "--server-restart-battles" });
 var operationReplayOnly = args.SequenceEqual(new[] { "--replay-account-operations" });
 var ct = deadline.Token;
 var connectionString = Environment.GetEnvironmentVariable("PROJECT333_DB_CONNECTION") ?? "";
@@ -35,7 +36,7 @@ await using (var reader = await isolation.ExecuteReaderAsync(ct))
     Require(await reader.ReadAsync(ct), "Isolation query must return a row.");
     Require(string.Equals(Path.GetFullPath(reader.GetString(0)), Path.GetFullPath(expectedDataPath),
             StringComparison.OrdinalIgnoreCase), "The running cluster must be the newly created test cluster.");
-    Require(replayOnly || operationReplayOnly || reader.GetInt64(1) == 0, "The test database must contain zero pre-existing accounts.");
+    Require(replayOnly || operationReplayOnly || restartBattles || reader.GetInt64(1) == 0, "The test database must contain zero pre-existing accounts.");
 }
 if (replayOnly)
 {
@@ -45,9 +46,11 @@ if (replayOnly)
 
 using var http = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:17339"), Timeout = TimeSpan.FromSeconds(12) };
 http.DefaultRequestHeaders.Add("X-Project333-Client-Version", "0.1.0-dev");
+if (restartBattles) { await ServerRestartCancellationChecks.HoldAcrossRestart(http, db, ct); return; }
 if (operationReplayOnly)
 {
     await AccountOperationChecks.ReplayAfterRestart(http, db, ct);
+    await GiftInboxChecks.ReplayAfterRestart(http, db, ct);
     return;
 }
 var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -59,12 +62,21 @@ var resultStore = new BattleResultStore(new DbConnectionFactory(configuration));
 var passCount = 0;
 var battleCount = 0;
 var resultCount = 0;
+await AiChallengeChecks.Run(db, configuration, Pass, ct);
+var fallbackFixtures = new[] { await DraftAccount("fallback-first"), await DraftAccount("fallback-second"),
+    await DraftAccount("fallback-human"), await DraftAccount("fallback-network") };
+await AiFallbackChecks.Run(db, configuration, fallbackFixtures[0], fallbackFixtures[1], fallbackFixtures[2], Pass, ct);
+await AiFallbackChecks.CheckNetwork(db, fallbackFixtures[3], Pass, ct);
 await SavedDraftOfferChecks.Run(http, db, configuration, Pass, ct);
 await RunStartAtomicityChecks.Run(http, db, configuration, Pass, ct);
 BattleParticipantChecks.Run(Pass);
+await ServerRestartCancellationChecks.CheckShutdown(Pass, ct);
+await PveReconnectChecks.Run(Pass, ct);
+await PveReconnectConcurrencyChecks.Run(Pass, ct);
 await ConnectionStabilityChecks.Run(Pass, ct);
 await BattleInputChecks.Run(Pass, ct);
 BattleConnectionLimitChecks.Run(Pass);
+await BattleConnectionLimitChecks.CheckDeadlineWakeups(Pass, ct);
 var a = await DraftAccount("win-cap");
 var b = await DraftAccount("loss-cap");
 var c = await DraftAccount("binding-original");
@@ -79,6 +91,7 @@ foreach (var account in parallelAccounts) { var stats = await ReadStats(account)
 Require(parallelStats.All(s => s.Wins + s.Losses == 1) && parallelStats.Sum(s => s.Wins) == 2 && parallelStats.Sum(s => s.Losses) == 2,
     "Two concurrent matches must record exactly one result per original participant.");
 Pass("both concurrently matched battles persist exactly two wins and two losses to their original runs");
+await PveReconnectChecks.CheckNetwork(http, db, configuration, parallelAccounts[2], parallelAccounts[3], Pass, ct);
 var initialA = await Snapshot(a.AccountId);
 var initialB = await Snapshot(b.AccountId);
 await BattleBindingNetworkChecks.CheckDatabase(db, runService, configuration, a, b, ct);
@@ -186,7 +199,9 @@ catch (RunServiceException ex) when (ex.Code == "run_result_not_recorded") { }
 Require(await Snapshot(a.AccountId) == finalA, "Completed run must reject further results without changing rewards.");
 Pass("completed run rejects additional server results without changing its record or rewards");
 
-Console.WriteLine($"PASS: {passCount} checks; {battleCount} progression battles and 5 WebSocket battles plus participant/delivery/connection/matchmaking regressions; {resultCount} progression results; 12 synthetic accounts; zero live DB/server access.");
+await GiftInboxChecks.Run(http, db, configuration, Pass, ct);
+ServerRestartCancellationChecks.SaveAccounts(parallelAccounts);
+Console.WriteLine($"PASS: {passCount} checks; {battleCount} progression battles and 6 WebSocket battles plus participant/delivery/connection/matchmaking regressions; {resultCount} progression results; synthetic test accounts; zero live DB/server access.");
 
 async Task<TestAccount> DraftAccount(string label)
 {

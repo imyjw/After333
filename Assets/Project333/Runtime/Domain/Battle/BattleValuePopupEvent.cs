@@ -18,7 +18,8 @@ namespace Project333.Runtime.Domain.Battle
         Firewall = 9,
         Piercing = 10,
         NuclearPowerPlant = 11,
-        BiochemicalBomb = 12
+        BiochemicalBomb = 12,
+        Fallout = 13
     }
 
     public sealed class BattleValuePopupEvent

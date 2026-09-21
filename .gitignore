@@ -123,3 +123,7 @@ InitTestScene*.unity*
 *.jks
 *.pfx
 *.p12
+
+# Generated per-player build identity (including failed build residue).
+/Assets/Project333/Resources/Project333/ClientBuild.json
+/Assets/Project333/Resources/Project333/ClientBuild.json.meta

@@ -81,11 +81,6 @@ namespace Project333.Runtime.Application.Services
 
             if (!battleState.IsEnded)
             {
-                ResolvePowerPlantEffects(battleState);
-            }
-
-            if (!battleState.IsEnded)
-            {
                 _scienceUpkeepService.ResolveUpkeep(battleState);
             }
 
@@ -96,7 +91,8 @@ namespace Project333.Runtime.Application.Services
 
             if (!battleState.IsEnded)
             {
-                ResolveAreaDamageEffects(battleState);
+                ResolveFallout(battleState);
+                if (!battleState.IsEnded) ResolveAreaDamageEffects(battleState);
             }
 
             if (!battleState.IsEnded)
@@ -157,6 +153,8 @@ namespace Project333.Runtime.Application.Services
             var targetPlayer = battleState.GetOpponent(effect.OwnerId);
             var targetBoard = battleState.GetBoard(targetPlayer.Id);
             var targets = new List<OccupantState>(targetBoard.EnumerateOccupants());
+            var resolvedEffectDamage = SpellPowerRules.ApplyCurrent(
+                battleState, effect.OwnerId, effect.EffectDamage, effect.EffectDamageType);
 
             foreach (var target in targets)
             {
@@ -167,7 +165,7 @@ namespace Project333.Runtime.Application.Services
 
                 var actualDamage = DamageResolutionRules.ApplyEffectDamage(
                     target,
-                    effect.EffectDamage,
+                    resolvedEffectDamage,
                     effect.EffectDamageType);
                 BattleValuePopupRecorder.RecordDamage(
                     battleState,
@@ -226,6 +224,23 @@ namespace Project333.Runtime.Application.Services
             return false;
         }
 
+        private static void ResolveFallout(BattleState battleState)
+        {
+            // Aggregate stacks into one fixed-damage packet; both boards tick on every turn start.
+            foreach (var owner in new[] { PlayerId.Player, PlayerId.AI })
+            {
+                foreach (var occupant in battleState.GetBoard(owner).EnumerateOccupants())
+                {
+                    if (!occupant.IsAlive || occupant.IsSealbound || occupant.Kind == OccupantKind.Master || occupant.FalloutStacks <= 0) continue;
+                    var damage = (int)Math.Min(int.MaxValue, (long)occupant.FalloutStacks * NuclearRules.FalloutDamage);
+                    var actual = DamageResolutionRules.ApplyEffectDamage(occupant, damage, DamageType.Fixed);
+                    BattleValuePopupRecorder.RecordDamage(battleState, occupant, actual, BattleValueChangeCause.Fallout,
+                        DamageType.Fixed, sourceCardId: NuclearRules.CardId);
+                }
+            }
+            OccupantDestructionService.ResolveDefeatedOccupants(battleState);
+        }
+
         private static void ResolveAreaDamageEffects(BattleState battleState)
         {
             var effects = new List<PersistentEffectState>(battleState.PersistentEffects);
@@ -258,10 +273,7 @@ namespace Project333.Runtime.Application.Services
                 ? effect.OwnerId
                 : battleState.GetOpponent(effect.OwnerId).Id;
             var targetBoard = battleState.GetBoard(targetPlayerId);
-            var resolvedEffectDamage = SpellPowerRules.ApplyCaptured(
-                effect.EffectDamage,
-                effect.EffectDamageType,
-                effect.CapturedSpellPower);
+            var resolvedEffectDamage = SpellPowerRules.ApplyCurrent(battleState, effect.OwnerId, effect.EffectDamage, effect.EffectDamageType);
             var targets = new List<OccupantState>();
             var targetCoords = new List<TileCoord>(BoardState.ColumnCount);
             for (var column = 0; column < BoardState.ColumnCount; column++)
@@ -322,8 +334,7 @@ namespace Project333.Runtime.Application.Services
 
             var targetPlayer = battleState.GetOpponent(effect.OwnerId);
             var targetBoard = battleState.GetBoard(targetPlayer.Id);
-            var resolvedEffectDamage = SpellPowerRules.ApplyCaptured(
-                effect.EffectDamage, effect.EffectDamageType, effect.CapturedSpellPower);
+            var resolvedEffectDamage = SpellPowerRules.ApplyCurrent(battleState, effect.OwnerId, effect.EffectDamage, effect.EffectDamageType);
             var targets = new List<OccupantState>();
             var targetCoords = new List<TileCoord>(BiochemicalBombRules.AreaWidth * BoardState.RowCount);
             for (var column = effect.TargetStartColumn;
@@ -482,45 +493,6 @@ namespace Project333.Runtime.Application.Services
                 }
 
                 persistentEffect.ResolveOwnerTurnStart();
-            }
-        }
-
-        private static void ResolvePowerPlantEffects(BattleState battleState)
-        {
-            var activePlayer = battleState.GetPlayer(battleState.ActivePlayerId);
-            var activeBoard = battleState.GetBoard(battleState.ActivePlayerId);
-            var triggerCost = new ResourceSet(
-                mana: 0,
-                qi: 0,
-                power: 0,
-                gold: PowerPlantRules.TriggerGoldCost);
-
-            for (var column = 0; column < BoardState.ColumnCount; column++)
-            {
-                for (var row = 0; row < BoardState.RowCount; row++)
-                {
-                    var occupant = activeBoard.GetOccupant(new TileCoord(column, row));
-                    if (occupant == null ||
-                        !string.Equals(occupant.CardId, PowerPlantRules.CardId, StringComparison.Ordinal) ||
-                        occupant.EffectsSuppressed ||
-                        !activePlayer.Resources.CanAfford(triggerCost))
-                    {
-                        continue;
-                    }
-
-                    var resourceGain = new ResourceSet(
-                        mana: 0,
-                        qi: 0,
-                        power: PowerPlantRules.PowerGain,
-                        gold: 0);
-                    activePlayer.Resources.Spend(triggerCost);
-                    activePlayer.Resources.Add(resourceGain);
-                    battleState.RecordResourceChange(new BattleResourceChangeEvent(
-                        activePlayer.Id,
-                        occupant.CardId,
-                        gained: resourceGain,
-                        spent: triggerCost));
-                }
             }
         }
 

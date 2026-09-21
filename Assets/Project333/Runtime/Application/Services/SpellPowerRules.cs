@@ -19,10 +19,18 @@ namespace Project333.Runtime.Application.Services
                 total = checked(total + occupant.EffectiveSpellPower);
             }
 
+            // Player-owned turn buffs are independent of occupant suppression and survival.
+            foreach (var effect in battleState.PersistentEffects)
+            {
+                if (!effect.IsExpired && effect.OwnerId == ownerId &&
+                    string.Equals(effect.EffectId, MagicAmplificationCircleRules.EffectId, StringComparison.Ordinal))
+                    total = checked(total + MagicAmplificationCircleRules.SpellPowerBonus);
+            }
+
             return total;
         }
 
-        public static int Capture(BattleState battleState, PlayerId ownerId, DamageType damageType)
+        public static int GetCurrentBonus(BattleState battleState, PlayerId ownerId, DamageType damageType)
         {
             return damageType == DamageType.Magic ? GetTotal(battleState, ownerId) : 0;
         }
@@ -33,23 +41,23 @@ namespace Project333.Runtime.Application.Services
             int baseDamage,
             DamageType damageType)
         {
-            return ApplyCaptured(baseDamage, damageType, Capture(battleState, ownerId, damageType));
+            return AddBonus(baseDamage, damageType, GetCurrentBonus(battleState, ownerId, damageType));
         }
 
-        public static int ApplyCaptured(int baseDamage, DamageType damageType, int capturedSpellPower)
+        public static int AddBonus(int baseDamage, DamageType damageType, int spellPower)
         {
             if (baseDamage < 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(baseDamage));
             }
 
-            if (capturedSpellPower < 0)
+            if (spellPower < 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(capturedSpellPower));
+                throw new ArgumentOutOfRangeException(nameof(spellPower));
             }
 
             return damageType == DamageType.Magic
-                ? checked(baseDamage + capturedSpellPower)
+                ? checked(baseDamage + spellPower)
                 : baseDamage;
         }
     }

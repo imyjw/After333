@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Project333.Runtime.Application.Accounts;
 
 namespace Project333.Runtime.Presentation.Draft
 {
@@ -7,7 +8,8 @@ namespace Project333.Runtime.Presentation.Draft
     {
         Local,
         OnlineServerAi,
-        OnlineMatchmaking
+        OnlineMatchmaking,
+        OnlineAiChallenge
     }
 
     public enum DraftBattleOutcome
@@ -51,6 +53,16 @@ namespace Project333.Runtime.Presentation.Draft
         public static bool PendingBattleStartIsPvpReconnect { get; private set; }
 
         private static bool LastConsumedBattleStartWasPvpReconnect { get; set; }
+        public static string PendingAiChallengeResultAttemptId { get; private set; } = string.Empty;
+        public static bool ActiveBattleIsReconnect { get; private set; }
+        private static bool PendingExplicitReconnect;
+        public static string ActiveBattleGameMode { get; private set; } = "run";
+        public static string ActiveAiChallengeAttemptId { get; private set; } = string.Empty;
+        private static string PendingAiChallengeAttemptId = string.Empty;
+        private static string PendingPveReconnectMatchId = string.Empty;
+        private static DateTimeOffset PendingPveReconnectDeadlineUtc;
+        private static string LastConsumedPveReconnectMatchId = string.Empty;
+        private static DateTimeOffset LastConsumedPveReconnectDeadlineUtc;
 
         public static bool HasDraftedDeckReady => DraftedDeckCardIds.Count == 33 || CompletedDraftDeckCardIds.Count == 33;
 
@@ -78,11 +90,17 @@ namespace Project333.Runtime.Presentation.Draft
             PendingBattleStartAllowsMissingDeck = false;
             PendingBattleStartIsPvpReconnect = false;
             LastConsumedBattleStartWasPvpReconnect = false;
+            ClearPveReconnectLaunch();
             ServerRunId = string.Empty;
             ServerDeckId = string.Empty;
             Wins = 0;
             Losses = 0;
             LastBattleOutcomeText = string.Empty;
+            PendingAiChallengeResultAttemptId = string.Empty;
+            ActiveBattleIsReconnect = false;
+            ActiveBattleGameMode = "run";
+            ActiveAiChallengeAttemptId = string.Empty;
+            PendingAiChallengeAttemptId = string.Empty;
         }
 
         public static void ResetSessionState()
@@ -116,6 +134,7 @@ namespace Project333.Runtime.Presentation.Draft
 
         public static void QueueBattleStart(DraftBattleLaunchMode launchMode = DraftBattleLaunchMode.Local)
         {
+            ClearPveReconnectLaunch();
             HasPendingBattleStart = HasDraftedDeckReady;
             PendingBattleLaunchMode = HasPendingBattleStart ? launchMode : DraftBattleLaunchMode.Local;
             PendingBattleStartAllowsMissingDeck = false;
@@ -124,10 +143,78 @@ namespace Project333.Runtime.Presentation.Draft
 
         public static void QueuePvpReconnectBattleStart()
         {
+            ClearPveReconnectLaunch();
             HasPendingBattleStart = true;
             PendingBattleLaunchMode = DraftBattleLaunchMode.OnlineMatchmaking;
             PendingBattleStartAllowsMissingDeck = true;
             PendingBattleStartIsPvpReconnect = true;
+        }
+
+        public static void QueuePveReconnectBattleStart(string matchId, int remainingSeconds)
+        {
+            if (string.IsNullOrWhiteSpace(matchId) || remainingSeconds <= 0)
+            {
+                throw new ArgumentException("A live server battle and remaining reconnect time are required.");
+            }
+
+            ClearPveReconnectLaunch();
+            HasPendingBattleStart = true;
+            PendingBattleLaunchMode = DraftBattleLaunchMode.OnlineServerAi;
+            PendingBattleStartAllowsMissingDeck = true;
+            PendingBattleStartIsPvpReconnect = false;
+            PendingPveReconnectMatchId = matchId.Trim();
+            PendingPveReconnectDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(remainingSeconds);
+            PendingExplicitReconnect = true;
+        }
+
+        public static void QueueBattleReconnect(PvpReconnectStatusResponse response)
+        {
+            if (response == null || !response.ResolvedHasReconnectableBattle)
+                throw new ArgumentException("A live battle is required.");
+            if (response.ResolvedIsServerAiBattle || response.ResolvedIsAiChallenge)
+            {
+                QueuePveReconnectBattleStart(response.ResolvedMatchId, response.ResolvedRemainingSeconds);
+                PendingAiChallengeAttemptId = response.ResolvedAiChallengeAttemptId ?? string.Empty;
+                if (response.ResolvedIsAiChallenge)
+                    PendingBattleLaunchMode = DraftBattleLaunchMode.OnlineAiChallenge;
+            }
+            else QueuePvpReconnectBattleStart();
+        }
+
+        public static void QueueAiChallengeBattleStart(string matchId, string attemptId)
+        {
+            if (string.IsNullOrWhiteSpace(matchId) || string.IsNullOrWhiteSpace(attemptId))
+                throw new ArgumentException("A server challenge attempt and match are required.");
+            QueuePveReconnectBattleStart(matchId, 60);
+            PendingBattleLaunchMode = DraftBattleLaunchMode.OnlineAiChallenge;
+            PendingAiChallengeAttemptId = attemptId;
+            PendingExplicitReconnect = false;
+        }
+
+        public static void ApplyAuthoritativeBattleMode(string gameMode, string attemptId)
+        {
+            ActiveBattleGameMode = string.Equals(gameMode, "ai_challenge", StringComparison.OrdinalIgnoreCase)
+                ? "ai_challenge" : "run";
+            ActiveAiChallengeAttemptId = ActiveBattleGameMode == "ai_challenge" ? attemptId ?? string.Empty : string.Empty;
+        }
+
+        public static bool TryConsumeLastPveReconnect(out string matchId, out int remainingSeconds)
+        {
+            matchId = LastConsumedPveReconnectMatchId;
+            remainingSeconds = string.IsNullOrWhiteSpace(matchId) ? 0 : Math.Max(0, (int)Math.Ceiling(
+                (LastConsumedPveReconnectDeadlineUtc - DateTimeOffset.UtcNow).TotalSeconds));
+            ClearPveReconnectLaunch();
+            return !string.IsNullOrWhiteSpace(matchId);
+        }
+
+        private static void ClearPveReconnectLaunch()
+        {
+            PendingPveReconnectMatchId = string.Empty;
+            PendingPveReconnectDeadlineUtc = default;
+            LastConsumedPveReconnectMatchId = string.Empty;
+            LastConsumedPveReconnectDeadlineUtc = default;
+            PendingAiChallengeAttemptId = string.Empty;
+            PendingExplicitReconnect = false;
         }
 
         public static void SetServerRunDeckMetadata(string runId, string deckId)
@@ -157,15 +244,25 @@ namespace Project333.Runtime.Presentation.Draft
                 draftedDeckCardIds = Array.Empty<string>();
                 launchMode = DraftBattleLaunchMode.Local;
                 LastConsumedBattleStartWasPvpReconnect = false;
+                ClearPveReconnectLaunch();
                 return false;
             }
 
             HasPendingBattleStart = false;
             launchMode = PendingBattleLaunchMode;
+            ActiveBattleIsReconnect = PendingExplicitReconnect || PendingBattleStartIsPvpReconnect;
+            PendingExplicitReconnect = false;
+            ApplyAuthoritativeBattleMode(launchMode == DraftBattleLaunchMode.OnlineAiChallenge
+                ? "ai_challenge" : "run", PendingAiChallengeAttemptId);
+            PendingAiChallengeAttemptId = string.Empty;
             PendingBattleLaunchMode = DraftBattleLaunchMode.Local;
             var allowMissingDeck = PendingBattleStartAllowsMissingDeck;
             PendingBattleStartAllowsMissingDeck = false;
             LastConsumedBattleStartWasPvpReconnect = PendingBattleStartIsPvpReconnect;
+            LastConsumedPveReconnectMatchId = PendingPveReconnectMatchId;
+            LastConsumedPveReconnectDeadlineUtc = PendingPveReconnectDeadlineUtc;
+            PendingPveReconnectMatchId = string.Empty;
+            PendingPveReconnectDeadlineUtc = default;
             PendingBattleStartIsPvpReconnect = false;
             var sourceDeck = DraftedDeckCardIds.Count == 33
                 ? DraftedDeckCardIds
@@ -184,6 +281,7 @@ namespace Project333.Runtime.Presentation.Draft
         {
             var wasReconnect = LastConsumedBattleStartWasPvpReconnect;
             LastConsumedBattleStartWasPvpReconnect = false;
+            ClearPveReconnectLaunch();
             return wasReconnect;
         }
 
@@ -206,6 +304,40 @@ namespace Project333.Runtime.Presentation.Draft
         {
             RestoreCurrentDraftDeckFromCompletedDeckIfNeeded();
             SetLastBattleOutcome(DraftBattleOutcome.Draw);
+        }
+
+        public static void PrepareForUnavailableBattleReturn()
+        {
+            HasPendingBattleStart = false;
+            PendingBattleLaunchMode = DraftBattleLaunchMode.Local;
+            PendingBattleStartAllowsMissingDeck = false;
+            PendingBattleStartIsPvpReconnect = false;
+            LastConsumedBattleStartWasPvpReconnect = false;
+            ClearPveReconnectLaunch();
+            RestoreCurrentDraftDeckFromCompletedDeckIfNeeded();
+            LastBattleOutcomeText = string.Empty;
+        }
+        public static void QueueAiChallengeReceiptRefresh()
+        {
+            if (!string.IsNullOrWhiteSpace(ActiveAiChallengeAttemptId))
+                PendingAiChallengeResultAttemptId = ActiveAiChallengeAttemptId;
+        }
+
+        public static void RecordAiChallengeOutcome(bool won, bool draw)
+        {
+            PendingAiChallengeResultAttemptId = ActiveAiChallengeAttemptId;
+            LastBattleOutcomeText = draw ? "AI 도전 무승부" : won ? "AI 도전 승리" : "AI 도전 패배";
+        }
+
+        public static void ApplyAiChallengeReceipt(AiChallengeAttemptResponse receipt)
+        {
+            if (receipt == null || !receipt.IsFinished ||
+                receipt.AttemptId != PendingAiChallengeResultAttemptId) return;
+            LastBattleOutcomeText = receipt.Status == "completed"
+                ? receipt.Won == true ? $"AI 도전 승리 · 서버 골드 +{Math.Max(0, receipt.RewardGold)}"
+                    : "AI 도전 종료 · 보상 없음"
+                : "AI 도전 취소";
+            PendingAiChallengeResultAttemptId = string.Empty;
         }
 
         public static void SetLastBattleOutcome(DraftBattleOutcome outcome)

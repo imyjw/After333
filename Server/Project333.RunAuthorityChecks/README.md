@@ -68,9 +68,9 @@ All environment overrides are restored when the runner exits. Test-only settings
 
 ## Limits
 
-This is bounded integration coverage of HTTP/WebSocket endpoints, participant binding, result delivery, connection stability, matchmaking reservations and PostgreSQL reward transactions. The 34 progression battles and participant regressions run in-process; five additional battles use real WebSockets and matchmaking. Snapshot recovery uses JSON serialization and a new BattleSession instance. Durable outbox replay runs in four independent child processes. SQL failure and commit-response loss are injected; DB connection failure uses an unreachable local port. Reservation expiry is injected by moving only the synthetic reservation's deadline into the past. Transport timeout/send/close tests use a controllable WebSocket, while abrupt client disconnect uses a real ClientWebSocket. This does not simulate physical disk failure, a killed complete HTTP server during an arbitrary instruction, sustained load, all event ordering, Unity presentation, or every socket failure path.
+This is bounded integration coverage of HTTP/WebSocket endpoints, participant binding, result delivery, connection stability, matchmaking reservations and PostgreSQL reward transactions. The 34 progression battles and participant regressions run in-process; five additional battles use real WebSockets and matchmaking. Snapshot recovery uses JSON serialization and a new BattleSession instance. Durable outbox replay runs in four independent child processes. SQL failure and commit-response loss are injected; DB connection failure uses an unreachable local port. Reservation expiry is injected by moving only the synthetic reservation's deadline into the past. Transport timeout/send/close tests use a controllable WebSocket, while abrupt client disconnect uses a real ClientWebSocket. This does not simulate physical disk failure, process termination at every arbitrary instruction, sustained load, all event ordering, Unity presentation, or every socket failure path.
 
-The isolated runner raises the account HTTP fixture limit to 600 per window so ten accounts can complete their 33-card drafts in one run. The fixture also allows 100 WebSocket upgrades per window and sets the authentication deadline to 5 seconds for wire tests. Deterministic clock tests verify the 30-second production default; message and join budgets and the account socket cap use production defaults. These fixture overrides do not change the live server. The fresh test database applies migrations through `0015_account_operation_receipts`.
+The isolated runner raises the account HTTP fixture limit to 2,000 per window so the synthetic accounts can complete their 33-card drafts in one run. The fixture also allows 100 WebSocket upgrades per window and sets the authentication deadline to 5 seconds for wire tests. Deterministic clock tests verify the 30-second production default; message and join budgets and the account socket cap use production defaults. These fixture overrides do not change the live server. The fresh test database applies migrations through `0015_account_operation_receipts`.
 
 The runner sets `PROJECT333_BATTLE_RESULT_OUTBOX_DIR` inside its fresh temporary artifact directory. It never reads the deployed server's outbox. Child replay verifies the same loopback DB identity/data directory and is restricted to that run's artifact tree.
 
@@ -91,8 +91,53 @@ The checks compare full wallet/run/offer/ledger snapshots across retries, cancel
 This covers concurrent/repeated starts while a blocking run exists, not request-ID replay after all prior runs have ended and rewards are claimed, Upgrade/ticket-purchase retry semantics are covered in the section below.
 ## Account-operation retry regressions
 
-The current full suite passes 71 groups, two operation replays and durable-cancellation verification after a real isolated HTTP server restart, and four no-DB tombstone checks. It reuses the two run-start synthetic accounts: totals remain twelve accounts, 34 progression battles and five real WebSocket battles. The added checks cover concurrent purchase/upgrade retries, different request IDs at one expected level, changed payloads, account separation, current-state responses for old receipts, missing/invalid request IDs and levels, final receipt-insert failure and atomic rollback, canceled lock waits, and replay with zero balance.
+The account-operation stage passed 71 groups, two operation replays and durable-cancellation verification after a real isolated HTTP server restart, and four no-DB tombstone checks. It reuses the two run-start synthetic accounts: totals remain twelve accounts, 34 progression battles and five real WebSocket battles. The added checks cover concurrent purchase/upgrade retries, different request IDs at one expected level, changed payloads, account separation, current-state responses for old receipts, missing/invalid request IDs and levels, final receipt-insert failure and atomic rollback, canceled lock waits, and replay with zero balance.
 
 Only the synthetic fixtures receive SQL wallet/card top-ups. The runner stores their request bodies and synthetic tokens in its own temporary `operation-replays.json`, restarts only its own server process and verifies that both committed operations remain replayable with unchanged wallet/collection/ledger/receipt snapshots. It never reads real account credentials. This restart occurs after commits; it does not simulate killing the process at every instruction.
 
 Client pending-request tests live in `Server/Project333.AccountOperationClientChecks`. See `docs/account_operation_retries.md` for the API contract, client behavior, compatibility and rollout order.
+## Full regression update (2026-09-12)
+
+The latest full suite passes 78 groups, including saved draft-offer coverage and an authentication-deadline early-wakeup regression. The latter freezes the guard clock just before its deadline while real timers wake, then checks exact expiry, timely authentication, disposal and cancellation. Actual unauthenticated heartbeat and partial-frame sockets must still close at the configured deadline. Account-operation replay after isolated server restart and the four no-DB tombstones also pass. See docs/full_regression_2026-09-12.md. Deployment was separately verified at 21:54 KST; see TempBuild/AuthDeadlineDeploy_20260912/README.md for exact-release checks and production evidence.
+
+## Server interruption cancellation (2026-09-13)
+
+82 regression groups pass, including four added shutdown/result-handoff groups. The runner also holds real PvP and PvE client sockets, finishes mulligans, kills only its own isolated HTTP process, restarts it, and checks cancellation, unchanged run/deck/wallet/card/transaction/reward/result rows, rejected old-session reconnects, idempotent cleanup, stale-result suppression and reuse of the same run/deck for fresh matchmaking. A separate run also exercised interruption in mulligan.
+
+Shutdown checks suppress pending forfeit, timer, AI, surrender and late joins without creating even a draw result; already-finalized results remain identical. Startup checks retain and replay completed-result journals and refuse cancellation when a journal is unreadable/undeliverable. Existing normal client disconnect and result replay regressions remain enabled. New client process logs are restart-battles.log/.err.log. The runner cleans up its own held client process in finally.
+
+These tests use only the fresh synthetic DB and accounts. No production server termination, app build, phone UI validation, multi-server hosting, or exhaustive instruction-boundary crash coverage is claimed.
+
+## PvE 60-second reconnect (2026-09-13)
+
+The final server release candidate passes **91 regression groups**, plus actual isolated HTTP kill/restart cancellation, account-operation replay/cancellation after restart, and four no-DB tombstone checks. The main harness now includes six completed WebSocket battles in addition to its 34 progression battles; separate restart fixtures hold unfinished PvP/PvE battles without adding results.
+
+Added coverage verifies explicit/default 60-second reservations, early/expired/stale timeout callbacks, same-account discovery and original participant binding, state/deck/upgrade/timer retention, exactly one timeout loss, and server-shutdown suppression of a due forfeit. Account join gates serialize 72 queued admissions, permit other accounts, cancel queued waits and tolerate repeated lease disposal. AI orchestration admits one concurrent owner, allows the next loop after release and remains disabled after shutdown.
+
+Actual PvE WebSockets verify that two simultaneous joins by one account create only one playable battle, then exercise two abrupt disconnect/fresh-socket reconnect cycles using authenticated `/battle/reconnect-status` discovery. The legacy `/pvp/reconnect-status` cannot return PvE; another account cannot discover or claim the seat. Reconnect preserves moved board/hand/resources/turn deadline and hides the AI hand. Completion applies one original-run result, duplicate delivery changes nothing, and a late reconnect cannot restart the ended battle.
+
+Evidence: `TempBuild/PveReconnectDeploy_20260913/release-checks.log`; preserved isolated artifacts: `C:\Users\youndonghyeok\AppData\Local\Temp\after333-run-authority-check-6a6ee35ebb1f42e897069c3153e09f24`. Unity's separate focused run passes 46 EditMode cases at `TempBuild/PveReconnect_20260913/UnityTests.xml`. These results are not app installation or physical-device UI verification; client builds remain user-run. See [the implementation and rollout record](../../docs/pve_reconnect_2026-09-13.md).
+
+## Gift inbox and local administrator tool (2026-09-13)
+
+The gift stage runs after existing battle/economy assertions and registers six additional synthetic accounts (eighteen total). It checks administrator preview and recipient lookup, unpaid dispatch, authenticated ownership, simultaneous send/claim retries, distinct concurrent wallet grants, existing-account snapshots, optional expiration, claimed receipt replay, both wallet overflow boundaries, final-ledger failure rollback, fifty-entry keyset pagination during new delivery, invalid inputs and recipient validation. The isolated process restart also verifies pending/claimed gift persistence and all-account dispatch replay without adding later registrations. Gifts are never sent to live accounts.
+
+To include the built local administrator executable, set this process-only variable before running the same isolated runner:
+
+```powershell
+$env:AFTER333_GIFT_ADMIN_TEST_DLL = 'C:\Project_333\Builds\Tools\GiftAdminArtifacts\bin\Project333.GiftAdmin\release\Project333.GiftAdmin.dll'
+```
+
+Build that tool from current source first using its project at `Server/Project333.GiftAdmin/Project333.GiftAdmin.csproj` and the same artifact root. The three optional CLI groups launch only this explicitly supplied DLL with the runner's synthetic loopback database environment. They verify prepare/preview without dispatch, saved-request overwrite refusal, database-identity mismatch rejection, injected send rollback and safe retry/replay using the same file. Request files and synthetic replay tokens remain inside the runner's temporary artifact directory. Clear the environment variable afterwards if it was set in an interactive shell.
+
+The gift checks require migration `0017_gift_inbox`. They cover bounded concurrency and a restart after committed transactions; they do not claim physical disk failure or process termination at every instruction.
+
+## Normal matchmaking and daily AI challenge (2026-09-13)
+
+The latest suite passes **114 regression groups**, plus actual isolated server restart, operation/gift replay, and no-DB tombstone checks. The isolated account HTTP fixture budget is 2,000 per window to accommodate the additional synthetic 33-card drafts; production remains at its existing limit.
+
+New coverage verifies KST calendar boundaries, three challenge admissions per day, concurrent/idempotent requests, owned current-run decks, one atomic ten-gold win grant, zero loss/draw reward, unchanged normal-run progression, original-day server-cancellation refunds, startup cleanup, and stale-result rejection. Real WebSocket fallback waits 20 seconds, retains the same room, supports reconnect, records a normal-run result, and consumes no challenge quota. Matchmaking race coverage preserves human reservations and blocks conflicting AI admission. A former waiting-room participant can start a challenge after leaving while the actual AI opponent participant cannot do so during its battle or reconnect grace.
+
+The former direct-PvE network fixtures now use server-issued AI challenge admission and verify challenge results separately from normal-run results. Historical section counts and semantics above describe their original release stages.
+
+Latest evidence: `TempBuild/BattleModes_20260913/authority-verified.log`. See [battle mode rules and rollout](../../docs/battle_modes.md). Tests use only isolated synthetic accounts.

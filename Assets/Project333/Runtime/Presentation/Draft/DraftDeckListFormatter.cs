@@ -20,7 +20,8 @@ namespace Project333.Runtime.Presentation.Draft
             Func<string, CardDefinitionAsset> cardAssetResolver,
             string emptyText,
             string linePrefix = "",
-            bool includeCardDetails = false)
+            bool includeCardDetails = false,
+            Action<string, int, int> onEntry = null)
         {
             if (draftedCardIds == null || draftedCardIds.Count == 0)
             {
@@ -66,13 +67,17 @@ namespace Project333.Runtime.Presentation.Draft
             entries.Sort(CompareEntries);
 
             var lines = new List<string>(entries.Count);
+            var characterOffset = 0;
             for (var i = 0; i < entries.Count; i++)
             {
                 var entry = entries[i];
                 var detailText = includeCardDetails
                     ? $"    {FormatCost(entry.Cost)} | {FormatRarityShort(entry.Rarity)}"
                     : string.Empty;
-                lines.Add($"{linePrefix}{entry.Count}x {entry.DisplayName}{detailText}");
+                var line = $"{linePrefix}{entry.Count}x {entry.DisplayName}{detailText}";
+                lines.Add(line);
+                onEntry?.Invoke(entry.CardId, characterOffset, line.Length);
+                characterOffset += line.Length + Environment.NewLine.Length;
             }
 
             return string.Join(Environment.NewLine, lines);
@@ -81,7 +86,8 @@ namespace Project333.Runtime.Presentation.Draft
         public static string BuildDeckBuildingPanelText(
             IReadOnlyList<string> draftedCardIds,
             Func<string, CardDefinitionAsset> cardAssetResolver,
-            string emptyText)
+            string emptyText,
+            Action<string, int, int> onEntry = null)
         {
             if (draftedCardIds == null || draftedCardIds.Count == 0)
             {
@@ -89,14 +95,16 @@ namespace Project333.Runtime.Presentation.Draft
             }
 
             var summaryText = BuildDeckDistributionSummary(draftedCardIds, cardAssetResolver);
+            var prefix = $"{summaryText}{Environment.NewLine}{Environment.NewLine}CARD LIST{Environment.NewLine}";
             var listText = BuildDeckListText(
                 draftedCardIds,
                 cardAssetResolver,
                 emptyText,
                 "- ",
-                includeCardDetails: true);
+                includeCardDetails: true,
+                onEntry: (cardId, start, length) => onEntry?.Invoke(cardId, prefix.Length + start, length));
 
-            return $"{summaryText}{Environment.NewLine}{Environment.NewLine}CARD LIST{Environment.NewLine}{listText}";
+            return prefix + listText;
         }
 
         private static string BuildDeckDistributionSummary(

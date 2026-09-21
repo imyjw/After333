@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Project333.PvpServer.BattleSessions;
 using Project333.PvpServer.Messages;
 using Project333.Runtime.Application.Online;
@@ -15,13 +16,16 @@ public sealed record BattleResult(
     string EndedReason,
     IReadOnlyList<BattleRunResultRecord> Runs)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? AiChallengeAttemptId { get; init; }
+
     public BattleResult ValidatedCopy()
     {
         if (ResultId == Guid.Empty || string.IsNullOrWhiteSpace(MatchId) ||
             EndedReason is not ("normal" or "forfeit" or "reconnect_timeout") ||
             (IsDraw ? WinnerSeat != OnlineBattleSeatId.None :
-                WinnerSeat != OnlineBattleSeatId.PlayerA &&
-                WinnerSeat != (UseServerAiOpponent ? OnlineBattleSeatId.ServerAI : OnlineBattleSeatId.PlayerB)) ||
+                WinnerSeat != OnlineBattleSeatId.PlayerA && WinnerSeat != OnlineBattleSeatId.PlayerB &&
+                !(UseServerAiOpponent && WinnerSeat == OnlineBattleSeatId.ServerAI)) ||
             Runs == null || Runs.Count > (UseServerAiOpponent ? 1 : 2))
             throw new InvalidOperationException("Invalid server battle result.");
         var runs = Runs.OrderBy(r => r.SeatId).ToArray();
@@ -35,11 +39,20 @@ public sealed record BattleResult(
                 !Guid.TryParse(run.RunId, out var runId) || runId == Guid.Empty ||
                 !Guid.TryParse(run.DeckId, out var deck) || deck == Guid.Empty ||
                 run.SeatId is not (PlayerIdDto.Player or PlayerIdDto.AI) ||
-                run.OnlineSeatId != (run.SeatId == PlayerIdDto.Player ? OnlineBattleSeatId.PlayerA : OnlineBattleSeatId.PlayerB) ||
+                (UseServerAiOpponent
+                    ? run.OnlineSeatId is not (OnlineBattleSeatId.PlayerA or OnlineBattleSeatId.PlayerB)
+                    : run.OnlineSeatId != (run.SeatId == PlayerIdDto.Player ? OnlineBattleSeatId.PlayerA : OnlineBattleSeatId.PlayerB)) ||
                 (UseServerAiOpponent && run.SeatId != PlayerIdDto.Player) ||
                 run.Won != (!IsDraw && run.OnlineSeatId == WinnerSeat))
                 throw new InvalidOperationException("Invalid server result participant binding.");
         }
+        if (UseServerAiOpponent && !IsDraw && WinnerSeat != OnlineBattleSeatId.ServerAI &&
+            runs.Length > 0 && runs.All(r => r.OnlineSeatId != WinnerSeat))
+            throw new InvalidOperationException("The AI battle winner must be its bound human seat or ServerAI.");
+        if (AiChallengeAttemptId.HasValue &&
+            (AiChallengeAttemptId == Guid.Empty || !UseServerAiOpponent || runs.Length != 1 ||
+             runs[0].OnlineSeatId != OnlineBattleSeatId.PlayerA))
+            throw new InvalidOperationException("Invalid AI challenge result binding.");
         return this with { Runs = Array.AsReadOnly(runs) };
     }
 

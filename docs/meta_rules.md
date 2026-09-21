@@ -29,7 +29,8 @@ Implemented through the server and PostgreSQL:
 
 - Ticket spending when a new run starts
 - Persistent draft picks, current draft offer, completed deck, and run resume
-- PvE and PvP battle results applied to the current run
+- Normal matchmaking battles against humans or fallback AI applied to the current run
+- Separate daily AI challenge: 3 attempts per KST day, victory Resource Gold +10, no run-score changes (see battle_modes.md)
 - `33` cumulative win and `3` cumulative loss termination
 - One-time run-end reward claim
 - Persistent Resource Gold, card-copy collection, and upgrade levels
@@ -93,6 +94,9 @@ See [battle_rules.md](./battle_rules.md).
 - The first shop product exchanges `3` Resource Gold for `1` game ticket.
 - Ticket purchases are made from the dedicated `Shop_VSlice` scene opened from the Game Start scene.
 
+## Administrator Gift Inbox
+
+Confirmed 2026-09-13: administrators may dispatch tickets and Resource Gold to specific accounts or all accounts existing at dispatch time. Future registrations do not receive older all-account gifts. Gifts have no expiry by default; the administrator may specify an expiry. Dispatch only creates inbox entries. Claiming applies the server-defined attachments exactly once, atomically with the wallet and transaction record. Account IDs determine ownership, server time determines expiry, and reconnect/retry cannot duplicate a credit. Claimed gifts disappear from the client inbox immediately and remain hidden after refresh or relaunch; server claim and transaction records are retained for idempotency. A local administrator tool dispatches gifts; no public administrator endpoint is added. See [gift_inbox.md](./gift_inbox.md) for the operator workflow and limits.
 ## Meta Systems
 
 ### Shop
@@ -131,7 +135,7 @@ Confirmed temporary rules:
 - For every new card, ask the user for upgrade eligibility and the exact per-level gains before implementing upgrade behavior. Do not infer a schedule from its card type, rarity, attack capability, similar cards or a shared-code fallback. An explicitly supplied schedule may group levels if every level 1 through 13 is covered; do not ask again when that card's schedule has already been supplied.
 - All currently registered Unit and Building cards are upgradeable; new cards still require the user-supplied eligibility and schedule above.
 - Firebolt (`firebolt`), Firewall (`Firewall`), Timed Bomb (`TimedBomb`), and Biochemical Bomb (`BiochemicalBomb`) are upgradeable Spell cards; each level adds `+1` to their direct or stored damage.
-- The other ten current spells are not upgradeable: CheonraJimang, Daehwandan, TenThousandYearSnowGinseng, Gu, HuanShu, RobotFusion, Microreactor, PowerBank, ManaStone and ManaStoneBundle.
+- The following spells are not upgradeable: CheonraJimang, Daehwandan, TenThousandYearSnowGinseng, Gu, HuanShu, RobotFusion, Microreactor, PowerBank, ManaStone, ManaStoneBundle, Nuclear and MagicAmplificationCircle.
 - Cards marked non-upgradeable are excluded from random run card rewards.
 
 ### Ticket
@@ -158,14 +162,16 @@ Current temporary rules:
 - Account wallet, card collection, upgrades, draft picks, current offer, completed deck, run record, and reward claim are server-owned data.
 - Unity may cache session and display data but is not authoritative for progression.
 - Closing and reopening the game restores the latest resumable run from the authenticated account.
-- PvE and PvP results use the same persisted run win/loss counters.
+- Normal battles use the same persisted run win/loss counters regardless of human/AI opponent. Daily AI challenges never change these counters; their server result settles the challenge admission and separate Resource Gold reward. See [battle_modes.md](./battle_modes.md).
 - Only results resolved by a server battle may advance account run wins/losses or unlock run rewards. Client-reported or offline results never update account progression.
 - At battle start, the server fixes each participant's account, seat, run, deck contents and card upgrade levels. Rejoining or reconnecting restores this binding and cannot change the run receiving the result.
 - Run-result persistence must match the bound account and the run's completed deck. A battle started without a run cannot attach one after it starts.
-- Every battle has a server-generated result ID, retained by recovery snapshots. A committed result ID can never increment a run again.
+- Every battle has a server-generated result ID, retained by stored snapshots and finalized result journals. A committed result ID can never increment a run again.
 - Result receipts, both participants' run counters, and any persisted PvP match completion commit in one DB transaction. Draws complete the match without incrementing wins or losses.
 - The server durably queues terminal results before sending battle-end responses. Failed DB delivery remains pending for background retries and process-restart replay; client result uploads remain prohibited.
 - Unity refreshes server run data through /me while awaiting result persistence; it must not upload local win/loss totals as a fallback.
+
+- Server interruption cancels unfinished battles without a win/loss, draw, reward, ticket charge/refund, or run/deck reset. An AI challenge canceled by server interruption restores its consumed attempt against the original KST date. Existing completed results and pending durable terminal journals remain valid. See the server interruption policy in battle_rules.md.
 
 ## Relationship to Other Documents
 

@@ -23,7 +23,7 @@ MonoBehaviour:
   _affiliation: 2
   _chargeTileFootprint: 1
   _effectText: 
-  _specialEffectText: "\uB85C\uBD07\n4\uC5F0\uD0C0\n\uC804\uB825 -2"
+  _specialEffectText: "4연타, 전력 -2"
   _hasReplicate: 0
   _boardSprite: {fileID: 4723107735738678597, guid: 421802be1083a9849b74ccaaf6cb4639, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: c9d0ec2e25d93f1448856b0001a54768, type: 2}
@@ -38,7 +38,7 @@ MonoBehaviour:
   _hasEndure: 0
   _hasShielder: 0
   _hasLifeSteal: 0
-  _hasRobot: 1
+  _races: 01000000
   _canMove: 1
   _sealboundOwnerTurnStarts: 0
   _hasHiding: 0

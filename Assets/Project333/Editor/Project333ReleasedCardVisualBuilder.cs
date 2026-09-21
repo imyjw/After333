@@ -108,7 +108,7 @@ namespace Project333.Editor
                     r.SciencePowerUpkeep, Resources(r.TurnStartResourceGain), r.MaxAttacksPerTurn,
                     r.HasRush || r.CanAttackOnSummon, r.HitsPerAttack, r.HasBerserker,
                     r.HasEndure, r.HasShielder, r.HasLifeSteal, r.DamageType,
-                    r.PhysicalDefense, r.MagicDefense, r.HasRobot, r.SealboundOwnerTurnStarts,
+                    r.PhysicalDefense, r.MagicDefense, r.Races, r.SealboundOwnerTurnStarts,
                     r.HasHiding, r.HasFlying, r.SpellPower, r.InvincibleDuration,
                     r.InvincibleOwnerTurns, r.HasPiercing);
             else if (asset is BuildingCardDefinitionAsset building)

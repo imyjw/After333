@@ -139,7 +139,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Firewall_CapturesSpellPowerAtCastAndUsesItForEveryTargetAndTrigger()
+        public void Firewall_RecalculatesSpellPowerForEveryTrigger()
         {
             var battleState = CreateBattleState();
             var source = AddSpellPowerSource(battleState, PlayerId.Player, 5);
@@ -163,22 +163,23 @@ namespace Project333.Tests.EditMode
                 PlayerId.AI,
                 new TileCoord(4, 0));
 
-            Assert.That(battleState.PersistentEffects[0].CapturedSpellPower, Is.EqualTo(5));
+            Assert.That(battleState.PersistentEffects[0].CapturedSpellPower, Is.Zero);
             battleState.PlayerBoard.Remove(source.Position);
             AddSpellPowerSource(battleState, PlayerId.Player, 20);
 
             ResolveTurnStart(battleState, PlayerId.AI);
-            Assert.That(first.CurrentHp, Is.EqualTo(27));
-            Assert.That(second.CurrentHp, Is.EqualTo(27));
+            Assert.That(first.CurrentHp, Is.EqualTo(12));
+            Assert.That(second.CurrentHp, Is.EqualTo(12));
 
+            battleState.PlayerBoard.Remove(source.Position);
             ResolveTurnStart(battleState, PlayerId.Player);
-            Assert.That(first.CurrentHp, Is.EqualTo(14));
-            Assert.That(second.CurrentHp, Is.EqualTo(14));
+            Assert.That(first.CurrentHp, Is.EqualTo(4));
+            Assert.That(second.CurrentHp, Is.EqualTo(4));
             Assert.That(battleState.PersistentEffects[0].IsExpired, Is.True);
         }
 
         [Test]
-        public void StateViewRoundTrip_PreservesOccupantAndCapturedSpellPower()
+        public void StateViewRoundTrip_UsesCurrentSourceAndIgnoresLegacyCapturedSpellPower()
         {
             var battleState = CreateBattleState();
             var source = AddSpellPowerSource(battleState, PlayerId.Player, 3);
@@ -202,7 +203,11 @@ namespace Project333.Tests.EditMode
             Assert.That(
                 projected.PlayerBoard.GetOccupant(source.Position).SpellPower,
                 Is.EqualTo(3));
-            Assert.That(projected.PersistentEffects[0].CapturedSpellPower, Is.EqualTo(7));
+            Assert.That(projected.PersistentEffects[0].CapturedSpellPower, Is.EqualTo(7)); // Legacy wire compatibility.
+            var target = CreateUnit("legacy-target", PlayerId.AI, new TileCoord(0, 0), maxHp: 100);
+            projected.AIBoard.Place(target.Position, target);
+            ResolveTurnStart(projected, PlayerId.AI);
+            Assert.That(target.CurrentHp, Is.EqualTo(87), "10 base + 3 live power, ignoring stored 7");
         }
 
         [Test]
@@ -262,6 +267,182 @@ namespace Project333.Tests.EditMode
             Assert.That(
                 CardDatabaseValidator.Validate(CreateDraftCompatibleDatabase(spell)).Errors,
                 Has.Some.Contains("spellPower can only be used by Unit or Building cards"));
+        }
+
+
+        [Test]
+        public void Firewall_CastWithoutPowerThenSummonTenAndRemoveBeforeSecondTick()
+        {
+            var state = CreateBattleState();
+            var target = CreateUnit("target", PlayerId.AI, new TileCoord(1, 0), maxHp: 100);
+            state.AIBoard.Place(target.Position, target);
+            var spell = new ScriptedSpellCardDefinition("Firewall", "Firewall", new ResourceSet(),
+                "firewall", damage: 33, damageType: DamageType.Magic, triggerCount: 2);
+            var summon = new UnitCardDefinition("power", "Power", new ResourceSet(), AttackType.Melee,
+                0, 10, true, false, 0, spellPower: 10);
+            var provider = new InMemoryCardDefinitionProvider(new CardDefinition[] { spell, summon });
+            state.Player.Hand.Add("Firewall");
+            state.Player.Hand.Add("power");
+            new SpellService(provider).CastScriptedSpell(state, PlayerId.Player, "Firewall", PlayerId.AI, target.Position);
+            var source = new PlayCardService(provider).PlayUnitCard(state, PlayerId.Player, "power", new TileCoord(0, 0));
+            new EndTurnService().EndTurn(state);
+            new TurnStartService().ResolveTurnStart(state);
+            Assert.That(target.CurrentHp, Is.EqualTo(57));
+            source.CurrentHp = 0;
+            OccupantDestructionService.ResolveDefeatedOccupants(state);
+            new EndTurnService().EndTurn(state);
+            new TurnStartService().ResolveTurnStart(state);
+            Assert.That(target.CurrentHp, Is.EqualTo(24));
+        }
+
+        [TestCase(DamageType.Magic, 89)]
+        [TestCase(DamageType.Physical, 97)]
+        [TestCase(DamageType.Fixed, 97)]
+        public void NormalAttack_OnlyMagicUsesOwnersCurrentPower(DamageType damageType, int expectedHp)
+        {
+            var state = CreateBattleState();
+            var attacker = new UnitState("attacker", "attacker", PlayerId.Player, new TileCoord(1, 0),
+                AttackType.Ranged, 3, 100, true, false, 0, damageType: damageType, spellPower: 10);
+            attacker.HasSummoningSickness = false;
+            state.PlayerBoard.Place(attacker.Position, attacker);
+            var target = CreateUnit("target", PlayerId.AI, new TileCoord(1, 0), maxHp: 100, magicDefense: 2, spellPower: 50);
+            state.AIBoard.Place(target.Position, target);
+            new AttackService().Attack(state, PlayerId.Player, attacker.Position, target.Position);
+            Assert.That(target.CurrentHp, Is.EqualTo(expectedHp));
+        }
+
+        [TestCase("unit")]
+        [TestCase("building")]
+        [TestCase("master")]
+        public void EveryOccupantKind_MagicAttackReceivesPower(string kind)
+        {
+            var state = CreateBattleState();
+            AddSpellPowerSource(state, PlayerId.Player, 7);
+            OccupantState attacker;
+            if (kind == "building")
+                attacker = new BuildingState("a", "a", PlayerId.Player, new TileCoord(1, 0), true, 10, 100, damageType: DamageType.Magic);
+            else if (kind == "master")
+                attacker = new MasterState("a", PlayerId.Player, new TileCoord(1, 0), 10, 100);
+            else
+                attacker = new UnitState("a", "a", PlayerId.Player, new TileCoord(1, 0), AttackType.Melee, 10, 100, true, false, 0, damageType: DamageType.Magic);
+            // Synthetic magic Master exercises the common occupant path; real Master remains physical.
+            if (kind == "master") typeof(OccupantState).GetProperty("DamageType").SetValue(attacker, DamageType.Magic);
+            attacker.HasSummoningSickness = false;
+            state.PlayerBoard.Place(attacker.Position, attacker);
+            var target = CreateUnit("target", PlayerId.AI, new TileCoord(1, 0), maxHp: 100, magicDefense: 2);
+            state.AIBoard.Place(target.Position, target);
+            new AttackService().Attack(state, PlayerId.Player, attacker.Position, target.Position);
+            Assert.That(target.CurrentHp, Is.EqualTo(85));
+        }
+
+        [Test]
+        public void MultiHitMagicCounterattack_UsesDefendersPowerBeforeSimultaneousLethalHit()
+        {
+            var state = CreateBattleState();
+            AddSpellPowerSource(state, PlayerId.Player, 70);
+            var attacker = new UnitState("attacker", "attacker", PlayerId.Player, new TileCoord(1, 0),
+                AttackType.Melee, 100, 100, true, false, 0, damageType: DamageType.Physical);
+            var defender = new UnitState("defender", "defender", PlayerId.AI, new TileCoord(1, 0),
+                AttackType.Melee, 3, 5, true, false, 0, hitsPerAttack: 3, damageType: DamageType.Magic, spellPower: 10);
+            attacker.HasSummoningSickness = false;
+            state.PlayerBoard.Place(attacker.Position, attacker);
+            state.AIBoard.Place(defender.Position, defender);
+            new AttackService().Attack(state, PlayerId.Player, attacker.Position, defender.Position);
+            Assert.That(attacker.CurrentHp, Is.EqualTo(61));
+            Assert.That(state.AIBoard.GetOccupant(defender.Position), Is.Null);
+        }
+
+        [Test]
+        public void PiercingMultiHitMagicAttack_AddsPowerOncePerHitAndTarget()
+        {
+            var state = CreateBattleState();
+            var attacker = new UnitState("attacker", "attacker", PlayerId.Player, new TileCoord(1, 0),
+                AttackType.Ranged, 3, 100, true, false, 0, hitsPerAttack: 3, damageType: DamageType.Magic, spellPower: 10, hasPiercing: true);
+            attacker.HasSummoningSickness = false;
+            state.PlayerBoard.Place(attacker.Position, attacker);
+            var front = CreateUnit("front", PlayerId.AI, new TileCoord(1, 0), maxHp: 100, magicDefense: 2);
+            var back = CreateUnit("back", PlayerId.AI, new TileCoord(1, 1), maxHp: 100, magicDefense: 2);
+            state.AIBoard.Place(front.Position, front);
+            state.AIBoard.Place(back.Position, back);
+            new AttackService().Attack(state, PlayerId.Player, attacker.Position, front.Position);
+            Assert.That(front.CurrentHp, Is.EqualTo(67));
+            Assert.That(back.CurrentHp, Is.EqualTo(67));
+        }
+
+        [TestCase(false, 57)]
+        [TestCase(true, 67)]
+        public void RedDragonEffect_UsesLiveUnsuppressedPower(bool suppressed, int expectedHp)
+        {
+            var state = CreateBattleState();
+            var source = AddSpellPowerSource(state, PlayerId.Player, 10);
+            if (suppressed) source.ApplyErasure();
+            var dragon = new UnitState("dragon", "RedDragon", PlayerId.Player, new TileCoord(1, 0), AttackType.Ranged,
+                10, 100, true, false, 0, damageType: DamageType.Magic);
+            state.PlayerBoard.Place(dragon.Position, dragon);
+            var target = CreateUnit("target", PlayerId.AI, new TileCoord(1, 0), maxHp: 100);
+            state.AIBoard.Place(target.Position, target);
+            new EndTurnService().EndTurn(state);
+            Assert.That(target.CurrentHp, Is.EqualTo(expectedHp));
+        }
+
+        [Test]
+        public void AreaDamage_UsesOneCurrentValueForSimultaneousTargetsIncludingOwnPowerSource()
+        {
+            var state = CreateBattleState();
+            var source = AddSpellPowerSource(state, PlayerId.Player, 10);
+            var target = CreateUnit("target", PlayerId.Player, new TileCoord(1, 0), maxHp: 100);
+            state.PlayerBoard.Place(target.Position, target);
+            state.PersistentEffects.Add(new PersistentEffectState("Firewall", PlayerId.Player, "firewall", 1, "one trigger",
+                new ResourceSet(), targetRow: 0, remainingTriggers: 1, effectDamage: 33, effectDamageType: DamageType.Magic, targetsOwnerBoard: true));
+            ResolveTurnStart(state, PlayerId.AI);
+            Assert.That(state.PlayerBoard.GetOccupant(source.Position), Is.Null);
+            Assert.That(target.CurrentHp, Is.EqualTo(57));
+        }
+
+
+        [Test]
+        public void ShielderRedirectAndOverflow_DoNotAddSpellPowerTwice()
+        {
+            var state = CreateBattleState();
+            var attacker = new UnitState("attacker", "attacker", PlayerId.Player, new TileCoord(1, 0),
+                AttackType.Ranged, 10, 100, true, false, 0, damageType: DamageType.Magic, spellPower: 7);
+            attacker.HasSummoningSickness = false;
+            state.PlayerBoard.Place(attacker.Position, attacker);
+            var shield = new UnitState("shield", "shield", PlayerId.AI, new TileCoord(1, 0),
+                AttackType.Melee, 0, 5, true, false, 0, hasShielder: true);
+            var target = CreateUnit("target", PlayerId.AI, new TileCoord(1, 1), maxHp: 100);
+            state.AIBoard.Place(shield.Position, shield);
+            state.AIBoard.Place(target.Position, target);
+            new AttackService().Attack(state, PlayerId.Player, attacker.Position, target.Position);
+            Assert.That(state.AIBoard.GetOccupant(shield.Position), Is.Null);
+            Assert.That(target.CurrentHp, Is.EqualTo(88), "17 raw - 5 absorbed = 12 overflow");
+        }
+
+
+        [TestCase(0)]
+        [TestCase(13)]
+        public void RealManaPond_PaysFiveManaAndImmediatelyGrantsTwentyPower(int level)
+        {
+            var state = CreateBattleState();
+            var database = JsonCardDefinitionDatabase.FromJson(System.IO.File.ReadAllText(
+                System.IO.Path.Combine(UnityEngine.Application.dataPath, "Project333/Resources/Project333/Data/cards.json")));
+            var provider = database.CreateProvider();
+            var upgrades = new InMemoryCardUpgradeLevelProvider();
+            upgrades.SetUpgradeLevel(PlayerId.Player, "ManaPond", level);
+            state.Player.Hand.Add("ManaPond");
+            var manaBefore = state.Player.Resources.Mana;
+            var pond = new PlayCardService(provider, new SummonService(), upgrades)
+                .PlayBuildingCard(state, PlayerId.Player, "ManaPond", new TileCoord(0, 0));
+            Assert.That(state.Player.Resources.Mana, Is.EqualTo(manaBefore - 5));
+            Assert.That(pond.CurrentHp, Is.EqualTo(20 + level));
+            Assert.That(pond.Attack, Is.Zero);
+            Assert.That(pond.SpellPower, Is.EqualTo(20));
+            Assert.That(SpellPowerRules.GetTotal(state, PlayerId.Player), Is.EqualTo(20));
+            var target = CreateUnit("target", PlayerId.AI, new TileCoord(1, 0), maxHp: 100);
+            state.AIBoard.Place(target.Position, target);
+            state.Player.Hand.Add("firebolt");
+            new SpellService(provider).CastDamageSpell(state, PlayerId.Player, "firebolt", PlayerId.AI, target.Position);
+            Assert.That(target.CurrentHp, Is.EqualTo(70), "Firebolt 10 + ManaPond 20");
         }
 
         private static SpellService CreateDamageSpellService(

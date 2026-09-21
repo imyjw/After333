@@ -31,6 +31,8 @@ namespace Project333.Runtime.Application.Online
                 HasPendingRobotFusion = battleState.PendingRobotFusion != null,
                 PendingRobotFusionOwnerId = battleState.PendingRobotFusion?.OwnerId ?? PlayerId.Player,
                 PendingRobotFusionCardId = battleState.PendingRobotFusion?.CardId ?? string.Empty,
+                PlayerFalloutStacks = battleState.GetBoard(viewerId).FalloutStacks,
+                OpponentFalloutStacks = battleState.GetOpponentBoard(viewerId).FalloutStacks,
                 Player = CreatePlayerView(viewer, true),
                 Opponent = CreatePlayerView(opponent, false)
             };
@@ -127,12 +129,28 @@ namespace Project333.Runtime.Application.Online
                 HasShielder = occupant.HasShielder,
                 HasEndure = occupant.HasEndure,
                 HasLifeSteal = occupant.HasLifeSteal,
-                HasRobot = occupant is UnitState unit && unit.HasRobot,
+                Races = occupant is UnitState unit && occupant.Kind == OccupantKind.Unit
+                    ? UnitRaceCollection.ToArray(unit.Races) : null,
+                FalloutPlayerStacks = occupant.FalloutPlayerStacks,
+                FalloutAiStacks = occupant.FalloutAiStacks,
+                LastActiveEffectTurnNumber = occupant.LastActiveEffectTurnNumber,
                 EndureUsed = occupant.EndureUsed,
                 WasSummonedThisTurn = occupant.WasSummonedThisTurn,
                 HasSummoningSickness = occupant.HasSummoningSickness,
                 RemainingAttacksThisTurn = occupant.RemainingAttacksThisTurn
             };
+
+            foreach (var buff in occupant.CombatStatBuffs)
+            {
+                view.CombatStatBuffs.Add(new CombatStatBuffViewDto
+                {
+                    SourceCardId = buff.SourceCardId,
+                    AttackBonus = buff.AttackBonus,
+                    MaxHpBonus = buff.MaxHpBonus,
+                    PhysicalDefenseBonus = buff.PhysicalDefenseBonus,
+                    MagicDefenseBonus = buff.MagicDefenseBonus
+                });
+            }
 
             foreach (var effect in occupant.InvincibleEffects)
             {

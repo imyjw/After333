@@ -13,6 +13,11 @@ using Project333.PvpServer.Messages;
 using Project333.Runtime.Application.Online;
 using Project333.Runtime.Domain.Battle;
 
+if (int.TryParse(Environment.GetEnvironmentVariable("AFTER333_SOAK_SECONDS"), out var soakSeconds) && soakSeconds > 0)
+{
+    await SoakChecks.Run(soakSeconds, int.Parse(Environment.GetEnvironmentVariable("AFTER333_SETTLE_SECONDS") ?? "300"), int.Parse(Environment.GetEnvironmentVariable("AFTER333_MAX_MATCHES") ?? "20"));
+    return;
+}
 using var limit = new CancellationTokenSource(TimeSpan.FromMinutes(8));
 var ct = limit.Token;
 var connection = Environment.GetEnvironmentVariable("PROJECT333_DB_CONNECTION") ?? "";

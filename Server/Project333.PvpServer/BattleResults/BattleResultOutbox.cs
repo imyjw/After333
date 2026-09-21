@@ -138,6 +138,15 @@ public sealed class BattleResultOutbox : BackgroundService
         }
     }
 
+    // Do not cancel an unfinished-looking DB match whose final result is already on disk.
+    // Fail startup closed if a journal cannot be read/delivered; preserve it for repair/retry.
+    public async Task ReplayBeforeStartupCancellationAsync(CancellationToken cancellationToken)
+    {
+        if (!_store.IsConfigured) return;
+        await RetryPendingAsync(cancellationToken);
+        if (!_pending.IsEmpty || Directory.EnumerateFiles(DirectoryPath, "*.json").Any())
+            throw new InvalidOperationException("Pending battle results must be delivered before startup cancellation. Journals have been preserved.");
+    }
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (!_store.IsConfigured) return;

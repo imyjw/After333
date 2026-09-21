@@ -15,6 +15,7 @@ namespace Project333.Runtime.Application.Online
         MoveOccupant = 10,
         Attack = 11,
         EndTurn = 12,
-        Surrender = 13
+        Surrender = 13,
+        ActivateEffect = 14
     }
 }

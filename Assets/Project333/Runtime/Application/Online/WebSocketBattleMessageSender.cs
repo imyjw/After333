@@ -129,7 +129,9 @@ namespace Project333.Runtime.Application.Online
             string sessionToken = null,
             string accountId = null,
             bool isReconnectAttempt = false,
-            string previousConnectionId = null)
+            string previousConnectionId = null,
+            string gameMode = "run",
+            string aiChallengeAttemptId = null)
         {
             if (!IsConnected)
             {
@@ -147,7 +149,9 @@ namespace Project333.Runtime.Application.Online
                 sessionToken,
                 accountId,
                 isReconnectAttempt,
-                previousConnectionId);
+                previousConnectionId,
+                gameMode,
+                aiChallengeAttemptId);
             _ = SendJsonAsync(json);
         }
 

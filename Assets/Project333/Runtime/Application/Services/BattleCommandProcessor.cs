@@ -146,6 +146,10 @@ namespace Project333.Runtime.Application.Services
 
                     break;
 
+                case ActivateEffectCommand active:
+                    ActiveEffectService.Activate(battleState, actorId, active.SourceCoord, active.OccupantRuntimeId);
+                    break;
+
                 case MoveOccupantCommand moveOccupantCommand:
                     EnsureMainPhase(battleState);
                     _moveService.Move(

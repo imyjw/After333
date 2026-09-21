@@ -9,6 +9,9 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <Compile Include="LoadChecks.cs" />
+    <Compile Include="SoakChecks.cs" />
+    <Compile Include="ComplexEffectChecks.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Application\Online\BattleStateViewProjector.cs" Link="BattleStateViewProjector.cs" />
     <Reference Include="Project333.PvpServer"><HintPath>$(ServerOutput)\Project333.PvpServer.dll</HintPath></Reference>
     <Reference Include="Npgsql"><HintPath>$(ServerOutput)\Npgsql.dll</HintPath></Reference>
     <Content Include="$(ServerOutput)\Data\*.json" Link="Data\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

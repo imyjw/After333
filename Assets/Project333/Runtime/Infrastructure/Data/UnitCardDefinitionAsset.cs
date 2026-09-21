@@ -26,7 +26,9 @@ namespace Project333.Runtime.Infrastructure.Data
         [FormerlySerializedAs("_hasGuard")]
         [SerializeField] private bool _hasShielder;
         [SerializeField] private bool _hasLifeSteal;
-        [SerializeField] private bool _hasRobot;
+        [Header("Unit Races (종족)")]
+        [SerializeField] private UnitRace[] _races = Array.Empty<UnitRace>();
+        public IReadOnlyList<UnitRace> Races => UnitRaceCollection.Copy(_races);
         [Header("Board")]
         [SerializeField] private bool _canMove = true;
         [Min(0)]
@@ -71,11 +73,6 @@ namespace Project333.Runtime.Infrastructure.Data
                     !lines.Exists(line => string.Equals(line, powerUpkeepText, StringComparison.Ordinal)))
                 {
                     lines.Add(powerUpkeepText);
-                }
-
-                if (_hasRobot && !lines.Exists(ContainsRobotSpecialEffectText))
-                {
-                    lines.Add("로봇");
                 }
 
                 if (_canAttackOnSummon && !lines.Exists(ContainsRushSpecialEffectText))
@@ -146,7 +143,7 @@ namespace Project333.Runtime.Infrastructure.Data
                 damageType: _damageType,
                 physicalDefense: _physicalDefense,
                 magicDefense: _magicDefense,
-                hasRobot: _hasRobot,
+                races: _races,
                 hasReplicate: HasReplicate,
                 sealboundOwnerTurnStarts: _sealboundOwnerTurnStarts,
                 hasHiding: _hasHiding,
@@ -175,7 +172,7 @@ namespace Project333.Runtime.Infrastructure.Data
             DamageType damageType = DamageType.Physical,
             int physicalDefense = 0,
             int magicDefense = 0,
-            bool hasRobot = false,
+            IReadOnlyList<UnitRace> races = null,
             int sealboundOwnerTurnStarts = 0,
             bool hasHiding = false,
             bool hasFlying = false,
@@ -201,7 +198,7 @@ namespace Project333.Runtime.Infrastructure.Data
             _damageType = damageType;
             _physicalDefense = physicalDefense;
             _magicDefense = magicDefense;
-            _hasRobot = hasRobot;
+            _races = UnitRaceCollection.ToArray(UnitRaceCollection.Copy(races));
             _sealboundOwnerTurnStarts = sealboundOwnerTurnStarts;
             _hasHiding = hasHiding;
             _hasFlying = hasFlying;
@@ -216,13 +213,6 @@ namespace Project333.Runtime.Infrastructure.Data
             return _sciencePowerUpkeep > 0
                 ? $"전력 -{_sciencePowerUpkeep}"
                 : string.Empty;
-        }
-
-        private static bool ContainsRobotSpecialEffectText(string text)
-        {
-            return !string.IsNullOrWhiteSpace(text) &&
-                   (text.IndexOf("로봇", StringComparison.Ordinal) >= 0 ||
-                    text.IndexOf("Robot", StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         private static bool ContainsRushSpecialEffectText(string text)

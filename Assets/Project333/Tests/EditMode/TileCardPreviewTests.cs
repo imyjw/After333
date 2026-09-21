@@ -1,3 +1,9 @@
+using System.Collections.Generic;
+using System.Linq;
+using Project333.Runtime.Application.Gateways;
+using Project333.Runtime.Application.Services;
+using Project333.Runtime.Domain.Effects;
+using Project333.Runtime.Domain.Resources;
 using System.Reflection;
 using NUnit.Framework;
 using Project333.Runtime.Domain.Battle;
@@ -174,6 +180,238 @@ namespace Project333.Tests.EditMode
             Assert.That(Stat("AttackValueText"), Is.Not.Null);
             Assert.That(Stat("HpValueText"), Is.Not.Null);
             Assert.That(Overlay().gameObject.activeSelf, Is.False);
+        }
+
+        [Test]
+        public void Show_AttachedEffectsAreBelowAndPlayerInfluencesAreAboveTheCard()
+        {
+            var state = BindBattleState();
+            var unit = CreateUnit("unit", PlayerId.Player, 20, 40);
+            unit.ApplyCombatStatBuff("Hero", attackBonus: 33);
+            unit.RestoreFallout(2, 0);
+            state.PlayerBoard.Place(unit.Position, unit);
+            AddAmplification(state);
+            _tile.Present(unit);
+
+            Assert.That(_view.TryShowCurrentCardPreview(), Is.True);
+            var card = Overlay().Find("PreviewCardImage").GetComponent<RectTransform>();
+            var attached = VisiblePanels("AttachedEffectTooltip");
+            var influences = VisiblePanels("InfluenceTooltip");
+            Assert.That(attached.Length, Is.EqualTo(2));
+            Assert.That(influences.Length, Is.EqualTo(1));
+            Assert.That(attached.Select(panel => panel.Find("Title").GetComponent<TMP_Text>().text),
+                Does.Contain("용사: 공격력 +33"));
+            Assert.That(attached.Select(panel => panel.Find("Title").GetComponent<TMP_Text>().text),
+                Does.Contain("낙진"));
+            Assert.That(influences[0].Find("Title").GetComponent<TMP_Text>().text,
+                Is.EqualTo("마법 증폭진: 주문력 +10"));
+            foreach (var panel in attached)
+                Assert.That(panel.anchoredPosition.y + panel.rect.height * 0.5f,
+                    Is.LessThan(card.anchoredPosition.y - card.rect.height * 0.5f));
+            foreach (var panel in influences)
+                Assert.That(panel.anchoredPosition.y - panel.rect.height * 0.5f,
+                    Is.GreaterThan(card.anchoredPosition.y + card.rect.height * 0.5f));
+            foreach (var panel in attached.Concat(influences))
+            {
+                var description = panel.Find("Description").GetComponent<TMP_Text>();
+                Assert.That(description.text, Is.Empty);
+                Assert.That(description.gameObject.activeSelf, Is.False);
+                Assert.That(panel.rect.height, Is.LessThan(116f));
+            }
+            foreach (var text in TooltipRoot().GetComponentsInChildren<TMP_Text>())
+                Assert.That(text.raycastTarget, Is.False);
+            foreach (var panel in TooltipRoot().GetComponentsInChildren<UnityEngine.UI.Image>())
+                Assert.That(panel.raycastTarget, Is.False);
+        }
+
+        [Test]
+        public void Refresh_UpdatesSourceBuffAndHidesExpiredInfluenceDuringSameHold()
+        {
+            var state = BindBattleState();
+            var unit = CreateUnit("unit", PlayerId.Player, 20, 40);
+            unit.ApplyCombatStatBuff("Hero", attackBonus: 33);
+            state.PlayerBoard.Place(unit.Position, unit);
+            AddAmplification(state);
+            _tile.Present(unit);
+            Assert.That(_view.TryShowCurrentCardPreview(), Is.True);
+
+            unit.ApplyCombatStatBuff("Hero", attackBonus: 33);
+            state.PersistentEffects[0].Expire();
+            RefreshPreview();
+
+            var attached = VisiblePanels("AttachedEffectTooltip");
+            Assert.That(attached.Length, Is.EqualTo(1));
+            Assert.That(attached[0].Find("Title").GetComponent<TMP_Text>().text,
+                Is.EqualTo("용사: 공격력 +66"));
+            Assert.That(attached[0].Find("Description").gameObject.activeSelf, Is.False);
+            Assert.That(VisiblePanels("InfluenceTooltip"), Is.Empty);
+            _view.HideCurrentCardPreview();
+            foreach (Transform panel in TooltipRoot())
+                Assert.That(panel.gameObject.activeSelf, Is.False);
+        }
+
+        [Test]
+        public void Refresh_ReboundOccupantRemovesOldPooledStatusPanels()
+        {
+            var unit = CreateUnit("unit", PlayerId.Player, 20, 40);
+            unit.RestoreFallout(2, 0);
+            _tile.Present(unit);
+            Assert.That(_view.TryShowCurrentCardPreview(), Is.True);
+            Assert.That(VisiblePanels("AttachedEffectTooltip").Length, Is.EqualTo(1));
+
+            _tile.Present(CreateUnit("unit", PlayerId.Player, 20, 40));
+            RefreshPreview();
+
+            Assert.That(VisiblePanels("AttachedEffectTooltip"), Is.Empty);
+            Assert.That(VisiblePanels("InfluenceTooltip"), Is.Empty);
+        }
+
+        [TestCase(1920f, 1080f)]
+        [TestCase(1280f, 720f)]
+        [TestCase(2560f, 1080f)]
+        public void Refresh_AllVisiblePanelsStayInsideCanvasAfterResize(float width, float height)
+        {
+            var state = BindBattleState();
+            var unit = new UnitState("unit", "PreviewTestUnit", PlayerId.Player,
+                new TileCoord(0, 0), AttackType.Melee, 20, 90, true, false, 0,
+                hitsPerAttack: 2, hasBerserker: true, hasEndure: true,
+                hasLifeSteal: true, hasRush: true, spellPower: 20);
+            unit.ApplyCombatStatBuff("Hero", attackBonus: 33);
+            unit.ApplyCombatStatBuff("RobotFusion", maxHpBonus: 20);
+            unit.ApplyCombatStatBuff("Daehwandan", physicalDefenseBonus: 10);
+            unit.RestoreFallout(2, 0);
+            unit.CurrentHp -= 10;
+            state.PlayerBoard.Place(unit.Position, unit);
+            AddAmplification(state);
+            _tile.Present(unit);
+            Assert.That(_view.TryShowCurrentCardPreview(), Is.True);
+            _canvasObject.GetComponent<RectTransform>().sizeDelta = new Vector2(width, height);
+            Canvas.ForceUpdateCanvases();
+            RefreshPreview();
+
+            var root = Overlay().GetComponent<RectTransform>();
+            var rects = new List<Rect>();
+            rects.Add(BoundsIn(root, root.Find("PreviewCardImage").GetComponent<RectTransform>()));
+            foreach (Transform transform in TooltipRoot())
+            {
+                if (!transform.gameObject.activeSelf) continue;
+                var panel = transform.GetComponent<RectTransform>();
+                rects.Add(BoundsIn(root, panel));
+                var title = panel.Find("Title").GetComponent<TMP_Text>();
+                Assert.That(title.preferredHeight,
+                    Is.LessThanOrEqualTo(title.rectTransform.rect.height + 1f));
+                var description = panel.Find("Description").GetComponent<TMP_Text>();
+                if (description.gameObject.activeSelf)
+                    Assert.That(description.preferredHeight,
+                        Is.LessThanOrEqualTo(description.rectTransform.rect.height + 1f));
+            }
+            for (var i = 0; i < rects.Count; i++)
+            {
+                Assert.That(rects[i].xMin, Is.GreaterThanOrEqualTo(root.rect.xMin - 0.1f));
+                Assert.That(rects[i].xMax, Is.LessThanOrEqualTo(root.rect.xMax + 0.1f));
+                Assert.That(rects[i].yMin, Is.GreaterThanOrEqualTo(root.rect.yMin - 0.1f));
+                Assert.That(rects[i].yMax, Is.LessThanOrEqualTo(root.rect.yMax + 0.1f));
+                for (var j = i + 1; j < rects.Count; j++)
+                    Assert.That(rects[i].Overlaps(rects[j]), Is.False);
+            }
+        }
+
+
+        [TestCase("normal")]
+        [TestCase("release")]
+        [TestCase("exit")]
+        [TestCase("exit-release")]
+        [TestCase("disable")]
+        [TestCase("empty")]
+        public void LongPress_OnlySuppressesItsOwnGesture(string ending)
+        {
+            _tile.Present(CreateUnit("unit", PlayerId.Player, 20, 40));
+            var relay = _tile.gameObject.AddComponent<TileLongPressRelay>();
+            relay.Initialize(_view, _tile);
+            var pointer = new UnityEngine.EventSystems.PointerEventData(null);
+            var clicks = 0;
+            _tile.Clicked += _ => clicks++;
+
+            if (ending != "normal")
+            {
+                relay.OnPointerDown(pointer);
+                typeof(TileLongPressRelay).GetField("_pointerDownStartedAt",
+                    BindingFlags.Instance | BindingFlags.NonPublic).SetValue(relay, Time.unscaledTime - 1f);
+                typeof(TileLongPressRelay).GetMethod("Update",
+                    BindingFlags.Instance | BindingFlags.NonPublic).Invoke(relay, null);
+                Assert.That(Overlay().gameObject.activeSelf, Is.True);
+
+                if (ending == "disable")
+                {
+                    relay.enabled = false;
+                    relay.enabled = true;
+                }
+                else
+                {
+                    if (ending == "exit" || ending == "exit-release" || ending == "empty")
+                        relay.OnPointerExit(pointer);
+                    relay.OnPointerUp(pointer);
+                    if (ending == "release" || ending == "exit-release")
+                        relay.OnPointerClick(pointer);
+                }
+                Assert.That(clicks, Is.Zero, "The preview gesture must not select or attack.");
+                Assert.That(Overlay().gameObject.activeSelf, Is.False);
+                if (ending == "empty")
+                    _tile.Present(null);
+            }
+
+            for (var expected = 1; expected <= 3; expected++)
+            {
+                relay.OnPointerDown(pointer);
+                relay.OnPointerUp(pointer);
+                relay.OnPointerClick(pointer);
+                Assert.That(clicks, Is.EqualTo(expected), "Each new short press must reach TileView.");
+            }
+        }
+
+        private BattleState BindBattleState()
+        {
+            var deck = Enumerable.Repeat("Goblin", 33).ToArray();
+            var battle = new BattleSetupService().CreateInitialState(
+                new BattleSetupRequest(deck, deck, PlayerId.Player));
+            var flow = new BattleFlowController();
+            flow.RestoreBattleState(battle);
+            var bootstrapperObject = new GameObject("PreviewTestBootstrapper");
+            bootstrapperObject.transform.SetParent(_canvasObject.transform, false);
+            bootstrapperObject.SetActive(false);
+            var bootstrapper = bootstrapperObject.AddComponent<BattleBootstrapper>();
+            typeof(BattleBootstrapper).GetField("_battleGateway",
+                BindingFlags.Instance | BindingFlags.NonPublic).SetValue(bootstrapper, new LocalBattleGateway(flow));
+            SetField("_battleBootstrapper", bootstrapper);
+            return battle;
+        }
+
+        private static void AddAmplification(BattleState state)
+        {
+            state.PersistentEffects.Add(new PersistentEffectState(
+                MagicAmplificationCircleRules.CardId, PlayerId.Player,
+                MagicAmplificationCircleRules.EffectId, state.TurnNumber, "", new ResourceSet()));
+        }
+
+        private Transform TooltipRoot() => Overlay().Find("PreviewSpecialEffectTooltips");
+
+        private RectTransform[] VisiblePanels(string prefix) =>
+            TooltipRoot().Cast<Transform>().Where(panel => panel.name.StartsWith(prefix) &&
+                panel.gameObject.activeSelf).Select(panel => panel.GetComponent<RectTransform>()).ToArray();
+
+        private static Rect BoundsIn(RectTransform root, RectTransform child)
+        {
+            var corners = new Vector3[4];
+            child.GetWorldCorners(corners);
+            var min = (Vector2)root.InverseTransformPoint(corners[0]);
+            var max = min;
+            foreach (var corner in corners)
+            {
+                var local = (Vector2)root.InverseTransformPoint(corner);
+                min = Vector2.Min(min, local);
+                max = Vector2.Max(max, local);
+            }
+            return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
         }
 
         private static UnitState CreateUnit(string id, PlayerId owner, int attack, int hp)

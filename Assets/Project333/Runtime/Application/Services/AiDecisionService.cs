@@ -2,8 +2,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text;
 using Project333.Runtime.Application.Commands;
 using Project333.Runtime.Domain.Battle;
+using Project333.Runtime.Domain.Board;
+using Project333.Runtime.Domain.Cards;
 using Project333.Runtime.Infrastructure.Data;
 
 namespace Project333.Runtime.Application.Services
@@ -18,6 +21,7 @@ namespace Project333.Runtime.Application.Services
 
     public sealed class AiDecisionService
     {
+        private const double ScoreTieEpsilon = 0.0001;
         private readonly AiActionGenerator _generator;
         private readonly AiBattleSimulation _simulation;
         private readonly AiPositionEvaluator _evaluator = new AiPositionEvaluator();
@@ -86,17 +90,17 @@ namespace Project333.Runtime.Application.Services
                             if (node == null) continue;
                             var key = AiBattleStateCopy.PositionKey(node.States[0]) + "|" + AiBattleStateCopy.PositionKey(node.States[1]);
                             if (!seen.Add(key) || _visited.Contains(AiBattleStateCopy.PositionKey(node.States[0]))) continue;
-                            if (node.Score > best.Score + 0.0001) best = node;
+                            if (IsPreferred(node, best)) best = node;
                             if (!node.States[0].IsEnded && node.States[0].ActivePlayerId == PlayerId.AI) next.Add(node);
                         }
                     }
                     LastCompletedDepth = depth;
-                    // Stable insertion-order tie breaks, independent of newly generated card/occupant GUIDs.
+                    // Resolve otherwise equal attacks by target HP, then retain stable insertion order.
                     for (var i = 1; i < next.Count; i++)
                     {
                         var item = next[i];
                         var j = i - 1;
-                        while (j >= 0 && next[j].Score < item.Score) { next[j + 1] = next[j]; j--; }
+                        while (j >= 0 && IsPreferred(item, next[j])) { next[j + 1] = next[j]; j--; }
                         next[j + 1] = item;
                     }
                     frontier = DiverseBeam(next);
@@ -115,7 +119,10 @@ namespace Project333.Runtime.Application.Services
         private Node? Expand(Node parent, AiAction action, Stopwatch watch)
         {
             var node = new Node { First = parent.First ?? action.Commands[0], States = new BattleState[2],
-                Depth = parent.Depth + action.Commands.Length, Cost = parent.Cost + action.Commands.Length * 0.25 };
+                Depth = parent.Depth + action.Commands.Length, Cost = parent.Cost + action.Commands.Length * 0.25,
+                Focus = parent.Focus };
+            var firstFocus = parent.First == null ? CreateAttackFocus(parent.States[0], action.Commands[0]) : null;
+            var focusIsValid = firstFocus != null;
             double total = 0, worst = double.MaxValue;
             for (var sample = 0; sample < 2; sample++)
             {
@@ -132,6 +139,12 @@ namespace Project333.Runtime.Application.Services
                 var after = _simulation.Apply(parent.States[sample], action, sample);
                 if (after == null) return null;
                 node.States[sample] = after;
+                if (firstFocus != null)
+                {
+                    var targetAfter = after.PlayerBoard.GetOccupant(firstFocus.Target);
+                    focusIsValid &= targetAfter == null ||
+                        (targetAfter.RuntimeId == firstFocus.TargetRuntimeId && targetAfter.CurrentHp < firstFocus.Hp);
+                }
                 var projected = after;
                 if (!after.IsEnded && after.ActivePlayerId == PlayerId.AI)
                 {
@@ -179,13 +192,68 @@ namespace Project333.Runtime.Application.Services
                     }
                     score += movementScore;
                 }
+                if (after.IsEnded || projected.IsEnded)
+                {
+                    focusIsValid = false;
+                    node.Focus = null;
+                }
                 total += score;
                 worst = Math.Min(worst, score);
             }
+            if (parent.First == null) node.Focus = focusIsValid ? firstFocus : null;
             // Do not choose an optimistic random outcome and present it as a guaranteed kill.
             node.Score = total * 0.375 + worst * 0.25 - node.Cost;
             return node;
         }
+        private static bool IsPreferred(Node candidate, Node incumbent)
+        {
+            if (candidate.Score > incumbent.Score + ScoreTieEpsilon) return true;
+            if (Math.Abs(candidate.Score - incumbent.Score) > ScoreTieEpsilon) return false;
+            var focus = candidate.Focus;
+            var previous = incumbent.Focus;
+            return focus != null && previous != null && focus.Attacker.Equals(previous.Attacker) &&
+                focus.EquivalenceKey == previous.EquivalenceKey && focus.Hp < previous.Hp;
+        }
+
+        private static AttackFocus? CreateAttackFocus(BattleState before, IBattleCommand command)
+        {
+            if (command is not AttackCommand attack) return null;
+            var attacker = before.AIBoard.GetOccupant(attack.AttackerCoord);
+            var target = before.PlayerBoard.GetOccupant(attack.TargetCoord);
+            if (attacker == null || attacker.IsUnderHuanShu || target == null ||
+                target.Kind != OccupantKind.Unit || !target.IsAlive) return null;
+
+            var key = new StringBuilder(AiBattleStateCopy.FocusTargetKey(target));
+            for (var index = 0; index < before.PersistentEffects.Count; index++)
+            {
+                var effect = before.PersistentEffects[index];
+                if (effect.IsExpired) continue;
+                // Delayed destruction is not interchangeable with an unmarked target.
+                if (effect.TargetRuntimeId == target.RuntimeId) return null;
+                if (effect.EffectDamage <= 0) continue;
+                var affectedOwner = effect.TargetsOwnerBoard ? effect.OwnerId : before.GetOpponent(effect.OwnerId).Id;
+                if (affectedOwner != target.OwnerId ||
+                    (effect.TargetRow >= 0 && effect.TargetRow != target.Position.Row) ||
+                    (effect.TargetStartColumn >= 0 &&
+                     !BiochemicalBombRules.ContainsColumn(effect.TargetStartColumn, target.Position.Column))) continue;
+                key.Append("|area:").Append(index);
+            }
+            return new AttackFocus
+            {
+                Attacker = attack.AttackerCoord, Target = attack.TargetCoord,
+                TargetRuntimeId = target.RuntimeId, Hp = target.CurrentHp, EquivalenceKey = key.ToString()
+            };
+        }
+
+        private sealed class AttackFocus
+        {
+            public TileCoord Attacker;
+            public TileCoord Target;
+            public string TargetRuntimeId = string.Empty;
+            public string EquivalenceKey = string.Empty;
+            public int Hp;
+        }
+
         private bool HasBudget(Stopwatch watch) => LastSimulationCount < _options.MaxSimulations &&
             watch.Elapsed.TotalMilliseconds < _options.MaxMilliseconds;
 
@@ -213,6 +281,7 @@ namespace Project333.Runtime.Application.Services
             public int Depth;
             public double Cost;
             public double Score;
+            public AttackFocus? Focus;
         }
     }
 }

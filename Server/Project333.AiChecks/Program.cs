@@ -13,6 +13,18 @@ using ServerEventType = Project333.PvpServer.Messages.BattleEventType;
 using ServerPlayerId = Project333.PvpServer.Messages.PlayerIdDto;
 
 // Offline checks only: no HTTP listener, database, accounts, rewards or production matches.
+if (args.Contains("--status-tooltips-only")) { CombatStatBuffChecks.Run(); return; }
+CombatStatBuffChecks.Run();
+if (args.Contains("--magic-amplification-only")) { MagicAmplificationChecks.Run(); return; }
+MagicAmplificationChecks.Run();
+if (args.Contains("--nuclear-only")) { NuclearChecks.Run(); return; }
+NuclearChecks.Run();
+if (args.Contains("--hero-only")) { HeroKillChecks.Run(); return; }
+HeroKillChecks.Run();
+if (args.Contains("--active-effects-only")) { ActiveEffectChecks.Run(); return; }
+ActiveEffectChecks.Run();
+UnitRaceChecks.Run();
+if (args.Contains("--unit-races-only")) return;
 PveAiDeckChecks.Run();
 var provider = PrototypeCardDefinitions.LoadCardDefinitionProvider();
 var ids = new[] { "Goblin", "GoldMiner", "ManaWeaver", "firebolt", "ElfLongbowScout", "ManaStone", "A-111",

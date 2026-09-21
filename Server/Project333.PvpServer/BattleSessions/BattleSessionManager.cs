@@ -7,14 +7,59 @@ public sealed class BattleSessionManager
     private readonly BattleResultOutbox? _resultOutbox;
     public BattleSessionManager(BattleResultOutbox? resultOutbox = null) => _resultOutbox = resultOutbox;
     private readonly object _gate = new();
+    private bool _serverShutdown;
     private readonly Dictionary<string, BattleSession> _sessions = new(StringComparer.Ordinal);
     private readonly Dictionary<BattleSession, int> _pendingJoins = new();
 
-    public BattleSessionJoinLease AcquireForJoin(string matchId, bool useServerAiOpponent)
+    private sealed class AccountJoinGate
+    {
+        public readonly SemaphoreSlim Semaphore = new(1, 1);
+        public int Users;
+    }
+    private readonly Dictionary<string, AccountJoinGate> _accountJoins = new(StringComparer.Ordinal);
+
+    // Presence checks and async deck loading must not let two sockets create two battles for one account.
+    public async Task<IDisposable> AcquireAccountJoinAsync(string accountId, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountId);
+        AccountJoinGate gate;
+        lock (_gate)
+        {
+            if (_serverShutdown) throw new InvalidOperationException("Server is shutting down.");
+            if (!_accountJoins.TryGetValue(accountId, out gate!))
+                _accountJoins.Add(accountId, gate = new AccountJoinGate());
+            gate.Users++;
+        }
+        try { await gate.Semaphore.WaitAsync(cancellationToken); }
+        catch { ReleaseAccountJoin(accountId, gate, acquired: false); throw; }
+        return new BattleAccountJoinLease(() => ReleaseAccountJoin(accountId, gate, acquired: true));
+    }
+
+    private void ReleaseAccountJoin(string accountId, AccountJoinGate gate, bool acquired)
     {
         lock (_gate)
         {
-            var session = GetOrCreate(matchId, useServerAiOpponent);
+            if (acquired) gate.Semaphore.Release();
+            if (--gate.Users == 0)
+            {
+                _accountJoins.Remove(accountId);
+                gate.Semaphore.Dispose();
+            }
+        }
+    }
+    public void CancelForServerShutdown()
+    {
+        lock (_gate)
+        {
+            _serverShutdown = true;
+            foreach (var session in _sessions.Values) session.CancelForServerShutdown();
+        }
+    }
+    public BattleSessionJoinLease AcquireForJoin(string matchId, bool useServerAiOpponent, Guid? aiChallengeAttemptId = null)
+    {
+        lock (_gate)
+        {
+            var session = GetOrCreate(matchId, useServerAiOpponent, aiChallengeAttemptId);
             _pendingJoins.TryGetValue(session, out var count);
             _pendingJoins[session] = count + 1;
             return new BattleSessionJoinLease(session, () => ReleaseJoin(session));
@@ -72,7 +117,7 @@ public sealed class BattleSessionManager
             : null;
     }
 
-    public BattleSession GetOrCreate(string matchId, bool useServerAiOpponent = true)
+    public BattleSession GetOrCreate(string matchId, bool useServerAiOpponent = true, Guid? aiChallengeAttemptId = null)
     {
         if (string.IsNullOrWhiteSpace(matchId))
         {
@@ -81,12 +126,13 @@ public sealed class BattleSessionManager
 
         lock (_gate)
         {
+            if (_serverShutdown) throw new InvalidOperationException("Server is shutting down.");
             if (_sessions.TryGetValue(matchId, out var session))
             {
                 return session;
             }
 
-            session = new BattleSession(matchId, useServerAiOpponent, resultOutbox: _resultOutbox);
+            session = new BattleSession(matchId, useServerAiOpponent, resultOutbox: _resultOutbox, aiChallengeAttemptId: aiChallengeAttemptId);
             _sessions.Add(matchId, session);
             return session;
         }
@@ -96,6 +142,7 @@ public sealed class BattleSessionManager
     {
         lock (_gate)
         {
+            if (_serverShutdown) throw new InvalidOperationException("Server is shutting down.");
             var reconnectSession = _sessions.Values
                 .Where(session => session.CanReconnectIdentityKey(reconnectIdentityKey))
                 .OrderBy(session => session.MatchId, StringComparer.Ordinal)
@@ -128,7 +175,9 @@ public sealed class BattleSessionManager
         }
     }
 
-    public BattleSession? FindConnectedPvpSession(string reconnectIdentityKey)
+    public BattleSession? FindConnectedPvpSession(string reconnectIdentityKey) => FindConnectedSession(reconnectIdentityKey, false);
+
+    public BattleSession? FindConnectedSession(string reconnectIdentityKey, bool useServerAiOpponent)
     {
         if (string.IsNullOrWhiteSpace(reconnectIdentityKey))
         {
@@ -139,7 +188,7 @@ public sealed class BattleSessionManager
         {
             return _sessions.Values
                 .Where(session =>
-                    !session.UseServerAiOpponent &&
+                    session.UseServerAiOpponent == useServerAiOpponent &&
                     !session.IsBattleEnded &&
                     session.HasConnectedIdentityKey(reconnectIdentityKey))
                 .OrderBy(session => session.MatchId, StringComparer.Ordinal)
@@ -147,7 +196,7 @@ public sealed class BattleSessionManager
         }
     }
 
-    public PendingReconnectStatusSnapshot? FindReconnectStatus(string reconnectIdentityKey)
+    public PendingReconnectStatusSnapshot? FindReconnectStatus(string reconnectIdentityKey, bool useServerAiOpponent = false)
     {
         if (string.IsNullOrWhiteSpace(reconnectIdentityKey))
         {
@@ -157,6 +206,7 @@ public sealed class BattleSessionManager
         lock (_gate)
         {
             return _sessions.Values
+                .Where(session => session.UseServerAiOpponent == useServerAiOpponent)
                 .Select(session => session.TryGetReconnectStatus(reconnectIdentityKey, out var status)
                     ? status
                     : null)
@@ -192,5 +242,12 @@ public sealed class BattleSessionJoinLease : IDisposable
     private Action? _release;
     internal BattleSessionJoinLease(BattleSession session, Action release) { Session = session; _release = release; }
     public BattleSession Session { get; }
+    public void Dispose() => Interlocked.Exchange(ref _release, null)?.Invoke();
+}
+
+public sealed class BattleAccountJoinLease : IDisposable
+{
+    private Action? _release;
+    internal BattleAccountJoinLease(Action release) => _release = release;
     public void Dispose() => Interlocked.Exchange(ref _release, null)?.Invoke();
 }

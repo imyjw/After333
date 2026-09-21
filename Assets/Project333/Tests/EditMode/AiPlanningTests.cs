@@ -33,7 +33,7 @@ namespace Project333.Tests.EditMode
             bool robot = false, int upkeep = 0, string id = "unit")
         {
             var unit = new UnitState(Guid.NewGuid().ToString(), id, owner, coord, type, attack, hp, true,
-                robot, upkeep, hasShielder: shielder, hasRobot: robot, hasPiercing: piercing);
+                robot, upkeep, hasShielder: shielder, races: robot ? new[] { UnitRace.Robot } : null, hasPiercing: piercing);
             unit.HasSummoningSickness = false;
             unit.RemainingAttacksThisTurn = 1;
             state.GetBoard(owner).Place(coord, unit);
@@ -174,12 +174,14 @@ namespace Project333.Tests.EditMode
             Assert.That(((CastScriptedSpellCommand)command).HasTarget, Is.True);
         }
 
-        [Test]
-        public void Planning_RobotFusionCompletesPaidSelectionThenAttacks()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Planning_RobotFusionCompletesPaidSelectionThenAttacks(bool eraseMaterial)
         {
             var state = State();
             var survivor = Unit(state, PlayerId.AI, new TileCoord(0,0), 3, 15, AttackType.Ranged, robot:true, upkeep:2);
             var material = Unit(state, PlayerId.AI, new TileCoord(0,1), 30, 15, robot:true, upkeep:1);
+            if (eraseMaterial) material.ApplyErasure();
             material.HasSummoningSickness = true;
             material.RemainingAttacksThisTurn = 0;
             state.Player.Master.CurrentHp = 33;

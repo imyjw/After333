@@ -27,7 +27,6 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private TileChangedEvent _onTileChanged = new TileChangedEvent();
 
         private OccupantState _currentOccupant;
-        private bool _suppressNextClick;
 
         public event Action<TileView> Clicked;
 
@@ -73,19 +72,8 @@ namespace Project333.Runtime.Presentation.Battle
             _highlightState = highlightState;
         }
 
-        public void SuppressNextClick()
-        {
-            _suppressNextClick = true;
-        }
-
         public void NotifyClicked()
         {
-            if (_suppressNextClick)
-            {
-                _suppressNextClick = false;
-                return;
-            }
-
             Clicked?.Invoke(this);
         }
     }

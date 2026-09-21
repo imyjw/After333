@@ -60,13 +60,34 @@ namespace Project333.Runtime.Application.Services
             ResolveDestructionQueue(battleState, occupant);
         }
 
+        public static void DestroyUnsealedSummons(BattleState battleState)
+        {
+            if (battleState == null) throw new ArgumentNullException(nameof(battleState));
+            var removed = new List<OccupantState>();
+            foreach (var owner in BoardOrder)
+            {
+                var board = battleState.GetBoard(owner);
+                foreach (var occupant in new List<OccupantState>(board.EnumerateOccupants()))
+                {
+                    if (occupant.Kind == OccupantKind.Master || occupant.IsSealbound) continue;
+                    if (TryEnterDemonKingRevivalSeal(battleState, occupant)) continue;
+                    board.Remove(occupant.Position);
+                    removed.Add(occupant);
+                }
+            }
+            ResolveDestructionQueue(battleState, null, removed);
+        }
+
         private static void ResolveDestructionQueue(
             BattleState battleState,
-            OccupantState explicitlyDestroyed)
+            OccupantState explicitlyDestroyed,
+            IEnumerable<OccupantState> explicitlyDestroyedGroup = null)
         {
             var pendingExplosions = new Queue<NuclearExplosionSource>();
             var queuedSources = new HashSet<OccupantState>();
             QueueNuclearExplosion(explicitlyDestroyed, pendingExplosions, queuedSources);
+            if (explicitlyDestroyedGroup != null)
+                foreach (var occupant in explicitlyDestroyedGroup) QueueNuclearExplosion(occupant, pendingExplosions, queuedSources);
             CollectAndRemoveDefeatedOccupants(battleState, pendingExplosions, queuedSources);
 
             while (pendingExplosions.Count > 0)

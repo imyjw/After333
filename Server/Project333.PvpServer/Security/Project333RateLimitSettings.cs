@@ -180,8 +180,11 @@ public static class Project333RateLimiting
 
         if (path.Equals("/me", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWithSegments("/pvp/reconnect-status") ||
+            path.StartsWithSegments("/battle/reconnect-status") ||
+            path.StartsWithSegments("/ai-challenge") ||
             path.StartsWithSegments("/account/operations") ||
             path.StartsWithSegments("/wallet") ||
+            path.StartsWithSegments("/gifts") ||
             (path.StartsWithSegments("/ads") &&
              !path.StartsWithSegments("/ads/levelplay/rewarded-callback")) ||
             path.StartsWithSegments("/cards") ||

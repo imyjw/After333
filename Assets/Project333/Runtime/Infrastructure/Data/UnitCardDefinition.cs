@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using Project333.Runtime.Domain.Cards;
 using Project333.Runtime.Domain.Resources;
@@ -27,7 +28,7 @@ namespace Project333.Runtime.Infrastructure.Data
             DamageType damageType = DamageType.Physical,
             int physicalDefense = 0,
             int magicDefense = 0,
-            bool hasRobot = false,
+            IReadOnlyList<UnitRace> races = null,
             bool includeInDraft = true,
             bool hasRush = false,
             bool hasReplicate = false,
@@ -69,7 +70,7 @@ namespace Project333.Runtime.Infrastructure.Data
             DamageType = damageType;
             PhysicalDefense = physicalDefense;
             MagicDefense = magicDefense;
-            HasRobot = hasRobot;
+            Races = UnitRaceCollection.Copy(races);
             SealboundOwnerTurnStarts = sealboundOwnerTurnStarts;
             HasHiding = hasHiding;
             HasFlying = hasFlying;
@@ -97,7 +98,8 @@ namespace Project333.Runtime.Infrastructure.Data
         public DamageType DamageType { get; }
         public int PhysicalDefense { get; }
         public int MagicDefense { get; }
-        public bool HasRobot { get; }
+        public IReadOnlyList<UnitRace> Races { get; }
+        public bool HasRace(UnitRace race) => UnitRaceCollection.Contains(Races, race);
         public int SealboundOwnerTurnStarts { get; }
         public bool HasHiding { get; }
         public bool HasFlying { get; }

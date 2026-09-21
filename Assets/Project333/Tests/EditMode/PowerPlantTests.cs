@@ -1,165 +1,171 @@
-using System.Collections.Generic;
+using System;
+using System.Linq;
 using NUnit.Framework;
+using Newtonsoft.Json;
+using Project333.Runtime.Application.Commands;
 using Project333.Runtime.Application.Services;
+using Project333.Runtime.Application.Online;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Board;
 using Project333.Runtime.Domain.Cards;
 using Project333.Runtime.Domain.Resources;
+using Project333.Runtime.Infrastructure.Data;
 
 namespace Project333.Tests.EditMode
 {
     public sealed class PowerPlantTests
     {
-        [Test]
-        public void ResolveTurnStart_ConvertsAfterResourceGainAndBeforePowerUpkeep()
+        private static BattleState State(PlayerId actor = PlayerId.Player)
         {
-            var battleState = CreateTurnStartBattle();
-            ClearStartingGold(battleState.Player);
-            battleState.PlayerBoard.Place(
-                new TileCoord(0, 0),
-                CreatePowerPlant("plant", new TileCoord(0, 0)));
-            battleState.PlayerBoard.Place(
-                new TileCoord(0, 1),
-                new BuildingState(
-                    "gold-source",
-                    "GoldSource",
-                    PlayerId.Player,
-                    new TileCoord(0, 1),
-                    canAttack: false,
-                    attack: 0,
-                    maxHp: 1,
-                    turnStartResourceGain: new ResourceSet(0, 0, 0, 1),
-                    damageType: DamageType.None));
-            var upkeepUnit = new UnitState(
-                "upkeep-unit",
-                "ScienceUpkeepTwo",
-                PlayerId.Player,
-                new TileCoord(1, 0),
-                AttackType.Melee,
-                attack: 1,
-                maxHp: 1,
-                canMove: true,
-                isScience: true,
-                sciencePowerUpkeep: 2);
-            battleState.PlayerBoard.Place(upkeepUnit.Position, upkeepUnit);
+            var deck = Enumerable.Repeat("Goblin", 33).ToArray();
+            var state = new BattleSetupService().CreateInitialState(new BattleSetupRequest(deck, deck, actor));
+            state.SetPhase(PhaseType.Main);
+            return state;
+        }
+        private static BuildingState Plant(BattleState state, PlayerId owner = PlayerId.Player, int col = 0)
+        {
+            var plant = new BuildingState("plant-" + col, "PowerPlant", owner, new TileCoord(col,0), false, 0, 30);
+            state.GetBoard(owner).Place(plant.Position, plant);
+            return plant;
+        }
+        private static void Activate(BattleState state, BuildingState plant) =>
+            ActiveEffectService.Activate(state, plant.OwnerId, plant.Position, plant.RuntimeId);
 
-            new TurnStartService().ResolveTurnStart(battleState);
-
-            Assert.That(upkeepUnit.IsDrained, Is.False);
-            Assert.That(battleState.Player.Resources.Gold, Is.Zero);
-            Assert.That(battleState.Player.Resources.Power, Is.Zero);
+        [Test]
+        public void SummonTurn_ConvertsOnlyOnCommand_OncePerPlantPerTurn()
+        {
+            var state = State(); var plant = Plant(state);
+            var gold = state.Player.Resources.Gold;
+            Assert.That(plant.HasSummoningSickness, Is.True);
+            Assert.That(ActiveEffectService.CanActivate(state, PlayerId.Player, plant.Position), Is.True);
+            Activate(state, plant);
+            Assert.That(state.Player.Resources.Gold, Is.EqualTo(gold - 1));
+            Assert.That(state.Player.Resources.Power, Is.EqualTo(2));
+            Assert.Throws<InvalidOperationException>(() => Activate(state, plant));
+            Assert.That(state.Player.Resources.Gold, Is.EqualTo(gold - 1));
+            Assert.That(state.Player.Resources.Power, Is.EqualTo(2));
+            var second = Plant(state, col:1);
+            Activate(state, second);
+            Assert.That(state.Player.Resources.Power, Is.EqualTo(4));
+            state.RestoreRuntimeState(state.TurnNumber + 2, PlayerId.Player, PhaseType.Main);
+            Activate(state, plant);
+            Assert.That(state.Player.Resources.Power, Is.EqualTo(6));
         }
 
         [Test]
-        public void ResolveTurnStart_MultiplePowerPlantsConvertIndependently()
+        public void TurnStart_DoesNotConvertGold_OrSupplyAutomaticUpkeep()
         {
-            var battleState = CreateTurnStartBattle();
-            ClearStartingGold(battleState.Player);
-            battleState.Player.Resources.Add(new ResourceSet(0, 0, 0, 2));
-            battleState.PlayerBoard.Place(
-                new TileCoord(4, 1),
-                CreatePowerPlant("later", new TileCoord(4, 1)));
-            battleState.PlayerBoard.Place(
-                new TileCoord(0, 0),
-                CreatePowerPlant("earlier", new TileCoord(0, 0)));
-
-            new TurnStartService().ResolveTurnStart(battleState);
-
-            Assert.That(battleState.Player.Resources.Gold, Is.Zero);
-            Assert.That(battleState.Player.Resources.Power, Is.EqualTo(4));
-            Assert.That(battleState.ResourceChangeEvents, Has.Count.EqualTo(2));
-            Assert.That(battleState.ResourceChangeEvents[0].SourceCardId, Is.EqualTo(PowerPlantRules.CardId));
-            Assert.That(battleState.ResourceChangeEvents[0].Spent.Gold, Is.EqualTo(1));
-            Assert.That(battleState.ResourceChangeEvents[0].Gained.Power, Is.EqualTo(2));
-            Assert.That(battleState.ResourceChangeEvents[1].SourceCardId, Is.EqualTo(PowerPlantRules.CardId));
-            Assert.That(battleState.ResourceChangeEvents[1].Spent.Gold, Is.EqualTo(1));
-            Assert.That(battleState.ResourceChangeEvents[1].Gained.Power, Is.EqualTo(2));
+            var state = State(); Plant(state);
+            state.PlayerBoard.Place(new TileCoord(1,0), new UnitState("robot","A-111",PlayerId.Player,
+                new TileCoord(1,0),AttackType.Melee,13,13,true,true,1));
+            var before = state.Player.Resources.Gold;
+            state.SetPhase(PhaseType.TurnStart);
+            new TurnStartService().ResolveTurnStart(state);
+            Assert.That(state.Player.Resources.Power, Is.Zero);
+            Assert.That(state.Player.Resources.Gold, Is.EqualTo(before)); // Base gold +1, then upkeep pays gold 1 directly.
+            Assert.That(state.ResourceChangeEvents.Any(e => e.SourceCardId == "PowerPlant"), Is.False);
         }
 
-        [Test]
-        public void ResolveTurnStart_WithoutGold_PowerPlantDoesNothing()
+        [TestCase("gold")][TestCase("erasure")][TestCase("drained")][TestCase("sealed")]
+        [TestCase("dead")][TestCase("enemy-turn")][TestCase("phase")][TestCase("pending-fusion")]
+        public void InvalidActivation_DoesNotSpendOrMarkUsed(string reason)
         {
-            var battleState = CreateTurnStartBattle();
-            ClearStartingGold(battleState.Player);
-            battleState.PlayerBoard.Place(
-                new TileCoord(0, 0),
-                CreatePowerPlant("plant", new TileCoord(0, 0)));
-
-            new TurnStartService().ResolveTurnStart(battleState);
-
-            Assert.That(battleState.Player.Resources.Gold, Is.Zero);
-            Assert.That(battleState.Player.Resources.Power, Is.Zero);
-        }
-
-        [Test]
-        public void ResolveTurnStart_SuppressedPowerPlantsDoNotConvert()
-        {
-            var battleState = CreateTurnStartBattle();
-            ClearStartingGold(battleState.Player);
-            battleState.Player.Resources.Add(new ResourceSet(0, 0, 0, 4));
-
-            var active = CreatePowerPlant("active", new TileCoord(0, 0));
-            var drained = CreatePowerPlant("drained", new TileCoord(0, 1));
-            drained.IsDrained = true;
-            var erased = CreatePowerPlant("erased", new TileCoord(1, 0));
-            erased.ApplyErasure();
-            var sealbound = CreatePowerPlant("sealbound", new TileCoord(1, 1));
-            sealbound.EnterSealbound(1);
-
-            battleState.PlayerBoard.Place(active.Position, active);
-            battleState.PlayerBoard.Place(drained.Position, drained);
-            battleState.PlayerBoard.Place(erased.Position, erased);
-            battleState.PlayerBoard.Place(sealbound.Position, sealbound);
-
-            new TurnStartService().ResolveTurnStart(battleState);
-
-            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(3));
-            Assert.That(battleState.Player.Resources.Power, Is.EqualTo(2));
-        }
-
-        private static BuildingState CreatePowerPlant(string runtimeId, TileCoord position)
-        {
-            return new BuildingState(
-                runtimeId,
-                PowerPlantRules.CardId,
-                PlayerId.Player,
-                position,
-                canAttack: false,
-                attack: 0,
-                maxHp: PowerPlantRules.BaseHealth,
-                damageType: DamageType.None);
-        }
-
-        private static BattleState CreateTurnStartBattle()
-        {
-            var setupService = new BattleSetupService();
-            var mulliganService = new MulliganService();
-            var battleState = setupService.CreateInitialState(new BattleSetupRequest(
-                CreateDeck("P"),
-                CreateDeck("A"),
-                PlayerId.Player));
-            mulliganService.PassMulligan(battleState, PlayerId.Player);
-            battleState.RestoreRuntimeState(1, PlayerId.Player, PhaseType.TurnStart);
-            return battleState;
-        }
-
-        private static void ClearStartingGold(PlayerState player)
-        {
-            if (player.Resources.Gold > 0)
+            var state = State(); var plant = Plant(state);
+            switch(reason)
             {
-                player.Resources.Spend(new ResourceSet(0, 0, 0, player.Resources.Gold));
+                case "gold": state.Player.Resources.Spend(state.Player.Resources.Clone()); break;
+                case "erasure": plant.ApplyErasure(); break;
+                case "drained": plant.IsDrained = true; break;
+                case "sealed": plant.EnterSealbound(2); break;
+                case "dead": plant.CurrentHp = 0; break;
+                case "enemy-turn": state.RestoreRuntimeState(2,PlayerId.AI,PhaseType.Main); break;
+                case "phase": state.SetPhase(PhaseType.TurnStart); break;
+                case "pending-fusion": state.BeginRobotFusion(PlayerId.Player,"RobotFusion"); break;
             }
+            var gold = state.Player.Resources.Gold;
+            Assert.Throws<InvalidOperationException>(() => Activate(state,plant));
+            Assert.That(state.Player.Resources.Gold,Is.EqualTo(gold));
+            Assert.That(plant.LastActiveEffectTurnNumber,Is.EqualTo(-1));
         }
 
-        private static IReadOnlyList<string> CreateDeck(string prefix)
+        [TestCase(PlayerId.Player)][TestCase(PlayerId.AI)]
+        public void NoGold_OffersButtonButRejectsActivationWithoutConsumingUsage(PlayerId owner)
         {
-            var cards = new List<string>();
-            for (var i = 0; i < 20; i++)
-            {
-                cards.Add($"{prefix}-{i}");
-            }
+            var state = State(owner); var plant = Plant(state, owner);
+            var resources = state.GetPlayer(owner).Resources;
+            resources.Spend(resources.Clone());
+            Assert.That(ActiveEffectService.CanOfferActivation(state, owner, plant.Position), Is.True);
+            Assert.That(ActiveEffectService.CanActivate(state, owner, plant.Position), Is.False);
+            Assert.That(Assert.Throws<InvalidOperationException>(() => Activate(state, plant)).Message, Is.EqualTo("골드가 부족합니다"));
+            Assert.That(resources.Gold, Is.Zero);
+            Assert.That(resources.Power, Is.Zero);
+            Assert.That(plant.LastActiveEffectTurnNumber, Is.EqualTo(-1));
+            Assert.That(state.ResourceChangeEvents, Is.Empty);
+            resources.Add(new ResourceSet(0, 0, 0, 1));
+            Activate(state, plant);
+            Assert.That(resources.Power, Is.EqualTo(2));
+            Assert.That(ActiveEffectService.CanOfferActivation(state, owner, plant.Position), Is.False);
+        }
 
-            return cards;
+        [Test]
+        public void WrongIdentityOrEnemyTile_DoesNotActivate()
+        {
+            var state = State(); var plant = Plant(state);
+            Assert.Throws<InvalidOperationException>(() =>
+                ActiveEffectService.Activate(state,PlayerId.Player,plant.Position,"stale-runtime-id"));
+            Assert.Throws<InvalidOperationException>(() =>
+                ActiveEffectService.Activate(state,PlayerId.AI,plant.Position,plant.RuntimeId));
+            Assert.That(plant.LastActiveEffectTurnNumber, Is.EqualTo(-1));
+        }
+
+        [TestCase(PlayerId.Player)][TestCase(PlayerId.AI)]
+        public void ReconnectAndAiCopy_KeepUsage(PlayerId owner)
+        {
+            var state = State(owner); var plant = Plant(state,owner);
+            Activate(state,plant);
+            var view = new BattleStateViewFactory().CreateForPlayer(state,"active",owner);
+            var roundTrip = JsonConvert.DeserializeObject<BattleStateViewDto>(JsonConvert.SerializeObject(view));
+            var restored = BattleStateViewProjector.CreateLocalPerspectiveState(roundTrip);
+            Assert.That(ActiveEffectService.CanActivate(restored,PlayerId.Player,plant.Position),Is.False);
+            var copy = AiBattleStateCopy.Create(state);
+            Assert.That(copy.GetBoard(owner).GetOccupant(plant.Position).LastActiveEffectTurnNumber,
+                Is.EqualTo(state.TurnNumber));
+        }
+
+        [Test]
+        public void ActiveTooltipAndCardAsset_UseConfirmedDescription()
+        {
+            var asset=UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingCardDefinitionAsset>(
+                "Assets/Project333/ScriptableObjects/StarterTen/Cards/PowerPlant.asset");
+            Assert.That(asset.SpecialEffectText,Is.EqualTo("액티브: "+ActiveEffectService.PowerPlantDescription));
+            var state=State(); var plant=Plant(state);
+            var tooltip=Project333.Runtime.Presentation.Battle.OccupantSpecialEffectTooltipCatalog.Build(asset.ToDefinition(),plant);
+            Assert.That(tooltip.Any(t=>t.Title=="액티브" && t.Description==ActiveEffectService.PowerPlantDescription),Is.True);
+        }
+
+        [Test]
+        public void Ai_CanActivateToAffordWinningSpell()
+        {
+            var state = State(PlayerId.AI); var plant = Plant(state,PlayerId.AI);
+            state.AI.Resources.Spend(state.AI.Resources.Clone());
+            state.AI.Resources.Add(new ResourceSet(0,0,0,1));
+            foreach(var id in state.AI.Hand.CardIds.ToArray()) state.AI.Hand.Remove(id);
+            state.AI.Hand.Add("finisher");
+            state.AI.Master.RemainingAttacksThisTurn=0;
+            state.Player.Master.CurrentHp=1;
+            var provider = new InMemoryCardDefinitionProvider(new CardDefinition[] {
+                new DamageSpellCardDefinition("finisher","Finish",new ResourceSet(0,0,2,0),99)
+            });
+            var ai = new AiDecisionService(provider,new TargetingService(),ZeroCardUpgradeLevelProvider.Instance,
+                new AiSearchOptions { MaxMilliseconds=10000, MaxSimulations=16000 });
+            var command=ai.GetNextCommand(state);
+            Assert.That(command,Is.TypeOf<ActivateEffectCommand>());
+            var processor=new BattleCommandProcessor(new PlayCardService(provider),new SpellService(provider),
+                new MoveService(),new AttackService(),new EndTurnService());
+            processor.Execute(state,PlayerId.AI,command);
+            processor.Execute(state,PlayerId.AI,ai.GetNextCommand(state));
+            Assert.That(state.IsEnded,Is.True);
+            Assert.That(state.Result.Winner,Is.EqualTo(PlayerId.AI));
         }
     }
 }

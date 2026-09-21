@@ -218,6 +218,12 @@ namespace Project333.Runtime.Presentation.Draft
 
         public void Hide()
         {
+            if (_deckListText != null)
+            {
+                var preview = _deckListText.GetComponent<DeckListCardHoldPreview>();
+                if (preview != null) preview.HidePreview();
+            }
+
             if (_rootCanvasGroup == null)
             {
                 return;
@@ -1151,7 +1157,8 @@ namespace Project333.Runtime.Presentation.Draft
                 _deckPanelTitleText.text = $"Current Deck ({cardCount}/33)";
             }
 
-            _deckListText.text = BuildDeckListText(draftedCardIds);
+            DeckListCardHoldPreview.Configure(
+                _deckListText, draftedCardIds, ResolveCardAsset, "No cards selected yet.", includeSummary: true);
             RefreshDeckListScrollLayout(resetToTop: true);
         }
 

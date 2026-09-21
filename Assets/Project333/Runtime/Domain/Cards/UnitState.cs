@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Board;
 using Project333.Runtime.Domain.Resources;
@@ -28,7 +29,7 @@ namespace Project333.Runtime.Domain.Cards
             DamageType damageType = DamageType.Physical,
             int physicalDefense = 0,
             int magicDefense = 0,
-            bool hasRobot = false,
+            IReadOnlyList<UnitRace> races = null,
             bool hasRush = false,
             bool hasHiding = false,
             bool hasFlying = false,
@@ -62,12 +63,12 @@ namespace Project333.Runtime.Domain.Cards
         {
             IsScience = isScience;
             SciencePowerUpkeep = sciencePowerUpkeep;
-            HasRobot = hasRobot;
+            Races = UnitRaceCollection.Copy(races);
         }
 
         public bool IsScience { get; }
         public int SciencePowerUpkeep { get; }
-        public bool HasRobot { get; }
-        public bool HasActiveRobot => HasRobot && !IsErasure && !IsSealbound;
+        public IReadOnlyList<UnitRace> Races { get; }
+        public bool HasRace(UnitRace race) => UnitRaceCollection.Contains(Races, race);
     }
 }

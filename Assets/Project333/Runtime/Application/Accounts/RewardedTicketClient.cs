@@ -84,6 +84,7 @@ namespace Project333.Runtime.Application.Accounts
             await AccountHttpTransport.SendAsync(webRequest, cancellationToken);
             if (webRequest.result != UnityWebRequest.Result.Success)
             {
+                Debug.LogWarning($"After333 rewarded ad HTTP: method={method}, status={webRequest.responseCode}, result={webRequest.result}");
                 throw new InvalidOperationException(BuildErrorMessage(webRequest));
             }
 

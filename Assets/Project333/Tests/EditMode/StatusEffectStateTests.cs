@@ -1,3 +1,4 @@
+using Project333.Runtime.Application.Services;
 using NUnit.Framework;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Board;
@@ -62,7 +63,7 @@ namespace Project333.Tests.EditMode
                 sciencePowerUpkeep: 1,
                 maxAttacksPerTurn: 3,
                 hitsPerAttack: 3,
-                hasRobot: true,
+                races: new[] { UnitRace.Robot },
                 physicalDefense: 3,
                 magicDefense: 2);
             unit.CurrentHp = 25;
@@ -85,7 +86,7 @@ namespace Project333.Tests.EditMode
             Assert.That(unit.EffectiveHitsPerAttack, Is.EqualTo(1));
             Assert.That(unit.EffectiveMaxAttacksPerTurn, Is.EqualTo(1));
             Assert.That(unit.RemainingAttacksThisTurn, Is.EqualTo(0));
-            Assert.That(unit.HasActiveRobot, Is.False);
+            Assert.That(unit.HasRace(UnitRace.Robot), Is.True);
             Assert.That(unit.CannotAttack, Is.False);
             Assert.That(unit.CannotCounterattack, Is.False);
             Assert.That(unit.CannotMoveDueToState, Is.False);

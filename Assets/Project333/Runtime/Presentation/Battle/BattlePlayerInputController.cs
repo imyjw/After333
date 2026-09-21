@@ -19,6 +19,10 @@ namespace Project333.Runtime.Presentation.Battle
 {
     public sealed class BattlePlayerInputController : MonoBehaviour
     {
+        private Button _activeEffectButton;
+        private TileView _activeEffectTile;
+        private string _activeEffectRuntimeId = string.Empty;
+
         private const string RobotFusionSelectionCanvasName = "RobotFusionSelectionCanvas";
         private static readonly string[] KoreanFontCandidates =
         {
@@ -88,6 +92,7 @@ namespace Project333.Runtime.Presentation.Battle
         private void Update()
         {
             SyncRobotFusionSelectionState();
+            RefreshActiveEffectButton();
             UpdateBackgroundDeselectInput();
         }
 
@@ -98,6 +103,12 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void OnDestroy()
         {
+            if (_activeEffectButton != null)
+            {
+                _activeEffectButton.onClick.RemoveListener(ActivateSelectedEffect);
+                if (UnityEngine.Application.isPlaying) Destroy(_activeEffectButton.gameObject);
+                else DestroyImmediate(_activeEffectButton.gameObject);
+            }
             if (_robotFusionConfirmButton != null)
             {
                 _robotFusionConfirmButton.onClick.RemoveListener(ConfirmRobotFusionSelection);
@@ -153,6 +164,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         public void ClearSelection()
         {
+            HideActiveEffectButton();
             ClearCardSelection();
             ClearUnitSelection();
             ClearHandCardDragState();
@@ -602,6 +614,89 @@ namespace Project333.Runtime.Presentation.Battle
             }
         }
 
+        private void HideActiveEffectButton()
+        {
+            _activeEffectTile = null;
+            _activeEffectRuntimeId = string.Empty;
+            if (_activeEffectButton != null) _activeEffectButton.gameObject.SetActive(false);
+        }
+
+        private void ShowActiveEffectButton(TileView tile)
+        {
+            HideActiveEffectButton();
+            ClearUnitSelection();
+            _activeEffectTile = tile;
+            _activeEffectRuntimeId = _battleBootstrapper.CurrentBattleState.PlayerBoard.GetOccupant(tile.Coord).RuntimeId;
+            if (_activeEffectButton == null)
+            {
+                var go = new GameObject("ActiveEffectButton", typeof(RectTransform), typeof(Image), typeof(Button), typeof(Canvas), typeof(GraphicRaycaster));
+                _activeEffectButton = go.GetComponent<Button>();
+                var background = go.GetComponent<Image>();
+                background.color = new Color(0.12f, 0.35f, 0.55f, 0.98f);
+                _activeEffectButton.targetGraphic = background;
+                _activeEffectButton.onClick.AddListener(ActivateSelectedEffect);
+                var labelObject = new GameObject("Label", typeof(RectTransform), typeof(Text));
+                labelObject.transform.SetParent(go.transform, false);
+                var labelRect = labelObject.GetComponent<RectTransform>();
+                labelRect.anchorMin = Vector2.zero;
+                labelRect.anchorMax = Vector2.one;
+                labelRect.offsetMin = Vector2.zero;
+                labelRect.offsetMax = Vector2.zero;
+                var label = labelObject.GetComponent<Text>();
+                label.text = "액티브";
+                label.font = _robotFusionConfirmButtonText != null && _robotFusionConfirmButtonText.font != null
+                    ? _robotFusionConfirmButtonText.font : ResolveRobotFusionKoreanFont();
+                label.fontStyle = FontStyle.Bold;
+                label.fontSize = 24;
+                label.resizeTextForBestFit = true;
+                label.resizeTextMinSize = 10;
+                label.resizeTextMaxSize = 24;
+                label.alignment = TextAnchor.MiddleCenter;
+                label.color = Color.white;
+                label.raycastTarget = false;
+            }
+            var rect = (RectTransform)_activeEffectButton.transform;
+            var anchor = tile.GetComponent<TileTextView>()?.ActiveEffectButtonAnchor;
+            rect.SetParent(anchor != null ? anchor : tile.transform, false);
+            rect.SetAsLastSibling();
+            var buttonCanvas = _activeEffectButton.GetComponent<Canvas>();
+            buttonCanvas.overrideSorting = true;
+            buttonCanvas.sortingOrder = 400; // Above occupants, below effects and previews.
+            rect.anchorMin = new Vector2(0.2f, 0.12f);
+            rect.anchorMax = new Vector2(0.8f, 0.4f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            if (anchor == null) rect.sizeDelta = new Vector2(100f, 38f);
+            _activeEffectButton.gameObject.SetActive(true);
+            RefreshActiveEffectButton();
+        }
+
+        private void RefreshActiveEffectButton()
+        {
+            if (_activeEffectTile == null) return;
+            var state = _battleBootstrapper?.CurrentBattleState;
+            var valid = isActiveAndEnabled && _battleBootstrapper != null && !_battleBootstrapper.IsBusy &&
+                !_isDraggingCard && !_isRobotFusionSelectionMode && string.IsNullOrWhiteSpace(_selectedCardId) &&
+                ActiveEffectService.CanOfferActivation(state, PlayerId.Player, _activeEffectTile.Coord) &&
+                state.PlayerBoard.GetOccupant(_activeEffectTile.Coord)?.RuntimeId == _activeEffectRuntimeId;
+            if (!valid) { HideActiveEffectButton(); return; }
+            _activeEffectButton.interactable = true;
+            _activeEffectButton.transform.SetAsLastSibling();
+        }
+
+        private void ActivateSelectedEffect()
+        {
+            if (_activeEffectTile == null || _battleBootstrapper == null) return;
+            var tile = _activeEffectTile;
+            var runtimeId = _activeEffectRuntimeId;
+            if (_battleBootstrapper.TryActivatePlayerEffect(tile.Coord, runtimeId, out _interactionStatus))
+                HideActiveEffectButton(); // Hide after accepted/sent requests, but retain it after a cost failure.
+            else
+                RefreshActiveEffectButton();
+        }
+
+        private void OnDisable() => HideActiveEffectButton();
+
         private void HandleTileClicked(TileView tileView)
         {
             if (_isDraggingCard)
@@ -629,6 +724,15 @@ namespace Project333.Runtime.Presentation.Battle
             if (_battleBootstrapper.CurrentBattleState?.Phase == PhaseType.Mulligan)
             {
                 _interactionStatus = "멀리건을 확정한 뒤 전장을 조작할 수 있습니다.";
+                return;
+            }
+
+            HideActiveEffectButton();
+            if (!_isRobotFusionSelectionMode && string.IsNullOrWhiteSpace(_selectedCardId) &&
+                tileView.OwnerId == PlayerId.Player &&
+                ActiveEffectService.CanOfferActivation(_battleBootstrapper.CurrentBattleState, PlayerId.Player, tileView.Coord))
+            {
+                ShowActiveEffectButton(tileView);
                 return;
             }
 
@@ -1153,6 +1257,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void SetCardSelection(string cardId, string handCardRuntimeId, int slotIndex)
         {
+            HideActiveEffectButton();
             ClearUnitSelection();
             _selectedCardId = cardId ?? string.Empty;
             _selectedHandCardRuntimeId = handCardRuntimeId ?? string.Empty;
@@ -1307,11 +1412,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         private static bool IsLivingFriendlyRobot(BattleState battleState, TileCoord coord)
         {
-            return battleState?.PlayerBoard?.GetOccupant(coord) is UnitState
-            {
-                HasRobot: true,
-                IsAlive: true,
-            };
+            return RobotFusionRules.IsEligibleRobot(battleState?.PlayerBoard?.GetOccupant(coord));
         }
 
         private static bool CanOccupantAct(OccupantState occupant)

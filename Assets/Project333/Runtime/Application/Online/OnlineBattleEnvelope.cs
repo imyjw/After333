@@ -21,6 +21,10 @@ namespace Project333.Runtime.Application.Online
 
         public string DeckId { get; set; } = string.Empty;
 
+        public string GameMode { get; set; } = "run";
+
+        public string AiChallengeAttemptId { get; set; } = string.Empty;
+
         public bool UseServerAiOpponent { get; set; } = true;
 
         public bool UseMatchmakingQueue { get; set; }
