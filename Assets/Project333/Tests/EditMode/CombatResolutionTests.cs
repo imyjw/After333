@@ -65,7 +65,11 @@ namespace Project333.Tests.EditMode
 
             Assert.That(
                 () => attackService.Attack(battleState, PlayerId.Player, new TileCoord(0, 0), new TileCoord(0, 0)),
-                Throws.InvalidOperationException.With.Message.Contains("0 attack"));
+                Throws.InvalidOperationException.With.Message.EqualTo("공격력이 0이하인 유닛은 공격할 수 없습니다."));
+            Assert.That(attacker.CurrentHp, Is.EqualTo(10));
+            Assert.That(defender.CurrentHp, Is.EqualTo(7));
+            Assert.That(battleState.PlayerBoard.GetOccupant(new TileCoord(0, 0)), Is.SameAs(attacker));
+            Assert.That(battleState.AIBoard.GetOccupant(new TileCoord(0, 0)), Is.SameAs(defender));
         }
 
         [Test]

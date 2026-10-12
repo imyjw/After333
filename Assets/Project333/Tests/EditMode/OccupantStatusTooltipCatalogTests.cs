@@ -223,15 +223,31 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Influences_BoardFalloutIsNotAddedToOccupantStacksAndResourceEffectsAreOmitted()
+        public void Influences_HistoricalNuclearCounterDoesNotCreateFieldInfluence()
         {
             var state = State(); var unit = Unit(state);
             state.PlayerBoard.AddFalloutStack();
             Effect(state, "daehwandan", PlayerId.Player);
-            var entry = OccupantStatusTooltipCatalog.BuildInfluences(null, unit, state).Single();
-            Assert.That(entry.Title, Is.EqualTo("전장 낙진"));
+            Assert.That(OccupantStatusTooltipCatalog.BuildInfluences(null, unit, state),Is.Empty);
             Assert.That(OccupantStatusTooltipCatalog.BuildAttached(null, unit, state).Single().Title, Is.EqualTo("낙진"));
-            Assert.That(OccupantStatusTooltipCatalog.BuildInfluences(null, state.Player.Master, state), Is.Empty);
+            Assert.That(OccupantStatusTooltipCatalog.BuildInfluences(null, state.Player.Master, state),Is.Empty);
+            Assert.That(OccupantStatusTooltipCatalog.BuildAttached(null, state.Player.Master, state).Single().Title, Is.EqualTo("낙진"));
+        }
+
+        [TestCase(PlayerId.Player)][TestCase(PlayerId.AI)]
+        public void Fallout_UnitAndMasterShowOnlyAttachedDebuff_BuildingsIgnoreLegacyStacks(PlayerId owner)
+        {
+            var state=State();var unit=Unit(state,owner);
+            var building=new BuildingState("legacy-building","PowerPlant",owner,new TileCoord(1,0),false,0,100);
+            state.GetBoard(owner).Place(building.Position,building);building.RestoreFallout(4,5);
+            state.GetBoard(owner).AddFalloutStack();
+            foreach(var occupant in new OccupantState[]{unit,state.GetPlayer(owner).Master})
+            {
+                Assert.That(OccupantStatusTooltipCatalog.BuildAttached(null,occupant,state).Single().Title,Is.EqualTo("낙진"));
+                Assert.That(OccupantStatusTooltipCatalog.BuildInfluences(null,occupant,state),Is.Empty);
+            }
+            Assert.That(OccupantStatusTooltipCatalog.BuildAttached(null,building,state),Is.Empty);
+            Assert.That(OccupantStatusTooltipCatalog.BuildInfluences(null,building,state),Is.Empty);
         }
 
         [Test]

@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3009c6625a5e04942abb529a14d6fb06, type: 3}
+  m_Name: Nuclear
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.ScriptedSpellCardDefinitionAsset
+  _cardId: Nuclear
+  _displayName: "\uB274\uD074\uB9AC\uC5B4"
+  _rarity: 4
+  _cost:
+    _mana: 0
+    _qi: 0
+    _power: 13
+    _gold: 0
+  _affiliation: 2
+  _chargeTileFootprint: 0
+  _effectText: "(\uC0AC\uC6A9 \uC989\uC2DC) \uC0C1\uB300\uBC29 \uC804\uC7A5 \uC804\uCCB4\uC5D0
+    \uACE0\uC815 \uB370\uBBF8\uC9C0 100\uC744 \uC785\uD78C\uB2E4. \uC0AC\uC6A9 \uB2F9\uC2DC
+    \uC0C1\uB300 \uC804\uC7A5\uC5D0 \uC788\uB294 \uC720\uB2DB(\uB9C8\uC2A4\uD130
+    \uD3EC\uD568)\uC5D0 \uB099\uC9C4\uC744 \uBD80\uC5EC\uD55C\uB2E4."
+  _specialEffectText: "\uB099\uC9C4: \uC591\uCABD \uD134 \uC2DC\uC791\uB9C8\uB2E4
+    \uC911\uCCA9\uB2F9 \uACE0\uC815 \uD53C\uD574 10\uC744 \uBC1B\uB294\uB2E4."
+  _hasReplicate: 0
+  _boardSprite: {fileID: 0}
+  _boardAnimatorController: {fileID: 0}
+  _effectId: nuclear
+  _damage: 100
+  _damageType: 3
+  _triggerCount: 0
+  _effectAmount: 0

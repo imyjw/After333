@@ -5,6 +5,7 @@ using Project333.Runtime.Application.Services;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Board;
 using Project333.Runtime.Domain.Cards;
+using Project333.Runtime.Domain.Effects;
 using Project333.Runtime.Domain.Resources;
 
 namespace Project333.Tests.EditMode
@@ -49,7 +50,7 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.Player.Resources.Mana, Is.EqualTo(4));
             Assert.That(battleState.Player.Resources.Qi, Is.EqualTo(1));
             Assert.That(battleState.Player.Resources.Power, Is.EqualTo(4));
-            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(7));
+            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(9));
             Assert.That(battleState.Phase, Is.EqualTo(PhaseType.Main));
         }
 
@@ -78,7 +79,7 @@ namespace Project333.Tests.EditMode
             service.ResolveTurnStart(battleState);
 
             Assert.That(battleState.Player.Resources.Power, Is.EqualTo(0));
-            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(3));
+            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(5));
             Assert.That(drainedUnit.IsDrained, Is.False);
         }
 
@@ -89,6 +90,7 @@ namespace Project333.Tests.EditMode
             var service = new TurnStartService();
 
             battleState.Player.Resources.Add(new ResourceSet(mana: 0, qi: 0, power: 5, gold: 0));
+            battleState.Player.Resources.Spend(new ResourceSet(0, 0, 0, 2));
 
             var upkeepSeven = CreateScienceUnit("science-7", new TileCoord(0, 0), 7);
             var upkeepThree = CreateScienceUnit("science-3", new TileCoord(0, 1), 3);
@@ -124,7 +126,7 @@ namespace Project333.Tests.EditMode
 
             Assert.That(upkeepUnit.IsDrained, Is.False);
             Assert.That(battleState.Player.Resources.Power, Is.EqualTo(0));
-            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(2));
+            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(4));
             var upkeepPayment = battleState.ResourceChangeEvents.Single(change =>
                 change.SourceCardId == upkeepUnit.CardId);
             Assert.That(upkeepPayment.Spent.Power, Is.EqualTo(1));
@@ -173,6 +175,137 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.Player.Resources.Power, Is.EqualTo(3));
         }
 
+        [TestCase(PlayerId.Player, "firewall")]
+        [TestCase(PlayerId.AI, "firewall")]
+        [TestCase(PlayerId.Player, "fallout")]
+        [TestCase(PlayerId.AI, "fallout")]
+        [TestCase(PlayerId.Player, "biochemical_bomb")]
+        [TestCase(PlayerId.AI, "biochemical_bomb")]
+        [TestCase(PlayerId.Player, "timed_bomb")]
+        [TestCase(PlayerId.AI, "timed_bomb")]
+        [TestCase(PlayerId.Player, "cheonra_jimang")]
+        [TestCase(PlayerId.AI, "cheonra_jimang")]
+        public void ResolveTurnStart_DestroyedOccupantPaysNeitherPowerNorGold(PlayerId owner, string effectId)
+        {
+            var state = CreateBattleState(owner);
+            var target = new UnitState("doomed", "doomed", owner, new TileCoord(0, 0),
+                AttackType.Melee, 3, 5, true, true, sciencePowerUpkeep: 9);
+            state.GetBoard(owner).Place(target.Position, target);
+            state.GetPlayer(owner).Resources.Add(new ResourceSet(0, 0, 5, 0));
+            AddTurnStartHazard(state, target, effectId, 10);
+
+            new TurnStartService().ResolveTurnStart(state);
+
+            Assert.That(state.GetBoard(owner).GetOccupant(target.Position), Is.Null);
+            Assert.That(state.GetPlayer(owner).Resources.Power, Is.EqualTo(5));
+            Assert.That(state.GetPlayer(owner).Resources.Gold, Is.EqualTo(6));
+            Assert.That(state.ResourceChangeEvents.Any(e => e.SourceCardId == target.CardId), Is.False);
+            Assert.That(target.IsDrained, Is.False);
+            Assert.That(state.Phase, Is.EqualTo(PhaseType.Main));
+        }
+
+        [TestCase(PlayerId.Player)]
+        [TestCase(PlayerId.AI)]
+        public void ResolveTurnStart_SurvivorCanUsePowerNotChargedToDestroyedOccupant(PlayerId owner)
+        {
+            var state = CreateBattleState(owner);
+            var doomed = new UnitState("first", "first", owner, new TileCoord(0, 0),
+                AttackType.Melee, 3, 5, true, true, sciencePowerUpkeep: 9);
+            var survivor = new UnitState("next", "next", owner, new TileCoord(0, 1),
+                AttackType.Melee, 3, 5, true, true, sciencePowerUpkeep: 5);
+            state.GetBoard(owner).Place(doomed.Position, doomed);
+            state.GetBoard(owner).Place(survivor.Position, survivor);
+            state.GetPlayer(owner).Resources.Add(new ResourceSet(0, 0, 5, 0));
+            AddTurnStartHazard(state, doomed, "firewall", 10);
+
+            new TurnStartService().ResolveTurnStart(state);
+
+            Assert.That(survivor.IsDrained, Is.False);
+            Assert.That(state.GetPlayer(owner).Resources.Power, Is.Zero);
+            Assert.That(state.GetPlayer(owner).Resources.Gold, Is.EqualTo(6));
+            var payment = state.ResourceChangeEvents.Single(e => e.SourceCardId == survivor.CardId);
+            Assert.That(payment.Spent.Power, Is.EqualTo(5));
+            Assert.That(payment.Spent.Gold, Is.Zero);
+        }
+
+        [TestCase(false, true, 4)]
+        [TestCase(true, true, 2)]
+        [TestCase(false, false, 4)]
+        [TestCase(true, false, 2)]
+        public void ResolveTurnStart_DamageUsesDrainedStateBeforePayment(bool wasDrained, bool canPay, int hp)
+        {
+            var state = CreateBattleState(PlayerId.Player);
+            var target = CreateScienceUnit("survives", new TileCoord(0, 0), canPay ? 3 : 99);
+            target.IsDrained = wasDrained;
+            state.PlayerBoard.Place(target.Position, target);
+            state.Player.Resources.Add(new ResourceSet(0, 0, 1, 0));
+            AddTurnStartHazard(state, target, "firewall", 1);
+
+            new TurnStartService().ResolveTurnStart(state);
+
+            Assert.That(target.CurrentHp, Is.EqualTo(hp));
+            Assert.That(target.IsDrained, Is.EqualTo(!canPay));
+            Assert.That(state.Player.Resources.Power, Is.EqualTo(canPay ? 0 : 1));
+            Assert.That(state.Player.Resources.Gold, Is.EqualTo(canPay ? 4 : 6));
+        }
+
+        [Test]
+        public void ResolveUpkeep_DeadOccupantStillOnBoardCannotPayOrBecomeDrained()
+        {
+            var state = CreateBattleState(PlayerId.Player);
+            var target = CreateScienceUnit("dead", new TileCoord(0, 0), 9);
+            state.PlayerBoard.Place(target.Position, target);
+            target.CurrentHp = 0;
+            state.Player.Resources.Add(new ResourceSet(0, 0, 6, 0));
+
+            new ScienceUpkeepService().ResolveUpkeep(state);
+
+            Assert.That(state.Player.Resources.Power, Is.EqualTo(6));
+            Assert.That(state.Player.Resources.Gold, Is.EqualTo(3));
+            Assert.That(state.ResourceChangeEvents, Is.Empty);
+            Assert.That(target.IsDrained, Is.False);
+        }
+
+        [TestCase(PlayerId.Player)]
+        [TestCase(PlayerId.AI)]
+        public void ResolveTurnStart_DestructionChainCompletesBeforeUpkeep(PlayerId owner)
+        {
+            var state = CreateBattleState(owner);
+            var target = new UnitState("chain-victim", "chain-victim", owner, new TileCoord(0, 1),
+                AttackType.Melee, 3, 5, true, true, sciencePowerUpkeep: 9);
+            state.GetBoard(owner).Place(target.Position, target);
+            var plant = new BuildingState("plant", NuclearPowerPlantRules.CardId, owner,
+                new TileCoord(0, 0), false, 0, 30);
+            state.GetBoard(owner).Place(plant.Position, plant);
+            state.GetPlayer(owner).Resources.Add(new ResourceSet(0, 0, 5, 0));
+            state.PersistentEffects.Add(new PersistentEffectState(
+                "Firewall", state.GetOpponent(owner).Id, "firewall", 2, "one trigger", new ResourceSet(),
+                targetRow: 0, remainingTriggers: 1, effectDamage: 30, effectDamageType: DamageType.Magic));
+
+            new TurnStartService().ResolveTurnStart(state);
+
+            Assert.That(state.GetBoard(owner).GetOccupant(target.Position), Is.Null);
+            Assert.That(state.GetPlayer(owner).Resources.Power, Is.EqualTo(5));
+            Assert.That(state.GetPlayer(owner).Resources.Gold, Is.EqualTo(6));
+            Assert.That(state.ResourceChangeEvents.Any(e => e.SourceCardId == target.CardId), Is.False);
+        }
+        private static void AddTurnStartHazard(BattleState state, UnitState target, string effectId, int damage)
+        {
+            if (effectId == "fallout")
+            {
+                target.RestoreFallout(1, 0);
+                return;
+            }
+            // Timed Bomb uses its shared constant, so use its real effect id.
+            if (effectId == "timed_bomb") effectId = TimedBombRules.EffectId;
+            state.PersistentEffects.Add(new PersistentEffectState(
+                effectId, effectId == "cheonra_jimang" ? target.OwnerId : state.GetOpponent(target.OwnerId).Id,
+                effectId, 2, "one trigger", new ResourceSet(),
+                targetRuntimeId: target.RuntimeId, targetRow: target.Position.Row,
+                remainingTriggers: 1, effectDamage: damage,
+                effectDamageType: effectId == "firewall" ? DamageType.Magic : DamageType.Fixed,
+                targetStartColumn: 0));
+        }
         private static UnitState CreateScienceUnit(string id, TileCoord coord, int upkeep)
         {
             return new UnitState(

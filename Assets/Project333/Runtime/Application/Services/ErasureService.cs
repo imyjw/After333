@@ -40,6 +40,7 @@ namespace Project333.Runtime.Application.Services
 
                 effect.Expire();
             }
+            OccupantDestructionService.ResolveDefeatedOccupants(battleState);
         }
     }
 }

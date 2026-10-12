@@ -24,7 +24,8 @@ namespace Project333.Runtime.Application.Services
             OccupantState recipient,
             int damage,
             DamageType damageType,
-            bool halveForFlying = false)
+            bool halveForFlying = false,
+            bool isCritical = false)
         {
             if (recipient == null)
             {
@@ -47,7 +48,15 @@ namespace Project333.Runtime.Application.Services
                 recipient.IsDrained,
                 recipient.PhysicalDefense,
                 recipient.MagicDefense);
-            return halveForFlying ? resolvedDamage / 2 : resolvedDamage;
+            if (halveForFlying) resolvedDamage /= 2;
+            return ApplyCriticalMultiplier(resolvedDamage, isCritical);
+        }
+
+        // Critical damage doubles the final mitigated packet, before HP/Endure limits.
+        public static int ApplyCriticalMultiplier(int resolvedDamage, bool isCritical)
+        {
+            if (resolvedDamage < 0) throw new ArgumentOutOfRangeException(nameof(resolvedDamage));
+            return isCritical ? checked(resolvedDamage * 2) : resolvedDamage;
         }
 
         public static bool ShouldHalveForFlying(OccupantState attacker, OccupantState target)
@@ -97,17 +106,19 @@ namespace Project333.Runtime.Application.Services
             OccupantState recipient,
             int damage,
             DamageType damageType,
-            bool halveForFlying = false)
+            bool halveForFlying = false,
+            bool isCritical = false)
         {
-            return ApplyDamage(recipient, damage, damageType, allowEndure: true, halveForFlying: halveForFlying);
+            return ApplyDamage(recipient, damage, damageType, allowEndure: true, halveForFlying: halveForFlying, isCritical: isCritical);
         }
 
         public static int ApplyEffectDamage(
             OccupantState recipient,
             int damage,
-            DamageType damageType)
+            DamageType damageType,
+            bool isCritical = false)
         {
-            return ApplyDamage(recipient, damage, damageType, allowEndure: true);
+            return ApplyDamage(recipient, damage, damageType, allowEndure: true, isCritical: isCritical);
         }
 
         // Shielder overflow has already passed through the original target's mitigation.
@@ -199,9 +210,10 @@ namespace Project333.Runtime.Application.Services
             int damage,
             DamageType damageType,
             bool allowEndure,
-            bool halveForFlying = false)
+            bool halveForFlying = false,
+            bool isCritical = false)
         {
-            var resolvedDamage = ResolveIncomingDamage(recipient, damage, damageType, halveForFlying);
+            var resolvedDamage = ResolveIncomingDamage(recipient, damage, damageType, halveForFlying, isCritical);
             return ApplyResolvedDamage(recipient, resolvedDamage, allowEndure);
         }
 
@@ -235,7 +247,10 @@ namespace Project333.Runtime.Application.Services
             }
 
             var hpAfterForAbsorption = Math.Max(recipient.CurrentHp, 0);
-            return Math.Max(0, hpBefore - hpAfterForAbsorption);
+            var actualDamage = Math.Max(0, hpBefore - hpAfterForAbsorption);
+            // Any damage source breaks Hiding only when it removes HP.
+            if (actualDamage > 0) recipient.RevealHiding();
+            return actualDamage;
         }
 
         private static int ProjectDamageTaken(

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Cards;
+using Project333.Runtime.Domain.Board;
 
 namespace Project333.Runtime.Application.Services
 {
@@ -10,7 +11,8 @@ namespace Project333.Runtime.Application.Services
         private const string BlueDragonCardId = "BlueDragon";
         private const string RedDragonCardId = "RedDragon";
         private const int BlueDragonHealAmount = 33;
-        private const int RedDragonDamageAmount = 33;
+        private const int RedDragonDamageAmount = 20;
+        public const string RedDragonFlamesEffectId = "redDragonEndFlames";
 
         public EndTurnService()
         {
@@ -36,11 +38,14 @@ namespace Project333.Runtime.Application.Services
 
             if (battleState.Phase != PhaseType.Main)
             {
-                throw new InvalidOperationException("Turns can only end during the Main phase.");
+                throw new InvalidOperationException("자신의 턴에만 턴을 종료할 수 있습니다.");
             }
 
             battleState.GetPlayer(battleState.ActivePlayerId).Hand.RemoveTemporaryReplicates();
 
+            // A local presenter may retain the preceding turn's consumed cue. Each
+            // accepted EndTurn creates a new ordered set; never infer it from a snapshot.
+            battleState.AreaSpellEffectEvents.RemoveAll(effect => effect.EffectId == RedDragonFlamesEffectId);
             var endingPlayerId = battleState.ActivePlayerId;
             ResolveEndTurnOccupantEffects(battleState);
             // Turn-end Magic effects still benefit; the next turn's damage must not.
@@ -56,6 +61,10 @@ namespace Project333.Runtime.Application.Services
             }
 
             battleState.ResolveInvincibleTurnEnd(endingPlayerId);
+            foreach (var occupant in battleState.PlayerBoard.EnumerateOccupants())
+                occupant.ResolveActionDebuffsTurnEnd();
+            foreach (var occupant in battleState.AIBoard.EnumerateOccupants())
+                occupant.ResolveActionDebuffsTurnEnd();
             battleState.SetPhase(PhaseType.TurnEnd);
             battleState.StartNextTurn(GetNextPlayerId(endingPlayerId));
         }
@@ -146,6 +155,15 @@ namespace Project333.Runtime.Application.Services
             var enemyBoard = battleState.GetOpponentBoard(ownerId);
             var damagedOccupants = new List<OccupantState>(enemyBoard.EnumerateOccupants());
             var damage = SpellPowerRules.ApplyCurrent(battleState, ownerId, RedDragonDamageAmount, DamageType.Magic);
+            var targetCoords = new List<TileCoord>(BoardState.ColumnCount * BoardState.RowCount);
+            for (var row = 0; row < BoardState.RowCount; row++)
+            for (var column = 0; column < BoardState.ColumnCount; column++)
+                targetCoords.Add(new TileCoord(column, row));
+            // Presentation-only activation precedes the existing damage packets,
+            // including empty or fully protected fields and separate Dragon sources.
+            battleState.RecordAreaSpellEffect(new BattleAreaSpellEffectEvent(
+                RedDragonFlamesEffectId, RedDragonCardId, ownerId,
+                battleState.GetOpponent(ownerId).Id, targetCoords, battleState.ValuePopupEvents.Count));
 
             foreach (var occupant in damagedOccupants)
             {

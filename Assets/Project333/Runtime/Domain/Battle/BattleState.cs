@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Project333.Runtime.Domain.Board;
+using Project333.Runtime.Domain.Cards;
 using Project333.Runtime.Domain.Effects;
 using Project333.Runtime.Domain.Resources;
 
@@ -17,12 +18,17 @@ namespace Project333.Runtime.Domain.Battle
             AI = ai;
             PlayerBoard = playerBoard;
             AIBoard = aiBoard;
+            PlayerBoard.BindOwnerResources(Player.Resources, AI.Resources);
+            AIBoard.BindOwnerResources(Player.Resources, AI.Resources);
             PersistentEffects = new List<PersistentEffectState>();
+            ArmedTraps = new List<ArmedTrapState>();
+            TrapEvents = new List<BattleTrapEvent>();
             ValuePopupEvents = new List<BattleValuePopupEvent>();
             CardDrawEvents = new List<BattleCardDrawEvent>();
             CardGenerationEvents = new List<BattleCardGenerationEvent>();
             ResourceChangeEvents = new List<BattleResourceChangeEvent>();
             AreaSpellEffectEvents = new List<BattleAreaSpellEffectEvent>();
+            TimedBombCountdownEvents = new List<BattleTimedBombCountdownEvent>();
             Counters = new BattleCounters();
             Result = new BattleResultState();
             Phase = PhaseType.BattleStart;
@@ -49,6 +55,11 @@ namespace Project333.Runtime.Domain.Battle
 
         public List<PersistentEffectState> PersistentEffects { get; }
 
+        // Ordered private zone; opponent projections expose only HiddenTrapCount.
+        public List<ArmedTrapState> ArmedTraps { get; }
+
+        public List<BattleTrapEvent> TrapEvents { get; }
+
         public List<BattleValuePopupEvent> ValuePopupEvents { get; }
 
         public List<BattleCardDrawEvent> CardDrawEvents { get; }
@@ -59,13 +70,30 @@ namespace Project333.Runtime.Domain.Battle
 
         public List<BattleAreaSpellEffectEvent> AreaSpellEffectEvents { get; }
 
+        // Presentation-only events; persistent effect order remains the stable bomb identity.
+        public List<BattleTimedBombCountdownEvent> TimedBombCountdownEvents { get; }
+
         public BattleCounters Counters { get; }
 
         public PendingRobotFusionState PendingRobotFusion { get; private set; }
 
         public BattleAttackResolution LastAttackResolution { get; private set; }
 
+        // Transient pre-trap presentation snapshot, never projected or persisted as battle truth.
+        public OccupantState LastSummonedOccupant { get; private set; } = null!;
+        public int LastSummonedAttack { get; private set; }
+
         public bool IsEnded => Result.HasResult;
+
+        public int GetArmedTrapCount(PlayerId ownerId)
+        {
+            if (ownerId != PlayerId.Player && ownerId != PlayerId.AI)
+                throw new System.ArgumentOutOfRangeException(nameof(ownerId));
+            long count = GetPlayer(ownerId).HiddenTrapCount;
+            foreach (var trap in ArmedTraps)
+                if (trap != null && trap.OwnerId == ownerId) count++;
+            return (int)System.Math.Min(int.MaxValue, count);
+        }
 
         public PlayerState GetPlayer(PlayerId playerId)
         {
@@ -168,6 +196,25 @@ namespace Project333.Runtime.Domain.Battle
                 : new PendingRobotFusionState(ownerId, cardId);
         }
 
+        public void RecordSummonedOccupant(OccupantState occupant)
+        {
+            LastSummonedAttack = occupant?.Attack ?? 0;
+            LastSummonedOccupant = occupant == null ? null! : occupant.CloneDetached();
+        }
+
+        public void ClearSummonedOccupant()
+        {
+            LastSummonedOccupant = null!;
+            LastSummonedAttack = 0;
+        }
+
+        public void ClearTrapEvents() => TrapEvents.Clear();
+
+        public void RecordTrapEvent(BattleTrapEvent trapEvent)
+        {
+            if (trapEvent != null) TrapEvents.Add(trapEvent);
+        }
+
         public void ClearValuePopupEvents()
         {
             ValuePopupEvents.Clear();
@@ -237,6 +284,13 @@ namespace Project333.Runtime.Domain.Battle
             }
         }
 
+        public void ClearTimedBombCountdownEvents() => TimedBombCountdownEvents.Clear();
+
+        public void RecordTimedBombCountdown(BattleTimedBombCountdownEvent countdownEvent)
+        {
+            if (countdownEvent != null) TimedBombCountdownEvents.Add(countdownEvent);
+        }
+
         private void SynchronizeOccupantTurnContext()
         {
             SynchronizeOccupantTurnContext(PlayerBoard);
@@ -295,6 +349,34 @@ namespace Project333.Runtime.Domain.Battle
         public ResourceSet Spent { get; }
     }
 
+    public sealed class BattleTimedBombCountdownEvent
+    {
+        public BattleTimedBombCountdownEvent(int effectIndex, string sourceCardId, PlayerId sourceOwnerId,
+            PlayerId targetOwnerId, int remainingTriggersBefore, int remainingTriggersAfter, int valuePopupEventIndex,
+            int valuePopupEventEndIndex = -1)
+        {
+            EffectIndex = effectIndex;
+            SourceCardId = sourceCardId ?? string.Empty;
+            SourceOwnerId = sourceOwnerId;
+            TargetOwnerId = targetOwnerId;
+            RemainingTriggersBefore = remainingTriggersBefore;
+            RemainingTriggersAfter = remainingTriggersAfter;
+            ValuePopupEventIndex = valuePopupEventIndex;
+            ValuePopupEventEndIndex = valuePopupEventEndIndex < 0 ? valuePopupEventIndex : valuePopupEventEndIndex;
+        }
+
+        public int EffectIndex { get; }
+        public string SourceCardId { get; }
+        public PlayerId SourceOwnerId { get; }
+        public PlayerId TargetOwnerId { get; }
+        public int RemainingTriggersBefore { get; }
+        public int RemainingTriggersAfter { get; }
+        // Keeps each countdown before its own damage packets when several bombs resolve together.
+        public int ValuePopupEventIndex { get; }
+        // Exclusive raw-popup boundary; later upkeep, fallout and area effects are outside this bomb.
+        public int ValuePopupEventEndIndex { get; }
+    }
+
     public sealed class BattleAreaSpellEffectEvent
     {
         public BattleAreaSpellEffectEvent(
@@ -302,7 +384,8 @@ namespace Project333.Runtime.Domain.Battle
             string sourceCardId,
             PlayerId sourceOwnerId,
             PlayerId targetOwnerId,
-            IEnumerable<TileCoord> targetCoords)
+            IEnumerable<TileCoord> targetCoords,
+            int valuePopupEventIndex = 0)
         {
             EffectId = effectId ?? string.Empty;
             SourceCardId = sourceCardId ?? string.Empty;
@@ -311,6 +394,7 @@ namespace Project333.Runtime.Domain.Battle
             TargetCoords = targetCoords == null
                 ? throw new System.ArgumentNullException(nameof(targetCoords))
                 : new List<TileCoord>(targetCoords);
+            ValuePopupEventIndex = valuePopupEventIndex;
         }
 
         public string EffectId { get; }
@@ -322,6 +406,9 @@ namespace Project333.Runtime.Domain.Battle
         public PlayerId TargetOwnerId { get; }
 
         public IReadOnlyList<TileCoord> TargetCoords { get; }
+
+        // The area cue belongs immediately before its first raw damage packet.
+        public int ValuePopupEventIndex { get; }
     }
 
     public sealed class BattleAttackResolution
@@ -337,7 +424,8 @@ namespace Project333.Runtime.Domain.Battle
             TileCoord resolvedTargetCoord,
             string resolvedTargetRuntimeId,
             string resolvedTargetCardId,
-            bool wasHuanShuRedirected)
+            bool wasHuanShuRedirected,
+            bool wasCancelledByTrap = false)
         {
             AttackerOwnerId = attackerOwnerId;
             AttackerCoord = attackerCoord;
@@ -350,6 +438,7 @@ namespace Project333.Runtime.Domain.Battle
             ResolvedTargetRuntimeId = resolvedTargetRuntimeId ?? string.Empty;
             ResolvedTargetCardId = resolvedTargetCardId ?? string.Empty;
             WasHuanShuRedirected = wasHuanShuRedirected;
+            WasCancelledByTrap = wasCancelledByTrap;
         }
 
         public PlayerId AttackerOwnerId { get; }
@@ -363,5 +452,6 @@ namespace Project333.Runtime.Domain.Battle
         public string ResolvedTargetRuntimeId { get; }
         public string ResolvedTargetCardId { get; }
         public bool WasHuanShuRedirected { get; }
+        public bool WasCancelledByTrap { get; }
     }
 }

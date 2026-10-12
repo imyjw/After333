@@ -70,7 +70,7 @@ All environment overrides are restored when the runner exits. Test-only settings
 
 This is bounded integration coverage of HTTP/WebSocket endpoints, participant binding, result delivery, connection stability, matchmaking reservations and PostgreSQL reward transactions. The 34 progression battles and participant regressions run in-process; five additional battles use real WebSockets and matchmaking. Snapshot recovery uses JSON serialization and a new BattleSession instance. Durable outbox replay runs in four independent child processes. SQL failure and commit-response loss are injected; DB connection failure uses an unreachable local port. Reservation expiry is injected by moving only the synthetic reservation's deadline into the past. Transport timeout/send/close tests use a controllable WebSocket, while abrupt client disconnect uses a real ClientWebSocket. This does not simulate physical disk failure, process termination at every arbitrary instruction, sustained load, all event ordering, Unity presentation, or every socket failure path.
 
-The isolated runner raises the account HTTP fixture limit to 2,000 per window so the synthetic accounts can complete their 33-card drafts in one run. The fixture also allows 100 WebSocket upgrades per window and sets the authentication deadline to 5 seconds for wire tests. Deterministic clock tests verify the 30-second production default; message and join budgets and the account socket cap use production defaults. These fixture overrides do not change the live server. The fresh test database applies migrations through `0015_account_operation_receipts`.
+The isolated runner raises the account HTTP fixture limit to 2,000 per window so the synthetic accounts can complete their 33-card drafts in one run. The fixture also allows 100 WebSocket upgrades per window and sets the authentication deadline to 5 seconds for wire tests. Deterministic clock tests verify the 30-second production default; message and join budgets and the account socket cap use production defaults. These fixture overrides do not change the live server. The fresh test database applies the current ordered migrations through `0023_ai_challenge_run_usage`; dated regression sections below retain the migration scope and evidence of their original stages.
 
 The runner sets `PROJECT333_BATTLE_RESULT_OUTBOX_DIR` inside its fresh temporary artifact directory. It never reads the deployed server's outbox. Child replay verifies the same loopback DB identity/data directory and is restricted to that run's artifact tree.
 
@@ -132,12 +132,36 @@ Build that tool from current source first using its project at `Server/Project33
 
 The gift checks require migration `0017_gift_inbox`. They cover bounded concurrency and a restart after committed transactions; they do not claim physical disk failure or process termination at every instruction.
 
-## Normal matchmaking and daily AI challenge (2026-09-13)
+<a id="normal-matchmaking-and-daily-ai-challenge-2026-09-13"></a>
+## Normal matchmaking and Gold Dungeon (2026-09-13 record)
 
-The latest suite passes **114 regression groups**, plus actual isolated server restart, operation/gift replay, and no-DB tombstone checks. The isolated account HTTP fixture budget is 2,000 per window to accommodate the additional synthetic 33-card drafts; production remains at its existing limit.
+Mode-name update (2026-10-01): this reference uses the current public name Gold Dungeon. Historical fixture counts, results, dates and proof identifiers below remain records of their original checks.
 
-New coverage verifies KST calendar boundaries, three challenge admissions per day, concurrent/idempotent requests, owned current-run decks, one atomic ten-gold win grant, zero loss/draw reward, unchanged normal-run progression, original-day server-cancellation refunds, startup cleanup, and stale-result rejection. Real WebSocket fallback waits 20 seconds, retains the same room, supports reconnect, records a normal-run result, and consumes no challenge quota. Matchmaking race coverage preserves human reservations and blocks conflicting AI admission. A former waiting-room participant can start a challenge after leaving while the actual AI opponent participant cannot do so during its battle or reconnect grace.
+The 2026-09-13 suite passed **114 regression groups**, plus actual isolated server restart, operation/gift replay, and no-DB tombstone checks. The isolated account HTTP fixture budget is 2,000 per window to accommodate the additional synthetic 33-card drafts; production remains at its existing limit.
 
-The former direct-PvE network fixtures now use server-issued AI challenge admission and verify challenge results separately from normal-run results. Historical section counts and semantics above describe their original release stages.
+At that historical stage, coverage verified KST calendar boundaries, three challenge admissions per day, concurrent/idempotent requests, owned current-run decks, one atomic ten-gold win grant, zero loss/draw reward, unchanged normal-run progression, original-day server-cancellation refunds, startup cleanup, and stale-result rejection. Real WebSocket fallback waits 20 seconds, retains the same room, supports reconnect, records a normal-run result, and consumes no challenge quota. Matchmaking race coverage preserves human reservations and blocks conflicting AI admission. A former waiting-room participant can start a challenge after leaving while the actual AI opponent participant cannot do so during its battle or reconnect grace.
+
+The former direct-PvE network fixtures now use server-issued Gold Dungeon admission and verify challenge results separately from normal-run results. Historical section counts and semantics above describe their original release stages.
 
 Latest evidence: `TempBuild/BattleModes_20260913/authority-verified.log`. See [battle mode rules and rollout](../../docs/battle_modes.md). Tests use only isolated synthetic accounts.
+
+## Gold Dungeon per-run quota (2026-10-09)
+
+The current rule is up to three Gold Dungeon admissions per run started with three tickets. Midnight does not restore attempts. `AiChallengeChecks` now checks the current run's complete 33-card deck, zero usable quota during drafting/after completion/for archived or incomplete decks, three admissions per run, persisted usage across service recreation and earlier audit dates, and legacy usage above three clamped to zero without deleting rows.
+
+The new-run regression calls the actual `RunStartService` with a three-ticket fixture configuration, verifies one atomic ticket debit, and completes 33 authoritative picks before checking the fresh quota. Earlier request IDs continue to replay their original run's attempt/quota. Earlier-run refunds cannot create a fourth attempt in a new run. Existing concurrent starts, double-click aliases, result transaction rollback, ten-gold victory rewards, draw/timeout behavior, stale-result rejection and startup/outbox protection checks remain enabled.
+
+For a focused execution of only these Gold Dungeon checks, build the fresh server as above and add `-GoldDungeonOnly` to the runner:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File .\Server\Project333.RunAuthorityChecks\RunIsolatedRunAuthorityChecks.ps1 `
+  -ServerOutput $serverOutput -GoldDungeonOnly
+if ($LASTEXITCODE -ne 0) { throw 'Gold Dungeon checks failed' }
+```
+
+This option executes `RunAuthorityChecks.dll --gold-dungeon-only` after the same database identity/empty-cluster checks, prints the completed Gold Dungeon group count, and uses the runner's normal `finally` cleanup. The default command without this switch still runs the full suite and its restart/replay/tombstone stages.
+
+The same isolated runner applies migration `0023_ai_challenge_run_usage` in its fresh synthetic PostgreSQL cluster. It does not connect to or migrate a live database. This paragraph describes current check coverage; use the latest task evidence for an execution result, and retain the dated counts above as historical records.
+
+Turn input regression: after building with the isolated ServerOutput, run RunAuthorityChecks.dll --turn-input-only. This branch uses synthetic in-memory PvE/PvP sessions and no DB; it rejects old-turn EndTurn/Attack without mutation and accepts a fresh-turn command.

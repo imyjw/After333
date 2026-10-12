@@ -53,6 +53,8 @@
 
 Windows·Android 앱 업데이트는 아직 하지 않았다. 공통 HTTP 제한·광고 자동 복구·공격 위치·클라이언트 드래프트 복원 변경은 앱 배포가 남아 있다. 서버 자동 실행 설정은 계속 보류한다.
 
+
+명칭 표기 갱신(2026-10-01): 일일 AI 대전 모드의 공개 이름은 골드 던전이다. 아래 과거 작업·검증 기록은 현재 이름으로 지칭하며 당시 결과·날짜는 변경하지 않았다.
 ## 9월 12일 강화 수정 및 문서 정리
 
 케르베로스는 Lv.1~12에 HP +1씩, Lv.13에만 ATK +1로 수정했다(Lv.13 ATK/HP 10/78). 마나의 샘은 Lv.1~13에 HP +1씩이며 ATK는 증가하지 않는다(Lv.13 ATK/HP 0/33). 해당 소스 수정은 Unity 강화/A-212 검사 70개와 배포본 격리 서버 검사 77개 그룹을 통과하고, 19:13 KST에 `20260912-card-upgrade-corrections` 릴리스로 서버에 반영했다. [강화 수정·배포 기록](C:/Project_333/TempBuild/CardUpgradeCorrections_20260912/README.md)
@@ -179,7 +181,7 @@ Unity 전체 1,174개 검사 통과. 실제 JSON과 Unity 에셋 일치, Lv.0/13
 증거: `TempBuild/ManaPond20_20260913/UnityTests.xml`, `server-ai-checks.log`, `RunningServer.json`, `DeploymentResult.json`, `Backup.json`, `InspectDatabase.json`.
 ## 2026-09-21 후속 — 최신 클라이언트 설치·MYBOX 복원
 
-사용자가 일반 전투 20초 후 AI 매칭·일일 AI 도전 변경 이후 최신 클라이언트를 빌드·설치했다고 확인했다. 새 실기기 전투 검증 결과나 빌드 ID를 확인한 것은 아니다.
+사용자가 일반 전투 20초 후 AI 매칭·일일 골드 던전 변경 이후 최신 클라이언트를 빌드·설치했다고 확인했다. 새 실기기 전투 검증 결과나 빌드 ID를 확인한 것은 아니다.
 
 MYBOX 웹에서 사용자가 독립 다운로드한 21:00 백업을 신규 격리 PostgreSQL에 복원했다. 34개 테이블 조회·인덱스/제약 조건 검증·DB 재시작 전후 스키마와 행 수/해시 일치가 통과했다. 운영 DB/서버 프로세스는 유지했고 임시 DB·평문 덤프를 정리했다. [상세 및 검증 한계](mybox_database_backup.md), [결과](../TempBuild/MyboxRestoreDrill_20260921/Result.json).
 

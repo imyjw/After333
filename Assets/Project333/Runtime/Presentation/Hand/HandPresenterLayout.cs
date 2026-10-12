@@ -25,6 +25,14 @@ namespace Project333.Runtime.Presentation.Hand
 
     public static class HandPresenterLayout
     {
+        public static HandCardFanLayout ApplyExpansion(HandCardFanLayout layout, bool expanded)
+        {
+            if (expanded) return layout;
+            const float compactScale = 0.48f;
+            return new HandCardFanLayout(layout.AnchoredPosition * compactScale + new Vector2(0, -24),
+                layout.RotationDegrees, layout.Scale * compactScale, layout.NormalizedPosition);
+        }
+
         public static string GetCardIdForSlot(IReadOnlyList<string> cardIds, int slotIndex)
         {
             if (slotIndex < 0)

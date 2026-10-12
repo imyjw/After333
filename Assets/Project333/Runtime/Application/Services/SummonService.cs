@@ -26,18 +26,18 @@ namespace Project333.Runtime.Application.Services
 
             if (occupant.Kind == OccupantKind.Master)
             {
-                throw new InvalidOperationException("Master units cannot be summoned.");
+                throw new InvalidOperationException("마스터 유닛은 소환 불가능합니다.");
             }
 
             var board = battleState.GetBoard(playerId);
             if (!board.IsInside(targetCoord))
             {
-                throw new InvalidOperationException("Cannot summon outside the board.");
+                throw new InvalidOperationException("해당 위치에 소환할 수 없습니다.");
             }
 
             if (!board.IsEmpty(targetCoord))
             {
-                throw new InvalidOperationException("Cannot summon onto an occupied tile.");
+                throw new InvalidOperationException("해당 타일에는 소환물이 이미 존재합니다.");
             }
 
             occupant.Position = targetCoord;

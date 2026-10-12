@@ -1,7 +1,6 @@
 # Owned Cards Pixel Layout
 
-The collection uses the same teal/gold button artwork as GameStart. Card rules,
-upgrade costs, account requests, pagination and the six-column/two-row list are unchanged.
+The collection uses the same teal/gold button artwork as GameStart. The pixel layout implementation preserved card rules, upgrade costs, account requests, pagination and the six-column/two-row list. Current upgrade prices were separately revised on 2026-10-01, with target Lv.2 adjusted from 5/5 to 6/6 on 2026-10-02; see the [target-level cost table](meta_rules.md#card-upgrade-costs). The list/detail requirements and green upgrade border use the shared cost rule.
 
 ## Apply
 
@@ -32,3 +31,7 @@ Typography is authored once. Account refreshes and entering Play mode do not
 reset the collection's authored font or font size. Dynamic text (card stats,
 wallet balance, upgrade availability) is still refreshed from game/account data.
 The existing green upgrade-ready outline and gold selection background are kept.
+
+## Current detail behavior (2026-10-01)
+
+The gallery opens a centered modal with current JSON-backed stats, unit races above affiliation and scrollable rules. Its artwork can flip to the black/white Lv.1–13 upgrade-increment table and back. The flip changes only the artwork region; upgrade actions, scrolling, modal close and background response handling keep their existing behavior. See [owned_cards_ui.md](owned_cards_ui.md) for current input and data rules. Collection styling remains separate from the shared notice theme in [notice_ui.md](notice_ui.md).

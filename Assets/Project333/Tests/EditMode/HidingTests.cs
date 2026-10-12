@@ -91,7 +91,8 @@ namespace Project333.Tests.EditMode
             Assert.That(hiddenAttacker.HidingRevealed, Is.True);
             Assert.That(hiddenAttacker.CurrentHp, Is.EqualTo(15),
                 "The revealed melee attacker must receive the normal counterattack.");
-            Assert.That(defender.CurrentHp, Is.EqualTo(15));
+            Assert.That(defender.CurrentHp, Is.EqualTo(10),
+                "Hiding doubles the accepted attack's final damage.");
         }
 
         [Test]
@@ -127,8 +128,8 @@ namespace Project333.Tests.EditMode
                 damageType: DamageType.Magic);
 
             Assert.That(alliedHidden.CurrentHp, Is.EqualTo(15));
-            Assert.That(alliedHidden.IsHiding, Is.True,
-                "An allied single-target spell must not reveal Hiding.");
+            Assert.That(alliedHidden.IsHiding, Is.False,
+                "Actual spell damage reveals Hiding.");
 
             var areaDamage = DamageResolutionRules.ApplyEffectDamage(
                 enemyHidden,
@@ -136,7 +137,7 @@ namespace Project333.Tests.EditMode
                 DamageType.Magic);
             Assert.That(areaDamage, Is.EqualTo(3));
             Assert.That(enemyHidden.CurrentHp, Is.EqualTo(17));
-            Assert.That(enemyHidden.IsHiding, Is.True);
+            Assert.That(enemyHidden.IsHiding, Is.False);
         }
 
         [Test]

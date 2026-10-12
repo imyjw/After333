@@ -11,6 +11,15 @@ namespace Project333.Runtime.Presentation.Hand
 
         public Action<PointerEventData> EndDrag;
 
+        public Action CancelDrag;
+
+        protected override void OnDisable()
+        {
+            base.OnDisable();
+            // The runtime visual can hide independently of its source HandCardTextView.
+            CancelDrag?.Invoke();
+        }
+
         public void OnBeginDrag(PointerEventData eventData)
         {
             BeginDrag?.Invoke(eventData);

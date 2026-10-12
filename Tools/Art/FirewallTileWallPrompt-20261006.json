@@ -1,0 +1,11 @@
+{
+  "tool": "built-in image_gen",
+  "use_case": "stylized-concept",
+  "date": "2026-10-06",
+  "prompt": "Use case: stylized-concept. Asset type: production pixel-art game VFX sprite atlas for After333 Firewall.\nInput image role: reference only for fire colors, flame silhouette and crisp retro pixel texture. The reference shows five separate flames stacked on five game tiles; DO NOT draw that entire stack, DO NOT rotate a horizontal strip.\nCreate a genuinely transparent square sprite sheet with exactly 16 chronological animation frames in an evenly spaced 4 by 4 grid. Each cell contains ONE upright, compact, vertical wall of roaring flame rooted on a small dark ember/charred stone base, facing the camera. The one flame is about 60% of cell width and 80% of cell height, centered horizontally, same fixed ground baseline in all cells, with comfortable transparent padding on all four sides so no pixels enter adjacent cells. All sixteen cells same framing and same overall size, a continuous smooth rising fire cycle: curling orange-red tongues and a bright yellow ivory heart flow upwards, flame tips subtly curl/change between frames, small sparse rising embers, consistent solid ember base. Rows ordered left to right then top to bottom. No idle duplicated poses; smooth progression of flame pattern, final frame loops smoothly to first. Clear pixel clusters, hard pixel edges like a high quality 16-bit sprite, orange red amber yellow palette, very limited ivory hottest core, no huge blurred neon glow. A SINGLE fire wall per frame with tongues, not a giant uniform triangle, not a whole scene, not a repeated five-flame column inside a cell. No text, labels, grid lines, black rectangle/background, characters, interface, drop shadows. Actual transparent background. The game will play these frames separately on each of five tiles while preserving square aspect ratio.",
+  "reference": "C:/Users/youndonghyeok/Downloads/레트로 픽셀 화염 기둥.png",
+  "generated_source": "C:/Users/youndonghyeok/.codex/generated_images/01a08439-297d-79c0-a9dc-a0153e47e32b/exec-0e4d66e0-17d9-43da-89ca-33289a47cf3e.png",
+  "atlas": "4x4, sixteen chronological upright single-tile flame frames",
+  "reference_sha256": "456E79C2A12B8EE5E42EFE3A7BAB0909B0FE21760A4EF070981E2A2405729E5A",
+  "packed_sha256": "3221C0F597D8B8CF376300A75F7C684CCA0377CEC6067148C154D20C15D069CE"
+}

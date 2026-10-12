@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Project333.Runtime.Application.Online;
+using Project333.Runtime.Application.Services;
+using Project333.Runtime.Domain.Board;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Cards;
 
@@ -17,10 +19,23 @@ namespace Project333.Runtime.Presentation.Battle
                 return string.Empty;
             }
 
+            if (entry.EntryType == BattleCombatLogEntryType.TrapInstalled)
+                return $"{FormatActor(entry.SourceOwnerId)} 트랩을 설치";
+
             var sourceName = ResolveCardName(entry.SourceCardId, cardNameResolver);
             var targetName = ResolveCardName(entry.TargetCardId, cardNameResolver);
             switch (entry.EntryType)
             {
+                case BattleCombatLogEntryType.TrapTriggered:
+                    if (entry.SourceCardId == Project333.Runtime.Infrastructure.Data.TrapMirrorFieldCardRules.CardId)
+                        return $"{FormatPossessiveOwner(entry.SourceOwnerId)} {sourceName} 발동: 공격 취소 후 {targetName}에게 마법 피해 반사";
+                    return $"{FormatPossessiveOwner(entry.SourceOwnerId)} {sourceName} 발동: {targetName}을 패로 되돌리고 공격 취소";
+
+                case BattleCombatLogEntryType.ActiveEffectActivated:
+                    return CombatLogFormatter.FormatActiveEffect(entry.SourceOwnerId, entry.SourceCardId,
+                        entry.SourceCoord == null ? (TileCoord?)null :
+                            new TileCoord(entry.SourceCoord.Column, entry.SourceCoord.Row), cardNameResolver);
+
                 case BattleCombatLogEntryType.BattleStarted:
                     return $"전투 시작 - {FormatOwner(entry.SourceOwnerId)} 선공";
 
@@ -54,7 +69,15 @@ namespace Project333.Runtime.Presentation.Battle
                            $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName} 대신 피해를 받음";
 
                 case BattleCombatLogEntryType.SpellCast:
-                    return $"{FormatActor(entry.SourceOwnerId)} {sourceName} 마법카드를 사용했다.";
+                    if (!string.IsNullOrWhiteSpace(entry.TargetCardId))
+                    {
+                        return $"{FormatActor(entry.SourceOwnerId)} " +
+                               $"{FormatPossessiveOwner(entry.TargetOwnerId)} " +
+                               $"{targetName}{FormatCoord(entry.TargetCoord)}에게 " +
+                               $"{sourceName} 마법카드를 사용했다.";
+                    }
+
+    return $"{FormatActor(entry.SourceOwnerId)} {sourceName} 마법카드를 사용했다.";
 
                 case BattleCombatLogEntryType.AttackBuffApplied:
                     return $"{sourceName} 효과로 {FormatPossessiveOwner(entry.TargetOwnerId)} " +
@@ -92,6 +115,20 @@ namespace Project333.Runtime.Presentation.Battle
 
                 case BattleCombatLogEntryType.DrainedCleared:
                     return $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName} 방전 해제";
+
+                case BattleCombatLogEntryType.StunApplied:
+                    return $"{FormatPossessiveOwner(entry.TargetOwnerId)} " +
+                           $"{AppendSubjectParticle(targetName)} 스턴 상태가 됨";
+
+                case BattleCombatLogEntryType.StunCleared:
+                    return $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName} 스턴 해제";
+
+                case BattleCombatLogEntryType.FreezeApplied:
+                    return $"{FormatPossessiveOwner(entry.TargetOwnerId)} " +
+                           $"{AppendSubjectParticle(targetName)} 빙결 상태가 됨";
+
+                case BattleCombatLogEntryType.FreezeCleared:
+                    return $"{FormatPossessiveOwner(entry.TargetOwnerId)} {targetName} 빙결 해제";
 
                 case BattleCombatLogEntryType.ErasureApplied:
                     return $"{FormatPossessiveOwner(entry.TargetOwnerId)} " +

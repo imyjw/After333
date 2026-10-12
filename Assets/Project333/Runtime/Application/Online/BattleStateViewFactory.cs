@@ -40,7 +40,31 @@ namespace Project333.Runtime.Application.Online
             AddBoardOccupants(view, battleState.GetBoard(viewerId));
             AddBoardOccupants(view, battleState.GetOpponentBoard(viewerId));
             AddPersistentEffects(view, battleState);
+            AddArmedTrapViews(view, battleState, viewerId);
             return view;
+        }
+
+        private static void AddArmedTrapViews(BattleStateViewDto view, BattleState battleState, PlayerId viewerId)
+        {
+            view.Player.TrapCount = battleState.GetArmedTrapCount(viewerId);
+            view.Opponent.TrapCount = battleState.GetArmedTrapCount(battleState.GetOpponent(viewerId).Id);
+            foreach (var trap in battleState.ArmedTraps)
+            {
+                if (trap == null || trap.OwnerId != viewerId) continue;
+                view.Player.VisibleArmedTraps.Add(new ArmedTrapViewDto
+                {
+                    RuntimeId = trap.RuntimeId,
+                    OwnerId = trap.OwnerId,
+                    CardId = trap.CardId,
+                    TriggerType = trap.TriggerType,
+                    EffectType = trap.EffectType,
+                    ActivationCost = ResourceSetDto.FromDomain(trap.ActivationCost),
+                    EffectAmount = trap.EffectAmount,
+                    InstalledTurn = trap.InstalledTurn,
+                    UpgradeLevel = trap.UpgradeLevel,
+                    IsTemporaryReplicate = trap.IsTemporaryReplicate
+                });
+            }
         }
 
         private static BattlePlayerViewDto CreatePlayerView(PlayerState playerState, bool showHand)
@@ -137,14 +161,20 @@ namespace Project333.Runtime.Application.Online
                 EndureUsed = occupant.EndureUsed,
                 WasSummonedThisTurn = occupant.WasSummonedThisTurn,
                 HasSummoningSickness = occupant.HasSummoningSickness,
-                RemainingAttacksThisTurn = occupant.RemainingAttacksThisTurn
+                RemainingAttacksThisTurn = occupant.RemainingAttacksThisTurn,
+                StunTurnEndsRemaining = occupant.StunTurnEndsRemaining,
+                FreezeTurnEndsRemaining = occupant.FreezeTurnEndsRemaining
             };
+
+            foreach (var source in occupant.ErasedOrcChieftainSourceRuntimeIds)
+                view.ErasedOrcChieftainSourceRuntimeIds.Add(source);
 
             foreach (var buff in occupant.CombatStatBuffs)
             {
                 view.CombatStatBuffs.Add(new CombatStatBuffViewDto
                 {
                     SourceCardId = buff.SourceCardId,
+                    SourceRuntimeId = buff.SourceRuntimeId,
                     AttackBonus = buff.AttackBonus,
                     MaxHpBonus = buff.MaxHpBonus,
                     PhysicalDefenseBonus = buff.PhysicalDefenseBonus,

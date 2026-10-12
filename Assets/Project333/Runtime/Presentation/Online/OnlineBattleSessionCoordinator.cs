@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Project333.Runtime.Presentation.Battle;
+using Project333.Runtime.Presentation.Tutorial;
 using UnityEngine;
 
 namespace Project333.Runtime.Presentation.Online
@@ -55,6 +56,7 @@ namespace Project333.Runtime.Presentation.Online
 
         public static OnlineBattleSessionCoordinator GetOrCreate()
         {
+            if (TutorialRuntimeIsolation.IsActive) return s_instance;
             if (s_instance != null)
             {
                 return s_instance;
@@ -75,6 +77,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void Awake()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             if (s_instance != null && s_instance != this)
             {
                 Destroy(gameObject);
@@ -92,6 +95,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void Update()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             if (_connectionTester == null)
             {
                 return;
@@ -138,6 +142,7 @@ namespace Project333.Runtime.Presentation.Online
             IReadOnlyList<string> playerDeckCardIds,
             bool isReconnect)
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             if (_connectionTester == null)
             {
                 throw new InvalidOperationException("Online battle connection tester is missing.");
@@ -157,6 +162,7 @@ namespace Project333.Runtime.Presentation.Online
 
         public bool TryAttachToBattle(BattleBootstrapper battleBootstrapper)
         {
+            if (TutorialRuntimeIsolation.IsActive) return false;
             if (battleBootstrapper == null || !HasActiveBattle)
             {
                 return false;
@@ -169,6 +175,7 @@ namespace Project333.Runtime.Presentation.Online
 
         public async Task<bool> CancelMatchmakingAndDisposeAsync()
         {
+            if (TutorialRuntimeIsolation.IsActive) return false;
             if (HasActiveBattle)
             {
                 SetPhase(OnlineBattleSessionPhase.BattleReady);
@@ -180,6 +187,9 @@ namespace Project333.Runtime.Presentation.Online
             {
                 await _connectionTester.DisconnectFromServerAsync();
             }
+
+            while (TutorialRuntimeIsolation.IsActive && this != null) await Task.Delay(50);
+            if (this == null) return true;
 
             if (HasActiveBattle)
             {

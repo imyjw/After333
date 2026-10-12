@@ -1,5 +1,11 @@
 # After333 Google Login Setup
 
+## Current public authentication boundary (2026-10-01)
+
+Current routes support Game ID registration/login, Google login, saved-session refresh and device logout. Guest creation/resume and public account-link endpoints are not exposed. Legacy link helper methods and serialized button fields are implementation history, not a supported setup path. The start-scene settings menu provides confirmed logout and the mandatory login gate.
+
+This review compares source only. It does not verify the running server's OAuth client IDs/secrets, Google Console registration, token exchange or a device login. The platform configuration and remaining live checks below stay release prerequisites.
+
 ## What Is Implemented
 
 The server, Windows Unity client, and Android Unity client now share one account flow.
@@ -24,7 +30,7 @@ Both platforms then:
 2. Let the After333 server verify the token signature, issuer, expiration, and audience.
 3. Use Google's stable `sub` value as the login identity.
 4. Log an existing identity into its After333 account or create a registered account for a new identity.
-5. Use `POST /auth/link-google` to link Google to the current account without replacing cards, wallet, deck, or run data.
+5. Apply only the account returned by verified login. Existing account identities are not automatically merged, and public identity linking is not exposed.
 
 The raw Google authorization code, PKCE verifier, client secret, and ID token are never written to PostgreSQL or audit logs. Email is profile data only and is never used as the account key.
 
@@ -64,7 +70,7 @@ The Android OAuth client identifies the installed APK by package name and certif
 3. Select the object containing `GameStartSceneController`.
 4. In **Google Auth**, paste the Desktop app client ID into **Google Desktop Client Id**.
 5. Paste the Web application client ID into **Google Android Server Client Id**.
-6. `GoogleAuthPanel`, `LoginButton`, and `LinkButton` remain editable in the scene before Play mode.
+6. Configure `GoogleAuthPanel` and `LoginButton` before Play mode. A retained `LinkButton` field does not enable a public account-link route.
 
 The custom Android Gradle template includes:
 
@@ -173,19 +179,7 @@ Content-Type: application/json
 }
 ```
 
-Link Google to the currently logged-in guest or Game ID account:
-
-```http
-POST /auth/link-google
-Authorization: Bearer AFTER333_SESSION_TOKEN
-Content-Type: application/json
-
-{
-  "idToken": "GOOGLE_ID_TOKEN"
-}
-```
-
-Linking never automatically merges two existing After333 accounts. If the Google identity already belongs to another account, the server returns `google_identity_taken`.
+Guest authentication and `POST /auth/link-google` / `POST /auth/link-game-id` are unavailable in the current public server. Do not use the older link-readiness tool as a required passing login check. Provider identity verification uses Google's stable `sub`; email alone never merges accounts. A separate identity-link product flow would require a new confirmed decision and implementation.
 
 ## Android Build And Smoke Test
 
@@ -195,8 +189,8 @@ Linking never automatically merges two existing After333 accounts. If the Google
 4. Start the server with that Web client ID included in `PROJECT333_GOOGLE_CLIENT_IDS`.
 5. Build and install on a device with Google Play services.
 6. Press **Google login**, choose a test-user account, and confirm the same After333 account is restored after restarting the app.
-7. From a guest account, test **current account link** and confirm cards, gold, tickets, deck, and run remain unchanged.
-8. Attempt to link the same Google identity to a second account and confirm the server returns `google_identity_taken`.
+7. From the logged-in start scene, confirm logout in the settings menu, restart, and verify the login gate appears. Log in again and confirm server cards, gold, tickets, deck and run remain intact.
+8. Verify the same Google identity resumes its original After333 account; confirm a different provider identity does not silently merge through email or local cached profile data.
 
 If Android reports a provider-configuration error, first check package name, signing SHA, OAuth project, Web client ID, and whether the Google account is listed as a test user.
 

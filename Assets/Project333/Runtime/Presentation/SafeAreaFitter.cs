@@ -46,6 +46,7 @@ namespace Project333.Runtime.Presentation
         private const string DefaultSafeAreaRootName = "SafeAreaRoot";
 
         [SerializeField] private RectTransform[] _fullBleedElements = new RectTransform[0];
+        [SerializeField] private RectTransform[] _screenCenteredElements = new RectTransform[0];
 
         private RectTransform _rectTransform;
         private Rect _lastSafeArea;
@@ -57,6 +58,15 @@ namespace Project333.Runtime.Presentation
         {
             _rectTransform = transform as RectTransform;
             _fullBleedElements = fullBleedElements ?? new RectTransform[0];
+            _hasAppliedLayout = false;
+            ApplyNow();
+        }
+
+        // Direct children that must line up with a full-screen background/logo.
+        // Only horizontal anchors change: authored size, offsets and vertical layout stay intact.
+        public void ConfigureScreenCenteredElements(params RectTransform[] elements)
+        {
+            _screenCenteredElements = elements ?? new RectTransform[0];
             _hasAppliedLayout = false;
             ApplyNow();
         }
@@ -175,18 +185,46 @@ namespace Project333.Runtime.Presentation
                 return;
             }
 
-            var normalizedSafeArea = SafeAreaLayout.Normalize(Screen.safeArea, Screen.width, Screen.height);
+            ApplyLayout(Screen.safeArea, Screen.width, Screen.height);
+        }
+
+        private void ApplyLayout(Rect safeArea, int screenWidth, int screenHeight)
+        {
+            var normalizedSafeArea = SafeAreaLayout.Normalize(safeArea, screenWidth, screenHeight);
             _rectTransform.anchorMin = normalizedSafeArea.min;
             _rectTransform.anchorMax = normalizedSafeArea.max;
             _rectTransform.offsetMin = Vector2.zero;
             _rectTransform.offsetMax = Vector2.zero;
 
             ApplyFullBleedElements(normalizedSafeArea);
+            ApplyScreenCenteredElements(normalizedSafeArea);
 
-            _lastSafeArea = Screen.safeArea;
-            _lastScreenWidth = Screen.width;
-            _lastScreenHeight = Screen.height;
+            _lastSafeArea = safeArea;
+            _lastScreenWidth = screenWidth;
+            _lastScreenHeight = screenHeight;
             _hasAppliedLayout = true;
+        }
+
+        private void ApplyScreenCenteredElements(Rect normalizedSafeArea)
+        {
+            if (_screenCenteredElements == null)
+            {
+                return;
+            }
+
+            // Convert the physical screen midpoint into the safe area's local anchor space.
+            // Using 0.5 directly would shift toward the side opposite an asymmetric notch.
+            var centerX = (0.5f - normalizedSafeArea.xMin) / normalizedSafeArea.width;
+            foreach (var element in _screenCenteredElements)
+            {
+                if (element == null || element.parent != _rectTransform)
+                {
+                    continue;
+                }
+
+                element.anchorMin = new Vector2(centerX, element.anchorMin.y);
+                element.anchorMax = new Vector2(centerX, element.anchorMax.y);
+            }
         }
 
         private void ApplyFullBleedElements(Rect normalizedSafeArea)

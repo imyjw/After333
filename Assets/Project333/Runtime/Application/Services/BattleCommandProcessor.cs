@@ -13,6 +13,7 @@ namespace Project333.Runtime.Application.Services
         private readonly AttackService _attackService;
         private readonly EndTurnService _endTurnService;
         private readonly ReplicateService _replicateService;
+        private readonly TrapService _trapService;
 
         public BattleCommandProcessor(
             PlayCardService playCardService,
@@ -27,6 +28,7 @@ namespace Project333.Runtime.Application.Services
             _attackService = attackService ?? throw new ArgumentNullException(nameof(attackService));
             _endTurnService = endTurnService ?? throw new ArgumentNullException(nameof(endTurnService));
             _replicateService = new ReplicateService(_playCardService.CardDefinitionProvider);
+            _trapService = new TrapService(_playCardService.CardDefinitionProvider, _playCardService.CardUpgradeLevelProvider);
         }
 
         public void Execute(BattleState battleState, PlayerId actorId, IBattleCommand command)
@@ -48,12 +50,14 @@ namespace Project333.Runtime.Application.Services
 
             if (battleState.ActivePlayerId != actorId)
             {
-                throw new InvalidOperationException("Only the active player can execute commands.");
+                throw new InvalidOperationException("자신의 턴에만 행동할 수 있습니다.");
             }
 
             battleState.ClearValuePopupEvents();
             battleState.ClearResourceChangeEvents();
             battleState.ClearAttackResolution();
+            battleState.ClearTrapEvents();
+            battleState.ClearSummonedOccupant();
 
             var handCardCommand = command as IHandCardCommand;
             var actorHand = battleState.GetPlayer(actorId).Hand;
@@ -80,6 +84,11 @@ namespace Project333.Runtime.Application.Services
 
             switch (command)
             {
+                case InstallTrapCommand installTrapCommand:
+                    _trapService.Install(battleState, actorId, installTrapCommand.CardId,
+                        installTrapCommand.HandCardRuntimeId);
+                    break;
+
                 case PlayUnitCardCommand playUnitCardCommand:
                     _playCardService.PlayUnitCard(
                         battleState,
@@ -191,7 +200,7 @@ namespace Project333.Runtime.Application.Services
         {
             if (battleState.Phase != PhaseType.Main)
             {
-                throw new InvalidOperationException("This command can only be executed during the main phase.");
+                throw new InvalidOperationException("자신의 행동 턴에만 행동할 수 있습니다.");
             }
         }
     }

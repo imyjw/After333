@@ -116,7 +116,7 @@ namespace Project333.Tests.EditMode
                 attacker.Position,
                 defender.Position);
 
-            Assert.That(defender.CurrentHp, Is.EqualTo(20));
+            Assert.That(defender.CurrentHp, Is.EqualTo(30));
         }
 
         [Test]

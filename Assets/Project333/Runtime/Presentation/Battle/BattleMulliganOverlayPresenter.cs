@@ -13,7 +13,7 @@ using UnityEngine.UI;
 
 namespace Project333.Runtime.Presentation.Battle
 {
-    public sealed class BattleMulliganOverlayPresenter : MonoBehaviour
+    public sealed partial class BattleMulliganOverlayPresenter : MonoBehaviour
     {
         private const int DefaultCanvasSortingOrder = 6000;
 
@@ -70,6 +70,9 @@ namespace Project333.Runtime.Presentation.Battle
         private bool _editorStatTextEnsureQueued;
 #endif
 
+        public RectTransform TutorialConfirmRect => _confirmButton != null ? _confirmButton.transform as RectTransform : null;
+        public Image TutorialCardArtwork(int index) => index >= 0 && index < _cardArtworkImages.Length ? _cardArtworkImages[index] : null;
+        public void ResetTutorialSession() { EndSessionAndHide(); }
         public int SelectedCardCount => _selectedSlotIndices.Count;
 
         public bool IsSessionActive => _sessionActive;
@@ -78,6 +81,7 @@ namespace Project333.Runtime.Presentation.Battle
         {
             _battleBootstrapper = battleBootstrapper;
             EnsureCardStatTexts();
+            ApplyPresentationDesign();
         }
 
         private void Awake()
@@ -86,6 +90,7 @@ namespace Project333.Runtime.Presentation.Battle
             EnsureCardStatTexts();
             ApplyKoreanFonts();
             BindButtons();
+            ApplyPresentationDesign();
         }
 
         private void OnEnable()
@@ -94,12 +99,15 @@ namespace Project333.Runtime.Presentation.Battle
             EnsureCardStatTexts();
             ApplyKoreanFonts();
             BindButtons();
+            ApplyPresentationDesign();
         }
 
         private void LateUpdate()
         {
             if (_sessionActive)
             {
+                RefreshPresentationLayout();
+                AnimateKeepAuras();
                 RefreshCardStatLayouts();
             }
         }
@@ -153,6 +161,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void OnDestroy()
         {
+            CancelCardDeal(finishPendingFinalResult: false);
             UnbindButtons();
         }
 
@@ -182,6 +191,7 @@ namespace Project333.Runtime.Presentation.Battle
         public void ToggleCardFromUi(int slotIndex)
         {
             if (!_sessionActive ||
+                IsDealingCards ||
                 _confirmationSent ||
                 _hasReceivedConfirmedHand ||
                 slotIndex < 0 ||
@@ -190,6 +200,7 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
+            if (_battleBootstrapper != null && !_battleBootstrapper.TutorialAllowsMulliganToggle(_openingHandCardIds[slotIndex])) return;
             if (!_selectedSlotIndices.Add(slotIndex))
             {
                 _selectedSlotIndices.Remove(slotIndex);
@@ -197,11 +208,12 @@ namespace Project333.Runtime.Presentation.Battle
 
             RefreshSelectionVisuals();
             UpdateSelectionStatus();
+            _battleBootstrapper?.TutorialMulliganSelectionChanged(_selectedSlotIndices.Contains(slotIndex));
         }
 
         public void ConfirmSelectionFromUi()
         {
-            if (!_sessionActive || _confirmationSent || _hasReceivedConfirmedHand)
+            if (!_sessionActive || IsDealingCards || _confirmationSent || _hasReceivedConfirmedHand)
             {
                 return;
             }
@@ -222,8 +234,10 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             _confirmationSent = true;
+            HidePendingReplacementSlots();
             SetSelectionInteractable(false);
-            SetStatus("멀리건을 처리하는 중...");
+            RefreshSelectionVisuals();
+            SetStatus(Project333.Runtime.Presentation.Tutorial.TutorialRuntimeIsolation.IsActive ? string.Empty : "멀리건을 처리하는 중...");
 
             if (_battleBootstrapper.SubmitPlayerMulligan(selectedCardIds))
             {
@@ -231,7 +245,9 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             _confirmationSent = false;
+            RestorePendingReplacementSlots();
             SetSelectionInteractable(true);
+            RefreshSelectionVisuals();
             UpdateSelectionStatus();
         }
 
@@ -303,13 +319,15 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             SetTitle("멀리건 완료");
-            SetStatus("상대의 멀리건을 기다리는 중...");
+            SetStatus(IsDealingReplacementHand ? string.Empty : "상대의 멀리건을 기다리는 중...");
             SetSelectionInteractable(false);
             RefreshCardVisuals();
         }
 
         private void PresentFinalResult(BattleState battleState)
         {
+            // A phase change must finish the confirmed replacement flight before the result clock begins.
+            if (_isDealingOpeningHand) CancelOpeningDeal();
             if (!_hasReceivedConfirmedHand)
             {
                 if (_confirmationSent)
@@ -318,34 +336,39 @@ namespace Project333.Runtime.Presentation.Battle
                 }
                 else
                 {
-                    // A server timeout keeps the opening hand even if the player had highlighted cards locally.
+                    // A server timeout keeps the opening hand even when cards were highlighted locally.
                     _displayCardIds.Clear();
                     _displayCardIds.AddRange(_openingHandCardIds);
                     _hasReceivedConfirmedHand = true;
+                    _selectedSlotIndices.Clear();
                 }
             }
 
             SetVisible(true);
             SetTitle("멀리건 결과");
-            SetStatus("잠시 후 전투가 시작됩니다.");
+            SetStatus(IsDealingReplacementHand ? string.Empty : "잠시 후 전투가 시작됩니다.");
             SetSelectionInteractable(false);
-            if (_confirmButton != null)
-            {
-                _confirmButton.gameObject.SetActive(false);
-            }
-
+            if (_confirmButton != null) _confirmButton.gameObject.SetActive(false);
             RefreshCardVisuals();
-            if (_isShowingFinalResult)
+            if (IsDealingReplacementHand)
             {
+                _finalResultPending = true;
                 return;
             }
 
-            _isShowingFinalResult = true;
-            if (_resultSequence != null)
-            {
-                StopCoroutine(_resultSequence);
-            }
+            BeginFinalResultDisplay();
+        }
 
+        private void BeginFinalResultDisplay()
+        {
+            if (!_sessionActive || _isShowingFinalResult || IsDealingCards) return;
+            _finalResultPending = false;
+            _isShowingFinalResult = true;
+            SetStatus("잠시 후 전투가 시작됩니다.");
+            SetSelectionInteractable(false);
+            if (_confirmButton != null) _confirmButton.gameObject.SetActive(false);
+            RefreshSelectionVisuals();
+            if (_resultSequence != null) StopCoroutine(_resultSequence);
             _resultSequence = StartCoroutine(HideAfterResultDelay());
         }
 
@@ -375,6 +398,8 @@ namespace Project333.Runtime.Presentation.Battle
             _displayCardIds.Clear();
             _displayCardIds.AddRange(_openingHandCardIds);
             _selectedSlotIndices.Clear();
+            _pendingReplacementSlots = Array.Empty<int>();
+            _finalResultPending = false;
             _confirmationSent = false;
             _hasReceivedConfirmedHand = false;
             _isShowingFinalResult = false;
@@ -387,10 +412,12 @@ namespace Project333.Runtime.Presentation.Battle
             SetSelectionInteractable(true);
             UpdateSelectionStatus();
             RefreshCardVisuals();
+            if (!battleState.Player.HasUsedMulligan) StartOpeningDeal();
         }
 
         private void CaptureConfirmedHand(IReadOnlyList<string> currentHandCardIds)
         {
+            CancelOpeningDeal();
             _displayCardIds.Clear();
             if (_confirmationSent)
             {
@@ -410,9 +437,13 @@ namespace Project333.Runtime.Presentation.Battle
                 }
             }
 
+            // No pending slots exist on a confirmed reconnect, so restored cards are shown immediately.
+            var replacementSlots = _pendingReplacementSlots;
+            _pendingReplacementSlots = Array.Empty<int>();
             _hasReceivedConfirmedHand = true;
             _selectedSlotIndices.Clear();
-            RefreshSelectionVisuals();
+            RefreshCardVisuals();
+            if (replacementSlots.Length > 0) StartCardDeal(replacementSlots, replacement: true);
         }
 
         private IEnumerator HideAfterResultDelay()
@@ -424,6 +455,8 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void EndSessionAndHide()
         {
+            _finalResultPending = false;
+            CancelCardDeal(finishPendingFinalResult: false);
             if (_resultSequence != null)
             {
                 StopCoroutine(_resultSequence);
@@ -433,6 +466,7 @@ namespace Project333.Runtime.Presentation.Battle
             _openingHandCardIds.Clear();
             _displayCardIds.Clear();
             _selectedSlotIndices.Clear();
+            _pendingReplacementSlots = Array.Empty<int>();
             _confirmationSent = false;
             _hasReceivedConfirmedHand = false;
             _isShowingFinalResult = false;
@@ -481,26 +515,32 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             RefreshSelectionVisuals();
+            RefreshPresentationLayout();
             Canvas.ForceUpdateCanvases();
+            RefreshDecorationLayouts();
             RefreshCardStatLayouts();
+            ApplyPendingReplacementVisibility();
         }
 
         private void RefreshSelectionVisuals()
         {
             for (var slotIndex = 0; slotIndex < _cardButtons.Length; slotIndex++)
             {
-                var isSelected = !_hasReceivedConfirmedHand && _selectedSlotIndices.Contains(slotIndex);
+                var hasCard = slotIndex < _displayCardIds.Count && !string.IsNullOrWhiteSpace(_displayCardIds[slotIndex]);
+                var isSelected = hasCard && !_hasReceivedConfirmedHand && _selectedSlotIndices.Contains(slotIndex);
                 var selectionOverlay = GetAt(_selectionOverlays, slotIndex);
                 if (selectionOverlay != null)
                 {
                     selectionOverlay.gameObject.SetActive(isSelected);
                 }
+                RefreshDesignSelection(slotIndex, hasCard, isSelected);
 
             }
         }
 
         private void SetSelectionInteractable(bool interactable)
         {
+            interactable = interactable && !IsDealingCards;
             for (var i = 0; i < _cardButtons.Length; i++)
             {
                 if (_cardButtons[i] != null)
@@ -511,18 +551,19 @@ namespace Project333.Runtime.Presentation.Battle
 
             if (_confirmButton != null)
             {
-                _confirmButton.gameObject.SetActive(true);
+                _confirmButton.gameObject.SetActive(!_isShowingFinalResult);
                 _confirmButton.interactable = interactable;
             }
 
             if (_confirmButtonText != null)
             {
-                _confirmButtonText.text = interactable ? "교체" : "확정 완료";
+                _confirmButtonText.text = interactable || IsDealingCards ? "확인" : (_confirmationSent && !_hasReceivedConfirmedHand ? "확인 중..." : "확인 완료");
             }
         }
 
         private void UpdateSelectionStatus()
         {
+            if (IsDealingCards) return;
             SetStatus(_selectedSlotIndices.Count == 0
                 ? "교체하지 않으려면 바로 확정하세요."
                 : $"선택한 카드 {_selectedSlotIndices.Count}장을 교체합니다.");
@@ -551,13 +592,14 @@ namespace Project333.Runtime.Presentation.Battle
             {
                 gameObject.SetActive(false);
             }
+            if (visible) ApplyPendingReplacementVisibility();
         }
 
         private void SetTitle(string value)
         {
             if (_titleText != null)
             {
-                _titleText.text = BuildTurnOrderTitle(_isLocalFirstPlayer, value);
+                _titleText.text = _designApplied ? "시작 핸드 카드" : BuildTurnOrderTitle(_isLocalFirstPlayer, value);
             }
         }
 
@@ -742,7 +784,7 @@ namespace Project333.Runtime.Presentation.Battle
             if (!_showCardStats ||
                 _battleBootstrapper == null ||
                 !_battleBootstrapper.TryGetCardDefinition(cardId, out var definition) ||
-                !CardStatDisplay.TryCreate(definition, AccountSessionState.GetOwnedCardUpgradeLevel(cardId), out var stats))
+                !CardStatDisplay.TryCreate(definition, Project333.Runtime.Presentation.Tutorial.TutorialRuntimeIsolation.IsActive ? 0 : AccountSessionState.GetOwnedCardUpgradeLevel(cardId), out var stats))
             {
                 SetCardStatVisible(slotIndex, false);
                 return;
@@ -823,6 +865,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         private static Font ResolveKoreanFont()
         {
+            if (NoticeTheme.Font != null) return NoticeTheme.Font;
             if (s_koreanFont != null)
             {
                 return s_koreanFont;

@@ -191,6 +191,7 @@ namespace Project333.Tests.EditMode
             var gateway = new OnlineBattleGateway("match-1", "token-b", PlayerId.Player, sender);
 
             gateway.SetLocalPlayerId(PlayerId.AI);
+            gateway.ApplyServerView(new BattleStateViewDto { MatchId = "match-1", ActivePlayerId = PlayerId.AI, Phase = PhaseType.Main, TurnNumber = 1 });
             gateway.EndTurn();
 
             Assert.That(sender.Messages.Count, Is.EqualTo(1));
@@ -438,12 +439,95 @@ namespace Project333.Tests.EditMode
             Assert.That(OnlineBattleMessageSerializer.SerializeClientCommand(message),Does.Contain("ActivateEffect"));
         }
 
+        [TestCase(PlayerId.Player)]
+        [TestCase(PlayerId.AI)]
+        public void EndTurn_RejectsDoubleClickAndActionsUntilNextOwnTurn(PlayerId seat)
+        {
+            var sender = new RecordingSender();
+            var gateway = new OnlineBattleGateway("match-1", "token", seat, sender);
+            var view = new BattleStateViewDto { MatchId = "match-1", ViewerId = seat,
+                ActivePlayerId = seat, TurnNumber = 5, Phase = PhaseType.Main };
+            gateway.ApplyServerView(view);
+            gateway.EndTurn();
+            Assert.Throws<System.InvalidOperationException>(() => gateway.EndTurn());
+            Assert.Throws<System.InvalidOperationException>(() => gateway.ExecuteCommand(PlayerId.Player,
+                new AttackCommand(new TileCoord(0, 0), new TileCoord(1, 0))));
+            gateway.ApplyServerView(view); // Same-turn ACK/snapshot must not unlock.
+            Assert.Throws<System.InvalidOperationException>(() => gateway.ExecuteCommand(PlayerId.Player, new EndTurnCommand()));
+            view = new BattleStateViewDto { MatchId = "match-1", ViewerId = seat,
+                ActivePlayerId = seat == PlayerId.Player ? PlayerId.AI : PlayerId.Player,
+                TurnNumber = 6, Phase = PhaseType.Main };
+            gateway.ApplyServerView(view);
+            Assert.Throws<System.InvalidOperationException>(() => gateway.EndTurn());
+            Assert.That(sender.Messages.Count, Is.EqualTo(1));
+            view = new BattleStateViewDto { MatchId = "match-1", ViewerId = seat,
+                ActivePlayerId = seat, TurnNumber = 7, Phase = PhaseType.Main };
+            gateway.ApplyServerView(view);
+            gateway.EndTurn();
+            Assert.That(sender.Messages.Count, Is.EqualTo(2));
+        }
+        [Test]
+        public void EndTurn_OnlyMatchingRejectionUnlocksAndSurrenderRemainsAvailable()
+        {
+            var sender = new RecordingSender();
+            var gateway = new OnlineBattleGateway("match-1", "token", PlayerId.Player, sender);
+            gateway.ApplyServerView(new BattleStateViewDto { MatchId = "match-1", ActivePlayerId = PlayerId.Player,
+                Phase = PhaseType.Main, TurnNumber = 5 });
+            gateway.EndTurn();
+            var pending = sender.Messages[0];
+            Assert.That(pending.ExpectedTurnNumber, Is.EqualTo(5));
+            Assert.That(OnlineBattleMessageSerializer.SerializeClientCommand(pending), Does.Contain("ExpectedTurnNumber"));
+            gateway.RejectCommand(null);
+            gateway.RejectCommand(pending.Sequence - 1);
+            Assert.That(gateway.IsAwaitingNextTurn, Is.True);
+            gateway.SendSurrender();
+            Assert.That(sender.Messages[1].CommandType, Is.EqualTo(OnlineBattleCommandType.Surrender));
+            gateway.RejectCommand(pending.Sequence);
+            Assert.That(gateway.IsAwaitingNextTurn, Is.False);
+            gateway.EndTurn();
+            Assert.That(sender.Messages.Count, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void EndTurn_SynchronousSendFailureAllowsRetry()
+        {
+            var sender = new RecordingSender { ThrowOnSend = true };
+            var gateway = new OnlineBattleGateway("match-1", "token", PlayerId.Player, sender);
+            gateway.ApplyServerView(new BattleStateViewDto { MatchId = "match-1", ActivePlayerId = PlayerId.Player,
+                Phase = PhaseType.Main, TurnNumber = 5 });
+            Assert.Throws<System.InvalidOperationException>(() => gateway.EndTurn());
+            Assert.That(gateway.IsAwaitingNextTurn, Is.False);
+            sender.ThrowOnSend = false;
+            gateway.EndTurn();
+            Assert.That(sender.Messages.Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void EndTurn_DirectCommandUsesSameLockAndTurnStartDoesNotUnlockEarly()
+        {
+            var sender = new RecordingSender();
+            var gateway = new OnlineBattleGateway("match-1", "token", PlayerId.Player, sender);
+            var view = new BattleStateViewDto { MatchId = "match-1", ActivePlayerId = PlayerId.Player,
+                Phase = PhaseType.Main, TurnNumber = 5 };
+            gateway.ApplyServerView(view);
+            gateway.ExecuteCommand(PlayerId.Player, new EndTurnCommand());
+            view = new BattleStateViewDto { MatchId = "match-1", ActivePlayerId = PlayerId.Player,
+                Phase = PhaseType.TurnStart, TurnNumber = 7 };
+            gateway.ApplyServerView(view);
+            Assert.That(gateway.IsAwaitingNextTurn, Is.True);
+            view.Phase = PhaseType.Main;
+            gateway.ApplyServerView(view);
+            Assert.That(gateway.IsAwaitingNextTurn, Is.False);
+            Assert.That(sender.Messages.Count, Is.EqualTo(1), "Unlock must not replay an earlier click.");
+        }
         private sealed class RecordingSender : IOnlineBattleMessageSender
         {
+            public bool ThrowOnSend;
             public List<ClientBattleCommandMessage> Messages { get; } = new List<ClientBattleCommandMessage>();
 
             public void Send(ClientBattleCommandMessage message)
             {
+                if (ThrowOnSend) throw new System.InvalidOperationException("Disconnected");
                 Messages.Add(message);
             }
         }

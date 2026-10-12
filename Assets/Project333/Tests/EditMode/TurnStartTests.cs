@@ -58,7 +58,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void ResolveTurnStart_OnSecondBattleTurn_SecondPlayerGainsOneGold()
+        public void ResolveTurnStart_OnSecondBattleTurn_SecondPlayerKeepsInitialFourGold()
         {
             var battleState = CreateBattleState(PlayerId.Player);
             var service = new TurnStartService();
@@ -70,7 +70,7 @@ namespace Project333.Tests.EditMode
             service.ResolveTurnStart(battleState);
 
             Assert.That(battleState.TurnNumber, Is.EqualTo(2));
-            Assert.That(battleState.AI.Resources.Gold, Is.EqualTo(secondPlayerStartingGold + 1));
+            Assert.That(battleState.AI.Resources.Gold, Is.EqualTo(secondPlayerStartingGold));
             Assert.That(battleState.AI.Resources.Gold, Is.EqualTo(4));
             Assert.That(battleState.Phase, Is.EqualTo(PhaseType.Main));
         }
@@ -198,6 +198,75 @@ namespace Project333.Tests.EditMode
             Assert.That(unit.RemainingAttacksThisTurn, Is.EqualTo(2));
         }
 
+        [TestCase(PlayerId.Player)]
+        [TestCase(PlayerId.AI)]
+        public void ResolveTurnStart_LaterOwnTurnsGainThreeGoldWithoutChangingOpponentsGold(PlayerId first)
+        {
+            var state = CreateBattleState(first);
+            var service = new TurnStartService();
+            var second = state.GetOpponent(first).Id;
+            Assert.That(state.GetPlayer(first).Resources.Gold, Is.EqualTo(3));
+            Assert.That(state.GetPlayer(second).Resources.Gold, Is.EqualTo(4));
+            service.ResolveTurnStart(state);
+            Assert.That(state.GetPlayer(first).Resources.Gold, Is.EqualTo(3));
+            state.StartNextTurn(second);
+            service.ResolveTurnStart(state);
+            Assert.That(state.GetPlayer(second).Resources.Gold, Is.EqualTo(4));
+            Assert.That(state.GetPlayer(first).Resources.Gold, Is.EqualTo(3));
+            state.StartNextTurn(first);
+            service.ResolveTurnStart(state);
+            Assert.That(state.GetPlayer(first).Resources.Gold, Is.EqualTo(6));
+            Assert.That(state.GetPlayer(second).Resources.Gold, Is.EqualTo(4));
+            state.StartNextTurn(second);
+            service.ResolveTurnStart(state);
+            Assert.That(state.GetPlayer(second).Resources.Gold, Is.EqualTo(7));
+            Assert.That(state.GetPlayer(first).Resources.Gold, Is.EqualTo(6));
+        }
+        [Test]
+        public void ResolveTurnStart_OneFreeHandSlotAddsOneCardWithoutBurningAnother()
+        {
+            var state = CreateBattleState(PlayerId.Player);
+            while (state.Player.Hand.Count < state.Player.MaxHandSize - 1)
+                state.Player.Hand.Add("extra-" + state.Player.Hand.Count);
+            var deckBefore = state.Player.Deck.Count;
+
+            new TurnStartService().ResolveTurnStart(state);
+
+            Assert.That(state.Player.Hand.Count, Is.EqualTo(state.Player.MaxHandSize));
+            Assert.That(state.Player.Deck.Count, Is.EqualTo(deckBefore - 1));
+            Assert.That(state.CardDrawEvents, Has.Count.EqualTo(1));
+            Assert.That(state.Player.FailedDrawCount, Is.Zero);
+        }
+
+        [Test]
+        public void ResolveTurnStart_OneCardRemainingDrawsItWithoutAnotherExhaustionAttempt()
+        {
+            var state = CreateBattleState(PlayerId.Player);
+            while (state.Player.Deck.Count > 1) state.Player.Deck.TryDraw(out _);
+            var handBefore = state.Player.Hand.Count;
+
+            new TurnStartService().ResolveTurnStart(state);
+
+            Assert.That(state.Player.Deck.Count, Is.Zero);
+            Assert.That(state.Player.Hand.Count, Is.EqualTo(handBefore + 1));
+            Assert.That(state.CardDrawEvents, Has.Count.EqualTo(1));
+            Assert.That(state.Player.FailedDrawCount, Is.Zero);
+            Assert.That(state.Player.Master.CurrentHp, Is.EqualTo(333));
+        }
+
+        [Test]
+        public void DrawCards_LethalFirstExhaustionHitDoesNotAttemptTheSecondDraw()
+        {
+            var state = CreateBattleState(PlayerId.Player);
+            EmptyDeck(state.Player.Deck);
+            state.Player.Master.CurrentHp = 3;
+
+            BattleDrawService.DrawCards(state.Player, state, 2);
+
+            Assert.That(state.IsEnded, Is.True);
+            Assert.That(state.Player.FailedDrawCount, Is.EqualTo(1));
+            Assert.That(state.ValuePopupEvents, Has.Count.EqualTo(1));
+        }
         private static BattleState CreateBattleState(PlayerId firstPlayerId)
         {
             var setupService = new BattleSetupService();

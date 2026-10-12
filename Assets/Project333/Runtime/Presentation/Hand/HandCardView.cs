@@ -26,6 +26,7 @@ namespace Project333.Runtime.Presentation.Hand
         public event Action<HandCardView, Vector2> DragStarted;
         public event Action<HandCardView, Vector2> Dragged;
         public event Action<HandCardView, Vector2> DragEnded;
+        public event Action<HandCardView> DragCancelled;
 
         public int SlotIndex => _slotIndex;
 
@@ -99,6 +100,8 @@ namespace Project333.Runtime.Presentation.Hand
         {
             Dragged?.Invoke(this, screenPosition);
         }
+
+        public void NotifyDragCancelled() => DragCancelled?.Invoke(this);
 
         public void NotifyDragEnded(Vector2 screenPosition)
         {

@@ -24,18 +24,23 @@ namespace Project333.Tests.EditMode
         [TestCase("A-301", UnitRace.Robot)]
         [TestCase("Goblin", UnitRace.Goblin)]
         [TestCase("Gwangma", UnitRace.Human)]
+        [TestCase("GaebangChief", UnitRace.Human)]
         [TestCase("GoldMiner", UnitRace.Human)]
         [TestCase("ManaWeaver", UnitRace.Human)]
         [TestCase("Shieldbearer", UnitRace.Human)]
         [TestCase("Shaolin_1st_Disciple", UnitRace.Human)]
         [TestCase("ElfLongbowScout", UnitRace.Elf)]
+        [TestCase("ElfElder", UnitRace.Elf)]
         [TestCase("Hero", UnitRace.Human)]
         [TestCase("RedDragon", UnitRace.Dragon)]
         [TestCase("BlueDragon", UnitRace.Dragon)]
         [TestCase("Vampire", UnitRace.Vampire)]
         [TestCase("Skeleton", UnitRace.Undead)]
+        [TestCase("SkeletonArcher", UnitRace.Undead)]
         [TestCase("Zombie", UnitRace.Undead)]
         [TestCase("OrcWarrior", UnitRace.Orc)]
+        [TestCase("OrcBerserker", UnitRace.Orc)]
+        [TestCase("OrcChieftain", UnitRace.Orc)]
         [TestCase("Werewolf", UnitRace.Beast)]
         [TestCase("Cerberus", UnitRace.Beast)]
         public void ConfirmedCard_HasExactlyTheAssignedRace(string id, UnitRace race)
@@ -47,6 +52,7 @@ namespace Project333.Tests.EditMode
 
         [TestCase("Golem")]
         [TestCase("DemonKing")]
+        [TestCase("ManaCannon")]
         public void ConfirmedRacelessCard_HasEmptyRaceCollection(string id)
         {
             var definition = (UnitCardDefinition)JsonCardDefinitionDatabase.FromJson(File.ReadAllText(DataPath))
@@ -71,7 +77,7 @@ namespace Project333.Tests.EditMode
                 }
                 else Assert.That(card.Property("races"), Is.Null);
             }
-            Assert.That(units, Is.EqualTo(21));
+            Assert.That(units, Is.EqualTo(27));
             var verified = 0;
             foreach (var guid in AssetDatabase.FindAssets("t:UnitCardDefinitionAsset"))
             {
@@ -82,7 +88,7 @@ namespace Project333.Tests.EditMode
                 Assert.That(asset.SpecialEffectText, Does.Not.Contain("로봇"), asset.CardId);
                 verified++;
             }
-            Assert.That(verified, Is.EqualTo(19)); // Hero/DemonKing are JSON-only unreleased cards.
+            Assert.That(verified, Is.EqualTo(25)); // Hero/DemonKing are JSON-only unreleased cards.
         }
 
         [Test]

@@ -184,6 +184,7 @@ public static class Project333RateLimiting
             path.StartsWithSegments("/ai-challenge") ||
             path.StartsWithSegments("/account/operations") ||
             path.StartsWithSegments("/wallet") ||
+            path.StartsWithSegments("/shop") ||
             path.StartsWithSegments("/gifts") ||
             (path.StartsWithSegments("/ads") &&
              !path.StartsWithSegments("/ads/levelplay/rewarded-callback")) ||

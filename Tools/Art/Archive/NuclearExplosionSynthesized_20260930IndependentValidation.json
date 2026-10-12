@@ -1,0 +1,37 @@
+{
+    "file":  "C:\\Project_333\\Assets\\Project333\\Resources\\Project333\\SpellEffects\\Nuclear\\Audio\\NuclearExplosion.wav",
+    "validation":  "Independent RIFF chunk and decoded PCM analysis; no numpy/scipy or synthesizer helper used.",
+    "format":  {
+                   "encoding":  1,
+                   "channels":  1,
+                   "sampleRate":  44100,
+                   "byteRate":  88200,
+                   "blockAlign":  2,
+                   "bitsPerSample":  16
+               },
+    "containerBytes":  148220,
+    "pcmBytes":  148176,
+    "samples":  74088,
+    "durationSeconds":  1.68,
+    "peakDbfs":  -11.999946665424783,
+    "rmsDbfs":  -29.298477346141532,
+    "dcOffset":  3.2128969519355363E-08,
+    "peakTimeSeconds":  0.02215419501133787,
+    "maxAdjacentStep":  0.015533447265625,
+    "first200MsRmsDbfs":  -21.732946298563654,
+    "last200MsRmsDbfs":  -54.131212871672112,
+    "tailDecayPassed":  true,
+    "clippedSamples":  0,
+    "firstSample":  0,
+    "lastSample":  0,
+    "boundary64Samples":  {
+                              "firstPeak":  0.0025634765625,
+                              "lastPeak":  0,
+                              "firstMaxAdjacentStep":  0.0001220703125,
+                              "lastMaxAdjacentStep":  0,
+                              "passed":  true
+                          },
+    "sha256":  "2a01a9f3f70356f7218060117b07ca660fecd700c1f0518e5773da2c137847de",
+    "passed":  true,
+    "listening":  "No device/in-game listening validation; file and waveform checks only."
+}

@@ -173,14 +173,14 @@ static class AiFallbackChecks
             Require(await challenges.CancelAsync(a.AccountId, formerPlayerChallenge.AttemptId,
                 true, "server_cancel", ct), "Synthetic former-player challenge admission must be released.");
         }
-        var disconnect = session.DetachConnection(human, TimeSpan.FromSeconds(60))!;
+        var disconnect = session.DetachConnection(human, TimeSpan.FromSeconds(70))!;
         Require(disconnect.Reserved && session.TryGetReconnectStatus(br.AccountId, out var reconnect) &&
             reconnect!.UseServerAiOpponent && reconnect.GameMode == "run" &&
             reconnect.OnlineSeatId == OnlineBattleSeatId.PlayerB && reconnect.SeatId == PlayerIdDto.Player,
-            "Normal AI fallback must expose the same 60 second reconnect contract and stable online seat.");
+            "Normal AI fallback must expose the same 70 second reconnect contract and stable online seat.");
         await service.RecordConnectionDisconnectedAsync(new(first.MatchId, br.AccountId,
             br.ConnectionId, "PlayerB", disconnect.DeadlineUtc), ct);
-        await RejectActiveAiParticipantChallenge("60 second reconnect grace");
+        await RejectActiveAiParticipantChallenge("70 second reconnect grace");
         pass("former joined-then-left PlayerA may start an AI challenge; actual PlayerB is blocked while connected and during reconnect grace");
         var recovered = new BattleClientConnection(Guid.NewGuid().ToString("N"), new OfflineSocket())
             { AccountId = br.AccountId, PlayerToken = br.AccountId, RunId = br.RunId, DeckId = br.DeckId };
@@ -190,7 +190,7 @@ static class AiFallbackChecks
         await service.RecordConnectionJoinedAsync(new(first.MatchId, br.AccountId, recovered.ConnectionId,
             "PlayerB", "Player", br.RunId, br.DeckId, br.ClientVersion, "127.0.0.1", "synthetic-ai-reconnect"), ct);
         await CheckLoss(session, recovered, b);
-        pass("remaining PlayerB receives AI with stable online seat, original deck/run, 60 second reconnect and idempotent result");
+        pass("remaining PlayerB receives AI with stable online seat, original deck/run, 70 second reconnect and idempotent result");
 
         // A fresh join cannot inherit the canceled room's old timer.
         cr = Request(c); third = await service.ResolveMatchForQueueAsync(cr, ct);

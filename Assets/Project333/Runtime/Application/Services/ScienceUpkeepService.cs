@@ -29,7 +29,7 @@ namespace Project333.Runtime.Application.Services
             foreach (var tileCoord in PaymentOrder)
             {
                 var occupant = activeBoard.GetOccupant(tileCoord);
-                if (occupant == null || occupant.IsErasure || occupant.IsSealbound)
+                if (occupant == null || !occupant.IsAlive || occupant.IsErasure || occupant.IsSealbound)
                 {
                     continue;
                 }

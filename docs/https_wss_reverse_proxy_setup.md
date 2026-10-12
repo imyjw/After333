@@ -39,7 +39,7 @@ ListenUrl: http://127.0.0.1:7333
 PublicUrl: https://api.after333.com
 ```
 
-It also disables development smoke commands, enables request rate limits, enables PvP startup recovery, and enforces client version `0.1.0-dev` by default.
+It also disables development smoke commands, enables request rate limits, and enforces client version `0.1.0-dev` by default. Its retained startup-recovery environment setting is legacy compatibility only: current startup cancels unfinished battles without result and cannot revive snapshots.
 
 ## Why This Shape
 
@@ -135,10 +135,10 @@ After333.exe -project333ServerUrl https://api.after333.com
 
 ## Endpoint Test
 
-After Cloudflare Tunnel and the After333 server are both running:
+After Cloudflare Tunnel and the After333 server are both running, check the actual selected release. The readiness tool updated 2026-10-02 checks running-server reconnect 70 seconds, `StartupRecoveryEnabled=false`, and `InterruptedBattlePolicy=cancel_without_result`, including rejection of missing fields. It does not enable startup snapshot restoration. These source/documentation updates do not themselves verify a live tunnel, certificate or running server.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File C:\Project_333\Server\Project333.PvpServer\Tools\TestDeploymentReadiness.ps1 -BaseUrl 'https://api.after333.com' -ExpectedPublicUrl 'https://api.after333.com' -ExpectedRequiredClientVersion '0.1.0-dev' -RequireStartupRecovery
+powershell -ExecutionPolicy Bypass -File C:\Project_333\Server\Project333.PvpServer\Tools\TestDeploymentReadiness.ps1 -BaseUrl 'https://api.after333.com' -ExpectedPublicUrl 'https://api.after333.com' -ExpectedRequiredClientVersion '0.1.0-dev'
 ```
 
 Expected:

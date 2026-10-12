@@ -10,8 +10,10 @@ namespace Project333.Runtime.Infrastructure.Data
         [SerializeField] private int _damage;
         [SerializeField] private DamageType _damageType = DamageType.None;
         [SerializeField] private int _triggerCount;
+        [SerializeField] private int _effectAmount;
 
         public string EffectId => _effectId;
+        public int EffectAmount => _effectAmount;
 
         public override CardDefinition ToDefinition()
         {
@@ -23,19 +25,22 @@ namespace Project333.Runtime.Infrastructure.Data
                 damage: _damage,
                 damageType: _damageType,
                 triggerCount: _triggerCount,
-                hasReplicate: HasReplicate);
+                hasReplicate: HasReplicate,
+                effectAmount: _effectAmount);
         }
 
         public void ConfigureForTests(
             string effectId,
             int damage = 0,
             DamageType damageType = DamageType.None,
-            int triggerCount = 0)
+            int triggerCount = 0,
+            int effectAmount = 0)
         {
             _effectId = effectId;
             _damage = damage;
             _damageType = damageType;
             _triggerCount = triggerCount;
+            _effectAmount = effectAmount;
         }
     }
 }

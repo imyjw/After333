@@ -83,6 +83,20 @@ namespace Project333.Runtime.Presentation.Draft
             return string.Join(Environment.NewLine, lines);
         }
 
+        // Reuses the draft list's grouping and ordering for separate name and cost columns.
+        public static string BuildNameAndCostRows(
+            IReadOnlyList<string> cardIds, Func<string, CardDefinitionAsset> resolver,
+            string emptyText, Action<string, string, string> onRow)
+        {
+            var ranges = new List<Tuple<string, int, int>>();
+            var names = BuildDeckListText(cardIds, resolver, emptyText, "- ", onEntry: (id, start, length) =>
+                ranges.Add(Tuple.Create(id, start, length)));
+            foreach (var range in ranges)
+                onRow?.Invoke(range.Item1, names.Substring(range.Item2, range.Item3),
+                    FormatCost(resolver?.Invoke(range.Item1)?.Cost ?? default));
+            return names;
+        }
+
         public static string BuildDeckBuildingPanelText(
             IReadOnlyList<string> draftedCardIds,
             Func<string, CardDefinitionAsset> cardAssetResolver,

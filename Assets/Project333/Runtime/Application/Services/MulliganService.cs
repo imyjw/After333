@@ -73,7 +73,7 @@ namespace Project333.Runtime.Application.Services
         {
             if (battleState.Phase != PhaseType.Mulligan)
             {
-                throw new InvalidOperationException("Mulligan can only be applied during the mulligan phase.");
+                throw new InvalidOperationException("멀리건 단계가 아닙니다.");
             }
         }
 
@@ -81,7 +81,7 @@ namespace Project333.Runtime.Application.Services
         {
             if (playerState.HasUsedMulligan)
             {
-                throw new InvalidOperationException("This player has already used their mulligan.");
+                throw new InvalidOperationException("멀리건이 이미 확정되었습니다.");
             }
         }
 

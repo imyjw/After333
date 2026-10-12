@@ -31,7 +31,7 @@ Expected characteristics:
 
 - Listens on `http://127.0.0.1:7333`.
 - May use development ticket helpers.
-- Startup PvP recovery is off unless explicitly enabled.
+- Unfinished battles are canceled without result on server interruption/restart; startup snapshot revival cannot be enabled. Running-server reconnect remains 70 seconds.
 
 ### LAN Test
 
@@ -91,7 +91,7 @@ Expected characteristics:
 - PostgreSQL connection is required.
 - `PROJECT333_DEV_MIN_TICKETS` is disabled.
 - Request rate limiting is enabled for auth, account APIs, and new battle WebSocket connections.
-- `PROJECT333_ENABLE_PVP_STARTUP_RECOVERY` is enabled by default.
+- Startup always replays already-durable results, then cancels unfinished matches. `StartupRecoveryEnabled=false` and `InterruptedBattlePolicy=cancel_without_result` are expected.
 - `PROJECT333_REQUIRED_CLIENT_VERSION` is required.
 - Verbose transport logs are off unless explicitly enabled.
 - The published output includes the server DLL, `cards.json`, and SQL migration files.
@@ -107,7 +107,7 @@ Expected characteristics:
 | `PROJECT333_REQUIRED_CLIENT_VERSION` | Recommended for testing, required by production script | Exposed through `/server/status` and enforced during online battle `JoinMatch` through the `X-Project333-Client-Version` WebSocket header. |
 | `PROJECT333_RECOMMENDED_CLIENT_VERSION` | Optional | Non-blocking version hint. |
 | `PROJECT333_CARD_DEFINITION_VERSION` | Optional | Useful when card DB and client builds must be matched manually. |
-| `PROJECT333_ENABLE_PVP_STARTUP_RECOVERY` | Recommended for production-like tests | Restores reconnectable PvP matches after server restart when snapshots exist. |
+| `PROJECT333_ENABLE_PVP_STARTUP_RECOVERY` | Legacy compatibility only | Does not revive unfinished battles. Current startup policy cancels them without result; challenge admissions refund their original date. |
 | `PROJECT333_VERBOSE_TRANSPORT_LOGS` | No | Keep off unless diagnosing WebSocket payload issues. |
 | `PROJECT333_AUDIT_LOG_ENABLED` | Recommended | Writes JSONL audit events for auth, reward, run result, and PvP match result diagnostics. Enabled by default. |
 | `PROJECT333_AUDIT_LOG_DIR` | Optional | Overrides the audit log directory. Defaults to `C:\Project_333\Logs\Server\Audit` when available. |
@@ -137,21 +137,23 @@ Before asking another player outside the development PC to test:
 9. Confirm `Database.Status` is `Ok`.
 10. Confirm `Cards.Status` is `Ok`.
 11. Confirm `Deployment.Warnings` has no unexpected warnings.
-12. Confirm `PvP.ReconnectGraceSeconds` is `60`.
+12. Confirm `PvP.ReconnectGraceSeconds` is `70`, `StartupRecoveryEnabled` is `false`, and `InterruptedBattlePolicy` is `cancel_without_result`.
 13. Confirm `RateLimits.Enabled` is `true` and the reported limits are positive.
 14. Confirm `Audit.Enabled` is `true` unless audit logging was intentionally disabled.
 15. Confirm the Unity client points at the same server URL in `ServerSettingsPanel`.
 16. Run `TestServerEndpoint.ps1` against the target URL.
-17. Run `TestDeploymentReadiness.ps1` for the stricter preflight check.
+17. Run the strict preflight below, or the generated staging verifier, to check the current reconnect and interruption policy.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File C:\Project_333\Server\Project333.PvpServer\Tools\TestServerEndpoint.ps1 -BaseUrl 'http://SERVER_HOST:7333'
 ```
 
-Strict preflight check:
+Preflight policy updated 2026-10-02: both readiness tools and newly generated staging verifiers require `PvP.ReconnectGraceSeconds=70`, `StartupRecoveryEnabled=false`, and `InterruptedBattlePolicy=cancel_without_result`. Missing or conflicting fields fail, including when deployment warnings are allowed. `-RequireStartupRecovery` is retained only for old callers; it prints a retirement warning and performs the same current-policy check without requesting snapshot revival. Regenerate older staging bundles to obtain the corrected verifier and copied tool. These tool checks do not replace two-client battle or device tests.
+
+Strict preflight command:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File C:\Project_333\Server\Project333.PvpServer\Tools\TestDeploymentReadiness.ps1 -BaseUrl 'https://api.after333.com' -ExpectedRequiredClientVersion '0.1.0-dev' -RequireStartupRecovery
+powershell -ExecutionPolicy Bypass -File C:\Project_333\Server\Project333.PvpServer\Tools\TestDeploymentReadiness.ps1 -BaseUrl 'https://api.after333.com' -ExpectedRequiredClientVersion '0.1.0-dev'
 ```
 
 For local or LAN-only tests, deployment warnings such as `127.0.0.1` are expected.
@@ -165,7 +167,7 @@ powershell -ExecutionPolicy Bypass -File C:\Project_333\Server\Project333.PvpSer
 
 Before schema changes or deployment, preserve a custom-format PostgreSQL backup, its SHA256, the exact server release and backup-time validation records. Current deployment backups are kept outside the repository under `%LOCALAPPDATA%\After333\Server\Backups`; the older backup tool defaults to `C:\Project_333\Backups\PostgreSQL` unless explicitly overridden. Use the private location for account data and supply credentials through the existing protected configuration, not command-line examples or repository files.
 
-An actual restore drill passed on 2026-09-12: 30 public tables, backup-time account/economy/run/receipt comparisons, synthetic API operations, and isolated PostgreSQL plus HTTP server restart with idempotent replay. Production was not restored or restarted. Follow the [tested restore runbook](./postgres_restore_runbook.md) for the exact isolated command, locale requirements, verification evidence and production recovery sequence.
+An actual restore drill passed on 2026-09-12 (and an independently web-downloaded encrypted MYBOX backup passed isolated restoration on 2026-09-21): 30 public tables, backup-time account/economy/run/receipt comparisons, synthetic API operations, and isolated PostgreSQL plus HTTP server restart with idempotent replay. Production was not restored or restarted. Follow the [tested restore runbook](./postgres_restore_runbook.md) for the exact isolated command, locale requirements, verification evidence and production recovery sequence.
 
 `RestorePostgres_Project333.ps1` is the older in-place helper: it uses `--clean --if-exists`, so its confirmation flag does not make it an isolated drill. Prefer restoration to a new, explicitly verified recovery DB and preserve the current DB. Do not target the live `project333` DB for rehearsal. Database roles, server secrets and uncommitted result journal files require separate recovery planning.
 
@@ -175,16 +177,16 @@ An actual restore drill passed on 2026-09-12: 30 public tables, backup-time acco
 - Windows Desktop OAuth and Android Credential Manager Google login/link flows are implemented, but each remains disabled until its matching client ID is configured in Unity and accepted by the server.
 - Android Google login still needs a real-device smoke test with the `com.after333.game` OAuth client and the signing-certificate SHA. Kakao and Naver login are not implemented yet.
 - Account, game ID login, cards, rewards, deck building, PvP matchmaking, reconnect, audit logs, server-side battle resolution, and basic IP-partitioned request limiting are implemented for the current prototype flow, but still need load testing and broader abuse hardening.
-- Database backups are scripted, but automatic scheduled backups and migration rollback are not automated yet.
-- Crash restart is available through `RunPublishedServer_Watchdog.ps1`, but it is still a simple development wrapper rather than a full OS service.
+- The nightly 21:00 KST encrypted MYBOX backup task was configured and tested on 2026-09-13, with independent download/restore evidence on 2026-09-21; see [MYBOX backup](mybox_database_backup.md). This source review did not check its current execution, remote upload or retention. Migration rollback/PITR remain separate work.
+- A manual crash-restart wrapper exists as `RunPublishedServer_Watchdog.ps1`; it is not an OS service or a configured server-autostart policy. Server startup automation remains deferred. Any restart cancels unfinished battles under the current policy.
 
 ## Recommended Next Deployment Work
 
 1. Run the public PvP smoke-test checklist through `https://api.after333.com` with two external clients and record the result.
-2. The isolated restore drill is complete (2026-09-12); scheduled backups and separate-location retention remain future work and were not configured by the drill.
+2. Recheck the configured nightly MYBOX task, latest manifest and remote backup against the 2026-09-13/21 records. Full alternate-host service recovery, migration rollback and PITR are still separate from the completed isolated DB drills.
 3. Choose a VPS and managed PostgreSQL target when moving beyond the graduation-project demonstration stage.
 4. Replace the PowerShell watchdog with a real process manager on that hosted environment.
-5. Generate a staging deployment bundle for the hosted environment and repeat the public smoke test before wider testing.
+5. Generate a hosted bundle with the current readiness tools, verify its 70-second/cancellation policy, and repeat the public smoke test.
 
 ## Safe server publication (2026-09-12)
 
@@ -195,3 +197,10 @@ If the target exists, explicitly use -CleanOutput or choose a new path. -CleanOu
 The schema-2 publish manifest retains legacy summary fields and adds BuildId, SDK version, exit code and hashes for all published files. Git dirty status includes untracked files; this is artifact traceability, not a substitute for a clean source checkout and CI.
 
 Run Tools/TestPublishServerSafety.ps1 in a separate PowerShell process with a valid server ReferenceOutput to run isolated filesystem/compiler-boundary regression checks. Full validation evidence: [publish safety report](C:/Project_333/TempBuild/PublishSafety_20260912/README.md).
+## Actual release verification — 2026-10-02
+
+The separately authorized card-pack release ran at **2026-10-02 02:22:12 KST** from [C:/Project_333/Builds/Server/Releases/20261002-shop-card-pack](C:/Project_333/Builds/Server/Releases/20261002-shop-card-pack), after checking zero live sessions/active battles/challenges/queued matches and verifying a final pre-cutover DB backup. Actual migrations0020/0021/0022 are applied,22total/latest0022. Local/public HTTP10 checks, public HTTPS and actual WSS passed; strict public readiness reports reconnect70, StartupRecoveryEnabled=false and cancel_without_result. Shop purchase/receipt requests without authentication returned401; no account purchase was made.
+
+Protection checks found31unchanged protected table hashes plus a verified queue-only startup change:133queue rows,131unchanged,2historical matched rows for completed matches changed only queue_status/canceled_at/updated_at. Insertions/deletions0; all IDs/references/other columns preserved. The frozen final backup was restored in isolation with34/34table row/hash matches, without restoring production. These are recorded exceptions to hash equality, not a claim that all32protected tables are byte-identical.
+
+The actual [Android APK](C:/Project_333/Builds/Android/20261002-shop-card-pack/After333.apk) is versionCode5/versionName1.0, IL2CPP ARM64, 254.2 MiB, with a verified signature matching the prior APK. Physical-device installation/runtime, real-account purchasing and full two-client/device gameplay remain untested. No automatic startup, scheduled task or OS service setting changed. See [deployment proof](C:/Project_333/TempBuild/CardPackRelease_20261002/server/DeploymentResult.json), [APK proof](C:/Project_333/TempBuild/CardPackRelease_20261002/client/client-build-proof.json), and [card-pack actual release record](shop_card_packs.md).

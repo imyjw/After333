@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Cards;
+using Project333.Runtime.Domain.Effects;
 
 namespace Project333.Runtime.Application.Online
 {
@@ -81,9 +82,28 @@ namespace Project333.Runtime.Application.Online
 
         public bool HasUsedMulligan { get; set; }
 
+        public int TrapCount { get; set; }
+
+        // Only the viewer's own player record contains private armed-card details.
+        public List<ArmedTrapViewDto> VisibleArmedTraps { get; set; } = new List<ArmedTrapViewDto>();
+
         public List<string> VisibleHandCardIds { get; set; } = new List<string>();
 
         public List<HandCardViewDto> VisibleHandCards { get; set; } = new List<HandCardViewDto>();
+    }
+
+    public sealed class ArmedTrapViewDto
+    {
+        public string RuntimeId { get; set; } = string.Empty;
+        public PlayerId OwnerId { get; set; }
+        public string CardId { get; set; } = string.Empty;
+        public TrapTriggerType TriggerType { get; set; }
+        public TrapEffectType EffectType { get; set; }
+        public ResourceSetDto ActivationCost { get; set; } = new ResourceSetDto();
+        public int EffectAmount { get; set; }
+        public int InstalledTurn { get; set; }
+        public int UpgradeLevel { get; set; }
+        public bool IsTemporaryReplicate { get; set; }
     }
 
     public sealed class HandCardViewDto
@@ -187,6 +207,8 @@ namespace Project333.Runtime.Application.Online
         public List<InvincibleEffectViewDto> InvincibleEffects { get; set; } =
             new List<InvincibleEffectViewDto>();
 
+        public List<string> ErasedOrcChieftainSourceRuntimeIds { get; set; } = new List<string>();
+
         public List<CombatStatBuffViewDto> CombatStatBuffs { get; set; } =
             new List<CombatStatBuffViewDto>();
 
@@ -239,11 +261,17 @@ namespace Project333.Runtime.Application.Online
         public bool HasSummoningSickness { get; set; }
 
         public int RemainingAttacksThisTurn { get; set; }
+
+        // Missing fields in older StateView payloads mean that no action debuff is active.
+        public int StunTurnEndsRemaining { get; set; }
+
+        public int FreezeTurnEndsRemaining { get; set; }
     }
 
     public sealed class CombatStatBuffViewDto
     {
         public string SourceCardId { get; set; } = string.Empty;
+        public string SourceRuntimeId { get; set; } = string.Empty;
         public int AttackBonus { get; set; }
         public int MaxHpBonus { get; set; }
         public int PhysicalDefenseBonus { get; set; }

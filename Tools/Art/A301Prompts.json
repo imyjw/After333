@@ -1,0 +1,37 @@
+{
+  "method": "built-in image_gen (transparent), then deterministic 512px cell packing",
+  "prompts": [
+    {
+      "key": "Idle",
+      "refs": [
+        "Tools/Art/Source/A-301/References/Idle.png"
+      ],
+      "prompt": "Use the attached A-301 reference ONLY as character identity and pixel-art style reference. Create an improved production IDLE HOVER animation sprite sheet on a genuinely transparent background for the same flying robot. Exact identity: compact white/light-gray rectangular helicopter drone, dark graphite stepped underside tapering down, a large round dark-blue optic on its right side with tiny bright blue center, a square cyan-framed laser emitter underneath the right optic, a slim vertical mast and rotating horizontal two-blade rotor on top. No legs, arms, wings, wheels or humanoid body. Facing RIGHT in consistent slight three-quarter side view. Crisp chunky pixel art with square 4-6px clusters at 512-cell scale, restrained white-gray shading, blue eye and cyan emitter, no blurry painted rendering. Exactly EIGHT sequential frames in FOUR equal columns by TWO equal rows, total2048x1024, individual512x512 cells. Every complete drone/rotor fits inside its cell, no clipping or crossing borders. No text, labels, grid lines, ground shadow, checkerboard or background. Keep the same physical scale across all eight poses: full drone including rotor roughly336px wide by295px tall, lowest underside y≈496 in its lowest hover frame, ~16px transparent clearance below its lowest point. Do not enlarge to fill500px height. Center body horizontally around256, all cells use consistent coordinate placement. Lower-right emitter center approximately x400,y450 at the lowest hover pose; keep laser emitter cyan but do not emit a beam. Eight genuinely distinct rotor angles and subtle aerodynamic bob: frame1low-neutral,2rises4px with broad rotor,3rises8px with diagonal rotor,4high8px rotorforeshortened,5high4px with opposite broadrotor,6neutralheight,7slightlow,8matchingtransitionto1. Keep hover bob tiny not dramatic; body and optic steady aimingright, metal panels more readable but preserve silhouette. Do not resize/recenter each pose independently. Mild blue optic pulsing only, rotor motion legible through discrete hard pixel silhouettes, no huge glow effects."
+    },
+    {
+      "key": "Attack",
+      "refs": [
+        "Tools/Art/Source/A-301/References/Idle.png",
+        "Tools/Art/Source/A-301/Idle-Generated-20260930.png",
+        "Tools/Art/Source/A-301/References/Attack.png"
+      ],
+      "prompt": "Re-create reference A-301 ATTACK motion as improved production 2D pixel-art animation sprites, genuine transparent background. Reference Idle defines same character identity; old Attack defines red laser firing concept. Exact drone: white/light-gray compact rectangular helicopter housing, tapered dark graphite stepped underside, dark-blue circular optic on RIGHT with a tiny blue center, cyan square laser aperture BELOW right optic, top central vertical rotor mast with horizontal two-blade rotor. Same silhouette, no legs/arms/wings, no redesign into humanoid or bulky aircraft. Right-facing slight3/4 camera, crisp square pixel clusters4–6px at512cell scale, white-gray panel highlights darkoutline blueoptic cyanaperture. Exactly EIGHT complete sequential poses arranged FOUR columns x TWO rows, each512x512 total2048x1024, no labels/text/grid/background/shadow/checkerboard. All body, rotor and local effects fit within owncell with margins, never clip or crosscell. Common fixed physical scale ~336px full width and295px rotor-to-underside height, lowestpoint aroundy496, ~16px transparent underdrone. Keep consistent position/emitter center at x400,y450 in EVERY firingpose. Real distinct animation:1hoverandtakeaim,2cyanaperturebrightensandrotorbraces,3opticfocusandaperturewhitehotcyanwithtinyredcentralmuzzleflare,4fireswithslight3pxleftrecoilandcompactredwhitemuzzleflash,5firingstopsandaperturefades,6rotorcorrectswithtinybodypitch,7calmrecovery,8returnsidle. NO long beam drawn into this sprite sheet: a straight red laser will be drawn separately from this aperture to actual target in runtime. Only a very compact red-white-cyan muzzle glint inside about35px near emitter frames3/4. No giant glow, no detached projectiles, no diagonal spray, no stretching body, do not resize per pose. Match the improved white body/blueoptic/cyanemitter proportions and palette in the second reference (new Idle) across all frames."
+    },
+    {
+      "key": "Death",
+      "refs": [
+        "Tools/Art/Source/A-301/References/Idle.png",
+        "Tools/Art/Source/A-301/Idle-Generated-20260930.png",
+        "Tools/Art/Source/A-301/References/Death.png"
+      ],
+      "prompt": "Re-create reference A-301 DEATH animation as improved production2Dpixel-art sheet, genuine transparentbackground. Same white/lightgray compact helicopter drone, graphite tapered underside, rightside darkblue roundoptic with bluepupil, lower-right squarecyanemitter, thin topmast and horizontal2blade rotor. Identity fromIdle;oldDeath only motionreference. No humanoid, no legs/arms/wings. Crisp chunky hard square pixel clusters4–6px, samecamera facingrightslight3/4, same physicalscale approx336pxwidth295pxfullheight upright, never grow or shrink drone duringdeath. ExactlyEIGHT chronologicalframes inFOURcolumnsbyTWOrows, equal512x512cells total2048x1024. All brokenparts, smoke, rotor and sparksfitentirelyincellwithclear margins. No text, numbers, labels, grid, groundshadow, background/checkerboard, white silhouette or total dissolving. Fixed conceptualgroundbaseline y496, approx16pxtransparentbelowallgroundcontact/debris; no independentverticalrecenteringofposes. Sequence1opticflickersredandrotorlosesrotation,2smallgraypixelsmokeescapespanelandbodytilts10degrees,3rotorbladesbendanddronepitchesdown,4sinkingtowardground25degreeanglewithfewcompactambersparks,5housingstrikesgroundandcrumpleslow,6restsbrokenonitsundersidewithbentmastandrotorlyingacrosshousing,7smokediminishesoptic/emitterdark,8quietlifelesswrecksamepose. Physically collapse/downwardtilt not shrinking ormagicexplosion. Restrainedtinygraypixelpuffs frames2–6 only (max60pxabovebody), fewambersparksatcontact only, originalwhite-gray-bluepalette darkenedattheend. Entireposeinside512pxnomattertilt. Match the improved body/palette in second reference (new Idle), use it for all8 poses."
+    },
+    {
+      "key": "AttackCleanup",
+      "refs": [
+        "Tools/Art/Source/A-301/Attack-BeforeCleanup-20260930.png"
+      ],
+      "prompt": "Precisely edit this transparent eight-frame A-301 ATTACK sprite sheet. Change ONLY the fourth pose (top row, rightmost cell): REMOVE the protruding horizontal red-white beam/bar and its large red splashes to the right of the cyan square aperture. Restore clean transparent pixels beyond that aperture. Replace it with only a tiny 16–24px red-white glint entirely INSIDE the square cyan aperture, like the third pose. No projecting beam, no sparks past aperture edge. Keep all eight complete drones, all cell positions, scales, rotor angles, body silhouettes, blue round optics, white panels, cyan emitters and all remaining poses unchanged. Keep genuine transparent alpha background. Preserve exactly four columns by two rows, no text/grid/shadows. A separately rendered in-game beam will start at the aperture and aim toward arbitrary target directions, so there must be NO horizontal beam embedded in the sprite."
+    }
+  ]
+}

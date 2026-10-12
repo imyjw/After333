@@ -104,30 +104,39 @@ namespace Project333.Runtime.Application.Services
             Queue<NuclearExplosionSource> pendingExplosions,
             ISet<OccupantState> queuedSources)
         {
-            foreach (var ownerId in BoardOrder)
+            // Losing a chieftain's HP aura can defeat a previously scanned unit, including
+            // another chieftain. Settle the whole removal group before queued explosions.
+            var removedAny = true;
+            while (removedAny)
             {
-                var board = battleState.GetBoard(ownerId);
-                for (var column = 0; column < BoardState.ColumnCount; column++)
+                removedAny = false;
+                foreach (var ownerId in BoardOrder)
                 {
-                    for (var row = 0; row < BoardState.RowCount; row++)
+                    var board = battleState.GetBoard(ownerId);
+                    board.RefreshOrcChieftainAuras();
+                    for (var column = 0; column < BoardState.ColumnCount; column++)
                     {
-                        var coord = new TileCoord(column, row);
-                        var occupant = board.GetOccupant(coord);
-                        if (occupant == null ||
-                            occupant.Kind == OccupantKind.Master ||
-                            occupant.CurrentHp > 0 ||
-                            occupant.IsDemonKingRevivalPending)
+                        for (var row = 0; row < BoardState.RowCount; row++)
                         {
-                            continue;
-                        }
+                            var coord = new TileCoord(column, row);
+                            var occupant = board.GetOccupant(coord);
+                            if (occupant == null ||
+                                occupant.Kind == OccupantKind.Master ||
+                                occupant.CurrentHp > 0 ||
+                                occupant.IsDemonKingRevivalPending)
+                            {
+                                continue;
+                            }
 
-                        if (TryEnterDemonKingRevivalSeal(battleState, occupant))
-                        {
-                            continue;
-                        }
+                            if (TryEnterDemonKingRevivalSeal(battleState, occupant))
+                            {
+                                continue;
+                            }
 
-                        board.Remove(coord);
-                        QueueNuclearExplosion(occupant, pendingExplosions, queuedSources);
+                            board.Remove(coord);
+                            removedAny = true;
+                            QueueNuclearExplosion(occupant, pendingExplosions, queuedSources);
+                        }
                     }
                 }
             }

@@ -108,12 +108,37 @@ namespace Project333.Runtime.Presentation.Draft
         [SerializeField] private Vector2 _optionStatOutlineDistance = new Vector2(2.8f, -2.8f);
 
         private IDraftOverlayHost _host;
+        private bool _tutorialMode;
+        private int? _localUpgradeLevelOverride;
+        private Action<bool, int> _tutorialPreviewReleased;
+        private Func<bool> _tutorialInputAllowed;
+        private bool _tutorialOfferClicksEnabled = true;
+        private readonly List<RectTransform> _tutorialOfferRects = new List<RectTransform>();
+        private string[] _shownDraftCardIds = Array.Empty<string>();
         private RectTransform _rootRectTransform;
         private Button _backButton;
         private Text _backButtonText;
         private readonly List<DraftOptionView> _optionViews = new List<DraftOptionView>();
         private float _lastOptionLayoutRootWidth = -1f;
         private float _lastOptionLayoutRootHeight = -1f;
+
+        public IReadOnlyList<RectTransform> TutorialOfferRects => _tutorialOfferRects;
+        public RectTransform TutorialDeckPanelRect => _deckPanelRectTransform;
+        public RectTransform TutorialDeckListRect => _deckListScrollRect != null && _deckListScrollRect.viewport != null
+            ? _deckListScrollRect.viewport : _deckListText != null ? _deckListText.rectTransform : null;
+        public RectTransform TutorialDeckListTextRect => _deckListText != null ? _deckListText.rectTransform : null;
+        public RectTransform TutorialBackButtonRect => _backButton != null ? (RectTransform)_backButton.transform : null;
+
+        public Image GetTutorialOfferArtwork(int index) => index >= 0 && index < _optionViews.Count
+            ? _optionViews[index].ArtworkImage : null;
+
+        public bool GetTutorialDeckCardBounds(string cardId, out Rect localBounds)
+        {
+            localBounds = default;
+            return _deckListText != null &&
+                _deckListText.TryGetComponent<DeckListCardHoldPreview>(out var preview) &&
+                preview.TryGetCardLocalBounds(cardId, out localBounds);
+        }
 
         private void Awake()
         {
@@ -140,7 +165,49 @@ namespace Project333.Runtime.Presentation.Draft
 
         public void Bind(IDraftOverlayHost host)
         {
+            CancelTutorialPreviews();
             _host = host;
+            _tutorialMode = false;
+            _localUpgradeLevelOverride = null;
+            _tutorialPreviewReleased = null;
+            _tutorialInputAllowed = null;
+            _tutorialOfferClicksEnabled = true;
+        }
+
+        // The same scene presenter receives an ephemeral host instead of a real run.
+        // This changes data/input authority only; serialized UI and its layout are reused.
+        public void BindTutorial(IDraftOverlayHost host, Action<bool, int> previewReleased,
+            Func<bool> inputAllowed = null, int upgradeLevel = 0)
+        {
+            Bind(host);
+            _tutorialMode = true;
+            _localUpgradeLevelOverride = Mathf.Clamp(upgradeLevel, 0, 13);
+            _tutorialPreviewReleased = previewReleased;
+            _tutorialInputAllowed = inputAllowed;
+            _tutorialOfferClicksEnabled = false;
+            EnsureUi();
+            RefreshTutorialOfferRects();
+        }
+
+        public void SetTutorialOfferClicksEnabled(bool enabled)
+        {
+            if (_tutorialMode) _tutorialOfferClicksEnabled = enabled;
+        }
+
+        public void CancelTutorialPreviews()
+        {
+            foreach (var option in _optionViews)
+                if (option?.Button != null) option.Button.GetComponent<CardHoldPreview>()?.CancelHold();
+            if (_deckListText != null) _deckListText.GetComponent<DeckListCardHoldPreview>()?.HidePreview();
+        }
+
+        private bool TutorialInputAllowed => !_tutorialMode || (_tutorialInputAllowed?.Invoke() ?? true);
+
+        private void RefreshTutorialOfferRects()
+        {
+            _tutorialOfferRects.Clear();
+            foreach (var option in _optionViews)
+                if (option?.Button != null) _tutorialOfferRects.Add((RectTransform)option.Button.transform);
         }
 
 #if UNITY_EDITOR
@@ -167,6 +234,7 @@ namespace Project333.Runtime.Presentation.Draft
 
             EnsureUi();
             SetVisible(true);
+            RefreshTutorialOfferRects();
 
             _titleText.text = draftOffer.IsLegendaryOpeningOffer
                 ? "Choose 1 Legendary Card"
@@ -193,7 +261,7 @@ namespace Project333.Runtime.Presentation.Draft
 
                 var cardAsset = draftOffer.CandidateCards[i];
                 optionView.Button.gameObject.SetActive(true);
-                ConfigureOption(optionView, cardAsset);
+                ConfigureOption(optionView, cardAsset, i);
             }
         }
 
@@ -218,6 +286,7 @@ namespace Project333.Runtime.Presentation.Draft
 
         public void Hide()
         {
+            CancelTutorialPreviews();
             if (_deckListText != null)
             {
                 var preview = _deckListText.GetComponent<DeckListCardHoldPreview>();
@@ -232,12 +301,25 @@ namespace Project333.Runtime.Presentation.Draft
             SetVisible(false);
         }
 
-        private void ConfigureOption(DraftOptionView optionView, CardDefinitionAsset cardAsset)
+        private void ConfigureOption(DraftOptionView optionView, CardDefinitionAsset cardAsset, int optionIndex)
         {
             optionView.Button.onClick.RemoveAllListeners();
 
             var cardId = cardAsset == null ? string.Empty : cardAsset.CardId;
-            optionView.Button.onClick.AddListener(() => _host?.SelectDraftCard(cardId));
+            var hold = optionView.Button.GetComponent<CardHoldPreview>();
+            if (hold == null) hold = optionView.Button.gameObject.AddComponent<CardHoldPreview>();
+            hold.CancelHold();
+            hold.Configure(() => cardId, owner =>
+                DeckCardPreviewOverlay.ShowFor(owner, cardId, cardAsset, ResolveFont(), upgradeLevelOverride: _localUpgradeLevelOverride),
+                previewReleased: () =>
+                {
+                    if (_tutorialMode && TutorialInputAllowed) _tutorialPreviewReleased?.Invoke(false, optionIndex);
+                });
+            optionView.Button.onClick.AddListener(() =>
+            {
+                if (!hold.SuppressClick && TutorialInputAllowed && (!_tutorialMode || _tutorialOfferClicksEnabled))
+                    _host?.SelectDraftCard(cardId);
+            });
 
             if (cardAsset != null && CardArtworkLibrary.TryGetArtwork(cardAsset.CardId, out var artwork))
             {
@@ -385,7 +467,7 @@ namespace Project333.Runtime.Presentation.Draft
                 renderedSpriteRect, normalizedPosition);
         }
 
-        private static bool TryResolveCardStats(CardDefinitionAsset cardAsset, out CardStatDisplay stats)
+        private bool TryResolveCardStats(CardDefinitionAsset cardAsset, out CardStatDisplay stats)
         {
             stats = default;
 
@@ -397,7 +479,7 @@ namespace Project333.Runtime.Presentation.Draft
             try
             {
                 return CardStatDisplay.TryCreate(cardAsset.ToDefinition(),
-                    AccountSessionState.GetOwnedCardUpgradeLevel(cardAsset.CardId), out stats);
+                    _localUpgradeLevelOverride ?? AccountSessionState.GetOwnedCardUpgradeLevel(cardAsset.CardId), out stats);
             }
             catch (Exception)
             {
@@ -641,7 +723,7 @@ namespace Project333.Runtime.Presentation.Draft
 
         private void NotifyBackButtonClicked()
         {
-            _host?.ReturnFromDraftOverlay();
+            if (TutorialInputAllowed) _host?.ReturnFromDraftOverlay();
         }
 
         private static Text ResolveButtonLabel(Button button)
@@ -1152,14 +1234,26 @@ namespace Project333.Runtime.Presentation.Draft
             }
 
             var cardCount = draftedCardIds?.Count ?? 0;
+            _shownDraftCardIds = new string[cardCount];
+            for (var i = 0; i < cardCount; i++) _shownDraftCardIds[i] = draftedCardIds[i];
             if (_deckPanelTitleText != null)
             {
                 _deckPanelTitleText.text = $"Current Deck ({cardCount}/33)";
             }
 
             DeckListCardHoldPreview.Configure(
-                _deckListText, draftedCardIds, ResolveCardAsset, "No cards selected yet.", includeSummary: true);
+                _deckListText, draftedCardIds, ResolveCardAsset, "No cards selected yet.", namesAndCostsOnly: true,
+                upgradeLevelOverride: _localUpgradeLevelOverride,
+                previewReleased: _tutorialMode ? NotifyTutorialDeckPreviewReleased : null);
             RefreshDeckListScrollLayout(resetToTop: true);
+        }
+
+        private void NotifyTutorialDeckPreviewReleased(string cardId)
+        {
+            if (!_tutorialMode || !TutorialInputAllowed) return;
+            for (var i = 0; i < _shownDraftCardIds.Length; i++)
+                if (string.Equals(_shownDraftCardIds[i], cardId, StringComparison.Ordinal))
+                { _tutorialPreviewReleased?.Invoke(true, i); return; }
         }
 
         private void EnsureDeckListScrollView()
@@ -1251,7 +1345,10 @@ namespace Project333.Runtime.Presentation.Draft
             ConfigureTopAnchoredRect(_deckListText.rectTransform, viewportHeight);
             LayoutRebuilder.ForceRebuildLayoutImmediate(_deckListText.rectTransform);
 
-            var contentHeight = Mathf.Max(viewportHeight, _deckListText.preferredHeight + 4f);
+            var columns = _deckListText.GetComponent<DeckListColumnsView>();
+            if (columns != null) columns.RefreshLayout();
+            var listHeight = columns != null && columns.HasRows ? columns.ContentHeight : _deckListText.preferredHeight;
+            var contentHeight = Mathf.Max(viewportHeight, listHeight + 4f);
             ConfigureTopAnchoredRect(contentRect, contentHeight);
             ConfigureTopAnchoredRect(_deckListText.rectTransform, contentHeight);
             LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
@@ -1295,10 +1392,8 @@ namespace Project333.Runtime.Presentation.Draft
 
         private string BuildDeckListText(IReadOnlyList<string> draftedCardIds)
         {
-            return DraftDeckListFormatter.BuildDeckBuildingPanelText(
-                draftedCardIds,
-                ResolveCardAsset,
-                "No cards selected yet.");
+            return DraftDeckListFormatter.BuildNameAndCostRows(
+                draftedCardIds, ResolveCardAsset, "No cards selected yet.", null);
         }
 
         private CardDefinitionAsset ResolveCardAsset(string cardId)

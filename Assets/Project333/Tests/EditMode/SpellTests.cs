@@ -361,7 +361,7 @@ namespace Project333.Tests.EditMode
                     PlayerId.AI,
                     new TileCoord(0, 0)));
 
-            Assert.That(exception!.Message, Is.EqualTo("The player cannot afford this card."));
+            Assert.That(exception!.Message, Is.EqualTo("자원이 부족합니다."));
             Assert.That(battleState.Player.Hand.Contains("expensive-spell"), Is.True);
             Assert.That(battleState.Player.Discard.CardIds, Does.Not.Contain("expensive-spell"));
             Assert.That(target.CurrentHp, Is.EqualTo(6));

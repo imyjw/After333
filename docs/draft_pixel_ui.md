@@ -8,7 +8,7 @@ button handlers remain the source of behavior; no server or battle rules change.
 
 - Header: battle preparation title, Back to Start, wallet and existing gear.
 - Left: current deck, live count/summary and a larger scrolling card list.
-- Right: Wins/Losses and Last Battle, then PVE and PVP buttons. The existing
+- Right: Wins/Losses and Last Battle, then the normal battle and Gold Dungeon buttons (legacy PVP/PVE component names remain internally). The existing
   conditional Start Draft button has a separate slot and is not forced visible.
 - Bottom right: the existing live status text, including save/connection errors.
 - Claim Rewards stays centered in its separate canvas. Reward popup dimensions,
@@ -42,3 +42,7 @@ any rewards. All decorative images/text ignore raycasts.
 
 DraftSceneVisualStyleTests covers preservation of button/wallet styling and the
 legacy layout defaults. Full gameplay and mobile visual checks require Unity.
+
+## Current behavior reference (2026-10-01)
+
+Normal battle uses human-first matchmaking and a 20-second AI fallback. Gold Dungeon shows server-owned remaining attempts out of 3 for the current run started with 3 tickets. Midnight and relogin do not reset them; a new paid run has its own three attempts. Rewards remain separate without changing run score. Both reuse the persisted 33-card deck and support a 70-second reconnect grace. Notice/confirmation/remaining-time panels use [notice_ui.md](notice_ui.md); the current mode rules live in [battle_modes.md](battle_modes.md). These runtime policies do not require resetting authored layout.

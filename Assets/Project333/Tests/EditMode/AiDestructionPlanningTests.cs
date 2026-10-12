@@ -18,6 +18,35 @@ namespace Project333.Tests.EditMode
         private static readonly TileCoord BlockerTile = new TileCoord(2, 0);
 
         [Test]
+        public void Nuclear_UsesEnemyOnlyFixedDamageForSafeVictoryWithoutDestroyingHealthyPlants()
+        {
+            var state = State();
+            var ownPlant = PlacePlant(state, PlayerId.AI, PlantTile, hp: 30);
+            var enemyPlant = PlacePlant(state, PlayerId.Player, PlantTile, hp: 30);
+            enemyPlant.IncreaseMaxHpAndCurrentHp(170);
+            state.AI.Master.CurrentHp = 10;
+            state.Player.Master.CurrentHp = 100;
+            var nuclear = new ScriptedSpellCardDefinition(NuclearRules.CardId, "뉴클리어", new ResourceSet(0,0,10,0),
+                NuclearRules.EffectId, damage: NuclearRules.BaseDamage, damageType: DamageType.Fixed);
+            var provider = Provider(nuclear);
+            state.AI.Hand.Add(nuclear.CardId); state.AI.Resources.Add(nuclear.Cost);
+            var before = AiBattleStateCopy.PositionKey(state);
+
+            var command = Planner(provider).GetNextCommand(state);
+
+            Assert.That(AiBattleStateCopy.PositionKey(state), Is.EqualTo(before));
+            Assert.That(command, Is.TypeOf<CastScriptedSpellCommand>());
+            Assert.That(((CastScriptedSpellCommand)command).CardId, Is.EqualTo(NuclearRules.CardId));
+            Execute(state, provider, command);
+            AssertAiVictory(state);
+            Assert.That(state.AI.Master.CurrentHp, Is.EqualTo(10));
+            Assert.That(state.AIBoard.GetOccupant(ownPlant.Position), Is.SameAs(ownPlant));
+            Assert.That(ownPlant.CurrentHp, Is.EqualTo(30));
+            Assert.That(state.PlayerBoard.GetOccupant(enemyPlant.Position), Is.SameAs(enemyPlant));
+            Assert.That(enemyPlant.CurrentHp, Is.EqualTo(100), "AoE damage cannot assume unconditional reactor destruction.");
+        }
+
+        [Test]
         public void Attack_ExplodesEnemyPlantToDefeatMasterBehindFrontRowBlocker()
         {
             var state = State();

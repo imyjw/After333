@@ -83,7 +83,7 @@ namespace Project333.Tests.EditMode
             Assert.That(DraftRunSessionState.HasRunEnded, Is.True);
             Assert.That(AccountSessionState.HasUnclaimedLatestRunRewards, Is.False);
             Assert.That(InvokeStatic<bool>("IsLatestServerRunCompleted"), Is.False);
-            Assert.That(_claimButton.gameObject.activeSelf, Is.True);
+            Assert.That(_claimButton.gameObject.activeSelf, Is.False, "The legacy claim button is replaced by the reward chest.");
             Assert.That(_claimButton.interactable, Is.True, "The player can retry the read-only server check.");
             Assert.That(_claimLabel.text, Is.EqualTo("서버 결과 확인"));
             Assert.That(InvokeStatic<string>("BuildRunCompleteStatusText"), Does.Contain("Rewards are not available yet"));
@@ -138,6 +138,58 @@ namespace Project333.Tests.EditMode
             Assert.That(InvokeStatic<string>("BuildRunCompleteStatusText"), Does.Contain("Rewards are not available yet"));
         }
 
+        [Test]
+        public void ClaimedRun_WithMatchingPendingPresentation_RestoresClosedChestWithoutGrantingAgain()
+        {
+            var runId = System.Guid.NewGuid().ToString("D");
+            SetAccountProperty("AccountId", "reward-view-test-account");
+            SetAccountProperty("LatestRunId", runId);
+            SetAccountProperty("ActiveRunId", string.Empty);
+            SetAccountProperty("LatestRunStatus", "completed");
+            SetAccountProperty("LatestRunWins", 33);
+            SetAccountProperty("LatestRunRewardClaimedAt", "2026-10-02T00:00:00Z");
+            var endpoint = (string)typeof(DraftSceneController).GetProperty("AccountServerUrl", PrivateInstance).GetValue(_controller);
+            PendingRunRewardPresentation.Remember(endpoint, AccountSessionState.AccountId, runId);
+            try
+            {
+                RefreshClaimButton();
+                var reveal = (RunRewardRevealView)typeof(DraftSceneController).GetField("_runRewardReveal", PrivateInstance).GetValue(_controller);
+                Assert.That(reveal.Phase, Is.EqualTo(RunRewardRevealPhase.Closed));
+                Assert.That(_claimButton.gameObject.activeSelf, Is.False);
+                Assert.That(AccountSessionState.IsLatestRunRewardClaimed, Is.True);
+                Assert.That(PendingRunRewardPresentation.GetPendingRunId(endpoint, AccountSessionState.AccountId), Is.EqualTo(runId));
+            }
+            finally { PendingRunRewardPresentation.Clear(endpoint, AccountSessionState.AccountId, runId); }
+        }
+
+        [TestCase("CanApplyRewardAttempt", "_claimRewardsCancellation")]
+        [TestCase("CanApplyAccountRefresh", "_accountRefreshCancellation")]
+        public void LateReplies_AreRejectedAfterContextRotationCancellationOrDisabledOwner(string method, string field)
+        {
+            SetAccountProperty("AccountId", "reward-context-test-account");
+            _root.SetActive(true);
+            var endpoint = (string)typeof(DraftSceneController).GetProperty("AccountServerUrl", PrivateInstance).GetValue(_controller);
+            using var cancellation = new System.Threading.CancellationTokenSource();
+            SetControllerField(field, cancellation);
+            var gate = typeof(DraftSceneController).GetMethod(method, PrivateInstance);
+            var session = AccountSessionState.SessionToken;
+            var account = AccountSessionState.AccountId;
+            bool CanApply(string token, string owner, string url) =>
+                (bool)gate.Invoke(_controller, new object[] { cancellation, token, owner, url });
+            try
+            {
+                Assert.That(CanApply(session, account, endpoint), Is.True);
+                Assert.That(CanApply("old-token", account, endpoint), Is.False);
+                Assert.That(CanApply(session, "other-account", endpoint), Is.False);
+                Assert.That(CanApply(session, account, endpoint + "/other"), Is.False);
+                _controller.enabled = false;
+                Assert.That(CanApply(session, account, endpoint), Is.False);
+                _controller.enabled = true;
+                cancellation.Cancel();
+                Assert.That(CanApply(session, account, endpoint), Is.False);
+            }
+            finally { SetControllerField(field, null); }
+        }
         private static void SetAccountProperty(string name, object value) =>
             typeof(AccountSessionState).GetProperty(name, BindingFlags.Public | BindingFlags.Static).SetValue(null, value);
 

@@ -19,6 +19,14 @@ var replayOnly = args.SequenceEqual(new[] { "--replay-results" });
 var restartBattles = args.SequenceEqual(new[] { "--server-restart-battles" });
 var operationReplayOnly = args.SequenceEqual(new[] { "--replay-account-operations" });
 var ct = deadline.Token;
+if (args.SequenceEqual(new[] { "--reconnect-only" }))
+{
+    await PveReconnectChecks.Run(Console.WriteLine, ct);
+    await PveReconnectConcurrencyChecks.Run(Console.WriteLine, ct);
+    await ConnectionStabilityChecks.Run(Console.WriteLine, ct);
+    return;
+}
+if (args.SequenceEqual(new[] { "--turn-input-only" })) { TurnInputChecks.Run(Console.WriteLine); return; }
 var connectionString = Environment.GetEnvironmentVariable("PROJECT333_DB_CONNECTION") ?? "";
 var expectedDataPath = Environment.GetEnvironmentVariable("AFTER333_AUTHORITY_TEST_DATA") ?? "";
 var cs = new NpgsqlConnectionStringBuilder(connectionString);
@@ -63,12 +71,18 @@ var passCount = 0;
 var battleCount = 0;
 var resultCount = 0;
 await AiChallengeChecks.Run(db, configuration, Pass, ct);
+if (args.SequenceEqual(new[] { "--gold-dungeon-only" }))
+{
+    Console.WriteLine($"PASS: {passCount} Gold Dungeon regression groups completed in the fresh isolated database.");
+    return;
+}
 var fallbackFixtures = new[] { await DraftAccount("fallback-first"), await DraftAccount("fallback-second"),
     await DraftAccount("fallback-human"), await DraftAccount("fallback-network") };
 await AiFallbackChecks.Run(db, configuration, fallbackFixtures[0], fallbackFixtures[1], fallbackFixtures[2], Pass, ct);
 await AiFallbackChecks.CheckNetwork(db, fallbackFixtures[3], Pass, ct);
 await SavedDraftOfferChecks.Run(http, db, configuration, Pass, ct);
 await RunStartAtomicityChecks.Run(http, db, configuration, Pass, ct);
+await RunRewardReplayChecks.Run(db, configuration, Pass, ct);
 BattleParticipantChecks.Run(Pass);
 await ServerRestartCancellationChecks.CheckShutdown(Pass, ct);
 await PveReconnectChecks.Run(Pass, ct);
@@ -277,8 +291,13 @@ async Task VerifyRewardClaim(TestAccount account, int expectedWins, int expected
             stats.Cards == account.InitialCards + expectedCards && stats.Grants == 1,
         "Persisted wallet, collection, run and reward ledger must match the earned reward exactly.");
     var snapshot = await Snapshot(account.AccountId);
-    await ExpectError("/runs/claim-rewards", new { runId = account.RunId }, account.Token,
-        HttpStatusCode.Conflict, "reward_already_claimed");
+    var replay = await Post("/runs/claim-rewards", new { runId = account.RunId }, account.Token);
+    Require(replay.Field("reward").Field("id").GetString() == reward.Field("id").GetString() &&
+            replay.Field("reward").Field("resourceGoldDelta").GetInt64() == reward.Field("resourceGoldDelta").GetInt64() &&
+            replay.Field("reward").Field("ticketDelta").GetInt32() == reward.Field("ticketDelta").GetInt32() &&
+            replay.Field("reward").Field("cardRewardItems").GetRawText() == reward.Field("cardRewardItems").GetRawText() &&
+            replay.Field("reward").Field("packRewardItems").GetRawText() == reward.Field("packRewardItems").GetRawText(),
+        "Repeated claims must return the original stored reward receipt without rerolling.");
     Require(await Snapshot(account.AccountId) == snapshot,
         "Repeated reward claim must not change protected rows or pay a second reward.");
 }

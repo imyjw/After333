@@ -15,6 +15,9 @@ namespace Project333.Runtime.Presentation.Battle
 {
     public sealed class TileTextView : MonoBehaviour
     {
+        private TileTargetPulse _cardTargetPulse;
+        private TrapStatusMarker _trapStatusMarker;
+
         private const string AutoVisualName = "OccupantVisual";
         private const string AutoStatBarName = "OccupantStatBar";
         private const string AutoHuanShuIconName = "HuanShuStatusIcon";
@@ -170,6 +173,8 @@ namespace Project333.Runtime.Presentation.Battle
         private string _title = string.Empty;
         private string _content = "Empty";
         private bool _isOccupied;
+        [NonSerialized] private string _presentedHpRuntimeId;
+        [NonSerialized] private int _presentedHp;
         private BattleHighlightState _lastHighlightState = BattleHighlightState.None;
         private string _lastRenderedText = string.Empty;
         private Vector3 _baseScale = Vector3.one;
@@ -177,8 +182,19 @@ namespace Project333.Runtime.Presentation.Battle
         private string _lastVisualRuntimeId = string.Empty;
         private Sprite _lastVisualSprite;
         private RuntimeAnimatorController _lastVisualController;
+        private string _lastVisualControllerName = string.Empty;
         private bool _lastVisualWasDrained;
+        private bool _blueDragonUsesScaledMotion;
         private bool _isVisualActive;
+        private bool _isDeathPresentation;
+        private DrainedStatusVfx _drainedStatusVfx;
+        private ActionDebuffStatusVfx _actionDebuffStatusVfx;
+        private Animator _frozenBodyAnimator;
+        private RuntimeAnimatorController _frozenBodyController;
+        private string _frozenBodyRuntimeId;
+        private float _frozenBodyPreviousSpeed;
+        private bool _isFrozenBodyPaused;
+        private bool _isBindingVisual;
         private Canvas _occupantVisualCanvas;
         private SpriteAnimationSequence _activeSpriteSequence;
         private int _activeSequenceFrameIndex;
@@ -262,6 +278,11 @@ namespace Project333.Runtime.Presentation.Battle
             }
         }
 
+        private void OnEnable() => RefreshFrozenBodyPause();
+
+        // Pause before Unity evaluates native Animator motion; SetTile/Refresh also pause immediately.
+        private void Update() => RefreshFrozenBodyPause();
+
         private void LateUpdate()
         {
             Refresh();
@@ -270,10 +291,28 @@ namespace Project333.Runtime.Presentation.Battle
             SyncAnimatedVisualSprite();
             ApplyPulse();
             RefreshCurrentCardPreview();
+            RefreshDrainedStatusVfx();
+            RefreshActionDebuffStatusVfx();
         }
 
         private void OnDestroy()
         {
+            ReleaseFrozenBodyPause();
+            if (_actionDebuffStatusVfx != null)
+            {
+                _actionDebuffStatusVfx.Cancel();
+                if (UnityEngine.Application.isPlaying) Destroy(_actionDebuffStatusVfx);
+                else DestroyImmediate(_actionDebuffStatusVfx);
+                _actionDebuffStatusVfx = null;
+            }
+            if (_drainedStatusVfx != null)
+            {
+                _drainedStatusVfx.Cancel();
+                if (UnityEngine.Application.isPlaying) Destroy(_drainedStatusVfx);
+                else DestroyImmediate(_drainedStatusVfx);
+                _drainedStatusVfx = null;
+            }
+
             if (_spellEffectCoroutine != null)
             {
                 StopCoroutine(_spellEffectCoroutine);
@@ -303,15 +342,38 @@ namespace Project333.Runtime.Presentation.Battle
                 _persistentMarkImage = null;
             }
 
+            if (_cardTargetPulse != null)
+            {
+                if (UnityEngine.Application.isPlaying) Destroy(_cardTargetPulse.gameObject);
+                else DestroyImmediate(_cardTargetPulse.gameObject);
+            }
             HideCurrentCardPreview();
         }
 
         public void SetTile(string title, string content, bool isOccupied)
         {
+            ClearPresentedHp();
             _title = title ?? string.Empty;
             _content = content ?? string.Empty;
             _isOccupied = isOccupied;
             Refresh();
+        }
+
+        // A presentation hold never changes the occupant or survives a replacement/authoritative refresh.
+        internal void SetPresentedHp(string runtimeId, int hp)
+        {
+            if (string.IsNullOrWhiteSpace(runtimeId) || _tileView == null ||
+                !string.Equals(runtimeId, VisualRuntimeId, StringComparison.Ordinal) ||
+                !string.Equals(runtimeId, _tileView.CurrentOccupantRuntimeId, StringComparison.Ordinal)) return;
+            _presentedHpRuntimeId = runtimeId;
+            _presentedHp = Mathf.Max(0, hp);
+            RefreshOccupantStats();
+        }
+
+        private void ClearPresentedHp()
+        {
+            _presentedHpRuntimeId = null;
+            _presentedHp = 0;
         }
 
         public Vector3 GetVisualWorldPosition()
@@ -426,6 +488,110 @@ namespace Project333.Runtime.Presentation.Battle
             ApplyStatBarLayout();
         }
 
+        public string VisualRuntimeId => _lastVisualRuntimeId;
+        internal Image OccupantVisualImage => _occupantVisualImage;
+        internal string VisualControllerName => _lastVisualControllerName;
+        internal bool IsDeathPresentation => _isDeathPresentation;
+
+        internal int PresentedHitsPerAttack => _tileView?.CurrentOccupant?.EffectiveHitsPerAttack ?? 1;
+
+        internal Canvas GetVisualRootCanvas()
+        {
+            // Battle tiles own a child Canvas; the TileTextView itself has no Canvas ancestor.
+            var canvas = _occupantVisualImage != null ? _occupantVisualImage.GetComponentInParent<Canvas>(true) : null;
+            if (canvas == null && _text != null) canvas = _text.GetComponentInParent<Canvas>(true);
+            if (canvas == null) canvas = GetComponentInParent<Canvas>(true);
+            return canvas == null ? null : (canvas.rootCanvas != null ? canvas.rootCanvas : canvas);
+        }
+
+        public void ResetCombatPresentation()
+        {
+            var hadPresentedHp = _presentedHpRuntimeId != null;
+            ClearPresentedHp();
+            if (hadPresentedHp) RefreshOccupantStats();
+            RestoreVisualLayout();
+            ApplyPassiveAnimationState(_tileView == null ? null : _tileView.CurrentOccupant);
+            StopCharacterSound();
+        }
+
+        public Vector3 GetVisualNormalizedWorldPosition(Vector2 point)
+        {
+            if (_occupantVisualRoot == null) return GetVisualWorldPosition();
+            var rect = _occupantVisualRoot.rect;
+            var side = Mathf.Min(rect.width, rect.height);
+            return _occupantVisualRoot.TransformPoint(rect.center + (point - Vector2.one * 0.5f) * side);
+        }
+
+        // Shared arrival/impact anchor for all character VFX. Offset is in reference-tile
+        // UI units, so both board scaling and Canvas transforms preserve the lower hit point.
+        public Vector3 GetVisualImpactWorldPosition()
+        {
+            var bodyPosition = GetVisualNormalizedWorldPosition(new Vector2(0.5f,
+                ((_lastVisualCardId == BlueDragonPresentationAssets.CardId && _blueDragonUsesScaledMotion) || _lastVisualCardId == GwangmaPresentationAssets.CardId) ? 0.4f : 0.25f));
+            return bodyPosition + GetTileAnchorWorldPosition(new Vector2(0f, -10f))
+                - GetTileAnchorWorldPosition();
+        }
+
+        private AudioSource _characterAudio;
+        private static AudioClip _commonUnitHitSound;
+        private static AudioSource _commonHitSettings;
+        private static bool _commonHitSettingsLoaded;
+        private static AudioSource _lastCommonHitSource;
+        private static int _lastCommonHitFrame = -1;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetCommonHitPlayback()
+        {
+            _commonUnitHitSound = null;
+            _commonHitSettings = null;
+            _commonHitSettingsLoaded = false;
+            _lastCommonHitSource = null;
+            _lastCommonHitFrame = -1;
+        }
+
+        private void OnDisable()
+        {
+            ClearPresentedHp();
+            StopCharacterSound();
+            _drainedStatusVfx?.Cancel();
+            _actionDebuffStatusVfx?.Cancel();
+            ReleaseFrozenBodyPause();
+            if (_cardTargetPulse != null) _cardTargetPulse.GetComponent<Image>().enabled = false;
+        }
+
+        private void StopCharacterSound()
+        {
+            if (_characterAudio != null) _characterAudio.Stop();
+            if (_lastCommonHitSource == _characterAudio)
+            {
+                _lastCommonHitSource = null;
+                _lastCommonHitFrame = -1;
+            }
+        }
+        private void PlayBlueDragonSound(string name, float volume)
+        {
+            if (_lastVisualCardId != BlueDragonPresentationAssets.CardId || !UnityEngine.Application.isPlaying) return;
+            PlayCharacterSound(BlueDragonPresentationAssets.GetSound(name), volume);
+        }
+
+        private void PlayGwangmaSound(string name, float volume)
+        {
+            if (_lastVisualCardId != GwangmaPresentationAssets.CardId || !UnityEngine.Application.isPlaying) return;
+            PlayCharacterSound(GwangmaPresentationAssets.GetSound(name), volume);
+        }
+
+        private void PlayCharacterSound(AudioClip clip, float volume)
+        {
+            if (clip == null) return;
+            if (_characterAudio == null)
+            {
+                _characterAudio = gameObject.AddComponent<AudioSource>();
+                _characterAudio.playOnAwake = false;
+                _characterAudio.spatialBlend = 0f;
+            }
+            _characterAudio.PlayOneShot(clip, volume);
+        }
+
         public void PlayIdleAnimation()
         {
             PlayAnimationState(_idleStateName);
@@ -449,11 +615,45 @@ namespace Project333.Runtime.Presentation.Battle
         public void PlayBeAttackedAnimation()
         {
             PlayAnimationState(_beAttackedStateName);
+            PlayDamageSound();
+        }
+
+        internal void PlayDamageReactionAnimation()
+        {
+            // Timed multi-hit presentation has already played the shared hit cue.
+            PlayAnimationState(_beAttackedStateName);
+        }
+
+        public void PlayDamageSound()
+        {
+            // Every damaged occupant, including the master, uses the same impact sound.
+            // Death follows this reaction and must not trigger another hit sound.
+            if (!UnityEngine.Application.isPlaying || !isActiveAndEnabled) return;
+            // AoE reactions in one frame share one audible cue instead of summing
+            // identical waveforms. A hit on the next frame remains a separate cue.
+            if (_lastCommonHitFrame == Time.frameCount && _lastCommonHitSource != null &&
+                _lastCommonHitSource.isActiveAndEnabled) return;
+            // Read the prefab as settings only; never instantiate an extra sound emitter.
+            if (!_commonHitSettingsLoaded)
+            {
+                var settings = Resources.Load<GameObject>("Project333/Audio/Common/HitSoundSettings");
+                _commonHitSettings = settings == null ? null : settings.GetComponent<AudioSource>();
+                _commonHitSettingsLoaded = true;
+            }
+            if (_commonHitSettings == null && _commonUnitHitSound == null)
+                _commonUnitHitSound = Resources.Load<AudioClip>("Project333/Audio/Common/UnitHit");
+            var clip = _commonHitSettings != null ? _commonHitSettings.clip : _commonUnitHitSound;
+            if (clip == null) return;
+            PlayCharacterSound(clip, _commonHitSettings != null ? _commonHitSettings.volume : 0.52f);
+            _lastCommonHitSource = _characterAudio;
+            _lastCommonHitFrame = Time.frameCount;
         }
 
         public void PlayDeathAnimation()
         {
             PlayAnimationState(_deathStateName);
+            PlayBlueDragonSound("DragonDeath", 0.5f);
+            PlayGwangmaSound("GwangmaDeath", 0.48f);
         }
 
         public float GetIdleAnimationDurationSeconds()
@@ -535,6 +735,15 @@ namespace Project333.Runtime.Presentation.Battle
                 stackIndex));
         }
 
+        public static Image VisibleCardPreviewArtwork => s_previewOverlayRoot != null && s_previewOverlayRoot.gameObject.activeInHierarchy ? s_previewCardImage : null;
+        public static RectTransform VisibleCardPreviewTooltip(bool influence)
+        {
+            if (VisibleCardPreviewArtwork == null) return null;
+            var panels = influence ? PreviewInfluencePanels : PreviewTooltipPanels;
+            foreach (var panel in panels) if (panel.Root != null && panel.Root.gameObject.activeInHierarchy) return panel.Root;
+            return null;
+        }
+
         public bool CanShowCurrentCardPreview()
         {
             return TryGetPreviewSprite(out _);
@@ -603,10 +812,99 @@ namespace Project333.Runtime.Presentation.Battle
         public void Refresh()
         {
             RefreshOccupantVisual();
+            RefreshFrozenBodyPause();
             RefreshPersistentMark();
             RefreshOccupantStats();
+            RefreshTrapStatusMarker();
             RefreshText();
             RefreshTileBackgroundHighlight();
+            RefreshDrainedStatusVfx();
+            RefreshActionDebuffStatusVfx();
+        }
+
+        private void RefreshDrainedStatusVfx()
+        {
+            var occupant = _tileView == null ? null : _tileView.CurrentOccupant;
+            if (!isActiveAndEnabled)
+            {
+                _drainedStatusVfx?.Cancel();
+                return;
+            }
+            if (_drainedStatusVfx == null)
+            {
+                if (!UnityEngine.Application.isPlaying || !_isVisualActive || _isDeathPresentation ||
+                    occupant == null || !occupant.IsDrained || !occupant.IsAlive || occupant.IsSealbound ||
+                    (occupant.OwnerId == PlayerId.AI && occupant.IsHiding)) return;
+                _drainedStatusVfx = GetComponent<DrainedStatusVfx>();
+                if (_drainedStatusVfx == null) _drainedStatusVfx = gameObject.AddComponent<DrainedStatusVfx>();
+            }
+            _drainedStatusVfx.Refresh(occupant, _occupantVisualRoot, _occupantVisualImage,
+                _isVisualActive, _isDeathPresentation);
+        }
+
+        private void RefreshActionDebuffStatusVfx()
+        {
+            var occupant = _tileView == null ? null : _tileView.CurrentOccupant;
+            if (!isActiveAndEnabled)
+            {
+                _actionDebuffStatusVfx?.Cancel();
+                return;
+            }
+            if (_actionDebuffStatusVfx == null)
+            {
+                if (!UnityEngine.Application.isPlaying || !_isVisualActive || _isDeathPresentation ||
+                    occupant == null || (!occupant.IsStunned && !occupant.IsFrozen) || !occupant.IsAlive ||
+                    (occupant.OwnerId == PlayerId.AI && occupant.IsHiding)) return;
+                _actionDebuffStatusVfx = GetComponent<ActionDebuffStatusVfx>();
+                if (_actionDebuffStatusVfx == null)
+                    _actionDebuffStatusVfx = gameObject.AddComponent<ActionDebuffStatusVfx>();
+            }
+            _actionDebuffStatusVfx.Refresh(occupant, _occupantVisualRoot, _occupantVisualImage,
+                _isVisualActive, _isDeathPresentation, _lastVisualControllerName, _lastVisualCardId);
+        }
+
+        private bool ShouldPauseFrozenBody()
+        {
+            var occupant = _tileView == null ? null : _tileView.CurrentOccupant;
+            return UnityEngine.Application.isPlaying && isActiveAndEnabled && !_isBindingVisual &&
+                _isVisualActive && !_isDeathPresentation && occupant != null && occupant.IsAlive &&
+                occupant.IsFrozen && !(occupant.OwnerId == PlayerId.AI && occupant.IsHiding) &&
+                string.Equals(occupant.RuntimeId, _lastVisualRuntimeId, StringComparison.Ordinal) &&
+                _occupantVisualRoot != null && _occupantVisualRoot.gameObject.activeInHierarchy;
+        }
+
+        private void RefreshFrozenBodyPause()
+        {
+            var animator = _occupantVisualAnimator;
+            if (!ShouldPauseFrozenBody() || animator == null || !animator.isActiveAndEnabled ||
+                animator.runtimeAnimatorController == null)
+            {
+                ReleaseFrozenBodyPause();
+                return;
+            }
+            if (_isFrozenBodyPaused &&
+                (_frozenBodyAnimator != animator || _frozenBodyController != animator.runtimeAnimatorController ||
+                 !string.Equals(_frozenBodyRuntimeId, _lastVisualRuntimeId, StringComparison.Ordinal)))
+                ReleaseFrozenBodyPause();
+            if (!_isFrozenBodyPaused)
+            {
+                _frozenBodyAnimator = animator;
+                _frozenBodyController = animator.runtimeAnimatorController;
+                _frozenBodyRuntimeId = _lastVisualRuntimeId;
+                _frozenBodyPreviousSpeed = animator.speed;
+                _isFrozenBodyPaused = true;
+            }
+            animator.speed = 0f;
+        }
+
+        private void ReleaseFrozenBodyPause()
+        {
+            if (_isFrozenBodyPaused && _frozenBodyAnimator != null)
+                _frozenBodyAnimator.speed = _frozenBodyPreviousSpeed;
+            _isFrozenBodyPaused = false;
+            _frozenBodyAnimator = null;
+            _frozenBodyController = null;
+            _frozenBodyRuntimeId = null;
         }
 
         private void RefreshText()
@@ -714,10 +1012,11 @@ namespace Project333.Runtime.Presentation.Battle
                 _lastVisualRuntimeId = occupantRuntimeId;
                 _lastVisualSprite = boardSprite;
                 _lastVisualController = boardAnimatorController;
+                _lastVisualControllerName = boardAnimatorController == null ? string.Empty : boardAnimatorController.name;
                 BindVisual(boardSprite, boardAnimatorController, occupant);
                 _isVisualActive = true;
             }
-            else if (_lastVisualWasDrained != occupant.IsDrained)
+            else if (_lastVisualWasDrained != occupant.IsDrained && !ShouldPauseFrozenBody())
             {
                 ApplyPassiveAnimationState(occupant);
             }
@@ -750,6 +1049,23 @@ namespace Project333.Runtime.Presentation.Battle
 
             BindStatBar(occupant);
             SetStatBarActive(true);
+        }
+
+        private void RefreshTrapStatusMarker()
+        {
+            var occupant = _tileView?.CurrentOccupant;
+            var battle = _battleBootstrapper?.CurrentBattleState;
+            var count = _showOccupantStats && _isOccupied && occupant != null && occupant.Kind == OccupantKind.Master &&
+                        battle != null && _occupantStatRoot != null
+                ? battle.GetArmedTrapCount(occupant.OwnerId) : 0;
+            if (count <= 0) { _trapStatusMarker?.Present(0, null); return; }
+            if (_trapStatusMarker == null)
+            {
+                var markerObject = new GameObject("TrapStatusMarker", typeof(RectTransform), typeof(TrapStatusMarker));
+                markerObject.transform.SetParent(_occupantStatRoot, false);
+                _trapStatusMarker = markerObject.GetComponent<TrapStatusMarker>();
+            }
+            _trapStatusMarker.Present(count, _occupantStatHpText != null ? _occupantStatHpText.font : _occupantStatFontOverride);
         }
 
         private void RefreshPersistentMark()
@@ -786,6 +1102,11 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
+            ReleaseFrozenBodyPause();
+            _actionDebuffStatusVfx?.Cancel();
+            _isBindingVisual = true;
+            _isDeathPresentation = false;
+            StopCharacterSound();
             EnsureOccupantVisualSpriteRenderer();
             _occupantVisualImage.sprite = boardSprite;
             _occupantVisualImage.enabled = boardSprite != null;
@@ -797,6 +1118,7 @@ namespace Project333.Runtime.Presentation.Battle
             _occupantVisualAnimator.runtimeAnimatorController = boardAnimatorController;
             _occupantVisualAnimator.enabled = boardAnimatorController != null;
             _occupantVisualAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            _blueDragonUsesScaledMotion = false;
             RestoreVisualLayout();
 
             if (boardAnimatorController != null)
@@ -816,10 +1138,13 @@ namespace Project333.Runtime.Presentation.Battle
                 _activeSequenceFrameIndex = 0;
                 _activeSequenceFrameTimer = 0f;
             }
+            _isBindingVisual = false;
         }
 
         private void ApplyPassiveAnimationState(OccupantState occupant)
         {
+            // Preserve the marker of the state actually playing while frozen.
+            if (ShouldPauseFrozenBody()) return;
             _lastVisualWasDrained = occupant != null && occupant.IsDrained;
 
             if (_lastVisualWasDrained)
@@ -856,7 +1181,12 @@ namespace Project333.Runtime.Presentation.Battle
             _occupantStatAttackTypeImage.sprite = GetAttackIconSprite(
                 occupant.AttackType,
                 occupant.DamageType);
-            _occupantStatHpText.text = Mathf.Max(0, occupant.CurrentHp).ToString();
+            var hp = _presentedHpRuntimeId != null &&
+                string.Equals(_presentedHpRuntimeId, occupant.RuntimeId, StringComparison.Ordinal) &&
+                string.Equals(_presentedHpRuntimeId, VisualRuntimeId, StringComparison.Ordinal) &&
+                string.Equals(_presentedHpRuntimeId, _tileView?.CurrentOccupantRuntimeId, StringComparison.Ordinal)
+                ? _presentedHp : occupant.CurrentHp;
+            _occupantStatHpText.text = Mathf.Max(0, hp).ToString();
             _occupantStatAttackText.text = Mathf.Max(0, occupant.Attack).ToString();
             if (_occupantStatBackgroundImage != null)
             {
@@ -882,10 +1212,18 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void ClearVisual()
         {
+            ReleaseFrozenBodyPause();
+            _isBindingVisual = false;
+            _isDeathPresentation = false;
+            _drainedStatusVfx?.Cancel();
+            _actionDebuffStatusVfx?.Cancel();
+            ClearPresentedHp();
+            StopCharacterSound();
             _lastVisualCardId = string.Empty;
             _lastVisualRuntimeId = string.Empty;
             _lastVisualSprite = null;
             _lastVisualController = null;
+            _lastVisualControllerName = string.Empty;
             _lastVisualWasDrained = false;
             _isVisualActive = false;
             _activeSpriteSequence = null;
@@ -910,6 +1248,7 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             SetStatBarActive(false);
+            _trapStatusMarker?.Present(0, null);
             SetPersistentMarkActive(false);
             SetVisualActive(false);
         }
@@ -966,6 +1305,20 @@ namespace Project333.Runtime.Presentation.Battle
             _text.color = displayColor;
         }
 
+        private void SetBlueDragonMotionLayout(bool usesScaledMotion)
+        {
+            if (_blueDragonUsesScaledMotion == usesScaledMotion) return;
+            var previousScale = _blueDragonUsesScaledMotion ? BlueDragonPresentationAssets.BoardScale : 1f;
+            _blueDragonUsesScaledMotion = usesScaledMotion;
+            if (_occupantVisualRoot == null) return;
+            var nextScale = usesScaledMotion ? BlueDragonPresentationAssets.BoardScale : 1f;
+            var previousHeight = _occupantVisualRoot.sizeDelta.y;
+            _occupantVisualRoot.sizeDelta *= nextScale / previousScale;
+            // Preserve the ground line and any current combat travel offset.
+            _occupantVisualRoot.anchoredPosition += Vector2.up *
+                (_occupantVisualRoot.sizeDelta.y - previousHeight) * 0.5f;
+        }
+
         private void PlayAnimationState(string stateName)
         {
             if (string.IsNullOrWhiteSpace(stateName) || _occupantVisualAnimator == null)
@@ -973,7 +1326,27 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
-            if (!_occupantVisualAnimator.enabled || _occupantVisualAnimator.runtimeAnimatorController == null)
+            var requestsDeath = string.Equals(stateName, _deathStateName, StringComparison.OrdinalIgnoreCase);
+            if (requestsDeath)
+            {
+                ReleaseFrozenBodyPause();
+                _actionDebuffStatusVfx?.Cancel();
+            }
+            else
+            {
+                RefreshFrozenBodyPause();
+                // A hit/idle/run request must not reset the pose held inside the ice.
+                if (ShouldPauseFrozenBody()) return;
+            }
+            _isDeathPresentation = requestsDeath;
+            if (_isDeathPresentation) _drainedStatusVfx?.Cancel();
+
+            // All motion frames and playback timing come from the card's controller.
+            // Keep the existing BlueDragon artwork-size correction independent of playback.
+            if (_lastVisualCardId == BlueDragonPresentationAssets.CardId)
+                SetBlueDragonMotionLayout(stateName != _idleStateName && stateName != _drainedStateName);
+            if (!_occupantVisualAnimator.isActiveAndEnabled || !_occupantVisualAnimator.isInitialized ||
+                _occupantVisualAnimator.runtimeAnimatorController == null)
             {
                 PlaySampledClip(stateName, false);
                 return;
@@ -1079,6 +1452,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void AdvanceSampledAnimation()
         {
+            if (ShouldPauseFrozenBody()) return;
             if (_activeSpriteSequence == null || _activeSpriteSequence.Frames.Count == 0)
             {
                 return;
@@ -2671,6 +3045,17 @@ namespace Project333.Runtime.Presentation.Battle
             _occupantVisualRoot.sizeDelta = _occupantVisualSize *
                                             Mathf.Max(0.1f, _occupantVisualScaleMultiplier) *
                                             responsiveVisualScale;
+            var atlasScale = _lastVisualCardId == GwangmaPresentationAssets.CardId
+                ? GwangmaPresentationAssets.BoardScale
+                : _lastVisualCardId == BlueDragonPresentationAssets.CardId && _blueDragonUsesScaledMotion
+                    ? BlueDragonPresentationAssets.BoardScale : 1f;
+            if (atlasScale != 1f)
+            {
+                // New art fills its cells; keep its ground line at the existing tile lift.
+                var originalHeight = _occupantVisualRoot.sizeDelta.y;
+                _occupantVisualRoot.sizeDelta *= atlasScale;
+                _occupantVisualRoot.anchoredPosition -= Vector2.up * originalHeight * (1f - atlasScale) * 0.5f;
+            }
             _occupantVisualRoot.localScale = new Vector3(facingScaleX, 1f, 1f);
             _occupantVisualRoot.SetAsFirstSibling();
 
@@ -2956,7 +3341,15 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
-            tileBackgroundImage.color = _lastHighlightState switch
+            var highlight = _tileView != null ? _tileView.HighlightState : _lastHighlightState;
+            var showTargetPulse = highlight == BattleHighlightState.Playable ||
+                                  highlight == BattleHighlightState.SpellTarget;
+            if (showTargetPulse && _cardTargetPulse == null)
+                _cardTargetPulse = TileTargetPulse.Create(tileBackgroundImage);
+            if (_cardTargetPulse != null)
+                _cardTargetPulse.Refresh(tileBackgroundImage, showTargetPulse, Time.unscaledTime);
+
+            tileBackgroundImage.color = highlight switch
             {
                 BattleHighlightState.Selected => _tileBackgroundSelectedTint,
                 BattleHighlightState.DragHoverTarget => _tileBackgroundDragHoverTint,

@@ -33,7 +33,16 @@ namespace Project333.Editor
                 throw new MissingComponentException("Battle_VSlice does not contain a BattleScreenPresenter.");
             }
 
-            DestroySceneObjectByName(scene, OverlayName);
+            var existingOverlay = FindSceneComponent<BattleMulliganOverlayPresenter>(scene);
+            if (existingOverlay != null)
+            {
+                existingOverlay.ApplyPresentationDesign();
+                EditorUtility.SetDirty(existingOverlay);
+                EditorSceneManager.MarkSceneDirty(scene);
+                EditorSceneManager.SaveScene(scene, BattleScenePath);
+                Selection.activeGameObject = existingOverlay.gameObject;
+                return;
+            }
             DestroySceneObjectByName(scene, LegacyButtonName);
 
             var overlayObject = new GameObject(
@@ -154,6 +163,7 @@ namespace Project333.Editor
             screenSerializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(battleScreenPresenter);
 
+            overlayPresenter.ApplyPresentationDesign();
             SetLayerRecursively(overlayObject, LayerMask.NameToLayer("UI"));
             overlayObject.SetActive(false);
             EditorUtility.SetDirty(overlayPresenter);

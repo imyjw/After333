@@ -3,6 +3,7 @@ using Project333.Runtime.Presentation.Battle;
 using Project333.Runtime.Presentation.Draft;
 using Project333.Runtime.Presentation.OwnedCards;
 using Project333.Runtime.Presentation.Startup;
+using Project333.Runtime.Presentation.Tutorial;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
@@ -72,6 +73,8 @@ namespace Project333.Runtime.Presentation.Settings
         private Action _pendingConfirmationAction;
         private string _sceneName = string.Empty;
         private bool _isHandlingSceneBackNavigation;
+        private bool _tutorialPracticeLoaded;
+        private bool IsTutorialPracticeMode => _tutorialPracticeLoaded || TutorialRuntimeIsolation.IsActive;
 
         public static bool IsSupportedScene(string sceneName)
         {
@@ -158,6 +161,7 @@ namespace Project333.Runtime.Presentation.Settings
 
         private void Awake()
         {
+            _tutorialPracticeLoaded = TutorialRuntimeIsolation.IsActive;
             _sceneName = gameObject.scene.name;
             EnsureEditableHierarchy();
             BindUi();
@@ -166,6 +170,12 @@ namespace Project333.Runtime.Presentation.Settings
 
         private void OnEnable()
         {
+            if (IsTutorialPracticeMode)
+            {
+                if (_gearButton != null) _gearButton.interactable = true;
+                SetActive(_modalRoot, false);
+                return;
+            }
             _sceneName = gameObject.scene.name;
             if (UnityEngine.Application.isPlaying)
             {
@@ -176,24 +186,25 @@ namespace Project333.Runtime.Presentation.Settings
 
         private void OnDisable()
         {
-            After333AudioSettings.Save();
+            if (!IsTutorialPracticeMode) After333AudioSettings.Save();
         }
 
         private void OnApplicationPause(bool paused)
         {
             if (paused)
             {
-                After333AudioSettings.Save();
+                if (!IsTutorialPracticeMode) After333AudioSettings.Save();
             }
         }
 
         private void OnApplicationQuit()
         {
-            After333AudioSettings.Save();
+            if (!IsTutorialPracticeMode) After333AudioSettings.Save();
         }
 
         private void Update()
         {
+            if (IsTutorialPracticeMode) return;
             if (_modalRoot != null &&
                 _modalRoot.gameObject.activeSelf &&
                 string.Equals(_sceneName, "Battle_VSlice", StringComparison.Ordinal))
@@ -217,6 +228,7 @@ namespace Project333.Runtime.Presentation.Settings
 
         private void HandleSceneBackNavigation()
         {
+            if (IsTutorialPracticeMode) return;
             if (_isHandlingSceneBackNavigation)
             {
                 return;
@@ -230,8 +242,14 @@ namespace Project333.Runtime.Presentation.Settings
                     return;
 
                 case "OwnedCards_VSlice":
-                    _isHandlingSceneBackNavigation = true;
                     var ownedCardsController = FindSceneComponent<OwnedCardsSceneController>(gameObject.scene);
+                    if (ownedCardsController != null && ownedCardsController.IsCardDetailOpen)
+                    {
+                        ownedCardsController.CloseCardDetailFromUi();
+                        return;
+                    }
+
+                    _isHandlingSceneBackNavigation = true;
                     if (ownedCardsController != null)
                     {
                         ownedCardsController.ReturnToStartSceneFromUi();
@@ -263,6 +281,7 @@ namespace Project333.Runtime.Presentation.Settings
 
         public void OpenMenu()
         {
+            if (IsTutorialPracticeMode) return;
             ClearBattleSelection();
             RefreshContextButtons();
             SetActive(_modalRoot, true);
@@ -273,7 +292,7 @@ namespace Project333.Runtime.Presentation.Settings
         {
             _pendingConfirmationAction = null;
             SetActive(_modalRoot, false);
-            After333AudioSettings.Save();
+            if (!IsTutorialPracticeMode) After333AudioSettings.Save();
         }
 
         private void EnsureGearButton()
@@ -288,6 +307,8 @@ namespace Project333.Runtime.Presentation.Settings
                 new Vector2(-24f, -24f),
                 new Color(0.025f, 0.075f, 0.1f, 0.94f),
                 out _);
+
+            Project333.Runtime.Presentation.Hand.PreserveExpandedHand.Attach(_gearButton.gameObject);
 
             var iconTransform = _gearButton.transform.Find("GearIcon") as RectTransform;
             if (_gearIcon == null && iconTransform != null)
@@ -657,6 +678,7 @@ namespace Project333.Runtime.Presentation.Settings
 
         private void OpenAudioSettings()
         {
+            if (IsTutorialPracticeMode) return;
             if (_masterVolumeSlider != null)
             {
                 _masterVolumeSlider.SetValueWithoutNotify(After333AudioSettings.MasterVolume);
@@ -674,19 +696,21 @@ namespace Project333.Runtime.Presentation.Settings
         private void ReturnToMainMenu()
         {
             _pendingConfirmationAction = null;
-            After333AudioSettings.Save();
+            if (!IsTutorialPracticeMode) After333AudioSettings.Save();
             RefreshContextButtons();
             ShowOnly(_mainPanel);
         }
 
         private void HandleMasterVolumeChanged(float value)
         {
+            if (IsTutorialPracticeMode) return;
             After333AudioSettings.SetMasterVolume(value);
             RefreshVolumeLabels();
         }
 
         private void HandleMusicVolumeChanged(float value)
         {
+            if (IsTutorialPracticeMode) return;
             After333AudioSettings.SetMusicVolume(value);
             RefreshVolumeLabels();
         }
@@ -706,6 +730,7 @@ namespace Project333.Runtime.Presentation.Settings
 
         private void RequestSurrender()
         {
+            if (IsTutorialPracticeMode) return;
             var currentBattle = FindSceneComponent<BattleBootstrapper>(gameObject.scene);
             if (currentBattle == null || !currentBattle.CanPlayerSurrender)
             {
@@ -732,6 +757,7 @@ namespace Project333.Runtime.Presentation.Settings
 
         private void RequestLogout()
         {
+            if (IsTutorialPracticeMode) return;
             var gameStartController = FindSceneComponent<GameStartSceneController>(gameObject.scene);
             if (gameStartController == null || !gameStartController.IsAccountLoggedIn)
             {
@@ -759,6 +785,7 @@ namespace Project333.Runtime.Presentation.Settings
 
         private void RequestQuit()
         {
+            if (IsTutorialPracticeMode) return;
             var message = string.Equals(_sceneName, "Battle_VSlice", StringComparison.Ordinal)
                 ? "게임을 종료하시겠습니까?\n진행 중인 온라인 전투는 재접속 대기 상태가 됩니다."
                 : "게임을 종료하시겠습니까?";
@@ -780,6 +807,7 @@ namespace Project333.Runtime.Presentation.Settings
 
             ConfigureLabel(_confirmationAcceptButtonLabel, acceptLabel, 26);
             SetActive(_confirmationCancelButton == null ? null : _confirmationCancelButton.transform as RectTransform, true);
+            NoticeTheme.Dialog(_confirmationPanel);
             ShowOnly(_confirmationPanel);
         }
 
@@ -798,11 +826,13 @@ namespace Project333.Runtime.Presentation.Settings
 
             ConfigureLabel(_confirmationAcceptButtonLabel, "확인", 26);
             SetActive(_confirmationCancelButton == null ? null : _confirmationCancelButton.transform as RectTransform, false);
+            NoticeTheme.Dialog(_confirmationPanel);
             ShowOnly(_confirmationPanel);
         }
 
         private void AcceptConfirmation()
         {
+            if (IsTutorialPracticeMode) return;
             var action = _pendingConfirmationAction;
             _pendingConfirmationAction = null;
             action?.Invoke();
@@ -822,6 +852,7 @@ namespace Project333.Runtime.Presentation.Settings
 
         private static void QuitApplication()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             After333AudioSettings.Save();
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;

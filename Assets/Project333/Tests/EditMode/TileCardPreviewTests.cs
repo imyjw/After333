@@ -86,6 +86,36 @@ namespace Project333.Tests.EditMode
             Assert.That(Stat("HpValueText").text, Is.EqualTo("29"));
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Show_PowerConsumptionExplainsDrainedAlongsideTheCard_AndRefreshesOnlyTheCurrentStatusBelow(bool building)
+        {
+            OccupantState occupant = building
+                ? (OccupantState)new BuildingState("power-preview", "PreviewPowerBuilding", PlayerId.Player,
+                    new TileCoord(0, 0), false, 0, 20, sciencePowerUpkeep: 3)
+                : new UnitState("power-preview", "PreviewPowerUnit", PlayerId.Player,
+                    new TileCoord(0, 0), AttackType.Melee, 3, 20, true, false, 3);
+            _tile.Present(occupant);
+
+            Assert.That(_view.TryShowCurrentCardPreview(), Is.True);
+            foreach (var drained in new[] { false, true, false })
+            {
+                occupant.IsDrained = drained;
+                RefreshPreview();
+                var abilities = VisiblePanels("SpecialEffectTooltip");
+                Assert.That(abilities.Select(panel => panel.Find("Title").GetComponent<TMP_Text>().text),
+                    Is.EquivalentTo(new[] { "전력소모: 3", "방전" }));
+                Assert.That(abilities.All(panel => panel.Find("Description").gameObject.activeSelf), Is.True);
+                var attached = VisiblePanels("AttachedEffectTooltip");
+                Assert.That(attached.Length, Is.EqualTo(drained ? 1 : 0));
+                if (drained)
+                {
+                    Assert.That(attached[0].Find("Title").GetComponent<TMP_Text>().text, Is.EqualTo("방전"));
+                    Assert.That(attached[0].Find("Description").gameObject.activeSelf, Is.False);
+                }
+                Assert.That(occupant.IsDrained, Is.EqualTo(drained));
+            }
+        }
         [Test]
         public void Refresh_UpdatesBuffsDamageAndReplacementStateWithSameRuntimeId()
         {
@@ -344,6 +374,8 @@ namespace Project333.Tests.EditMode
                 if (ending == "disable")
                 {
                     relay.enabled = false;
+                    // EditMode does not dispatch this runtime lifecycle callback automatically.
+                    typeof(TileLongPressRelay).GetMethod("OnDisable", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(relay, null);
                     relay.enabled = true;
                 }
                 else

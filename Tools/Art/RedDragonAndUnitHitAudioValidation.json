@@ -1,0 +1,27 @@
+{
+    "format":  "PCM16 mono",
+    "sampleRate":  44100,
+    "source":  "Original deterministic synthesis; no recordings or external samples",
+    "clips":  [
+                  {
+                      "name":  "FireBreath",
+                      "seconds":  0.460,
+                      "samples":  20286,
+                      "peakDbfs":  -3.609,
+                      "rmsDbfs":  -15.310,
+                      "dcOffset":  0.0000004,
+                      "clippedSamples":  0,
+                      "suggestedOneShotGain":  0.45
+                  },
+                  {
+                      "name":  "UnitHit",
+                      "seconds":  0.180,
+                      "samples":  7938,
+                      "peakDbfs":  -4.152,
+                      "rmsDbfs":  -21.606,
+                      "dcOffset":  -0.0003768,
+                      "clippedSamples":  0,
+                      "suggestedOneShotGain":  0.52
+                  }
+              ]
+}

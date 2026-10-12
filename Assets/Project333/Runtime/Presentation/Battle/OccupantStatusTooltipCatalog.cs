@@ -31,10 +31,14 @@ namespace Project333.Runtime.Presentation.Battle
                 Add(entries, "방전", OccupantTooltipKind.Debuff);
             if (occupant.IsErasure)
                 Add(entries, "망각", OccupantTooltipKind.Debuff);
+            if (occupant.IsStunned)
+                Add(entries, "스턴", OccupantTooltipKind.Debuff);
+            if (occupant.IsFrozen)
+                Add(entries, "빙결", OccupantTooltipKind.Debuff);
             if (occupant.IsUnderHuanShu)
                 Add(entries, "환술", OccupantTooltipKind.Debuff);
-            if (occupant.FalloutStacks > 0)
-                Add(entries, "낙진", OccupantTooltipKind.Debuff);
+            if (occupant.IsFalloutTarget && occupant.FalloutStacks > 0)
+                Add(entries, "낙진: 양쪽 턴 시작마다 10의 고정 피해를 입는다.", OccupantTooltipKind.Debuff);
 
             AddDelayedDestruction(entries, occupant, battleState);
             if (occupant.IsDemonKingRevivalPending)
@@ -93,8 +97,24 @@ namespace Project333.Runtime.Presentation.Battle
             foreach (var group in areas)
                 Add(entries, group.Key + ": " + string.Join(", ", CombineIdenticalLines(group.Value)),
                     OccupantTooltipKind.Influence);
-            if (board.FalloutStacks > 0 && occupant.Kind != OccupantKind.Master)
-                Add(entries, "전장 낙진", OccupantTooltipKind.Influence);
+            return entries;
+        }
+
+        // Hand cards have no tile: only player-wide influences can apply here.
+        public static IReadOnlyList<OccupantSpecialEffectTooltip> BuildHandInfluences(BattleState battle, PlayerId owner)
+        {
+            var entries = new List<OccupantSpecialEffectTooltip>();
+            if (battle == null) return entries;
+            var auraPower = 0;
+            foreach (var ally in battle.GetBoard(owner).EnumerateOccupants()) auraPower += ally.EffectiveSpellPower;
+            if (auraPower > 0) Add(entries, $"주문력 +{auraPower}", OccupantTooltipKind.Influence);
+            var amplification = 0;
+            foreach (var effect in battle.PersistentEffects)
+                if (effect != null && !effect.IsExpired && effect.OwnerId == owner &&
+                    effect.EffectId == MagicAmplificationCircleRules.EffectId)
+                    amplification += MagicAmplificationCircleRules.SpellPowerBonus;
+            if (amplification > 0)
+                Add(entries, $"마법 증폭진: 주문력 +{amplification}", OccupantTooltipKind.Influence);
             return entries;
         }
 
@@ -104,15 +124,37 @@ namespace Project333.Runtime.Presentation.Battle
             var trackedHp = 0;
             var trackedPhysical = 0;
             var trackedMagic = 0;
+            var sourceOrder = new List<string>();
+            var totals = new Dictionary<string, int[]>(StringComparer.Ordinal);
+            var chieftainSources = new HashSet<string>(StringComparer.Ordinal);
             foreach (var buff in occupant.CombatStatBuffs)
             {
                 trackedAttack += buff.AttackBonus;
                 trackedHp += buff.MaxHpBonus;
                 trackedPhysical += buff.PhysicalDefenseBonus;
                 trackedMagic += buff.MagicDefenseBonus;
-                var text = StatDescription(buff.AttackBonus, buff.MaxHpBonus, buff.PhysicalDefenseBonus, buff.MagicDefenseBonus);
-                if (text.Length > 0)
-                    Add(entries, SourceName(buff.SourceCardId) + ": " + text, OccupantTooltipKind.Buff);
+                if (!totals.TryGetValue(buff.SourceCardId, out var values))
+                {
+                    values = new int[4];
+                    totals.Add(buff.SourceCardId, values);
+                    sourceOrder.Add(buff.SourceCardId);
+                }
+                values[0] += buff.AttackBonus;
+                values[1] += buff.MaxHpBonus;
+                values[2] += buff.PhysicalDefenseBonus;
+                values[3] += buff.MagicDefenseBonus;
+                if (buff.SourceCardId == "OrcChieftain" && !string.IsNullOrWhiteSpace(buff.SourceRuntimeId))
+                    chieftainSources.Add(buff.SourceRuntimeId);
+            }
+            foreach (var source in sourceOrder)
+            {
+                var values = totals[source];
+                var text = StatDescription(values[0], values[1], values[2], values[3]);
+                if (text.Length == 0) continue;
+                var name = SourceName(source);
+                if (source == "OrcChieftain" && chieftainSources.Count > 1)
+                    name += " ×" + chieftainSources.Count;
+                Add(entries, name + ": " + text, OccupantTooltipKind.Buff);
             }
             var fallback = StatDescription(
                 occupant.BaseAttack - occupant.OriginalAttack - trackedAttack,
@@ -122,7 +164,6 @@ namespace Project333.Runtime.Presentation.Battle
             if (fallback.Length > 0)
                 Add(entries, "능력치 변화: " + fallback, OccupantTooltipKind.State);
         }
-
         private static string StatDescription(int attack, int maxHp, int physical, int magic)
         {
             var values = new List<string>();
@@ -142,7 +183,10 @@ namespace Project333.Runtime.Presentation.Battle
                 "Hero" => "용사",
                 "RobotFusion" => "로봇 합체",
                 "Daehwandan" => "대환단",
+                "PlasmaShield" => "플라즈마 쉴드",
+                "ManaShield" => "마나쉴드",
                 "DemonKing" => "마왕 부활",
+                "OrcChieftain" => "오크 족장",
                 _ => string.IsNullOrWhiteSpace(sourceCardId) ? "능력치 변화" : sourceCardId,
             };
         }

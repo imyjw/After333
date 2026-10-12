@@ -41,6 +41,11 @@ namespace Project333.Runtime.Presentation.Battle
                 statusLabels.Add("Erasure");
             }
 
+            if (occupant.IsStunned)
+                statusLabels.Add($"스턴 {occupant.StunTurnEndsRemaining}");
+            if (occupant.IsFrozen)
+                statusLabels.Add($"빙결 {occupant.FreezeTurnEndsRemaining}");
+
             if (occupant.IsSealbound)
             {
                 statusLabels.Add($"Sealbound {occupant.SealboundOwnerTurnStartsRemaining}");

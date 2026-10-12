@@ -1,5 +1,9 @@
 # After333 Game Design
 
+Actual release status (2026-10-02): the separately approved card-pack server/DB0020–0022 rollout and Android APK(versionCode5) build passed. See [actual release evidence](shop_card_packs.md). Earlier source-only snapshots retain their scope; physical-device installation/runtime remains untested.
+
+Updated 2026-10-02 for confirmed shop card-pack purchase/opening; the earlier card-content snapshot below retains its own scope. This describes source behavior; it does not certify the version installed on a device or deployed to production.
+
 ## Document Purpose
 
 This document defines the high-level game design, shared terminology, and the boundary between the implemented account-backed prototype and later full-game systems.
@@ -12,10 +16,10 @@ This document defines the high-level game design, shared terminology, and the bo
 
 - Public game name: `After333`
 - Genre: 2.5D mobile landscape turn-based card game
-- Current play modes: normal matchmaking (human opponent first; fallback AI after 20 seconds) and a separate daily AI challenge. Both use the current run deck. See [battle_modes.md](./battle_modes.md).
+- Current play modes: normal matchmaking (human opponent first; fallback AI after 20 seconds) and a separate per-run Gold Dungeon. Both use the current run deck. See [battle_modes.md](./battle_modes.md).
 - Field size: each player owns a 5x2 tile field
 - Core deck concept: build a 33-card deck through a 3-choose-1 draft
-- Full game long-term goal: reach 33 cumulative wins before 3 cumulative losses
+- Implemented run goal: reach 33 cumulative wins before 3 cumulative losses
 
 ## Scope Separation
 
@@ -32,20 +36,20 @@ The full game design loop is:
 
 The current implemented loop is:
 
-1. Login with a server-backed guest, Game ID, or Google account
+1. Login with a server-backed Game ID or Google account, or refresh its saved session
 2. Spend `3` tickets to start a run
 3. Build and persist a `33`-card deck through draft
-4. Play normal matchmaking battles against a human or fallback AI; optionally play daily AI challenges for separate Resource Gold
+4. Play normal matchmaking battles against a human or fallback AI; optionally use up to three Gold Dungeon attempts per paid run for separate Resource Gold
 5. Persist run wins and losses until `33` wins or `3` losses
 6. Claim run-end Resource Gold and random card-copy rewards
 7. Spend Resource Gold and matching card copies to upgrade eligible cards
+8. Buy ticket/card-pack products in the shop; a 33 Resource Gold pack immediately grants ten independent random reward-eligible card copies and then presents its opening
 
 The current prototype does not yet implement:
 
 - Kakao or Naver OAuth login
 - Ranked matchmaking, MMR, seasons, or ladders
-- Shop inventory or purchases
-- Pack opening
+- Individual card-shop inventory/pricing/refresh beyond the implemented ticket/card-pack products
 - Crafting
 - Paid purchase flows
 
@@ -53,7 +57,7 @@ The current prototype does not yet implement:
 
 ### Match Unit
 
-- A normal battle advances the run and may have a human or AI opponent. A daily AI challenge uses the run deck but has separate attempts and rewards; it does not advance or end the run.
+- A normal battle advances the run and may have a human or AI opponent. Gold Dungeon uses the completed active run deck, with up to three attempts per run started with 3 tickets and separate rewards; it does not advance or end the run.
 - A run is the atomic progression unit for the full game design.
 
 ### Protected Leader
@@ -115,6 +119,11 @@ Some cards may occupy more than one tile.
 | Drained | A power-upkeep failure state for units and buildings that prevents attack, movement, counterattack, and effect use while making the occupant take triple damage |
 | Erasure | `망각`; suppresses card effects and removes existing combat-time modifiers while preserving ordinary attack, movement, baseline defenses, damage taken, and front-row blocking |
 | Persistent Spell | A spell whose effect remains in a separate persistent zone after the card itself is cast and sent to the discard pile |
+| Unit Race | Zero or more user-confirmed unit classifications, independent of effects and preserved by Erasure |
+| Stun | Prevents attack, counterattack and active abilities; duration decreases at each player's turn end |
+| Freeze | Stun restrictions plus no movement or front-row blocking; pauses the occupant Animator until removed |
+| Trap | A privately identified, freely installed spell that pays activation resources and is consumed once when its condition succeeds |
+| Spell Power | Adds the damage owner's current effective Spell Power to Magic damage when damage is resolved |
 
 ## Core Systems Overview
 
@@ -123,14 +132,19 @@ Some cards may occupy more than one tile.
 - Random first player / second player
 - Opening hands of `3` for both players
 - One mulligan per player, using Hearthstone-style partial replacement
-- Starting resources of `0 mana`, `0 qi`, `0 power`, and `3 gold`; the first player skips base gold gain on battle turn `1`, while the second player gains `gold +1` on battle turn `2`
-- Turn structure with draw/resource calculation, gain, science power payment, main phase, and turn end
+- Starting resources of `0 mana`, `0 qi`, `0 power`, and gold `3` for the first player / `4` for the second player, assigned before mulligan; neither first turn adds base gold (battle turns `1` and `2`); normal own-turn gain is `gold +3` from battle turn `3` onward
+- Turn structure with base draw of 1 card every own turn (including opening turns), resource calculation/gain, science power payment, main phase, and turn end
 - Summon, move, attack, and spell usage in the main phase
 - Melee and ranged targeting rules
 - Melee-versus-melee counterattack only
 - Physical, Magic, and Fixed damage with separate Physical/Magic defenses
 - Per-hit defense calculation for multi-hit attacks
 - Draw failure damage to the Master Unit when the deck is empty
+- Paid attacks (ManaCannon), live resource-based ATK (GaebangChief), stackable source-bound OrcChieftain auras, and permanent stackable defenses
+- Stun/Freeze durations set by their applying effect, refreshed to the longer remaining duration, and decreased at every player's turn end
+- Private, free trap installation with ordered, affordable, pre-damage activation; Return cancels and returns an ordinary attacker, Mirror Field cancels and reflects Magic damage
+- Immediate enemy-field spells, column-piercing FireSpear, delayed TimedBomb and Nuclear's unit/Master-only permanent Fallout
+- Fresh battle resources for each new battle; rejoining the same battle restores its existing resource state
 
 See [battle_rules.md](./battle_rules.md).
 
@@ -148,14 +162,32 @@ See [draft_rules.md](./draft_rules.md).
 - A single drafted deck is used across repeated battles in a run
 - The run ends at 33 wins or 3 losses
 - Resource Gold and eligible card copies are awarded after the run ends
-- Resource Gold is currently spent on card upgrades and ticket purchases
-- Shop, pack, and crafting uses are planned but not implemented
+- Resource Gold is currently spent on card upgrades, ticket purchases and 33-gold ten-card packs
+- The ticket shop, server-verified rewarded-ticket ads and card-pack purchase/opening source are implemented; individual card-shop inventory, separate unopened-pack inventory, crafting and paid purchases remain deferred
+- Card packs use per-copy Common/Uncommon/Rare/Unique/Legendary odds of 40/30/18/9/3%. Duplicates are allowed. The server atomically commits charge, ten collection copies and original receipt before the sealed pack appears; interrupted opening restores presentation without another grant. See [card packs](shop_card_packs.md).
 
 See [meta_rules.md](./meta_rules.md).
 
+## Current Content and Presentation
+
+- Shared definitions: 59 cards (27 units, 7 buildings, 25 spells); native catalog and draft pool: 52. Actual random reward pool: 40; upgradeable definitions: 44. See the catalog for flags and unreleased cards rather than treating all definitions as playable.
+- Four hidden traps share free installation, captured activation costs, ordered one-shot triggers and duplicate-card exclusion. Reactive Armour protects the owner Master from ordinary melee Units; Iron Dome protects that Master from ordinary ranged Units. Both cost 4 Power on activation with Gold substitution, cancel the attack and destroy its attacker. See [battle rules](battle_rules.md#irondome).
+- Hand cards fold at bottom center, expand on click and move/scale smoothly. Both fields, the settings gear and End Turn preserve the expanded hand. End Turn locks actions immediately while keeping hand inspection available.
+- Affordable selected cards pulse their legal tile targets with reduced white brightness. Untargeted spells only show tile hints where their input rules explicitly support them.
+- Long-press previews share trait/effect information across supported card surfaces; live board previews additionally show statuses and applied effects from the actual occupant.
+- Owned-card details resolve bundled current definitions, show unit races, and flip between artwork and a black/white Lv.1–13 increment table.
+- Card-pack presentation dims the shop, tears a central foil pack, rapidly ejects white glowing cards and reveals ten actual copies in a responsive 5×2 grid. Rare/Unique/Legendary borders glow blue/red/yellow; a guarded click anywhere returns to the shop.
+- Notices share a dark navy rounded panel, thin border and NeoDunggeunmo Pro. The original gold pixel Your Turn banner is an explicit exception. Ordinary connection-progress startup messages stay hidden.
+- Character attacks, whole-field spells, status loops and one-shot shields have dedicated animation/VFX/audio paths. Timed spell presentation completes its relevant impact before the following state is projected.
+
 ## Document Reference Map
 
+- [README.md](./README.md) indexes current guides and distinguishes historical verification records.
 - This document is the overview and glossary.
+- [card_catalog.md](./card_catalog.md), [card_details.md](./card_details.md) and [card_authoring_checklist.md](./card_authoring_checklist.md) describe current cards, exact upgrade schedules and release flags.
+- [battle_modes.md](./battle_modes.md) covers matchmaking, three Gold Dungeon attempts per paid run without a midnight reset and the 70-second reconnect policy.
+- [pve_ai.md](./pve_ai.md) documents current evaluation and protection rules.
+- [unit_races.md](./unit_races.md), [special_effects.md](./special_effects.md) and [occupant_status_tooltips.md](./occupant_status_tooltips.md) cover classifications and effect presentation.
 - [battle_rules.md](./battle_rules.md) is the source of truth for battle state, coordinates, actions, targeting, and combat resolution.
 - [draft_rules.md](./draft_rules.md) is the source of truth for 33-pick deck construction.
 - [meta_rules.md](./meta_rules.md) is the source of truth for run progression, rewards, and meta spending.
@@ -166,6 +198,6 @@ See [meta_rules.md](./meta_rules.md).
 
 > TBD: Full civilization roster and any civilization rules beyond the confirmed science power-upkeep rule
 
-> TBD: Any cross-battle carryover rules for battle resources in the full multi-battle run
+Current battles start with mana/qi/power 0 and gold 3. The deck and account upgrade levels carry across the run; battle resources and temporary occupant states do not. Any different future carryover rule needs a separate user decision.
 
 

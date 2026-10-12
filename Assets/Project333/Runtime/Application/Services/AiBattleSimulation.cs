@@ -75,6 +75,7 @@ namespace Project333.Runtime.Application.Services
                 PlayUnitCardCommand c => new PlayUnitCardCommand(c.CardId, c.TargetCoord, id),
                 PlayBuildingCardCommand c => new PlayBuildingCardCommand(c.CardId, c.TargetCoord, id),
                 CastDamageSpellCommand c => new CastDamageSpellCommand(c.CardId, c.TargetOwnerId, c.TargetCoord, id),
+                InstallTrapCommand c => new InstallTrapCommand(c.CardId, id),
                 CastPersistentResourceSpellCommand c => new CastPersistentResourceSpellCommand(c.CardId, id),
                 CastScriptedSpellCommand c when c.HasTarget => new CastScriptedSpellCommand(c.CardId, c.TargetOwnerId, c.TargetCoord, id),
                 CastScriptedSpellCommand c => new CastScriptedSpellCommand(c.CardId, id),

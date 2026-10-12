@@ -10,14 +10,16 @@ using Project333.Runtime.Application.Services;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Board;
 using Project333.Runtime.Domain.Cards;
+using Project333.Runtime.Infrastructure.Data;
 using Project333.Runtime.Presentation.Battle;
+using Project333.Runtime.Presentation.Tutorial;
 using UnityEngine;
 
 namespace Project333.Runtime.Presentation.Online
 {
     public sealed class OnlineBattleConnectionTester : MonoBehaviour
     {
-        private const float MinimumAutomaticReconnectWindowSeconds = 60f;
+        private const float MinimumAutomaticReconnectWindowSeconds = 70f;
         private const float ServerAiBoardCardStateWaitSeconds = 2f;
         private const int MaxCombatLogEntries = 33;
 
@@ -33,7 +35,7 @@ namespace Project333.Runtime.Presentation.Online
         [SerializeField] private float _connectTimeoutSeconds = 5f;
         [Header("Automatic Battle Reconnect")]
         [SerializeField] private bool _automaticallyReconnectDuringBattle = true;
-        [SerializeField] [Min(1f)] private float _automaticReconnectWindowSeconds = 60f;
+        [SerializeField] [Min(1f)] private float _automaticReconnectWindowSeconds = 70f;
         [SerializeField] [Min(0.1f)] private float _automaticReconnectInitialDelaySeconds = 0.5f;
         [SerializeField] [Min(0.1f)] private float _automaticReconnectMaximumDelaySeconds = 5f;
         [SerializeField] [Min(1f)] private float _automaticReconnectJoinTimeoutSeconds = 6f;
@@ -105,7 +107,10 @@ namespace Project333.Runtime.Presentation.Online
 
         public bool PresentsStateViewsToBattleScreen => _presentStateViewsToBattleScreen;
 
-        public bool IsReadyForCommands => _gateway != null &&
+        public bool IsAwaitingNextTurn => _gateway != null && _gateway.IsAwaitingNextTurn;
+
+        public bool IsReadyForCommands => !TutorialRuntimeIsolation.IsActive &&
+                                          _gateway != null &&
                                           _messageSender != null &&
                                           _messageSender.IsConnected &&
                                           _hasAssignedSeat;
@@ -130,6 +135,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void Awake()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             _lastInternetReachability = UnityEngine.Application.internetReachability;
             AutoAssignBattleScreenPresenter();
             AutoAssignBattleBootstrapper();
@@ -142,6 +148,7 @@ namespace Project333.Runtime.Presentation.Online
             PlayerId localPlayerId,
             bool presentStateViewsToBattleScreen = true)
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             _serverUrl = string.IsNullOrWhiteSpace(serverUrl) ? _serverUrl : serverUrl;
             _matchId = string.IsNullOrWhiteSpace(matchId) ? _matchId : matchId;
             _playerToken = string.IsNullOrWhiteSpace(playerToken) ? _playerToken : playerToken;
@@ -162,7 +169,10 @@ namespace Project333.Runtime.Presentation.Online
 
         private void Update()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             DrainQueuedMessages();
+            if (_presentationQueueCoroutine == null && _presentationMessages.Count > 0)
+                _presentationQueueCoroutine = StartCoroutine(ProcessPresentationQueue());
             DetectMobileNetworkTransition();
             MonitorAutomaticReconnect();
             SendClientHeartbeatIfNeeded();
@@ -199,7 +209,7 @@ namespace Project333.Runtime.Presentation.Online
             string playerToken,
             IReadOnlyList<string> playerDeckCardIds,
             bool isReconnectAttempt = false,
-            int reconnectRemainingSeconds = 60,
+            int reconnectRemainingSeconds = 70,
             string gameMode = "run",
             string aiChallengeAttemptId = null)
         {
@@ -223,6 +233,7 @@ namespace Project333.Runtime.Presentation.Online
             _currentProjectedBattleState = null;
             ResetPresentationStateForNewConnection();
             await DisconnectAsync();
+            if (!await WaitUntilTutorialEndsAsync()) return;
             if (isReconnectAttempt)
             {
                 BeginPveReconnectFromDraft(reconnectRemainingSeconds);
@@ -259,6 +270,7 @@ namespace Project333.Runtime.Presentation.Online
             _matchmakingFailureMessage = string.Empty;
             ResetPresentationStateForNewConnection();
             await DisconnectAsync();
+            if (!await WaitUntilTutorialEndsAsync()) return;
             await ConnectAsync();
         }
 
@@ -311,11 +323,13 @@ namespace Project333.Runtime.Presentation.Online
         [ContextMenu("Disconnect")]
         public async void Disconnect()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             await DisconnectAsync();
         }
 
         public async System.Threading.Tasks.Task DisconnectFromServerAsync()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             await DisconnectAsync();
         }
 
@@ -342,6 +356,7 @@ namespace Project333.Runtime.Presentation.Online
 
         public void DetachBattlePresentation()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             _presentStateViewsToBattleScreen = false;
             _battleBootstrapper = null;
             _battleScreenPresenter = null;
@@ -349,6 +364,7 @@ namespace Project333.Runtime.Presentation.Online
 
         public void AttachToBattlePresentation(BattleBootstrapper battleBootstrapper)
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             if (battleBootstrapper == null)
             {
                 throw new ArgumentNullException(nameof(battleBootstrapper));
@@ -364,6 +380,11 @@ namespace Project333.Runtime.Presentation.Online
 
         public bool TrySendPlayerCommand(IBattleCommand command, out string message)
         {
+            if (TutorialRuntimeIsolation.IsActive)
+            {
+                message = "튜토리얼에서는 온라인 전투 명령을 사용할 수 없습니다.";
+                return false;
+            }
             if (command == null)
             {
                 message = "Cannot send an empty online battle command.";
@@ -395,6 +416,11 @@ namespace Project333.Runtime.Presentation.Online
 
         public bool TrySendEndTurn(out string message)
         {
+            if (TutorialRuntimeIsolation.IsActive)
+            {
+                message = "튜토리얼에서는 온라인 전투 명령을 사용할 수 없습니다.";
+                return false;
+            }
             if (!IsReadyForCommands)
             {
                 message = "Cannot send online end turn until this client is connected and seated.";
@@ -419,6 +445,11 @@ namespace Project333.Runtime.Presentation.Online
 
         public bool TrySendSurrender(out string message)
         {
+            if (TutorialRuntimeIsolation.IsActive)
+            {
+                message = "튜토리얼에서는 온라인 전투 명령을 사용할 수 없습니다.";
+                return false;
+            }
             if (!IsReadyForCommands)
             {
                 message = "항복하려면 서버 연결과 좌석 배정이 완료되어야 합니다.";
@@ -443,6 +474,11 @@ namespace Project333.Runtime.Presentation.Online
 
         public bool TrySendMulligan(IReadOnlyList<string> selectedCardIds, out string message)
         {
+            if (TutorialRuntimeIsolation.IsActive)
+            {
+                message = "튜토리얼에서는 온라인 전투 명령을 사용할 수 없습니다.";
+                return false;
+            }
             if (!IsReadyForCommands)
             {
                 message = "멀리건을 확정하려면 서버 연결과 좌석 배정이 완료되어야 합니다.";
@@ -479,6 +515,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private async System.Threading.Tasks.Task ConnectAsync()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             if (!UnityEngine.Application.isPlaying)
             {
                 return;
@@ -523,13 +560,14 @@ namespace Project333.Runtime.Presentation.Online
                     accountId);
 
                 SetStatus($"Connecting to {resolvedServerUrl}...");
-                PresentConnectionProgress($"서버에 연결 중입니다. {resolvedServerUrl}");
+                PresentConnectionProgress();
 
                 using (var timeoutCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(Mathf.Max(1f, _connectTimeoutSeconds))))
                 {
                     await _messageSender.ConnectAsync(timeoutCancellation.Token);
                 }
 
+                if (!await WaitUntilTutorialEndsAsync() || _messageSender == null) return;
                 _hasAssignedSeat = false;
                 Debug.Log(
                     $"[After333 Online Join] sending match={FormatLogValue(_matchId)} account={FormatLogValue(accountId)} token={FormatLogValue(_playerToken)} localSeat={_localPlayerId} serverAi={_joinUseServerAiOpponent} matchmaking={_joinUseMatchmakingQueue} clientVersion={FormatLogValue(resolvedClientVersion)} run={FormatLogValue(_joinRunId)} deck={FormatLogValue(_joinDeckId)} deckCards={_joinPlayerDeckCardIds.Count}");
@@ -550,10 +588,11 @@ namespace Project333.Runtime.Presentation.Online
                 _nextClientHeartbeatRealtime = UnityEngine.Time.unscaledTime +
                                                Mathf.Max(1f, _clientHeartbeatIntervalSeconds);
                 SetStatus($"Connected to {resolvedServerUrl}. Joining match {_matchId} with run={FormatLogValue(_joinRunId)}, deck={FormatLogValue(_joinDeckId)}.");
-                PresentConnectionProgress("서버에 연결했습니다. 전투를 복원하는 중입니다.");
+                PresentConnectionProgress();
             }
             catch (OperationCanceledException)
             {
+                if (!await WaitUntilTutorialEndsAsync()) return;
                 var timeoutSeconds = Mathf.Max(1f, _connectTimeoutSeconds);
                 _matchmakingFailureMessage = "서버 연결 시간이 초과되었습니다. 나중에 다시 시도해주세요.";
                 SetStatus($"Connection failed: timed out after {timeoutSeconds:0.#} seconds.");
@@ -562,6 +601,7 @@ namespace Project333.Runtime.Presentation.Online
             }
             catch (Exception ex)
             {
+                if (!await WaitUntilTutorialEndsAsync()) return;
                 _matchmakingFailureMessage = "서버 연결에 실패했습니다. 나중에 다시 시도해주세요.";
                 SetStatus($"Connection failed: {ex.Message}");
                 PresentConnectionFailure();
@@ -569,7 +609,7 @@ namespace Project333.Runtime.Presentation.Online
             }
         }
 
-        private void PresentConnectionProgress(string message)
+        private void PresentConnectionProgress()
         {
             if (_isAutomaticReconnectActive)
             {
@@ -577,7 +617,7 @@ namespace Project333.Runtime.Presentation.Online
                 return;
             }
 
-            ShowOnlineStatusToast(message);
+            // Initial connection progress stays silent; reconnect countdown remains visible.
         }
 
         private void PresentConnectionFailure()
@@ -738,6 +778,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void DrainQueuedMessages()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             while (TryDequeueConnectionClosed(out var closeReason))
             {
                 if (CanAutomaticallyRecoverCurrentBattle())
@@ -808,6 +849,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void StopPresentationQueue()
         {
+            _battleBootstrapper?.CancelCombatPresentation();
             if (_presentationQueueCoroutine != null)
             {
                 StopCoroutine(_presentationQueueCoroutine);
@@ -825,7 +867,7 @@ namespace Project333.Runtime.Presentation.Online
             }
 
             _presentationMessages.Enqueue(envelope);
-            if (_presentationQueueCoroutine == null)
+            if (_presentationQueueCoroutine == null && !TutorialRuntimeIsolation.IsActive)
             {
                 _presentationQueueCoroutine = StartCoroutine(ProcessPresentationQueue());
             }
@@ -835,10 +877,12 @@ namespace Project333.Runtime.Presentation.Online
         {
             while (_presentationMessages.Count > 0)
             {
+                while (TutorialRuntimeIsolation.IsActive) yield return null;
                 var envelope = _presentationMessages.Peek();
                 while (ShouldDeferBattleEventsForMulliganPresentation(envelope))
                 {
                     yield return null;
+                    while (TutorialRuntimeIsolation.IsActive) yield return null;
                 }
 
                 envelope = _presentationMessages.Dequeue();
@@ -849,6 +893,7 @@ namespace Project333.Runtime.Presentation.Online
                     while (_presentationMessages.Count == 0 && Time.unscaledTime < stateWaitDeadline)
                     {
                         yield return null;
+                        while (TutorialRuntimeIsolation.IsActive) yield return null;
                     }
 
                     if (_presentationMessages.Count > 0 &&
@@ -858,6 +903,7 @@ namespace Project333.Runtime.Presentation.Online
                         followingStatePresented = true;
                         // Let the newly summoned occupant render before the card reveal fades in.
                         yield return null;
+                        while (TutorialRuntimeIsolation.IsActive) yield return null;
                     }
                 }
 
@@ -865,6 +911,15 @@ namespace Project333.Runtime.Presentation.Online
                 if (durationSeconds > 0f)
                 {
                     yield return new WaitForSecondsRealtime(durationSeconds);
+                    while (TutorialRuntimeIsolation.IsActive) yield return null;
+                }
+
+                // A delayed impact preserves the complete Meteor tail beyond the initial estimate.
+                while (_battleBootstrapper != null &&
+                    (_battleBootstrapper.IsRedDragonOnlinePresentationPending || _battleBootstrapper.IsMeteorOnlinePresentationPending || _battleBootstrapper.IsFireSpearOnlinePresentationPending || _battleBootstrapper.IsPlasmaShieldOnlinePresentationPending || _battleBootstrapper.IsManaShieldOnlinePresentationPending || _battleBootstrapper.IsReactiveArmourOnlinePresentationPending || _battleBootstrapper.IsIronDomeOnlinePresentationPending || _battleBootstrapper.IsSummonTrapOnlinePresentationPending))
+                {
+                    yield return null;
+                    while (TutorialRuntimeIsolation.IsActive) yield return null;
                 }
 
                 var pauseSeconds = envelope.MessageType == OnlineBattleMessageType.BattleEvents
@@ -879,17 +934,20 @@ namespace Project333.Runtime.Presentation.Online
                         while (_presentationMessages.Count == 0 && Time.unscaledTime < stateWaitDeadline)
                         {
                             yield return null;
+                            while (TutorialRuntimeIsolation.IsActive) yield return null;
                         }
                         if (_presentationMessages.Count > 0 &&
                             _presentationMessages.Peek()?.MessageType == OnlineBattleMessageType.StateView)
                         {
                             HandleEnvelope(_presentationMessages.Dequeue());
                             yield return null;
+                            while (TutorialRuntimeIsolation.IsActive) yield return null;
                         }
                     }
                     if (_currentProjectedBattleState == null || !_currentProjectedBattleState.IsEnded)
                     {
                         yield return new WaitForSecondsRealtime((float)pauseSeconds);
+                        while (TutorialRuntimeIsolation.IsActive) yield return null;
                     }
                 }
             }
@@ -907,6 +965,11 @@ namespace Project333.Runtime.Presentation.Online
                 return false;
             }
 
+            // The final board can omit a unit killed on summon. Render its pre-hit event
+            // identity first and apply the following truth only after the reaction/death.
+            foreach (var entry in envelope.BattleEvents)
+                if (entry?.EventType == BattleEventType.TrapTriggered && entry.CardId == SummonTrapCardRules.CardId)
+                    return false;
             for (var eventIndex = 0; eventIndex < envelope.BattleEvents.Count; eventIndex++)
             {
                 if (OpponentPlayedCardRevealRules.IsBoardCardPlay(envelope.BattleEvents[eventIndex]))
@@ -979,6 +1042,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void DetectMobileNetworkTransition()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             var currentReachability = UnityEngine.Application.internetReachability;
             if (currentReachability == _lastInternetReachability)
             {
@@ -999,6 +1063,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void MonitorAutomaticReconnect()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             if (!_isAutomaticReconnectActive)
             {
                 if (CanAutomaticallyRecoverCurrentBattle() &&
@@ -1060,6 +1125,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void BeginPveReconnectFromDraft(int remainingSeconds)
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             _isResumingBattleFromDraft = true;
             _isAutomaticReconnectActive = true;
             _automaticReconnectGeneration += 1;
@@ -1081,6 +1147,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void BeginAutomaticReconnect(string reason, bool resetCurrentSender)
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             if (!_isAutomaticReconnectActive && !CanAutomaticallyRecoverCurrentBattle())
             {
                 return;
@@ -1125,6 +1192,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private async void AttemptAutomaticReconnectAsync()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             if (!_isAutomaticReconnectActive ||
                 _isAutomaticReconnectAttemptInProgress ||
                 _isDestroying)
@@ -1276,6 +1344,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void SendClientHeartbeatIfNeeded()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             if (_messageSender == null || !_messageSender.IsConnected)
             {
                 return;
@@ -1306,6 +1375,11 @@ namespace Project333.Runtime.Presentation.Online
 
         private float HandleEnvelope(OnlineBattleEnvelope envelope)
         {
+            if (TutorialRuntimeIsolation.IsActive)
+            {
+                if (envelope != null) _presentationMessages.Enqueue(envelope);
+                return 0f;
+            }
             if (envelope == null)
             {
                 return 0f;
@@ -1343,16 +1417,13 @@ namespace Project333.Runtime.Presentation.Online
                                                 _battleBootstrapper.IsPvpMatchmakingOverlayVisible &&
                                                 !_battleBootstrapper.IsCancellingPvpMatchmaking;
                         _battleBootstrapper?.HidePvpMatchmakingOverlay(showFoundMessage: wasPvpMatchmaking);
-                        if (!wasPvpMatchmaking)
-                        {
-                            ShowOnlineSuccessToast("서버 전투 준비 완료.");
-                        }
                     }
 
                     return 0f;
 
                 case OnlineBattleMessageType.Error:
                     var errorCode = envelope.Error?.Code ?? string.Empty;
+                    if (errorCode == "command_rejected") _gateway?.RejectCommand(envelope.Error?.CommandSequence);
                     if (!_hasReceivedFirstStateView && !_isAutomaticReconnectActive &&
                         (string.Equals(errorCode, "battle_reconnect_required", StringComparison.Ordinal) ||
                          string.Equals(errorCode, "already_in_pve_match", StringComparison.Ordinal)))
@@ -1404,6 +1475,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void ApplySeatAssignmentIfOwned(OnlineBattleEnvelope envelope)
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             if (!envelope.HasAssignedSeat)
             {
                 return;
@@ -1491,6 +1563,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void ApplyStateView(BattleStateViewDto view)
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             if (view == null)
             {
                 return;
@@ -1593,6 +1666,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void ApplyPendingStateViewIfReady()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             if (_pendingStateView == null || Time.unscaledTime < _deferStateViewUntilRealtime)
             {
                 return;
@@ -1656,7 +1730,7 @@ namespace Project333.Runtime.Presentation.Online
                 switch (battleEvent.EventType)
                 {
                     case BattleEventType.ReconnectGraceStarted:
-                        var reconnectGraceSeconds = battleEvent.Amount > 0 ? battleEvent.Amount : 60;
+                        var reconnectGraceSeconds = battleEvent.Amount > 0 ? battleEvent.Amount : 70;
                         _battleBootstrapper.ShowOpponentReconnectCountdown(reconnectGraceSeconds);
                         SetStatus($"Opponent reconnect grace started: {reconnectGraceSeconds} seconds.");
                         break;
@@ -1692,6 +1766,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private bool ShouldShowBattleStatusOverlay()
         {
+            if (TutorialRuntimeIsolation.IsActive) return false;
             if (ShouldDriveBattleScreen())
             {
                 return true;
@@ -1835,6 +1910,10 @@ namespace Project333.Runtime.Presentation.Online
                     SourceRuntimeId = battleEvent.SourceRuntimeId,
                     SourceCardId = battleEvent.SourceCardId,
                     EffectId = battleEvent.EffectId,
+                    EffectIndex = battleEvent.EffectIndex,
+                    RemainingTriggersBefore = battleEvent.RemainingTriggersBefore,
+                    RemainingTriggersAfter = battleEvent.RemainingTriggersAfter,
+                    TrapCount = battleEvent.TrapCount,
                     TargetRuntimeId = battleEvent.TargetRuntimeId,
                     TargetCardId = battleEvent.TargetCardId,
                     CardAttack = battleEvent.CardAttack,
@@ -1995,6 +2074,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private bool ShouldDriveBattleScreen()
         {
+            if (TutorialRuntimeIsolation.IsActive) return false;
             if (!_presentStateViewsToBattleScreen)
             {
                 return false;
@@ -2008,6 +2088,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void AutoAssignBattleScreenPresenter()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             if (_battleScreenPresenter != null)
             {
                 return;
@@ -2018,6 +2099,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void AutoAssignBattleBootstrapper()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             if (_battleBootstrapper != null)
             {
                 return;
@@ -2151,8 +2233,18 @@ namespace Project333.Runtime.Presentation.Online
                 : onlineSeatId.ToString();
         }
 
+        private async System.Threading.Tasks.Task<bool> WaitUntilTutorialEndsAsync()
+        {
+            // An operation begun before tutorial entry keeps its existing session intent.
+            // New tutorial actions are rejected at their entry points instead of queued.
+            while (TutorialRuntimeIsolation.IsActive && !_isDestroying && this != null)
+                await System.Threading.Tasks.Task.Delay(50);
+            return !_isDestroying && this != null;
+        }
+
         private bool EnsurePlayMode(string action)
         {
+            if (TutorialRuntimeIsolation.IsActive) return false;
             if (UnityEngine.Application.isPlaying)
             {
                 return true;

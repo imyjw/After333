@@ -12,6 +12,7 @@ namespace Project333.Runtime.Domain.Cards
         private bool _isDrained;
         private List<InvincibleEffectState> _invincibleEffects = new List<InvincibleEffectState>();
         private List<CombatStatBuffState> _combatStatBuffs = new List<CombatStatBuffState>();
+        private List<string> _erasedOrcChieftainSourceRuntimeIds = new List<string>();
         private BoardState _currentBoard;
         private PlayerId _currentActivePlayerId;
         private int _currentBattleTurnNumber;
@@ -97,22 +98,23 @@ namespace Project333.Runtime.Domain.Cards
             RemainingAttacksThisTurn = maxAttacksPerTurn;
         }
 
-        // Exposure is keyed by battlefield owner, so ownership transfer never clears or duplicates it.
+        // Acquired stacks are stored on this occupant; movement/ownership transfer cannot add stacks.
+        public bool IsFalloutTarget => Kind == OccupantKind.Unit || Kind == OccupantKind.Master;
         public int FalloutPlayerStacks { get; private set; }
         public int FalloutAiStacks { get; private set; }
-        public int FalloutStacks => FalloutPlayerStacks + FalloutAiStacks;
+        public int FalloutStacks => IsFalloutTarget ? FalloutPlayerStacks + FalloutAiStacks : 0;
         public void RestoreFallout(int playerStacks, int aiStacks)
         {
-            FalloutPlayerStacks = Kind == OccupantKind.Master ? 0 : Math.Max(0, playerStacks);
-            FalloutAiStacks = Kind == OccupantKind.Master ? 0 : Math.Max(0, aiStacks);
+            // Legacy building exposure is discarded; unit and Master history survives reconnect.
+            FalloutPlayerStacks = IsFalloutTarget ? Math.Max(0, playerStacks) : 0;
+            FalloutAiStacks = IsFalloutTarget ? Math.Max(0, aiStacks) : 0;
         }
-        internal void ApplyFalloutExposure(int stacks)
+        internal void AddFalloutStack()
         {
-            if (Kind == OccupantKind.Master || IsSealbound) return;
-            if (OwnerId == PlayerId.Player) FalloutPlayerStacks = Math.Max(FalloutPlayerStacks, stacks);
-            else FalloutAiStacks = Math.Max(FalloutAiStacks, stacks);
+            if (!IsFalloutTarget || !IsAlive || IsSealbound) return;
+            if (OwnerId == PlayerId.Player) FalloutPlayerStacks++;
+            else FalloutAiStacks++;
         }
-        private void RefreshFalloutExposure() => ApplyFalloutExposure(_currentBoard?.FalloutStacks ?? 0);
 
         // Global turn number: reconnect and movement must not reset per-turn active use.
         public int LastActiveEffectTurnNumber { get; private set; } = -1;
@@ -127,8 +129,11 @@ namespace Project333.Runtime.Domain.Cards
         public int OriginalAttack { get; private set; }
         public int BaseAttack { get; protected set; }
         public IReadOnlyList<CombatStatBuffState> CombatStatBuffs => _combatStatBuffs;
+        // Erasure removes the old contribution without repeatedly receiving that same live aura.
+        public IReadOnlyList<string> ErasedOrcChieftainSourceRuntimeIds => _erasedOrcChieftainSourceRuntimeIds;
         public int Attack => GetAttackForCurrentState() +
-                             WerewolfRules.CalculatePackAttackBonus(this, _currentBoard);
+                             WerewolfRules.CalculatePackAttackBonus(this, _currentBoard) +
+                             GaebangChiefRules.CalculateGoldAttackBonus(this, _currentBoard);
         public int OriginalMaxHp { get; private set; }
         public int MaxHp { get; protected set; }
         public int CurrentHp { get; set; }
@@ -198,9 +203,14 @@ namespace Project333.Runtime.Domain.Cards
                     {
                         RevealHiding();
                     }
+                    _currentBoard?.RefreshOrcChieftainAuras();
                 }
             }
         }
+        public bool IsStunned => StunTurnEndsRemaining > 0;
+        public int StunTurnEndsRemaining { get; private set; }
+        public bool IsFrozen => FreezeTurnEndsRemaining > 0;
+        public int FreezeTurnEndsRemaining { get; private set; }
         public bool IsErasure { get; private set; }
         public bool IsSealbound { get; private set; }
         public int SealboundOwnerTurnStartsRemaining { get; private set; }
@@ -217,13 +227,14 @@ namespace Project333.Runtime.Domain.Cards
         public int RemainingAttacksThisTurn { get; set; }
         public bool IsAlive => CurrentHp > 0;
 
-        public bool CannotAttack => IsDrained || IsSealbound;
-        public bool CannotCounterattack => IsDrained || IsSealbound;
-        public bool CannotMoveDueToState => IsDrained || IsSealbound;
+        public bool CannotAttack => IsDrained || IsSealbound || IsStunned || IsFrozen;
+        public bool CannotCounterattack => IsDrained || IsSealbound || IsStunned || IsFrozen;
+        public bool CannotMoveDueToState => IsDrained || IsSealbound || IsFrozen;
         public bool EffectsSuppressed => IsDrained || IsErasure || IsSealbound;
+        public bool CannotActivate => EffectsSuppressed || IsStunned || IsFrozen;
         public bool BuffsAndDebuffsSuppressed => IsDrained || IsSealbound;
         public bool TakesDrainedDamage => IsDrained;
-        public bool DoesNotBlockFrontRow => IsDrained || IsSealbound || IsHiding || HasActiveFlying;
+        public bool DoesNotBlockFrontRow => IsDrained || IsSealbound || IsFrozen || IsHiding || HasActiveFlying;
         public bool CanBeAffected => !IsSealbound;
 
         public bool CanTriggerEndure => HasEndure && !EndureUsed && !EffectsSuppressed;
@@ -237,12 +248,14 @@ namespace Project333.Runtime.Domain.Cards
         public OccupantState CloneDetached()
         {
             var copy = (OccupantState)MemberwiseClone();
+            copy.RestoreFallout(FalloutPlayerStacks, FalloutAiStacks);
             copy._currentBoard = null!;
             copy.TurnStartResourceGain = TurnStartResourceGain.Clone();
             copy._invincibleEffects = new List<InvincibleEffectState>();
             foreach (var effect in _invincibleEffects) copy._invincibleEffects.Add(effect.Clone());
             copy._combatStatBuffs = new List<CombatStatBuffState>();
             foreach (var buff in _combatStatBuffs) copy._combatStatBuffs.Add(buff.Clone());
+            copy._erasedOrcChieftainSourceRuntimeIds = new List<string>(_erasedOrcChieftainSourceRuntimeIds);
             return copy;
         }
 
@@ -268,6 +281,7 @@ namespace Project333.Runtime.Domain.Cards
             }
 
             OwnerId = newOwnerId;
+            _currentBoard?.RefreshOrcChieftainAuras();
         }
 
         public InvincibleEffectState AddInvincibleEffect(
@@ -327,6 +341,42 @@ namespace Project333.Runtime.Domain.Cards
             }
         }
 
+        // Action debuffs leave card effects, traits, defenses and damage rules intact.
+        // Every accepted global turn end consumes one duration, including the application turn.
+        public void ApplyStun(int turnEnds)
+        {
+            if (turnEnds < 0) throw new ArgumentOutOfRangeException(nameof(turnEnds));
+            if (turnEnds == 0 || IsSealbound) return;
+            StunTurnEndsRemaining = Math.Max(StunTurnEndsRemaining, turnEnds);
+        }
+
+        public void ApplyFreeze(int turnEnds)
+        {
+            if (turnEnds < 0) throw new ArgumentOutOfRangeException(nameof(turnEnds));
+            if (turnEnds == 0 || IsSealbound) return;
+            FreezeTurnEndsRemaining = Math.Max(FreezeTurnEndsRemaining, turnEnds);
+        }
+
+        public void RestoreActionDebuffs(int stunTurnEndsRemaining, int freezeTurnEndsRemaining)
+        {
+            // Ordinary Sealbound can retain earlier debuffs; their global clocks keep advancing.
+            // A pending Demon King has already died and discarded its action debuffs.
+            StunTurnEndsRemaining = IsDemonKingRevivalPending ? 0 : Math.Max(0, stunTurnEndsRemaining);
+            FreezeTurnEndsRemaining = IsDemonKingRevivalPending ? 0 : Math.Max(0, freezeTurnEndsRemaining);
+        }
+
+        public void ClearActionDebuffs()
+        {
+            StunTurnEndsRemaining = 0;
+            FreezeTurnEndsRemaining = 0;
+        }
+
+        public void ResolveActionDebuffsTurnEnd()
+        {
+            StunTurnEndsRemaining = Math.Max(0, StunTurnEndsRemaining - 1);
+            FreezeTurnEndsRemaining = Math.Max(0, FreezeTurnEndsRemaining - 1);
+        }
+
         /// <summary>
         /// Applies Erasure and removes combat-time modifiers that existed before it was applied.
         /// Account upgrade stats are part of the original summon stats and remain intact.
@@ -342,10 +392,14 @@ namespace Project333.Runtime.Domain.Cards
 
             RevealHiding();
             ClearHuanShu();
+            ClearActionDebuffs();
             IsErasure = true;
             _isDrained = false;
             BaseAttack = OriginalAttack;
             MaxHp = OriginalMaxHp;
+            foreach (var buff in _combatStatBuffs)
+                if (OrcChieftainRules.IsAura(buff) && !_erasedOrcChieftainSourceRuntimeIds.Contains(buff.SourceRuntimeId))
+                    _erasedOrcChieftainSourceRuntimeIds.Add(buff.SourceRuntimeId);
             _combatStatBuffs.Clear();
             CurrentHp = Math.Min(CurrentHp, MaxHp);
             PhysicalDefense = OriginalPhysicalDefense;
@@ -356,6 +410,7 @@ namespace Project333.Runtime.Domain.Cards
             }
 
             RemainingAttacksThisTurn = Math.Max(0, EffectiveMaxAttacksPerTurn - attacksSpent);
+            _currentBoard?.RefreshOrcChieftainAuras();
         }
 
         /// <summary>
@@ -376,6 +431,7 @@ namespace Project333.Runtime.Domain.Cards
             _isDrained = !IsErasure && isDrained;
             HidingRevealed = HasHiding &&
                              (hidingRevealed || IsErasure || (!IsSealbound && _isDrained));
+            _currentBoard?.RefreshOrcChieftainAuras();
         }
 
         public bool RevealHiding()
@@ -446,6 +502,7 @@ namespace Project333.Runtime.Domain.Cards
             SealboundOwnerTurnStartsRemaining = ownerTurnStarts;
             HasSummoningSickness = true;
             RemainingAttacksThisTurn = 0;
+            _currentBoard?.RefreshOrcChieftainAuras();
         }
 
         public bool ResolveSealboundOwnerTurnStart()
@@ -462,10 +519,10 @@ namespace Project333.Runtime.Domain.Cards
             }
 
             IsSealbound = false;
-            RefreshFalloutExposure();
             var canAttackOnReleaseTurn = HasRush && !EffectsSuppressed;
             HasSummoningSickness = !canAttackOnReleaseTurn;
             RemainingAttacksThisTurn = canAttackOnReleaseTurn ? EffectiveMaxAttacksPerTurn : 0;
+            _currentBoard?.RefreshOrcChieftainAuras();
             return true;
         }
 
@@ -481,6 +538,7 @@ namespace Project333.Runtime.Domain.Cards
             }
 
             CurrentHp = 0;
+            ClearActionDebuffs();
             IsSealbound = true;
             SealboundOwnerTurnStartsRemaining = DemonKingRules.RevivalTurnStarts;
             IsDemonKingRevivalPending = true;
@@ -522,12 +580,12 @@ namespace Project333.Runtime.Domain.Cards
 
             RevealHiding();
             ClearHuanShu();
+            ClearActionDebuffs();
             _invincibleEffects.Clear();
             IsErasure = false;
             _isDrained = false;
             HidingRevealed = false;
             EndureUsed = false;
-            RefreshFalloutExposure();
 
             BaseAttack = DemonKingRules.CalculateRevivedStat(
                 OriginalAttack,
@@ -537,6 +595,7 @@ namespace Project333.Runtime.Domain.Cards
                 DemonKingRevivalCount);
             CurrentHp = MaxHp;
             _combatStatBuffs.Clear();
+            _erasedOrcChieftainSourceRuntimeIds.Clear();
             RecordCombatStatBuff(new CombatStatBuffState(
                 DemonKingRules.CardId, BaseAttack - OriginalAttack, MaxHp - OriginalMaxHp));
             PhysicalDefense = OriginalPhysicalDefense;
@@ -544,6 +603,7 @@ namespace Project333.Runtime.Domain.Cards
             WasSummonedThisTurn = true;
             HasSummoningSickness = true;
             RemainingAttacksThisTurn = 0;
+            _currentBoard?.RefreshOrcChieftainAuras();
             return true;
         }
 
@@ -570,6 +630,7 @@ namespace Project333.Runtime.Domain.Cards
             }
 
             CurrentHp = 0;
+            ClearActionDebuffs();
             IsSealbound = true;
             SealboundOwnerTurnStartsRemaining = DemonKingRevivalTurnStartsRemaining;
             IsErasure = false;
@@ -609,10 +670,11 @@ namespace Project333.Runtime.Domain.Cards
             int attackBonus = 0,
             int maxHpBonus = 0,
             int physicalDefenseBonus = 0,
-            int magicDefenseBonus = 0)
+            int magicDefenseBonus = 0,
+            string sourceRuntimeId = "")
         {
             var buff = new CombatStatBuffState(
-                sourceCardId, attackBonus, maxHpBonus, physicalDefenseBonus, magicDefenseBonus);
+                sourceCardId, attackBonus, maxHpBonus, physicalDefenseBonus, magicDefenseBonus, sourceRuntimeId);
             if (IsSealbound) return;
 
             IncreaseBaseAttack(attackBonus);
@@ -636,6 +698,63 @@ namespace Project333.Runtime.Domain.Cards
             foreach (var buff in restored) RecordCombatStatBuff(buff);
         }
 
+        public void RestoreErasedOrcChieftainSources(IEnumerable<string> sourceRuntimeIds)
+        {
+            var restored = new List<string>();
+            if (sourceRuntimeIds != null)
+                foreach (var runtimeId in sourceRuntimeIds)
+                    if (!string.IsNullOrWhiteSpace(runtimeId) && !restored.Contains(runtimeId)) restored.Add(runtimeId);
+            _erasedOrcChieftainSourceRuntimeIds = restored;
+        }
+
+        // Decide the complete new source set before touching HP. Ownership transfer can replace
+        // an old source with a new one without transient death or an extra heal between updates.
+        internal bool ReconcileOrcChieftainAuras(IReadOnlyList<OccupantState> sources)
+        {
+            var isRecipient = OrcChieftainRules.IsRecipient(this);
+            var canReceiveNew = isRecipient && IsAlive && !IsSealbound;
+            var activeSourceIds = new HashSet<string>(StringComparer.Ordinal);
+            if (isRecipient)
+                foreach (var source in sources)
+                    if (source.OwnerId == OwnerId) activeSourceIds.Add(source.RuntimeId);
+
+            var attackDelta = 0;
+            var hpDelta = 0;
+            var changed = false;
+            var retainedIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = _combatStatBuffs.Count - 1; index >= 0; index--)
+            {
+                var buff = _combatStatBuffs[index];
+                if (!OrcChieftainRules.IsAura(buff)) continue;
+                if (activeSourceIds.Contains(buff.SourceRuntimeId))
+                {
+                    retainedIds.Add(buff.SourceRuntimeId);
+                    continue;
+                }
+                _combatStatBuffs.RemoveAt(index);
+                attackDelta -= buff.AttackBonus;
+                hpDelta -= buff.MaxHpBonus;
+                changed = true;
+            }
+            if (canReceiveNew)
+                foreach (var source in sources)
+                {
+                    if (source.OwnerId != OwnerId || retainedIds.Contains(source.RuntimeId) ||
+                        _erasedOrcChieftainSourceRuntimeIds.Contains(source.RuntimeId)) continue;
+                    RecordCombatStatBuff(new CombatStatBuffState(OrcChieftainRules.CardId,
+                        OrcChieftainRules.AuraAttackBonus, OrcChieftainRules.AuraHealthBonus,
+                        sourceRuntimeId: source.RuntimeId));
+                    retainedIds.Add(source.RuntimeId);
+                    attackDelta += OrcChieftainRules.AuraAttackBonus;
+                    hpDelta += OrcChieftainRules.AuraHealthBonus;
+                    changed = true;
+                }
+            BaseAttack += attackDelta;
+            MaxHp += hpDelta;
+            CurrentHp += hpDelta;
+            return changed;
+        }
+
         private void RecordCombatStatBuff(CombatStatBuffState buff)
         {
             if (buff.AttackBonus == 0 && buff.MaxHpBonus == 0 &&
@@ -643,13 +762,15 @@ namespace Project333.Runtime.Domain.Cards
             for (var index = 0; index < _combatStatBuffs.Count; index++)
             {
                 var existing = _combatStatBuffs[index];
-                if (!string.Equals(existing.SourceCardId, buff.SourceCardId, StringComparison.Ordinal)) continue;
+                if (!string.Equals(existing.SourceCardId, buff.SourceCardId, StringComparison.Ordinal) ||
+                    !string.Equals(existing.SourceRuntimeId, buff.SourceRuntimeId, StringComparison.Ordinal)) continue;
                 _combatStatBuffs[index] = new CombatStatBuffState(
                     buff.SourceCardId,
                     existing.AttackBonus + buff.AttackBonus,
                     existing.MaxHpBonus + buff.MaxHpBonus,
                     existing.PhysicalDefenseBonus + buff.PhysicalDefenseBonus,
-                    existing.MagicDefenseBonus + buff.MagicDefenseBonus);
+                    existing.MagicDefenseBonus + buff.MagicDefenseBonus,
+                    buff.SourceRuntimeId);
                 return;
             }
             _combatStatBuffs.Add(buff);

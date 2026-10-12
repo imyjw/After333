@@ -12,6 +12,8 @@ public sealed class ClientBattleCommandMessage
 
     public long Sequence { get; set; }
 
+        public int? ExpectedTurnNumber { get; set; }
+
     public PlayerIdDto ActorId { get; set; }
 
     public OnlineBattleCommandType CommandType { get; set; }

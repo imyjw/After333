@@ -6,7 +6,7 @@ namespace Project333.Runtime.Domain.Cards
     public static class WerewolfRules
     {
         public const string CardId = "Werewolf";
-        public const int BaseAttack = 20;
+        public const int BaseAttack = 10;
         public const int BaseHealth = 30;
         public const int ManaCost = 3;
         public const int AttackPerOtherWerewolf = 10;

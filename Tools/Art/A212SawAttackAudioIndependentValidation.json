@@ -1,0 +1,33 @@
+{
+    "file":  "Assets/Project333/Resources/Project333/Units/A-212/Audio/SawAttack.wav",
+    "validation":  "Independent RIFF chunk and decoded PCM analysis",
+    "format":  {
+                   "encoding":  1,
+                   "channels":  1,
+                   "sampleRate":  44100,
+                   "byteRate":  88200,
+                   "blockAlign":  2,
+                   "bitsPerSample":  16
+               },
+    "containerBytes":  42380,
+    "pcmBytes":  42336,
+    "samples":  21168,
+    "durationSeconds":  0.48,
+    "peakDbfs":  -13.893151077430284,
+    "rmsDbfs":  -25.159313778998289,
+    "dcOffset":  -3.5508689966872164E-06,
+    "peakTimeSeconds":  0.37319727891156462,
+    "clippedSamples":  0,
+    "firstSample":  0,
+    "lastSample":  0,
+    "boundary64Samples":  {
+                              "firstPeak":  0.001495361328125,
+                              "lastPeak":  0.00018310546875,
+                              "firstMaxAdjacentStep":  0.00103759765625,
+                              "lastMaxAdjacentStep":  0.000152587890625,
+                              "passed":  true
+                          },
+    "sha256":  "62d1d58d79ed43688b74752e1c780b3f344732c2859784c176d9fac60ea22697",
+    "passed":  true,
+    "listening":  "No device/in-game listening validation; this report validates file and waveform properties only."
+}

@@ -5,20 +5,11 @@ using Project333.PvpServer.Runs;
 
 namespace Project333.PvpServer.Challenges;
 
-/// <summary>Server-owned, durable daily admissions. Results are settled by BattleResultStore.</summary>
+/// <summary>Server-owned, durable admissions scoped to the paid run. Results are settled by BattleResultStore.</summary>
 public sealed class AiChallengeService(DbConnectionFactory connectionFactory)
 {
-    public const int DailyLimit = 3;
+    public const int RunLimit = 3;
     public const int WinResourceGold = 10;
-    private static readonly TimeSpan KoreanOffset = TimeSpan.FromHours(9);
-
-    public static (DateOnly Day, DateTimeOffset ResetsAtUtc) GetDayWindow(DateTimeOffset now)
-    {
-        var local = now.ToOffset(KoreanOffset);
-        var day = DateOnly.FromDateTime(local.Date);
-        return (day, new DateTimeOffset(local.Date.AddDays(1), KoreanOffset).ToUniversalTime());
-    }
-
     public async Task<AiChallengeStartResponse> StartAsync(
         Guid accountId, AiChallengeStartRequest request, CancellationToken cancellationToken)
     {
@@ -34,13 +25,14 @@ public sealed class AiChallengeService(DbConnectionFactory connectionFactory)
         await LockMatchmakingAsync(db, tx, cancellationToken);
         await LockWalletAsync(db, tx, accountId, cancellationToken);
         var now = await ReadClockAsync(db, tx, cancellationToken);
-        var window = GetDayWindow(now);
+        // Keep the original date for historical auditing only; quota is keyed by RunId.
+        var recordedDay = DateOnly.FromDateTime(now.ToOffset(TimeSpan.FromHours(9)).Date);
 
         var previous = await ReadAttemptAsync(db, tx, accountId, requestId: request.RequestId, cancellationToken: cancellationToken);
         if (previous != null)
         {
             EnsureBinding(previous, runId, deckId);
-            var replay = await ResponseAsync(db, tx, accountId, previous, window, true, cancellationToken);
+            var replay = await ResponseAsync(db, tx, accountId, previous, true, cancellationToken);
             await tx.CommitAsync(cancellationToken);
             return replay;
         }
@@ -51,7 +43,7 @@ public sealed class AiChallengeService(DbConnectionFactory connectionFactory)
             EnsureBinding(pending, runId, deckId);
             // Persist the alias too: replaying this second request after completion must still return this attempt.
             await SaveRequestAsync(db, tx, accountId, request.RequestId, pending.AttemptId, cancellationToken);
-            var replay = await ResponseAsync(db, tx, accountId, pending, window, true, cancellationToken);
+            var replay = await ResponseAsync(db, tx, accountId, pending, true, cancellationToken);
             await tx.CommitAsync(cancellationToken);
             return replay;
         }
@@ -87,8 +79,8 @@ public sealed class AiChallengeService(DbConnectionFactory connectionFactory)
             if (await busy.ExecuteScalarAsync(cancellationToken) is true)
                 throw Error("battle_already_active", "Finish or reconnect to the current battle before starting a challenge.");
         }
-        if (await RemainingAsync(db, tx, accountId, window.Day, cancellationToken) <= 0)
-            throw Error("ai_challenge_daily_limit", "All three AI challenge attempts for today have been used.");
+        if (await RemainingAsync(db, tx, accountId, runId, cancellationToken) <= 0)
+            throw Error("ai_challenge_run_limit", "All three Gold Dungeon attempts for this run have been used.");
 
         var attempt = new AiChallengeAttemptDto(Guid.NewGuid(), "challenge-" + Guid.NewGuid().ToString("N"), runId, deckId, "reserved");
         await using (var insert = new NpgsqlCommand("""
@@ -102,12 +94,12 @@ public sealed class AiChallengeService(DbConnectionFactory connectionFactory)
             insert.Parameters.AddWithValue("run", runId);
             insert.Parameters.AddWithValue("deck", deckId);
             insert.Parameters.AddWithValue("match", attempt.MatchId);
-            insert.Parameters.AddWithValue("day", window.Day);
+            insert.Parameters.AddWithValue("day", recordedDay);
             insert.Parameters.AddWithValue("now", now);
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
         await SaveRequestAsync(db, tx, accountId, request.RequestId, attempt.AttemptId, cancellationToken);
-        var response = await ResponseAsync(db, tx, accountId, attempt, window, false, cancellationToken);
+        var response = await ResponseAsync(db, tx, accountId, attempt, false, cancellationToken);
         await tx.CommitAsync(cancellationToken);
         return response;
     }
@@ -117,11 +109,12 @@ public sealed class AiChallengeService(DbConnectionFactory connectionFactory)
         await using var db = await connectionFactory.OpenConnectionAsync(cancellationToken);
         await using var tx = await db.BeginTransactionAsync(cancellationToken);
         await LockWalletAsync(db, tx, accountId, cancellationToken);
-        var window = GetDayWindow(await ReadClockAsync(db, tx, cancellationToken));
+        var runId = await ReadCurrentRunAsync(db, tx, accountId, cancellationToken);
         var pending = await ReadAttemptAsync(db, tx, accountId, pendingOnly: true, cancellationToken: cancellationToken);
-        var remaining = await RemainingAsync(db, tx, accountId, window.Day, cancellationToken);
+        var remaining = runId.HasValue
+            ? await RemainingAsync(db, tx, accountId, runId.Value, cancellationToken) : 0;
         await tx.CommitAsync(cancellationToken);
-        return new(DailyLimit, remaining, window.ResetsAtUtc, pending);
+        return new(RunLimit, remaining, runId, pending);
     }
 
     public async Task<AiChallengeAttemptDto?> FindAttemptAsync(Guid accountId, Guid attemptId, CancellationToken cancellationToken)
@@ -152,7 +145,7 @@ public sealed class AiChallengeService(DbConnectionFactory connectionFactory)
         string reason, CancellationToken cancellationToken)
     {
         if (refundAttempt && reason != "server_cancel")
-            throw new InvalidOperationException("Only a server outage/maintenance cancellation refunds an AI challenge.");
+            throw new InvalidOperationException("Only a server outage/maintenance cancellation refunds a Gold Dungeon.");
         if (reason is not ("server_cancel" or "join_failed"))
             throw new InvalidOperationException("Invalid challenge cancellation reason.");
         await using var db = await connectionFactory.OpenConnectionAsync(cancellationToken);
@@ -190,21 +183,35 @@ public sealed class AiChallengeService(DbConnectionFactory connectionFactory)
     }
 
     private static async Task<AiChallengeStartResponse> ResponseAsync(NpgsqlConnection db, NpgsqlTransaction tx,
-        Guid account, AiChallengeAttemptDto attempt, (DateOnly Day, DateTimeOffset ResetsAtUtc) window,
+        Guid account, AiChallengeAttemptDto attempt,
         bool replayed, CancellationToken ct) =>
         new(attempt.AttemptId, attempt.MatchId, attempt.RunId, attempt.DeckId, attempt.Status,
-            await RemainingAsync(db, tx, account, window.Day, ct), window.ResetsAtUtc, replayed);
+            await RemainingAsync(db, tx, account, attempt.RunId, ct), replayed);
 
     private static async Task<int> RemainingAsync(NpgsqlConnection db, NpgsqlTransaction tx, Guid account,
-        DateOnly day, CancellationToken ct)
+        Guid runId, CancellationToken ct)
     {
         await using var count = new NpgsqlCommand("""
             select count(*) from ai_challenge_attempts
-            where account_id=@account and challenge_day=@day and refunded_at is null;
+            where account_id=@account and run_id=@run and refunded_at is null;
             """, db, tx);
         count.Parameters.AddWithValue("account", account);
-        count.Parameters.AddWithValue("day", day);
-        return Math.Max(0, DailyLimit - checked((int)(long)(await count.ExecuteScalarAsync(ct))!));
+        count.Parameters.AddWithValue("run", runId);
+        return Math.Max(0, RunLimit - checked((int)(long)(await count.ExecuteScalarAsync(ct))!));
+    }
+
+    private static async Task<Guid?> ReadCurrentRunAsync(NpgsqlConnection db, NpgsqlTransaction tx,
+        Guid accountId, CancellationToken ct)
+    {
+        await using var command = new NpgsqlCommand("""
+            select r.id from draft_runs r join decks d on d.id=r.completed_deck_id
+            where r.account_id=@account and r.status in ('ready','in_progress')
+              and d.account_id=@account and d.source_run_id=r.id and not d.is_archived
+              and (select count(*) from deck_cards where deck_id=d.id)=33
+            order by r.started_at desc limit 1;
+            """, db, tx);
+        command.Parameters.AddWithValue("account", accountId);
+        return await command.ExecuteScalarAsync(ct) is Guid runId ? runId : null;
     }
 
     private static async Task<AiChallengeAttemptDto?> ReadAttemptAsync(NpgsqlConnection db, NpgsqlTransaction? tx,

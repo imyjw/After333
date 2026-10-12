@@ -1,5 +1,17 @@
 # Account Persistence DB Design
 
+실제 적용 상태(2026-10-09): 사용자 요청으로 운영 DB에 `0023_ai_challenge_run_usage` 적용 완료(총23개/latest0023). 적용 전 전체 백업과 아카이브 읽기를 검증했고, 기존33개 테이블의 행 수·전체 행 해시 및 도전25건이 보존되었다. 이번에는 서버 배포·재시작이나 클라이언트 빌드·설치를 수행하지 않았다. 상세 [운영 적용 기록](battle_modes.md#운영-db-마이그레이션-적용-2026-10-09).
+
+실제 적용 상태(2026-10-02): 아래 소스 대조의 운영 미조회 설명은 배포 전 기록이다. 후속 별도 승인으로 운영 DB0020/0021/0022·카드팩 서버 적용 및 Android APK(versionCode5) 빌드를 완료했고, 실제 스키마는 총22개/latest0022로 확인했다. [실제 적용 기록](shop_card_packs.md)에31보호 테이블 보존 및 대기열2행의 검증된 시작 시 상태 변경을 구분해 기록했다. 실기기 실행은 미검증이다.
+
+## 현재 구현과 설계 예시의 구분 (2026-10-09)
+
+현재 소스에는 SQL 마이그레이션 `0001`~`0024`가 있다. `0020_card_upgrade_costs_revision.sql`은 2026-10-01 확정 비용표의 13개 전이를 설정한 기록으로 유지하고, `0021_card_upgrade_level2_cost_revision.sql`은 2026-10-02 확정한 Lv.1→Lv.2의 동일 카드·계정 골드 비용만 6/6으로 갱신한다. 이후 `0022_card_pack_purchase_receipts.sql`은 영수증 작업 종류에 `card_pack_purchase`를 추가한다. `0023_ai_challenge_run_usage.sql`은 계정·런별 비환급 골드 던전 도전 조회 인덱스만 추가하며 기존 기록을 초기화하거나 재정산하지 않는다. 계정·인증/자동 로그인·서버 드래프트·강화·런 보상·광고 티켓·티켓/카드팩 구매와 강화의 요청 영수증·취소·관리자 선물함·골드 던전·사람 우선 매칭/AI 전환이 구현되어 있다. 카드팩은 33계정 골드 차감과 10장 지급을 한 트랜잭션에서 확정하고, 개봉 전에도 이미 보유카드에 포함한다. [카드팩 계약](shop_card_packs.md)을 따른다. 실제 DB의 적용 버전과 운영 실행본은 별도 점검 대상이며 이번 문서 대조에서 조회하지 않았다.
+
+문서의 `Suggested fields`와 미구현 미개봉 팩 재고/개별 카드 상점/제작은 설계 예시다. 실제 스키마는 `Server/Project333.PvpServer/Persistence/Migrations`와 서비스 코드가 기준이다. 게스트 및 계정 연결 경로는 현재 제공하지 않으며 Game ID 또는 Google 로그인과 저장 세션 복구를 사용한다. 시작 씬 톱니바퀴 메뉴에는 확인 후 로그아웃이 있다. 로그아웃은 로컬 자격 증명을 지우고 로그인 게이트를 다시 표시하며 계정 소유 데이터는 삭제하지 않는다.
+
+실행 중 서버의 사람/AI/도전 재접속은 70초다. 서버 재시작으로 미완료 전투는 취소하며, 영속 전투 결과 저널의 확정 결과만 멱등 재처리한다. 골드 던전은 티켓 3개로 시작한 현재 진행 중 런의 완성된 덱으로 런당 최대 3회·승리 Resource Gold10이고 일반 런 성적과 별개다. 자정·재로그인은 초기화하지 않고 서버 취소는 원래 런에만 환급한다. 현재 런의 기존 도전도 날짜와 무관하게 합산하며 3회 이상이면 잔여 0회다. `challenge_day`는 감사 정보로 유지한다. 광고 티켓의 UTC 일일 한도와 혼동하지 않는다.
+
 ## Document Purpose
 
 This document defines the database design for accounts, login identities, owned card copies, card upgrade levels, drafted run decks, run progress, reward history, and account-backed PvP reconnection.
@@ -23,7 +35,7 @@ Confirmed design direction:
 - Google login is implemented; Naver and Kakao remain future targets.
 - Guest account creation and authentication are disabled.
 - The game requires a valid Game ID or social-login account before any game feature can be used.
-- User-facing identity linking, logout, and account switching are not part of the current product flow.
+- User-facing identity linking is not exposed. The start-scene settings menu provides confirmed logout and then the mandatory login gate; account data remains server-owned.
 - Account and meta progression are designed for an actual server DB, not client-local authoritative storage.
 - Local data is only temporary cache or demo data unless a later rule says otherwise.
 - Static card definitions stay outside user rows.
@@ -33,10 +45,10 @@ Confirmed design direction:
 - A drafted deck is used until that run reaches either 33 wins or 3 losses.
 - A run deck stores card ids only; each battle applies the account's current upgrade level for those cards.
 - PvE and PvP can use the same persisted deck/run schema.
-- PvE is primarily for feature demonstration at this stage.
-- Rewards are granted at run end, not after every battle.
-- Rewards will likely include packs.
-- Future card acquisition routes may include packs, shop, rewards, and crafting.
+- Normal run battles use human-first matchmaking with server AI fallback after 20 seconds. Per-run Gold Dungeon is an independent mode; see [battle_modes.md](battle_modes.md).
+- Normal-run Resource Gold/card-copy rewards are granted by a one-time run-end claim. Gold Dungeon wins separately grant Resource Gold10; verified ads grant tickets and accepted gifts grant their server-owned amounts.
+- Run rewards grant eligible card copies directly. The confirmed 33 Resource Gold card pack also grants 10 copies immediately on purchase commit; opening is presentation only. See [shop_card_packs.md](shop_card_packs.md).
+- Future acquisition routes beyond the confirmed run rewards and card-pack purchases may include individual-card shop inventory and crafting.
 - Tickets are spent when starting a new run.
 - PvP matchmaking and reconnect must use authenticated server accounts, not local-only player names.
 - A reconnecting client must prove account identity with a valid `sessionToken` or a freshly restored session.
@@ -60,13 +72,14 @@ Current implementation target:
 - Game ID login/register support
 - social-login-ready identity storage for Google, Kakao, and Naver
 - account-backed draft/run/reward/card-upgrade persistence
+- confirmed 33 Resource Gold card-pack purchase, immediate 10-card grant and recoverable opening presentation
 - account-backed PvP matchmaking/reconnect storage
 
 Still deferred unless explicitly requested:
 
 - production OAuth provider integration
-- paid shop or real-money purchase flows
-- full pack-opening UX
+- real-money purchase flows beyond the confirmed Resource Gold ticket/card-pack purchases
+- server-owned unopened pack inventory, cross-device presentation markers and purchase-history UI beyond the current local opening presentation
 - crafting
 
 ## High-Level Storage Rule
@@ -120,7 +133,7 @@ Local files or local SQLite may still be used only as a non-authoritative cache.
 
 Allowed uses:
 
-- Remembering the last used guest token or refresh token.
+- Keeping registered-account session/refresh credentials only through [AccountCredentialStore](mobile_secure_credential_storage.md); obsolete guest tokens are deleted, not resumed.
 - Caching account/profile data for UI startup.
 - Caching card images or static data.
 - Temporary demo-only data when the backend is not being used.
@@ -141,7 +154,7 @@ Not allowed as authoritative data:
 
 Examples:
 
-- A local guest profile stored only on the device.
+- An old local-only prototype profile stored on the device.
 - A locally drafted deck that the server never saw.
 - Local battle results.
 - Local card rewards.
@@ -151,7 +164,7 @@ This matters because later online systems need to decide whether that local data
 
 Recommended rule:
 
-- Guest accounts are server accounts.
+- Real account progression requires registered server authentication; historical guest data does not bypass the login gate.
 - Local offline data should be treated as cache or temporary demo data.
 - Local offline rewards, local card ownership changes, and local ticket changes are not merged into real online accounts.
 - If true offline progression is added later, it needs a separate explicit merge policy before it can affect server accounts.
@@ -178,21 +191,21 @@ The account owns:
 
 An auth identity is one login method attached to an account.
 
-Confirmed provider targets:
+Schema provider identifiers (historical/future entries do not imply a current public login route):
 
 - `game_id`
-- `guest`
+- `guest` (historical rows only; authentication disabled)
 - `naver`
 - `kakao`
 - `google`
 
-One account can have multiple auth identities. For example, a user can start as a guest account and later link Google login to the same account.
+The schema can retain multiple identities for historical data, but current public login supports Game ID and Google only. No guest upgrade/link flow is exposed and provider identities are not automatically merged. Internal link helper code does not create a public API.
 
-Guest account rule:
+Current account rule:
 
-- Guest login creates or resumes a real server-side account.
-- The client may cache the guest token locally, but the account state lives on the server.
-- Linking Game ID or social login upgrades the same account instead of creating a separate account.
+- New Game ID or Google registration creates a registered server account.
+- A verified identity resumes its existing account; local cached profile data cannot change that binding.
+- Historical guest identities remain disabled and legacy guest credentials are removed by the client.
 
 Identity normalization rule:
 
@@ -214,9 +227,9 @@ Game ID policy v1:
 
 An auth session is a temporary API login session for one account.
 
-The account system uses three different token concepts:
+The current account system uses session and refresh tokens. The guest token entry below identifies obsolete data only:
 
-- `guestToken`: a stable guest-account resume credential.
+- `guestToken`: obsolete guest credential; deleted during loading and not accepted for current login.
 - `sessionToken`: a short-lived API credential used in `Authorization: Bearer ...`.
 - `refreshToken`: a longer-lived device login credential used only to rotate a new token pair.
 
@@ -224,7 +237,7 @@ Rules:
 
 - The server may return raw tokens to Unity when login succeeds.
 - The database should store only token hashes.
-- Unity must store `guestToken`, `sessionToken`, and `refreshToken` through the account credential-store boundary.
+- Unity stores `sessionToken` and `refreshToken` through the account credential-store boundary and clears obsolete `guestToken` data.
 - Android player builds use an Android Keystore AES-GCM key and keep only encrypted payloads in app-private preferences.
 - iOS player builds use Keychain generic-password entries with `AfterFirstUnlockThisDeviceOnly` accessibility.
 - Unity Editor and the current Windows development build use scoped `PlayerPrefs` only as development storage; this is not the mobile release security model.
@@ -232,9 +245,9 @@ Rules:
 - A `sessionToken` is valid only while its session row is not revoked and not expired.
 - A `refreshToken` is stored only as a hash in `auth_refresh_tokens` and is rotated on every successful refresh.
 - Reusing an already rotated refresh token revokes its token family and requires an explicit login.
-- Logging out revokes the current session and its refresh token before Unity clears local credentials.
+- Successful server logout revokes the current session and refresh token. Unity always clears local credentials afterward, including when the request fails, and requires a new login.
 - Logging in again can create a new session without changing the account.
-- Guest-to-Game-ID or guest-to-social linking should keep the same `account_id` and can revoke or preserve existing sessions based on later security rules.
+- Public identity linking is not part of the current API. Confirmed logout revokes the current device session when the server request succeeds and always clears the local credentials; it does not delete or merge account rows.
 
 ### Card Definition
 
@@ -269,11 +282,13 @@ This matches the intended Clash Royale-like model:
 - The card's level increases for that user's account.
 - Leftover copies remain after the upgrade.
 
-Example with only card-copy cost considered:
+Current cost and leftover-copy examples (2026-10-01):
 
-- If level 1 requires 13 copies, owning 13 Red Dragon copies allows level 0 to level 1 and leaves 0 copies.
-- If level 1 requires 13 copies, owning 22 Goblin copies allows level 0 to level 1 and leaves 9 copies.
-- If level 1 requires 13 copies and level 2 requires 23 copies, owning 38 Elf Longbow Scout copies allows level 0 to level 2 and leaves 2 copies.
+- Owning 3 Red Dragon copies and 3 Resource Gold allows Lv.0 -> Lv.1, consuming 3 copies and leaving 0 copies.
+- Owning 8 Goblin copies and at least 3 Resource Gold allows Lv.0 -> Lv.1, consuming 3 copies and leaving 5 copies.
+- Owning 10 Elf Longbow Scout copies and at least 9 Resource Gold allows two separate upgrades Lv.0 -> Lv.1 -> Lv.2, consuming 3 + 6 copies and leaving 1 copy.
+
+The same target-level table applies to every upgradeable card regardless of rarity: Lv.1/2/3/4/5 cost 3/6/10/20/30 copies and the same Resource Gold, and Lv.6–13 each cost 33/33. [Complete cost table](meta_rules.md#card-upgrade-costs). Individual stat/effect gains remain card-specific.
 
 ### Deck
 
@@ -456,9 +471,9 @@ Rules:
 
 ### `card_upgrade_costs`
 
-Stores card upgrade requirements if costs are managed by the server DB.
+Stores the authoritative card upgrade requirements read by CardUpgradeService when `/cards/upgrade` charges the account. The Unity shared table displays costs and availability; it does not replace the database charge authority.
 
-This table can also remain in a server config file if preferred.
+Migration `0020_card_upgrade_costs_revision.sql` established the 13 Lv.0 -> Lv.1 through Lv.12 -> Lv.13 rows; subsequent `0021_card_upgrade_level2_cost_revision.sql` changes only Lv.1 -> Lv.2 to 6 copies and 6 Resource Gold for the [current cost schedule](meta_rules.md#card-upgrade-costs). Original seed `0003` and migration `0020` are retained unchanged. A live database without the pending revisions keeps its previous costs; source editing does not apply the migration to the live server. Wallets, collection levels, receipts and transaction history are not rewritten. Existing receipts retain their original paid cost when replayed.
 
 Suggested fields:
 
@@ -473,12 +488,11 @@ Primary key:
 
 - `(level_from, level_to)`
 
-Open decision:
+Current confirmed policy:
 
-- Whether all cards share one upgrade cost table.
-- Whether rarity changes upgrade cost.
-- Maximum upgrade level.
-- Exact stat/effect scaling per level.
+- All upgradeable cards share the target-level cost table; rarity does not change the cost.
+- Maximum upgrade level is 13.
+- Cost revision does not change upgrade eligibility or per-card stat/effect gains. New cards still require the user's exact eligibility and Lv.1–13 increments under [card authoring rules](card_authoring_checklist.md).
 
 ### `decks`
 
@@ -642,7 +656,7 @@ Suggested fields:
 | `winner_account_id` | UUID nullable | Winning account when completed |
 | `ended_reason` | text nullable | `normal`, `forfeit`, `reconnect_timeout`, `server_cancel`, `error` |
 | `turn_timeout_seconds` | integer | Current default: 73 |
-| `reconnect_grace_seconds` | integer | Current default: 60 |
+| `reconnect_grace_seconds` | integer | Current runtime default: 70; historical rows keep their recorded value |
 | `created_at` | timestamp | Server time |
 | `started_at` | timestamp nullable | Server time |
 | `completed_at` | timestamp nullable | Server time |
@@ -727,14 +741,16 @@ Suggested fields:
 | `resource_gold_delta` | bigint | Rewarded Resource Gold |
 | `ticket_delta` | integer | Rewarded tickets |
 | `pack_rewards` | jsonb | Pack ids/counts |
-| `card_rewards` | jsonb | Direct card ids/counts, if ever used |
+| `card_rewards` | jsonb | Direct eligible card ids/counts for current run-end rewards |
 | `created_at` | timestamp | Server time |
 
 Notes:
 
-- Exact reward formula is not fixed yet.
-- Rewards are expected at run end.
+- Current temporary run-end formula is defined in [meta_rules.md](meta_rules.md); final balance can still change only by a confirmed request.
+- Normal-run rewards are claimed once at run end. Per-run Gold Dungeon, ads and gifts have separate settlement rules.
 - Packs can be granted here, then opened later through pack-opening logic.
+
+The following unopened-inventory and pack-opening-history tables are retained as future design examples. The current fixed card pack uses wallet/collection transactions and account operation receipts; clicking to open does not debit inventory or grant cards.
 
 ### `user_pack_inventory`
 
@@ -885,7 +901,7 @@ When a run reaches 33 wins or 3 losses:
 
 ## Implemented API Direction
 
-Account and meta operations use authenticated HTTP endpoints. Live battle commands and state use the `/battle` WebSocket.
+Account and meta operations use authenticated HTTP endpoints. Card-pack POST/receipt GET require bearer authentication and share the account API IP limit (default 120 per 60 seconds). Live battle commands and state use the `/battle` WebSocket.
 
 Implemented account/meta endpoints:
 
@@ -893,11 +909,18 @@ Implemented account/meta endpoints:
 | --- | --- |
 | `POST /auth/register` | Create Game ID account |
 | `POST /auth/login` | Login with Game ID |
-| `POST /auth/guest` | Create or resume guest account |
-| `POST /auth/link-game-id` | Link Game ID to the current guest account |
+| `POST /auth/google` | Validate Google identity and log in/create registered account |
+| `POST /auth/google/desktop-token` | Exchange Desktop authorization code for immediate Google login |
+| `POST /auth/refresh` | Rotate saved device credentials |
+| `POST /auth/logout` | Revoke the current device session |
 | `GET /me` | Current profile |
 | `POST /wallet/purchase-ticket` | Buy tickets with Resource Gold |
-| `POST /cards/upgrade` | Upgrade an eligible card |
+| `POST /shop/purchase-card-pack` | Purchase the fixed 33 Resource Gold pack with RequestId; atomically grant 10 cards |
+| `GET /shop/card-pack-purchases/{requestId}` | Read this account's original purchase result without charging or drawing again |
+| `POST /cards/upgrade` | Upgrade an eligible card using RequestId and ExpectedUpgradeLevel |
+| `POST /account/operations/resolve` | Complete/cancel a saved ticket/card-pack purchase or upgrade request without charging again |
+| `GET /gifts`, `POST /gifts/{giftId}/claim` | List/claim this account's pending administrator gifts |
+| `POST /ads/rewarded-ticket/attempt`, `GET /ads/rewarded-ticket/attempt/{attemptId}` | Start/query opt-in server-verified ticket rewards |
 | `POST /runs/start` | Spend tickets and start a persisted draft run |
 | `POST /runs/draft-state` | Read the authoritative selected picks and current offer |
 | `POST /runs/select-draft-card` | Select one card from the authoritative offer and advance the draft |
@@ -905,7 +928,9 @@ Implemented account/meta endpoints:
 | `POST /runs/complete-draft` | Removed client-authoritative compatibility route; returns `410 Gone` |
 | `POST /runs/sync-local-record` | Removed client-authoritative result route; always returns 410 Gone with client_authoritative_run_result_removed |
 | `POST /runs/claim-rewards` | Claim one completed run reward |
-| `GET /pvp/reconnect-status` | Query the authenticated account's reconnectable PvP match |
+| `GET /battle/reconnect-status` | Discover the original human/AI battle, seat, mode and server remaining time |
+| `GET /pvp/reconnect-status` | Legacy PvP-only compatibility query |
+| `GET /ai-challenge/status`, `POST /ai-challenge/start`, `GET /ai-challenge/attempts/{id}` | Three admissions per paid active run, run-scoped status and independent result receipts |
 
 PvP battle endpoints should still use server-authoritative command messages.
 
@@ -913,22 +938,25 @@ PvP battle endpoints should still use server-authoritative command messages.
 
 ### Implemented
 
-- Migrations `0001` through `0008` for account/meta data, sessions, upgrade costs, draft offers, login identities, PvP matchmaking, battle snapshots/command logs, and rotating refresh tokens
-- Server-backed guest creation/resume and opaque session-token authentication
-- Game ID register/login and guest-to-Game-ID linking without replacing the account id
-- Google ID-token verification, Google login/account creation, and guest-to-Google linking on the server
+- Source migrations `0001` through `0022` for account/meta data, rotating sessions, rewards/ads, guest disabling, draft and matchmaking atomicity, battle receipts, operation resolution, gifts, battle modes, revised upgrade costs and card-pack receipts
+- Opaque session-token authentication for registered accounts; guest creation/resume rejected
+- Game ID registration/login using stable server account identity
+- Google ID-token verification and Google login/account creation; provider identities are not automatically merged
 - Unity Google-auth HTTP contracts and account-session response application
-- Windows Desktop OAuth system-browser flow with loopback callback, `state`, PKCE, nonce validation, and editable start-scene login/link buttons
-- Android Credential Manager Google login with an explicit account-selection flow, nonce validation, and the same server login/link contracts
+- Windows Desktop OAuth system-browser flow with loopback callback, `state`, PKCE, nonce validation, and start-scene login button
+- Android Credential Manager Google login with an explicit account-selection flow, nonce validation, and the same server login contract
 - First-launch account login gate plus automatic saved-session restore and refresh-token rotation on later launches
 - Authenticated `/auth/refresh` replacement-token flow and `/auth/logout` device-session revocation
 - Platform credential-store boundary with legacy migration, Android Keystore-backed encrypted storage, and iOS Keychain storage
 - Authenticated `/me` profile, wallet, collection, latest run, and reconnect data
 - Persistent Resource Gold, tickets, card copies, upgrade levels, and upgrade audit transactions
 - Ticket purchase and ticket spending when a new run starts
+- Card-pack purchase with atomic 33 Resource Gold debit/10-card collection grant, immutable ordered receipts, cancellation protection, saved-request recovery and local opening presentation
 - Server-authoritative draft offers, persistent picks, exact resume, atomic completed 33-card deck creation, run wins/losses, and run resume
 - One-time run-end Resource Gold and random card-copy rewards
-- Account-backed PvP matchmaking, seat ownership, reconnect grace, result persistence, snapshots, and command logs
+- Account-backed normal matchmaking with server AI fallback, seat ownership, 70-second running-server reconnect, result receipts/outbox and command logs
+- Per-run Gold Dungeon admissions/refunds and independent gold settlement, purchase/upgrade resolution, administrator gifts and S2S-verified ad ticket rewards
+- Mandatory cancellation of unfinished battles after server interruption; no win/loss, mode-specific challenge refund
 
 ### Partially Implemented
 
@@ -936,13 +964,13 @@ PvP battle endpoints should still use server-authoritative command messages.
   - Android requires package `com.after333.game`, the signing-certificate SHA, and the Web application client ID as its server audience.
   - Android/iOS secure credential storage is implemented, but each platform still needs a real-device build smoke test before release.
 - Identity schema supports `kakao` and `naver`, but their production token verification and Unity provider login flows are not implemented.
-- Pack inventory tables exist, but pack granting/opening gameplay is not implemented.
-- Server-startup PvP recovery exists behind configuration and has been smoke-tested, but still needs hosted-environment and load validation.
+- Pack inventory/history tables remain placeholders for a future inventory-based design; the fixed card-pack purchase grants directly and its opening presentation is implemented without consuming those tables.
+- Production load and end-to-end device/network validation remain separate from source/isolated test records. Startup snapshot revival is superseded by the cancellation policy; `StartupRecoveryEnabled=false` is expected.
 
 ### Deferred
 
 - Production Kakao and Naver OAuth login/linking
-- Shop inventory, purchases, pack opening, and crafting
+- Individual-card shop inventory, additional pack products, server-owned unopened inventory/history UX, and crafting beyond the fixed card-pack and ticket purchases
 - Paid purchases
 - Ranked matchmaking, MMR, seasons, and ladders
 - Production abuse protection beyond current server-side battle validation
@@ -952,12 +980,11 @@ PvP battle endpoints should still use server-authoritative command messages.
 These rules are intentionally not decided by this document:
 
 - final reward balance beyond the current temporary Resource Gold/card-copy formula
-- exact pack contents and probabilities
-- whether any rewards exist before run end
-- whether upgrade costs differ by rarity
-- shop inventory and pricing
+- additional pack products and guarantees beyond the confirmed 33 Resource Gold/10 independent cards/40·30·18·9·3% probabilities
+- additional rewards beyond the confirmed Gold Dungeon, ad ticket and administrator gift flows
+- individual-card shop inventory and pricing beyond the confirmed ticket/card-pack products
 - crafting rules
-- additional ticket acquisition routes beyond the current Resource Gold purchase
+- ticket acquisition routes beyond the current Resource Gold purchase, verified ads and administrator gifts
 - exact non-credential profile-cache retention behavior
 - whether true offline progression will ever be added as a separate mode
 - production OAuth provider setup and account-recovery policy beyond the locked Google no-auto-merge rule
@@ -976,8 +1003,8 @@ These rules are intentionally not decided by this document:
 ### Other setup recommendations
 
 1. Create the Google Cloud Desktop, Web application, and Android OAuth clients described in `docs/google_auth_setup.md`.
-2. Run live Windows Google login, account-link, duplicate-link rejection, and persistence smoke tests through HTTPS.
-3. Run Android Google login/link, automatic session restore, secure credential migration/logout, and duplicate-link smoke tests on a real device.
+2. Run live Windows Google login and persistence smoke tests through HTTPS.
+3. Run Android Google login, automatic session restore and secure credential migration/logout smoke tests on a real device.
 4. Deploy the published server and PostgreSQL to a staging host behind HTTPS/WSS when a VPS is introduced.
 5. Add Kakao and Naver only after both Google platform flows are stable.
 
@@ -988,3 +1015,14 @@ These rules are intentionally not decided by this document:
 The server acquires `user_wallets ... FOR UPDATE` for the authenticated account before checking all active runs and unclaimed completed runs, under READ COMMITTED isolation. Competing starts wait before the read and see the winning transaction's committed run. Wallet debit, run, initial offer and ticket-spend ledger entry commit or roll back as a unit. The lookup does not lock an existing run while holding the wallet, avoiding reversed run/wallet lock order with reward claims. Different accounts remain independent.
 
 Completed historical rows are not constrained by the active-run index. Their unclaimed rewards are checked by the service and must not be silently discarded during deployment. HTTP start retries against an active run retain the existing 409 `active_run_exists` contract rather than creating a new run or returning an idempotency receipt.
+## 골드 던전 상태 계약 (2026-10-09)
+
+`GET /ai-challenge/status`는 `RunId`, `RunLimit=3`, `RemainingAttempts`, `PendingAttempt`를 반환하고 다음 일일 초기화 시각을 반환하지 않는다. 인증 계정의 완성된 진행 중 런에서 `(account_id, run_id)`별 비환급 도전을 합산하여 `max(0, 3 - 사용 횟수)`를 계산한다. 기존 런의 과거 날짜 도전도 포함한다. 진행 중 완성된 런이 없으면 입장은 불가능하고 잔여 횟수는 0이다.
+
+원래 런에 귀속된 취소만 해당 소비를 멱등 환급한다. 새 런의 횟수와 과거 런의 환급은 섞지 않으며, 만료 패배·정상 승패·앱 종료는 환급 사유가 아니다. 새 런 시작에는 기존 티켓 3개 비용을 지불하고, 던전 입장에는 추가 티켓을 부과하지 않는다.
+
+운영 DB의 총22개/latest0022 적용 기록은 2026-10-02의 당시 사실이다. 이번 소스의 0023 존재는 운영 적용·서버 배포·클라이언트 빌드 완료를 뜻하지 않는다.
+
+## ElfElder 카드 ID 통일 (2026-10-09 소스 변경)
+
+마이그레이션 `0024_elf_elder_card_id.sql`은 기존 카드 식별자를 공백 없는 `ElfElder`로 변환한다. 보유 카드 두 철자가 함께 있으면 잔여 수량을 합산하고 높은 강화 레벨을 유지한다. 덱 슬롯·드래프트 제시/선택·보상·카드팩·전투 JSON·거래 기록·성공 영수증 및 강화 요청 fingerprint를 같은 트랜잭션에서 변환하며 골드·티켓·수량 증감·요청 ID·결과를 바꾸지 않는다. JSON 오브젝트에 두 ID 키가 함께 있으면 임의 병합하지 않고 전체 롤백한 뒤 확인한다. 서버 업데이트 시 이전 실행본의 쓰기를 중지하고 새 클라이언트와 함께 적용해야 한다. 운영 DB는 여전히 0023이며 이번에는 0024를 운영에 적용하지 않았다.

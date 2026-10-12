@@ -16,5 +16,6 @@ public enum OnlineBattleCommandType
     Attack = 11,
     EndTurn = 12,
     Surrender = 13,
-        ActivateEffect = 14
+        ActivateEffect = 14,
+        InstallTrap = 15
 }

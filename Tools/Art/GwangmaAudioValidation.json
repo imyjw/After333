@@ -1,0 +1,61 @@
+{
+    "format":  "PCM16 mono",
+    "sampleRate":  44100,
+    "source":  "Original deterministic synthesis; no recordings or external samples",
+    "clips":  [
+                  {
+                      "name":  "SwordDraw",
+                      "seconds":  0.250,
+                      "samples":  11025,
+                      "peakDbfs":  -5.04,
+                      "rmsDbfs":  -20.85,
+                      "clippedSamples":  0,
+                      "suggestedOneShotGain":  0.22
+                  },
+                  {
+                      "name":  "SwordSwing",
+                      "seconds":  0.280,
+                      "samples":  12348,
+                      "peakDbfs":  -3.61,
+                      "rmsDbfs":  -16.83,
+                      "clippedSamples":  0,
+                      "suggestedOneShotGain":  0.42
+                  },
+                  {
+                      "name":  "CrossSlashImpact",
+                      "seconds":  0.340,
+                      "samples":  14994,
+                      "peakDbfs":  -3.10,
+                      "rmsDbfs":  -19.50,
+                      "clippedSamples":  0,
+                      "suggestedOneShotGain":  0.52
+                  },
+                  {
+                      "name":  "GwangmaHurt",
+                      "seconds":  0.240,
+                      "samples":  10584,
+                      "peakDbfs":  -4.15,
+                      "rmsDbfs":  -20.40,
+                      "clippedSamples":  0,
+                      "suggestedOneShotGain":  0.32
+                  },
+                  {
+                      "name":  "GwangmaDeath",
+                      "seconds":  0.560,
+                      "samples":  24696,
+                      "peakDbfs":  -3.88,
+                      "rmsDbfs":  -23.42,
+                      "clippedSamples":  0,
+                      "suggestedOneShotGain":  0.40
+                  },
+                  {
+                      "name":  "Dash",
+                      "seconds":  0.300,
+                      "samples":  13230,
+                      "peakDbfs":  -5.04,
+                      "rmsDbfs":  -19.95,
+                      "clippedSamples":  0,
+                      "suggestedOneShotGain":  0.23
+                  }
+              ]
+}

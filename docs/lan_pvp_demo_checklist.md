@@ -147,13 +147,13 @@ If an account has no deck, draft one first.
 
 On client A:
 
-1. Press `PVP 매칭`.
+1. Press normal `전투` (not the separate `골드 던전` button).
 2. Wait on the matchmaking overlay.
 
 On client B:
 
-1. Press `PVP 매칭`.
-2. Confirm both clients enter the same battle.
+1. Press normal `전투` (not the separate `골드 던전` button).
+2. Join within the default 20-second human-first window and confirm both clients enter the same human battle. A later join may face server AI instead.
 
 ## 9. Verify Battle Sync
 
@@ -165,9 +165,13 @@ During the match, verify:
 - turn changes appear on both clients
 - turn timer behavior is consistent enough for the current prototype
 
+## Running-server reconnect and interruption policy
+
+The current source gives human/AI/run/challenge battles a 70-second reconnect grace from server disconnect detection. Relaunch and use the common `전투 재접속` action before the server deadline; existing turn deadlines and AI progression continue. Server restart cancels unfinished battles without a result and is not a reconnect test. These source expectations do not update or identify the running LAN binary.
+
 ## 10. Finish The Battle
 
-Finish the match with normal play or the development result buttons.
+Finish through normal lethal damage or surrender. Server-confirmed results are authoritative; development/local result buttons do not upload run wins or losses.
 
 Expected result:
 
@@ -175,7 +179,7 @@ Expected result:
 - both clients leave battle cleanly
 - Draft/Start flow resumes
 - wins/losses are reflected on the correct accounts
-- no stale PvP reconnect button remains for the ended match
+- no stale common `전투 재접속` button remains for the ended match
 
 ## Quick Failure Map
 
@@ -189,7 +193,7 @@ Expected result:
 
 ## Current Confirmed LAN Address Example
 
-The latest successful local test used:
+The historical successful LAN test recorded this example (not a current network probe):
 
 ```text
 http://192.168.0.10:7333

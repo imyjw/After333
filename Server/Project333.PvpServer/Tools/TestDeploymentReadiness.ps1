@@ -6,6 +6,7 @@ param(
     [string]$ExpectedCardDefinitionVersion = "",
     [int]$TimeoutSeconds = 8,
     [switch]$AllowDeploymentWarnings,
+    # Retired call compatibility only; current interruption cancellation is always checked.
     [switch]$RequireStartupRecovery,
     [switch]$SkipWebSocket,
     [switch]$PrintOnly
@@ -116,7 +117,10 @@ $BattleWebSocketUrl = Resolve-BattleWebSocketUrl $BaseUrl $BattleWebSocketUrl
 Write-Host "[readiness] BaseUrl=$BaseUrl"
 Write-Host "[readiness] BattleWebSocketUrl=$BattleWebSocketUrl"
 Write-Host "[readiness] ExpectedPublicUrl=$(if ([string]::IsNullOrWhiteSpace($ExpectedPublicUrl)) { '-' } else { $ExpectedPublicUrl.Trim().TrimEnd('/') })"
-Write-Host "[readiness] AllowDeploymentWarnings=$AllowDeploymentWarnings RequireStartupRecovery=$RequireStartupRecovery"
+Write-Host "[readiness] AllowDeploymentWarnings=$AllowDeploymentWarnings"
+if ($RequireStartupRecovery) {
+    Write-Warning '[readiness] -RequireStartupRecovery is retired. Checking current startup cancellation policy instead; snapshot revival is not supported.'
+}
 
 if ($PrintOnly) {
     Write-Host "[readiness] PrintOnly was set. No endpoint checks were started."
@@ -222,15 +226,19 @@ if ($null -ne $serverStatus) {
         Add-ReadinessFailure $failures "PvP block is missing from /server/status."
     }
     else {
-        if ($serverStatus.PvP.ReconnectGraceSeconds -ne 60) {
-            Add-ReadinessFailure $failures "PvP.ReconnectGraceSeconds=$($serverStatus.PvP.ReconnectGraceSeconds), expected 60."
+        if ($serverStatus.PvP.ReconnectGraceSeconds -ne 70) {
+            Add-ReadinessFailure $failures "PvP.ReconnectGraceSeconds=$($serverStatus.PvP.ReconnectGraceSeconds), expected 70."
         }
 
-        if ($RequireStartupRecovery -and $serverStatus.PvP.StartupRecoveryEnabled -ne $true) {
-            Add-ReadinessFailure $failures "PvP.StartupRecoveryEnabled is not true."
+        if ($serverStatus.PvP.StartupRecoveryEnabled -ne $false) {
+            Add-ReadinessFailure $failures "PvP.StartupRecoveryEnabled=$($serverStatus.PvP.StartupRecoveryEnabled), expected false."
         }
 
-        Write-Host "[readiness] pvp reconnectGrace=$($serverStatus.PvP.ReconnectGraceSeconds) startupRecovery=$($serverStatus.PvP.StartupRecoveryEnabled) verboseTransport=$($serverStatus.PvP.VerboseTransportLogsEnabled)"
+        if ($serverStatus.PvP.InterruptedBattlePolicy -ne 'cancel_without_result') {
+            Add-ReadinessFailure $failures "PvP.InterruptedBattlePolicy=$($serverStatus.PvP.InterruptedBattlePolicy), expected cancel_without_result."
+        }
+
+        Write-Host "[readiness] pvp reconnectGrace=$($serverStatus.PvP.ReconnectGraceSeconds) startupRecovery=$($serverStatus.PvP.StartupRecoveryEnabled) interruptedBattlePolicy=$($serverStatus.PvP.InterruptedBattlePolicy) verboseTransport=$($serverStatus.PvP.VerboseTransportLogsEnabled)"
     }
 
     if ($null -eq $serverStatus.Audit) {

@@ -13,12 +13,27 @@ using ServerEventType = Project333.PvpServer.Messages.BattleEventType;
 using ServerPlayerId = Project333.PvpServer.Messages.PlayerIdDto;
 
 // Offline checks only: no HTTP listener, database, accounts, rewards or production matches.
+if (args.Contains("--opening-gold-only")) { OpeningGoldChecks.Run(); return; }
+if (args.Contains("--daehwandan-only")) { DaehwandanChecks.Run(); return; }
+if (args.Contains("--stun-freeze-only")) { ActionDebuffOnlineChecks.Run(); return; }
+if (args.Contains("--mana-cannon-only")) { ManaCannonChecks.Run(); return; }
+if (args.Contains("--gaebang-chief-only")) { GaebangChiefChecks.Run(); return; }
+if (args.Contains("--elf-elder-only")) { ElfElderChecks.Run(); return; }
+if (args.Contains("--skeleton-archer-only")) { SkeletonArcherChecks.Run(); return; }
+if (args.Contains("--orc-chieftain-only")) { OrcChieftainChecks.Run(); return; }
+if (args.Contains("--orc-berserker-only")) { OrcBerserkerChecks.Run(); return; }
+if (args.Contains("--meteor-only")) { MeteorChecks.Run(); return; }
+if (args.Contains("--earthquake-only")) { EarthquakeChecks.Run(); return; }
+if (args.Contains("--timed-bomb-only")) { TimedBombChecks.Run(); return; }
 if (args.Contains("--status-tooltips-only")) { CombatStatBuffChecks.Run(); return; }
 CombatStatBuffChecks.Run();
 if (args.Contains("--magic-amplification-only")) { MagicAmplificationChecks.Run(); return; }
 MagicAmplificationChecks.Run();
 if (args.Contains("--nuclear-only")) { NuclearChecks.Run(); return; }
 NuclearChecks.Run();
+MeteorChecks.Run();
+EarthquakeChecks.Run();
+TimedBombChecks.Run();
 if (args.Contains("--hero-only")) { HeroKillChecks.Run(); return; }
 HeroKillChecks.Run();
 if (args.Contains("--active-effects-only")) { ActiveEffectChecks.Run(); return; }

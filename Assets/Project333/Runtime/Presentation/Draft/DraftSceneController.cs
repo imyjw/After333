@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
@@ -19,7 +19,7 @@ using UnityEditor.SceneManagement;
 
 namespace Project333.Runtime.Presentation.Draft
 {
-    public sealed class DraftSceneController : MonoBehaviour, IDraftOverlayHost
+    public sealed partial class DraftSceneController : MonoBehaviour, IDraftOverlayHost
     {
         [SerializeField, HideInInspector] private int _draftVisualVersion;
         public int DraftVisualVersion => _draftVisualVersion;
@@ -151,6 +151,9 @@ namespace Project333.Runtime.Presentation.Draft
         private bool _isWaitingForServerRunResultSync;
         private bool _isPreparingBattle;
         private AiChallengeStatusResponse _aiChallengeStatus;
+        private AiChallengeStatusResponse CurrentRunAiChallengeStatus =>
+            _aiChallengeStatus != null && _aiChallengeStatus.IsForRun(AccountSessionState.ActiveRunId)
+                ? _aiChallengeStatus : null;
         private PvpReconnectStatusResponse _battleReconnectStatus;
         private bool _pendingAiChallengeReservation;
         private bool _hasReconnectableBattle;
@@ -184,6 +187,11 @@ namespace Project333.Runtime.Presentation.Draft
         private bool _isSavingDraftPicks;
         private bool _isReturningToStartFromDeckBuilding;
         private bool _isClaimingRewards;
+        private RunRewardRevealView _runRewardReveal;
+        private string _rewardPresentationRunId;
+        private string _rewardPresentationAccountId;
+        private string _rewardPresentationServerUrl;
+        private string _rewardPresentationSession;
         private bool _completedDeckSaveFailed;
         private bool _claimRewardsButtonNeedsDefaultLayout;
         private bool _serverWalletPanelNeedsDefaultLayout;
@@ -279,6 +287,7 @@ namespace Project333.Runtime.Presentation.Draft
 
         private void Awake()
         {
+            if (TryInitializeTutorialPractice()) return;
             DraftRunSessionState.ConfigureSceneNames(_draftSceneName, _battleSceneName);
             DraftRunSessionState.RestoreCurrentDraftDeckFromCompletedDeckIfNeeded();
             EnsureReturnToStartButton();
@@ -293,6 +302,7 @@ namespace Project333.Runtime.Presentation.Draft
 
         private async void Start()
         {
+            if (IsTutorialPracticeMode) return;
             await RefreshServerAccountStateAsync();
             if (this == null)
             {
@@ -316,7 +326,18 @@ namespace Project333.Runtime.Presentation.Draft
 
         private void Update()
         {
-            UpdateRewardClaimPopupClick();
+            if (IsTutorialPracticeMode) return;
+            if (_runRewardReveal != null && !string.IsNullOrEmpty(_rewardPresentationAccountId) &&
+                (!string.Equals(_rewardPresentationAccountId, AccountSessionState.AccountId, StringComparison.OrdinalIgnoreCase) ||
+                 !string.Equals(_rewardPresentationSession, AccountSessionState.SessionToken, StringComparison.Ordinal) ||
+                 !string.Equals(_rewardPresentationServerUrl, AccountServerUrl, StringComparison.Ordinal)))
+            {
+                ResetRunRewardPresentationContext();
+                CancelClaimRewards();
+                _isClaimingRewards = false;
+                RefreshStaticUi();
+            }
+            // The reward panel closes only through its explicit confirmation button.
             UpdateBattleReconnectCountdown();
             PollBattleReconnectStatus();
             UpdatePvpMatchmakingState();
@@ -397,6 +418,8 @@ namespace Project333.Runtime.Presentation.Draft
             CancelDraftPickSave();
             CancelAccountRefresh();
             CancelClaimRewards();
+            _runRewardReveal?.Hide();
+            _isClaimingRewards = false;
             CancelCompletedRunServerSyncRetry();
         }
 
@@ -431,6 +454,7 @@ namespace Project333.Runtime.Presentation.Draft
 
         public async void BeginDraftFromUi()
         {
+            if (IsTutorialPracticeMode) return;
             if (!CanBeginDraftInThisScene())
             {
                 SetStatus("Return to the start screen to begin a new server run.");
@@ -501,6 +525,7 @@ namespace Project333.Runtime.Presentation.Draft
 
         public async void SelectDraftCard(string cardId)
         {
+            if (IsTutorialPracticeMode) { _tutorialDraftHost?.SelectDraftCard(cardId); return; }
             if (_isSavingDraftPicks)
             {
                 SetStatus("Saving the current deck-building pick. Please wait a moment.");
@@ -569,16 +594,24 @@ namespace Project333.Runtime.Presentation.Draft
 
         public void StartBattleFromUi()
         {
-            StartPvpBattleFromUi();
+            if (IsTutorialPracticeMode) { StartPveBattleFromUi(); return; }
+            // Legacy StartBattleButton is reused as the Gold Dungeon button.
+            StartPveBattleFromUi();
         }
 
         public void StartPveBattleFromUi()
         {
+            if (IsTutorialPracticeMode)
+            {
+                if (_tutorialCanInteract == null || _tutorialCanInteract()) _tutorialGoldDungeonAction?.Invoke();
+                return;
+            }
             StartBattleWithMode(DraftBattleLaunchMode.OnlineAiChallenge);
         }
 
         public void StartPvpBattleFromUi()
         {
+            if (IsTutorialPracticeMode) return;
             StartBattleWithMode(DraftBattleLaunchMode.OnlineMatchmaking);
         }
 
@@ -623,18 +656,22 @@ namespace Project333.Runtime.Presentation.Draft
                 {
                     var client = new AiChallengeClient(AccountServerUrl);
                     var accountId = AccountSessionState.AccountId;
-                    var attempt = _aiChallengeStatus?.PendingAttempt;
+                    var runId = AccountSessionState.ActiveRunId;
+                    var attempt = CurrentRunAiChallengeStatus?.PendingAttempt;
                     if (attempt == null || attempt.IsFinished)
                         attempt = await client.StartAsync(AccountSessionState.SessionToken,
-                            AccountSessionState.ActiveRunId, AccountSessionState.ActiveDeckId, CancellationToken.None);
+                            runId, AccountSessionState.ActiveDeckId, CancellationToken.None);
                     else client.AcknowledgePendingAttempt();
-                    if (this == null || accountId != AccountSessionState.AccountId) return;
+                    if (this == null || accountId != AccountSessionState.AccountId ||
+                        !string.Equals(runId, AccountSessionState.ActiveRunId, StringComparison.OrdinalIgnoreCase)) return;
                     if (attempt.IsFinished)
                     {
-                        SetStatus("이전 AI 도전이 종료되었습니다. 새로운 도전을 시작할 수 있습니다.");
+                        SetStatus("이전 골드 던전이 종료되었습니다. 새로운 도전을 시작할 수 있습니다.");
                         await RefreshAiChallengeStatusAsync(CancellationToken.None);
                         return;
                     }
+                    if (!string.Equals(attempt.RunId, runId, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("현재 런의 골드 던전 정보를 다시 확인해 주세요.");
                     DraftRunSessionState.QueueAiChallengeBattleStart(attempt.MatchId, attempt.AttemptId);
                 }
                 else
@@ -644,7 +681,7 @@ namespace Project333.Runtime.Presentation.Draft
                 }
                 _isLoadingBattleScene = true;
                 SetBattleModeButtonsInteractable(false);
-                SetStatus(isReconnectLaunch ? "전투에 재접속하는 중..." : "AI 도전을 시작합니다.");
+                SetStatus(isReconnectLaunch ? "전투에 재접속하는 중..." : "골드 던전을 시작합니다.");
                 SceneManager.LoadScene(_battleSceneName);
             }
             catch (OperationCanceledException) { }
@@ -752,6 +789,7 @@ namespace Project333.Runtime.Presentation.Draft
 
         public async void CancelPvpMatchmakingFromUi()
         {
+            if (IsTutorialPracticeMode) return;
             if (!_isPvpMatchmakingActive || _isCancellingPvpMatchmaking)
             {
                 return;
@@ -873,6 +911,7 @@ namespace Project333.Runtime.Presentation.Draft
 
         public void ReturnToStartSceneFromUi()
         {
+            if (IsTutorialPracticeMode) { _tutorialPracticeReturn?.Invoke(); return; }
             if (_isPvpMatchmakingActive)
             {
                 _returnToStartAfterPvpCancellation = true;
@@ -965,130 +1004,162 @@ namespace Project333.Runtime.Presentation.Draft
 
         public async void ClaimRewardsFromUi()
         {
-            if (_isClaimingRewards)
-            {
-                return;
-            }
+            if (IsTutorialPracticeMode) return;
+            if (_isClaimingRewards || (_runRewardReveal != null &&
+                (_runRewardReveal.IsBusy || _runRewardReveal.IsShowingRewards))) return;
 
-            var shouldShowRewardClaimPopup = false;
-            if (IsCurrentRunRewardClaimed())
+            // Lock before the first await, including the read-only result confirmation.
+            _isClaimingRewards = true;
+            CancelClaimRewards();
+            var attempt = new CancellationTokenSource();
+            _claimRewardsCancellation = attempt;
+            var sessionToken = AccountSessionState.SessionToken;
+            var accountId = AccountSessionState.AccountId;
+            var serverUrl = AccountServerUrl;
+            RefreshStaticUi();
+            try
             {
-                DraftRunSessionState.ResetForNewDraft();
-                SetStatus("Rewards already claimed. Returning to the start screen.");
-                RefreshStaticUi();
-                ReturnToStartSceneFromUi();
-                return;
-            }
-
-            if (!IsLatestServerRunCompleted())
-            {
-                if (DraftRunSessionState.HasRunEnded)
+                if (!AccountSessionState.IsAuthenticated || string.IsNullOrWhiteSpace(accountId))
                 {
-                    SetStatus("Checking the server battle result...");
-                    RefreshStaticUi();
-                    await RefreshServerAccountStateAsync();
-                    if (this == null)
-                    {
-                        return;
-                    }
+                    ResetRunRewardPresentationContext();
+                    SetStatus("로그인이 필요합니다. 시작 화면으로 돌아갑니다.");
+                    ReturnToStartSceneFromUi();
+                    return;
+                }
 
-                    if (IsLatestServerRunCompleted())
-                    {
-                        RefreshStaticUi();
-                    }
-                    else if (IsCurrentRunRewardClaimed())
+                if (!IsLatestServerRunCompleted() && !HasPendingRunRewardPresentation())
+                {
+                    if (IsCurrentRunRewardClaimed())
                     {
                         DraftRunSessionState.ResetForNewDraft();
-                        SetStatus("Rewards already claimed. Returning to the start screen.");
-                        RefreshStaticUi();
                         ReturnToStartSceneFromUi();
                         return;
                     }
-                    else
+                    if (!DraftRunSessionState.HasRunEnded) return;
+                    SetStatus("전투 결과를 확인하고 있습니다.");
+                    await RefreshServerAccountStateAsync();
+                    if (!CanApplyRewardAttempt(attempt, sessionToken, accountId, serverUrl)) return;
+                    if (!IsLatestServerRunCompleted() && !HasPendingRunRewardPresentation())
                     {
-                        SetStatus("The server has not completed this run. Rewards are not available yet.");
                         QueueCompletedRunServerSyncRetry();
-                        RefreshStaticUi();
+                        _runRewardReveal?.ShowError("전투 결과가 아직 확정되지 않았습니다. 상자를 눌러 다시 확인하세요.");
                         return;
                     }
                 }
-                else
+
+                var runId = AccountSessionState.LatestRunId;
+                if (string.IsNullOrWhiteSpace(runId)) return;
+                EnsureRunRewardReveal();
+                if (_runRewardReveal.Phase == RunRewardRevealPhase.Hidden)
+                    _runRewardReveal.ShowClosed(AccountSessionState.LatestRunWins, AccountSessionState.LatestRunLosses, true);
+                // A previously read-only result check may have just become claimable.
+                if (_runRewardReveal.Phase == RunRewardRevealPhase.Closed)
+                    _runRewardReveal.ShowClosed(AccountSessionState.LatestRunWins, AccountSessionState.LatestRunLosses, true);
+                if (!_runRewardReveal.TryBeginOpening()) return;
+
+                _rewardPresentationRunId = runId;
+                _rewardPresentationAccountId = accountId;
+                _rewardPresentationServerUrl = serverUrl;
+                _rewardPresentationSession = sessionToken;
+                PendingRunRewardPresentation.Remember(serverUrl, accountId, runId);
+                var client = new ServerRunClient(serverUrl);
+                var response = await client.ClaimRunRewardsAsync(sessionToken, runId, attempt.Token);
+                if (!CanApplyRewardAttempt(attempt, sessionToken, accountId, serverUrl)) return;
+                if (!string.Equals(AccountSessionState.LatestRunId, runId, StringComparison.OrdinalIgnoreCase) ||
+                    (AccountSessionState.HasResumableRun &&
+                     !string.Equals(AccountSessionState.ActiveRunId, runId, StringComparison.OrdinalIgnoreCase)))
                 {
-                    SetStatus("Run rewards are available only after the run is complete.");
-                    RefreshStaticUi();
+                    _runRewardReveal.Hide();
                     return;
                 }
-            }
+                if (response?.ResolvedRun == null || response.ResolvedReward == null ||
+                    !string.Equals(response.ResolvedRun.ResolvedId, runId, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(response.ResolvedReward.ResolvedSourceId, runId, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(response.ResolvedReward.ResolvedSourceType, "run_end", StringComparison.OrdinalIgnoreCase) ||
+                    (response.ResolvedAccount != null &&
+                     !string.Equals(response.ResolvedAccount.ResolvedId, accountId, StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("The server reward receipt does not match this account and run.");
 
-            if (!IsLatestServerRunCompleted())
-            {
-                RefreshStaticUi();
-                return;
-            }
-
-            if (AccountSessionState.IsLatestRunRewardClaimed)
-            {
-                SetStatus(BuildRunCompleteStatusText());
-                RefreshStaticUi();
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(AccountSessionState.SessionToken) ||
-                string.IsNullOrWhiteSpace(AccountSessionState.LatestRunId))
-            {
-                SetStatus("Server account or completed run id is missing.");
-                RefreshStaticUi();
-                return;
-            }
-
-            CancelClaimRewards();
-            _claimRewardsCancellation = new CancellationTokenSource();
-            _isClaimingRewards = true;
-            SetStatus("Claiming run rewards...");
-            RefreshStaticUi();
-
-            try
-            {
-                var client = new ServerRunClient(AccountServerUrl);
-                var response = await client.ClaimRunRewardsAsync(
-                    AccountSessionState.SessionToken,
-                    AccountSessionState.LatestRunId,
-                    _claimRewardsCancellation.Token);
                 AccountSessionState.ApplyClaimRunRewardsResponse(response);
-
                 var reward = response.ResolvedReward;
-                var resourceGoldDelta = reward?.ResolvedResourceGoldDelta ?? 0;
-                var ticketDelta = reward?.ResolvedTicketDelta ?? 0;
-                var serverGold = response.ResolvedWallet?.ResolvedResourceGold ?? AccountSessionState.ResourceGold;
-                var rewardSummary = BuildRewardSummaryText(resourceGoldDelta, ticketDelta, reward);
-                Debug.Log(
-                    $"After333 run rewards claimed: run={AccountSessionState.LatestRunId}, rewards={rewardSummary}");
+                var gold = response.ResolvedWallet?.ResolvedResourceGold ?? AccountSessionState.ResourceGold;
+                Debug.Log($"After333 run rewards confirmed: run={runId}, rewards={BuildRewardSummaryText(reward.ResolvedResourceGoldDelta, reward.ResolvedTicketDelta, reward)}");
                 DraftRunSessionState.ResetForNewDraft();
-                SetStatus(BuildRewardClaimStatusText(resourceGoldDelta, ticketDelta, serverGold, reward));
-                ShowRewardClaimToast(resourceGoldDelta, ticketDelta, serverGold, reward);
-                shouldShowRewardClaimPopup = true;
+                SetStatus("런 보상을 수령했습니다.");
+                _runRewardReveal.SetReceipt(RunRewardDisplayContent.Build(reward,
+                    response.ResolvedRun.ResolvedWins, response.ResolvedRun.ResolvedLosses, gold, ResolveRewardItemDisplayName));
+                // Refresh the collection from its authority, not by applying receipt counts a second time.
+                _ = RefreshServerAccountStateAsync();
             }
             catch (OperationCanceledException)
             {
+                if (CanApplyRewardAttempt(attempt, sessionToken, accountId, serverUrl))
+                    _runRewardReveal?.ShowError("보상을 확인하지 못했습니다. 상자를 눌러 다시 확인하세요.");
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"After333 run reward claim failed: {ex.Message}");
-                SetStatus($"Reward claim failed: {ex.Message}");
+                Debug.LogWarning($"After333 run reward confirmation failed: {ex.Message}");
+                if (CanApplyRewardAttempt(attempt, sessionToken, accountId, serverUrl))
+                {
+                    SetStatus("보상을 확인하지 못했습니다. 다시 시도해 주세요.");
+                    _runRewardReveal?.ShowError("보상을 확인하지 못했습니다. 상자를 눌러 다시 확인하세요.");
+                }
             }
             finally
             {
-                _isClaimingRewards = false;
-                CancelClaimRewards();
-                if (!shouldShowRewardClaimPopup)
+                if (this != null && ReferenceEquals(_claimRewardsCancellation, attempt))
                 {
-                    RefreshStaticUi();
+                    if (!CanApplyRewardAttempt(attempt, sessionToken, accountId, serverUrl))
+                        ResetRunRewardPresentationContext();
+                    _isClaimingRewards = false;
+                    _claimRewardsCancellation = null;
+                    if (_runRewardReveal == null || (!_runRewardReveal.IsBusy && !_runRewardReveal.IsShowingRewards))
+                        RefreshStaticUi();
                 }
+                attempt.Dispose();
             }
+        }
+
+        private bool CanApplyRewardAttempt(CancellationTokenSource attempt, string session, string accountId, string serverUrl)
+        {
+            return this != null && isActiveAndEnabled && !attempt.IsCancellationRequested && ReferenceEquals(_claimRewardsCancellation, attempt) &&
+                string.Equals(AccountSessionState.SessionToken, session, StringComparison.Ordinal) &&
+                string.Equals(AccountSessionState.AccountId, accountId, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(AccountServerUrl, serverUrl, StringComparison.Ordinal);
+        }
+
+        private bool HasPendingRunRewardPresentation()
+        {
+            var pendingRun = PendingRunRewardPresentation.GetPendingRunId(AccountServerUrl, AccountSessionState.AccountId);
+            return AccountSessionState.IsAuthenticated && !string.IsNullOrWhiteSpace(pendingRun) &&
+                string.Equals(pendingRun, AccountSessionState.LatestRunId, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(AccountSessionState.LatestRunStatus, "completed", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void EnsureRunRewardReveal()
+        {
+            if (_runRewardReveal != null) return;
+            _runRewardReveal = RunRewardRevealView.Create(EnsureClaimRewardsCanvasRoot(), ClaimRewardsFromUi, ConfirmRunRewardPresentation);
+        }
+
+        private void ResetRunRewardPresentationContext()
+        {
+            _runRewardReveal?.Hide();
+            _rewardPresentationRunId = null;
+            _rewardPresentationAccountId = null;
+            _rewardPresentationServerUrl = null;
+            _rewardPresentationSession = null;
+        }
+
+        private void ConfirmRunRewardPresentation()
+        {
+            PendingRunRewardPresentation.Clear(_rewardPresentationServerUrl, _rewardPresentationAccountId, _rewardPresentationRunId);
+            ReturnToStartSceneFromUi();
         }
 
         private void RefreshStaticUi()
         {
+            if (IsTutorialPracticeMode) { RefreshTutorialPracticeUi(); return; }
             ReconcileLocalRunRecordFromAccountState();
             EnsureReturnToStartButton();
             EnsureBattleModeButtons();
@@ -1153,8 +1224,8 @@ namespace Project333.Runtime.Presentation.Draft
                                  !IsServerDraftSaveBlockingBattle() &&
                                  !IsServerRunResultSyncBlockingBattle();
             var canStartPveBattle = !_isPreparingBattle && !_hasReconnectableBattle &&
-                                    canStartBattle && _aiChallengeStatus != null &&
-                                    _aiChallengeStatus.PendingAttempt == null && _aiChallengeStatus.RemainingAttempts > 0;
+                                    canStartBattle && CurrentRunAiChallengeStatus != null &&
+                                    CurrentRunAiChallengeStatus.PendingAttempt == null && CurrentRunAiChallengeStatus.RemainingAttempts > 0;
             var canStartPvpBattle = !_isPreparingBattle && !_isPvpMatchmakingActive &&
                                     (canStartBattle || CanReconnectBattle(isDeckBuildingScene, isRunEndedForUi));
             RefreshDevelopmentSmokePanel(visibleDeckCount, isRunEndedForUi, canStartBattle);
@@ -1173,7 +1244,7 @@ namespace Project333.Runtime.Presentation.Draft
             RefreshBattleModeButton(
                 _startPveBattleButton,
                 BuildAiChallengeButtonLabel(),
-                hasDraftDeck ? BuildAiChallengeButtonLabel() : $"AI 도전 ({visibleDeckCount}/33)",
+                hasDraftDeck ? BuildAiChallengeButtonLabel() : $"골드 던전 ({visibleDeckCount}/33)",
                 _startPveBattleButtonLabel,
                 canStartPveBattle);
             RefreshBattleModeButton(
@@ -1203,7 +1274,7 @@ namespace Project333.Runtime.Presentation.Draft
 
             if (_returnToStartButton != null)
             {
-                _returnToStartButton.interactable = !_isReturningToStartFromDeckBuilding;
+                _returnToStartButton.interactable = !_isReturningToStartFromDeckBuilding && !_isClaimingRewards && (_runRewardReveal == null || !_runRewardReveal.IsBusy);
             }
         }
 
@@ -1332,7 +1403,7 @@ namespace Project333.Runtime.Presentation.Draft
 
             if (canStartBattle)
             {
-                return "전투 또는 AI 도전을 선택해 주세요.";
+                return "전투 또는 골드 던전을 선택해 주세요.";
             }
 
             return "Review status text; battle start is currently blocked.";
@@ -1435,8 +1506,7 @@ namespace Project333.Runtime.Presentation.Draft
             if (_startPveBattleButton != null)
             {
                 ConfigureBattleModeButton(_startPveBattleButton, _pveBattleButtonPosition, _pveBattleButtonColor);
-                _startPveBattleButton.onClick.RemoveListener(StartPveBattleFromUi);
-                _startPveBattleButton.onClick.AddListener(StartPveBattleFromUi);
+                BindBattleModeButtonClick(_startPveBattleButton, StartPveBattleFromUi);
             }
 
             if (_startPvpBattleButton == null && controlPanel != null)
@@ -1463,9 +1533,27 @@ namespace Project333.Runtime.Presentation.Draft
             if (_startPvpBattleButton != null)
             {
                 ConfigureBattleModeButton(_startPvpBattleButton, _pvpBattleButtonPosition, _pvpBattleButtonColor);
-                _startPvpBattleButton.onClick.RemoveListener(StartPvpBattleFromUi);
-                _startPvpBattleButton.onClick.AddListener(StartPvpBattleFromUi);
+                BindBattleModeButtonClick(_startPvpBattleButton, StartPvpBattleFromUi);
             }
+        }
+
+        private void BindBattleModeButtonClick(Button button, UnityAction action)
+        {
+            // Remove only this controller's launch callbacks, preserving unrelated listeners.
+            // RemoveListener cannot remove scene-serialized persistent callbacks.
+            for (var index = 0; index < button.onClick.GetPersistentEventCount(); index++)
+            {
+                if (button.onClick.GetPersistentTarget(index) != this) continue;
+                var method = button.onClick.GetPersistentMethodName(index);
+                if (method == nameof(StartBattleFromUi) || method == nameof(StartPveBattleFromUi) ||
+                    method == nameof(StartPvpBattleFromUi))
+                    button.onClick.SetPersistentListenerState(index, UnityEventCallState.Off);
+            }
+            button.onClick.RemoveListener(StartBattleFromUi);
+            button.onClick.RemoveListener(StartPveBattleFromUi);
+            button.onClick.RemoveListener(StartPvpBattleFromUi);
+            button.onClick.RemoveListener(action);
+            button.onClick.AddListener(action);
         }
 
         private static Button FindButton(RectTransform parent, string objectName)
@@ -1847,7 +1935,25 @@ namespace Project333.Runtime.Presentation.Draft
             var rewardsAlreadyClaimed = IsCurrentRunRewardClaimed();
             var localRunEnded = DraftRunSessionState.HasRunEnded;
             var shouldShowRewardsButton = canClaimRewards || localRunEnded;
-            _claimRewardsButton.gameObject.SetActive(shouldShowRewardsButton);
+            _claimRewardsButton.gameObject.SetActive(false);
+            var canReplayReceipt = HasPendingRunRewardPresentation();
+            if ((shouldShowRewardsButton && !rewardsAlreadyClaimed) || canReplayReceipt)
+            {
+                EnsureRunRewardReveal();
+                if (!_runRewardReveal.IsBusy && !_runRewardReveal.IsShowingRewards &&
+                    _runRewardReveal.Phase != RunRewardRevealPhase.Error)
+                {
+                    var confirmed = canClaimRewards || canReplayReceipt;
+                    _runRewardReveal.ShowClosed(
+                        confirmed ? AccountSessionState.LatestRunWins : DraftRunSessionState.Wins,
+                        confirmed ? AccountSessionState.LatestRunLosses : DraftRunSessionState.Losses,
+                        confirmed, !confirmed && (_accountRefreshCancellation != null || _isWaitingForServerRunResultSync));
+                }
+            }
+            else if (_runRewardReveal != null && !_runRewardReveal.IsBusy && !_runRewardReveal.IsShowingRewards)
+            {
+                _runRewardReveal.Hide();
+            }
             _claimRewardsButton.interactable = shouldShowRewardsButton &&
                                                !_isClaimingRewards &&
                                                (rewardsAlreadyClaimed ||
@@ -1961,7 +2067,7 @@ namespace Project333.Runtime.Presentation.Draft
                     return false;
                 }
 
-                SetStatus("Draft complete. Server deck verified (33/33). 전투 또는 AI 도전을 선택해 주세요.");
+                SetStatus("Draft complete. Server deck verified (33/33). 전투 또는 골드 던전을 선택해 주세요.");
                 return true;
             }
             catch (OperationCanceledException)
@@ -2278,11 +2384,15 @@ namespace Project333.Runtime.Presentation.Draft
         private async Task RefreshServerAccountStateAsync()
         {
             CancelAccountRefresh();
-            _accountRefreshCancellation = new CancellationTokenSource();
+            var refresh = new CancellationTokenSource();
+            _accountRefreshCancellation = refresh;
+            var session = AccountSessionState.SessionToken;
+            var accountId = AccountSessionState.AccountId;
+            var serverUrl = AccountServerUrl;
 
             try
             {
-                var client = new GuestAuthClient(AccountServerUrl);
+                var client = new GuestAuthClient(serverUrl);
                 if (!AccountSessionState.IsAuthenticated)
                 {
                     SetStatus("로그인이 필요합니다. 시작 화면으로 돌아갑니다.");
@@ -2292,9 +2402,9 @@ namespace Project333.Runtime.Presentation.Draft
                 }
 
                 var response = await client.GetMeAsync(
-                    AccountSessionState.SessionToken,
-                    _accountRefreshCancellation.Token);
-                if (this == null)
+                    session,
+                    refresh.Token);
+                if (!CanApplyAccountRefresh(refresh, session, accountId, serverUrl))
                 {
                     return;
                 }
@@ -2424,8 +2534,9 @@ namespace Project333.Runtime.Presentation.Draft
 
                 await RefreshBattleReconnectStatusAsync(
                     client,
-                    AccountSessionState.SessionToken,
-                    _accountRefreshCancellation.Token);
+                    session,
+                    refresh.Token);
+                if (!CanApplyAccountRefresh(refresh, session, accountId, serverUrl)) return;
                 if (_hasReconnectableBattle &&
                     DraftRunSessionState.HasDraftedDeckReady &&
                     !IsRunEndedForUi())
@@ -2443,14 +2554,23 @@ namespace Project333.Runtime.Presentation.Draft
             }
             finally
             {
-                CancelAccountRefresh();
-                if (this != null)
+                if (this != null && ReferenceEquals(_accountRefreshCancellation, refresh))
                 {
-                    RefreshStaticUi();
+                    _accountRefreshCancellation = null;
+                    if (isActiveAndEnabled) RefreshStaticUi();
                 }
+                refresh.Dispose();
             }
         }
 
+        private bool CanApplyAccountRefresh(CancellationTokenSource refresh, string session, string accountId, string serverUrl)
+        {
+            return this != null && isActiveAndEnabled && !refresh.IsCancellationRequested &&
+                ReferenceEquals(_accountRefreshCancellation, refresh) &&
+                string.Equals(session, AccountSessionState.SessionToken, StringComparison.Ordinal) &&
+                string.Equals(accountId, AccountSessionState.AccountId, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(serverUrl, AccountServerUrl, StringComparison.Ordinal);
+        }
         private async Task RefreshBattleReconnectStatusAsync(
             GuestAuthClient client,
             string sessionToken,
@@ -2466,14 +2586,14 @@ namespace Project333.Runtime.Presentation.Draft
                 var response = await client.GetBattleReconnectStatusAsync(sessionToken, cancellationToken);
                 if (response == null || !response.ResolvedHasReconnectableBattle)
                     await RefreshAiChallengeStatusAsync(cancellationToken);
-                if (this == null || !string.Equals(sessionToken, AccountSessionState.SessionToken, StringComparison.Ordinal))
+                if (this == null || !isActiveAndEnabled || cancellationToken.IsCancellationRequested || !string.Equals(sessionToken, AccountSessionState.SessionToken, StringComparison.Ordinal))
                 {
                     return;
                 }
                 _pendingAiChallengeReservation = false;
                 if (response == null || !response.ResolvedHasReconnectableBattle)
                 {
-                    var pending = _aiChallengeStatus?.PendingAttempt;
+                    var pending = CurrentRunAiChallengeStatus?.PendingAttempt;
                     if (pending == null || !string.Equals(pending.Status, "reserved", StringComparison.OrdinalIgnoreCase))
                     {
                         ClearBattleReconnectStatus();
@@ -2520,31 +2640,49 @@ namespace Project333.Runtime.Presentation.Draft
         private async Task RefreshAiChallengeStatusAsync(CancellationToken cancellationToken)
         {
             var sessionToken = AccountSessionState.SessionToken;
+            var accountId = AccountSessionState.AccountId;
+            var runId = AccountSessionState.ActiveRunId;
+            var serverUrl = AccountServerUrl;
+            if (CurrentRunAiChallengeStatus == null) _aiChallengeStatus = null;
             try
             {
-                var client = new AiChallengeClient(AccountServerUrl);
+                var client = new AiChallengeClient(serverUrl);
                 var status = await client.GetStatusAsync(sessionToken, cancellationToken);
-                if (this == null || sessionToken != AccountSessionState.SessionToken) return;
-                _aiChallengeStatus = status;
+                if (!CanApplyAiChallengeStatus(sessionToken, accountId, runId, serverUrl, cancellationToken)) return;
+                _aiChallengeStatus = status != null && status.IsForRun(runId) ? status : null;
                 var resultAttemptId = DraftRunSessionState.PendingAiChallengeResultAttemptId;
                 if (!string.IsNullOrWhiteSpace(resultAttemptId))
                 {
                     var receipt = await client.GetAttemptAsync(sessionToken, resultAttemptId, cancellationToken);
                     if (receipt != null && receipt.IsFinished)
                     {
-                        var account = await new GuestAuthClient(AccountServerUrl).GetMeAsync(sessionToken, cancellationToken);
-                        if (this == null || sessionToken != AccountSessionState.SessionToken) return;
+                        var account = await new GuestAuthClient(serverUrl).GetMeAsync(sessionToken, cancellationToken);
+                        if (!CanApplyAiChallengeStatus(sessionToken, accountId, runId, serverUrl, cancellationToken)) return;
                         AccountSessionState.ApplyMeResponse(account);
+                        if (CurrentRunAiChallengeStatus == null) _aiChallengeStatus = null;
                         DraftRunSessionState.ApplyAiChallengeReceipt(receipt);
                     }
                 }
             }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { Debug.LogWarning("After333 AI challenge status refresh failed: " + ex.Message); }
+            catch (Exception ex) { Debug.LogWarning("After333 Gold Dungeon status refresh failed: " + ex.Message); }
         }
 
-        private string BuildAiChallengeButtonLabel() => _aiChallengeStatus == null
-            ? "AI 도전 확인 중..." : $"AI 도전 ({Math.Max(0, _aiChallengeStatus.RemainingAttempts)}/3)";
+        private bool CanApplyAiChallengeStatus(string session, string accountId, string runId,
+            string serverUrl, CancellationToken cancellationToken) =>
+            this != null && isActiveAndEnabled && !cancellationToken.IsCancellationRequested &&
+            string.Equals(session, AccountSessionState.SessionToken, StringComparison.Ordinal) &&
+            string.Equals(accountId, AccountSessionState.AccountId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(runId, AccountSessionState.ActiveRunId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(serverUrl, AccountServerUrl, StringComparison.Ordinal);
+
+        private string BuildAiChallengeButtonLabel()
+        {
+            var status = CurrentRunAiChallengeStatus;
+            if (status == null) return "골드 던전 확인 중...";
+            var limit = Math.Max(0, status.RunLimit);
+            return $"골드 던전 ({Math.Min(limit, Math.Max(0, status.RemainingAttempts))}/{limit})";
+        }
 
         private void ClearBattleReconnectStatus()
         {
@@ -3719,6 +3857,10 @@ namespace Project333.Runtime.Presentation.Draft
                 _rewardClaimToastText.fontSize = Mathf.Max(1, _rewardClaimToastFontSize);
                 _rewardClaimToastText.lineSpacing = 1.05f;
             }
+            NoticeTheme.Panel(_rewardClaimToastPanelImage, false);
+            NoticeTheme.Text(_rewardClaimToastText);
+            // Reward lists retain their layout and line structure.
+            if (_rewardClaimToastText != null) _rewardClaimToastText.alignment = TextAnchor.UpperLeft;
         }
 
         private static Font ResolveRuntimeFont()
@@ -3874,7 +4016,7 @@ namespace Project333.Runtime.Presentation.Draft
         private bool IsDeckBuildingScene()
         {
             return string.Equals(
-                SceneManager.GetActiveScene().name,
+                IsTutorialPracticeMode ? gameObject.scene.name : SceneManager.GetActiveScene().name,
                 ResolveDeckBuildingSceneName(),
                 StringComparison.OrdinalIgnoreCase);
         }
@@ -4048,7 +4190,7 @@ namespace Project333.Runtime.Presentation.Draft
             for (var i = 0; i < sceneTexts.Length; i++)
             {
                 var text = sceneTexts[i];
-                if (text == null || !string.Equals(text.gameObject.name, "DeckListText", StringComparison.Ordinal))
+                if (text == null || (IsTutorialPracticeMode && text.gameObject.scene != gameObject.scene) || !string.Equals(text.gameObject.name, "DeckListText", StringComparison.Ordinal))
                 {
                     continue;
                 }

@@ -101,6 +101,9 @@ namespace Project333.Runtime.Presentation.HUD
             }
         }
 
+        public RectTransform TutorialPlayerResourcesRect => _playerResourceText != null ? _playerResourceText.rectTransform : null;
+        public RectTransform TutorialOpponentResourcesRect => _aiResourceText != null ? _aiResourceText.rectTransform : null;
+
         private void Awake()
         {
             EnsureResourceIconRows(allowCreationInEditMode: false);

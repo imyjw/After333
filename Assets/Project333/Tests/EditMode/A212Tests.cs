@@ -26,7 +26,7 @@ namespace Project333.Tests.EditMode
             Assert.That(record.Affiliation, Is.EqualTo(CardAffiliation.ScienceCivilization));
             Assert.That(record.IncludeInDraft && record.IncludeInRewards, Is.True);
             Assert.That(d.Attack, Is.EqualTo(6));
-            Assert.That(d.Health, Is.EqualTo(22));
+            Assert.That(d.Health, Is.EqualTo(30));
             Assert.That(d.Cost.Power, Is.EqualTo(4));
             Assert.That(d.Cost.Mana + d.Cost.Qi + d.Cost.Gold, Is.Zero);
             Assert.That(d.HitsPerAttack, Is.EqualTo(4));
@@ -54,9 +54,9 @@ namespace Project333.Tests.EditMode
             Assert.That(bonus.HpBonus, Is.EqualTo(hp));
         }
 
-        [TestCase(0, 6, 22)]
-        [TestCase(12, 6, 34)]
-        [TestCase(13, 7, 34)]
+        [TestCase(0, 6, 30)]
+        [TestCase(12, 6, 42)]
+        [TestCase(13, 7, 42)]
         public void SummonAndAttack_ApplyLevelAndFourSeparatePhysicalHits(int level, int atk, int hp)
         {
             var provider = Database().CreateProvider();
@@ -75,7 +75,7 @@ namespace Project333.Tests.EditMode
             var titles = OccupantSpecialEffectTooltipCatalog.Build(provider.GetRequired("A-212"), unit)
                 .Select(t => t.Title).ToArray();
             Assert.That(titles, Does.Contain("4연타"));
-            Assert.That(titles, Does.Contain("전력 -2"));
+            Assert.That(titles, Does.Contain("전력소모: 2").And.Contain("방전"));
             Assert.That(titles, Does.Not.Contain("로봇"));
 
             var target = new UnitState("target", "target", PlayerId.AI, new TileCoord(0, 0),

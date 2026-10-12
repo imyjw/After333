@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using Project333.Runtime.Application.Services;
+using Project333.Runtime.Application.Online;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Board;
 using Project333.Runtime.Domain.Cards;
+using Project333.Runtime.Domain.Effects;
 using Project333.Runtime.Domain.Resources;
 using Project333.Runtime.Infrastructure.Data;
 
@@ -14,7 +16,7 @@ namespace Project333.Tests.EditMode
     public sealed class ScriptedSpellEffectTests
     {
         [Test]
-        public void CastScriptedSpell_Daehwandan_BuffsMasterAndAddsPersistentQiGain()
+        public void CastScriptedSpell_Daehwandan_BuffsMasterWithoutPersistentQiGain()
         {
             var battleState = CreateBattleState();
             var spellService = CreateSpellService(new CardDefinition[]
@@ -23,7 +25,7 @@ namespace Project333.Tests.EditMode
                     cardId: "Daehwandan",
                     displayName: "대환단",
                     cost: new ResourceSet(mana: 0, qi: 5, power: 0, gold: 0),
-                    effectId: "daehwandan"),
+                    effectId: "daehwandan", effectAmount: 30),
             });
 
             battleState.Player.Hand.Add("Daehwandan");
@@ -36,9 +38,7 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.Player.Resources.Qi, Is.Zero);
             Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(3));
             Assert.That(battleState.Player.Master.Attack, Is.EqualTo(33));
-            Assert.That(battleState.PersistentEffects.Count, Is.EqualTo(1));
-            Assert.That(battleState.PersistentEffects[0].TurnStartResourceGain.Qi, Is.EqualTo(3));
-            Assert.That(battleState.PersistentEffects[0].OwnerTurnStartsRemaining, Is.EqualTo(3));
+            Assert.That(battleState.PersistentEffects, Is.Empty);
         }
 
         [Test]
@@ -276,7 +276,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void ResolveTurnStart_Firewall_RunsAfterUpkeepAndHitsCurrentRowOccupantsTwice()
+        public void ResolveTurnStart_Firewall_RunsBeforeUpkeepAndHitsCurrentRowOccupantsTwice()
         {
             var battleState = CreateBattleState();
             var spellService = CreateSpellService(new CardDefinition[] { CreateFirewallDefinition() });
@@ -307,8 +307,8 @@ namespace Project333.Tests.EditMode
             battleState.StartNextTurn(PlayerId.AI);
             new TurnStartService().ResolveTurnStart(battleState);
 
-            Assert.That(originalTarget.IsDrained, Is.False, "Power upkeep must resolve before Firewall damage.");
-            Assert.That(originalTarget.CurrentHp, Is.EqualTo(70));
+            Assert.That(originalTarget.IsDrained, Is.False, "The surviving unit pays upkeep after taking Firewall damage in its previous Drained state.");
+            Assert.That(originalTarget.CurrentHp, Is.EqualTo(1));
             Assert.That(otherRowTarget.CurrentHp, Is.EqualTo(100));
             Assert.That(battleState.PersistentEffects[0].RemainingTriggers, Is.EqualTo(1));
             Assert.That(battleState.PersistentEffects[0].IsExpired, Is.False);
@@ -321,7 +321,8 @@ namespace Project333.Tests.EditMode
             battleState.StartNextTurn(PlayerId.Player);
             new TurnStartService().ResolveTurnStart(battleState);
 
-            Assert.That(originalTarget.CurrentHp, Is.EqualTo(40));
+            Assert.That(originalTarget.IsAlive, Is.False);
+            Assert.That(battleState.AIBoard.GetOccupant(originalTarget.Position), Is.Null);
             Assert.That(laterTarget.CurrentHp, Is.EqualTo(67));
             Assert.That(otherRowTarget.CurrentHp, Is.EqualTo(100));
             Assert.That(battleState.PersistentEffects[0].RemainingTriggers, Is.Zero);
@@ -415,6 +416,7 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.PersistentEffects[0].EffectDamage,
                 Is.EqualTo(TimedBombRules.BaseDamage + 5));
             Assert.That(battleState.PersistentEffects[0].EffectDamageType, Is.EqualTo(DamageType.Physical));
+            Assert.That(battleState.TimedBombCountdownEvents, Is.Empty, "Casting shows 3 without advancing the countdown.");
         }
 
         [Test]
@@ -465,11 +467,21 @@ namespace Project333.Tests.EditMode
             turnStartService.ResolveTurnStart(battleState);
             Assert.That(target.CurrentHp, Is.EqualTo(100));
             Assert.That(battleState.PersistentEffects[0].RemainingTriggers, Is.EqualTo(2));
+            var firstTick = battleState.TimedBombCountdownEvents.Single();
+            Assert.That(firstTick.EffectIndex, Is.Zero);
+            Assert.That(firstTick.SourceOwnerId, Is.EqualTo(PlayerId.Player));
+            Assert.That(firstTick.TargetOwnerId, Is.EqualTo(PlayerId.AI));
+            Assert.That(firstTick.RemainingTriggersBefore, Is.EqualTo(3));
+            Assert.That(firstTick.RemainingTriggersAfter, Is.EqualTo(2));
+            Assert.That(firstTick.ValuePopupEventEndIndex, Is.EqualTo(firstTick.ValuePopupEventIndex));
 
             battleState.StartNextTurn(PlayerId.Player);
             turnStartService.ResolveTurnStart(battleState);
             Assert.That(target.CurrentHp, Is.EqualTo(100));
             Assert.That(battleState.PersistentEffects[0].RemainingTriggers, Is.EqualTo(1));
+            var secondTick = battleState.TimedBombCountdownEvents.Single();
+            Assert.That(secondTick.RemainingTriggersBefore, Is.EqualTo(2));
+            Assert.That(secondTick.RemainingTriggersAfter, Is.EqualTo(1));
 
             battleState.StartNextTurn(PlayerId.AI);
             turnStartService.ResolveTurnStart(battleState);
@@ -478,6 +490,121 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.AI.Master.CurrentHp, Is.EqualTo(masterHpBefore - TimedBombRules.BaseDamage));
             Assert.That(battleState.PersistentEffects[0].RemainingTriggers, Is.Zero);
             Assert.That(battleState.PersistentEffects[0].IsExpired, Is.True);
+            var detonation = battleState.TimedBombCountdownEvents.Single();
+            Assert.That(detonation.RemainingTriggersBefore, Is.EqualTo(1));
+            Assert.That(detonation.RemainingTriggersAfter, Is.Zero);
+            Assert.That(detonation.ValuePopupEventIndex, Is.Zero, "Detonation precedes its own damage packets.");
+            Assert.That(detonation.ValuePopupEventEndIndex, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void TimedBombCountdown_MultipleEffectsPreservePopupBoundariesAndCreationOrder()
+        {
+            var state = CreateBattleState();
+            var spells = CreateSpellService(new CardDefinition[] { CreateTimedBombDefinition() });
+            for (var i = 0; i < 2; i++)
+            {
+                state.Player.Hand.Add(TimedBombRules.CardId);
+                state.Player.Resources.Add(new ResourceSet(0, 0, 3, 0));
+                spells.CastScriptedSpell(state, PlayerId.Player, TimedBombRules.CardId);
+            }
+            state.PersistentEffects[0].RestoreRuntimeState(0, false, 1);
+            state.StartNextTurn(PlayerId.AI);
+            new TurnStartService().ResolveTurnStart(state);
+            Assert.That(state.TimedBombCountdownEvents.Count, Is.EqualTo(2));
+            var first = state.TimedBombCountdownEvents[0];
+            var second = state.TimedBombCountdownEvents[1];
+            Assert.That(first.EffectIndex, Is.Zero);
+            Assert.That(first.RemainingTriggersAfter, Is.Zero);
+            Assert.That(first.ValuePopupEventIndex, Is.Zero);
+            Assert.That(first.ValuePopupEventEndIndex, Is.EqualTo(1));
+            Assert.That(second.EffectIndex, Is.EqualTo(1));
+            Assert.That(second.RemainingTriggersAfter, Is.EqualTo(2));
+            Assert.That(second.ValuePopupEventIndex, Is.EqualTo(1), "The first bomb damages the Master before the next bomb's cue.");
+            Assert.That(second.ValuePopupEventEndIndex, Is.EqualTo(second.ValuePopupEventIndex));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void TimedBombCountdown_ExcludesLaterFalloutAndAreaDamage(bool detonate)
+        {
+            var state = CreateBattleState();
+            state.Player.Hand.Add(TimedBombRules.CardId);
+            state.Player.Resources.Add(new ResourceSet(0, 0, 3, 0));
+            CreateSpellService(new CardDefinition[] { CreateTimedBombDefinition() })
+                .CastScriptedSpell(state, PlayerId.Player, TimedBombRules.CardId);
+            if (detonate) state.PersistentEffects[0].RestoreRuntimeState(0, false, 1);
+            var target = new UnitState("mixed-target", "Goblin", PlayerId.AI, new TileCoord(0, 0),
+                AttackType.Melee, 1, 200, true, false, 0);
+            state.AIBoard.Place(target.Position, target);
+            state.AIBoard.AddFalloutStack();
+            state.PersistentEffects.Add(new PersistentEffectState("Firewall", PlayerId.Player, "firewall",
+                state.TurnNumber, "", new ResourceSet(), targetRow: 0, remainingTriggers: 2,
+                effectDamage: 10, effectDamageType: DamageType.Magic));
+            state.PersistentEffects.Add(new PersistentEffectState(BiochemicalBombRules.CardId, PlayerId.Player,
+                BiochemicalBombRules.EffectId, state.TurnNumber, "", new ResourceSet(), remainingTriggers: 2,
+                effectDamage: 25, effectDamageType: DamageType.Fixed, targetStartColumn: 0));
+            state.StartNextTurn(PlayerId.AI);
+            new TurnStartService().ResolveTurnStart(state);
+            var bomb = state.TimedBombCountdownEvents.Single();
+            var bombDamageCount = detonate ? 2 : 0;
+            Assert.That(bomb.ValuePopupEventIndex, Is.Zero);
+            Assert.That(bomb.ValuePopupEventEndIndex, Is.EqualTo(bombDamageCount),
+                "Only the bomb and its destruction consequences belong to the bomb impact step.");
+            Assert.That(state.ValuePopupEvents.Skip(bomb.ValuePopupEventIndex)
+                .Take(bomb.ValuePopupEventEndIndex - bomb.ValuePopupEventIndex)
+                .All(e => e.SourceCardId == TimedBombRules.CardId), Is.True);
+            Assert.That(state.ValuePopupEvents[bomb.ValuePopupEventEndIndex].SourceCardId, Is.EqualTo(NuclearRules.CardId));
+            Assert.That(state.AreaSpellEffectEvents[0].ValuePopupEventIndex, Is.EqualTo(bombDamageCount + 2));
+            Assert.That(state.AreaSpellEffectEvents[1].ValuePopupEventIndex, Is.EqualTo(bombDamageCount + 3));
+            foreach (var area in state.AreaSpellEffectEvents)
+                Assert.That(state.ValuePopupEvents[area.ValuePopupEventIndex].SourceCardId, Is.EqualTo(area.SourceCardId));
+        }
+
+        [Test]
+        public void TimedBombCountdown_MasterDefeatStopsLaterBombsAndDoesNotInventTheirTicks()
+        {
+            var state = CreateBattleState();
+            var spells = CreateSpellService(new CardDefinition[] { CreateTimedBombDefinition() });
+            for (var i = 0; i < 2; i++)
+            {
+                state.Player.Hand.Add(TimedBombRules.CardId);
+                state.Player.Resources.Add(new ResourceSet(0, 0, 3, 0));
+                spells.CastScriptedSpell(state, PlayerId.Player, TimedBombRules.CardId);
+            }
+            state.PersistentEffects[0].RestoreRuntimeState(0, false, 1);
+            state.AI.Master.CurrentHp = 20;
+            state.StartNextTurn(PlayerId.AI);
+            new TurnStartService().ResolveTurnStart(state);
+            Assert.That(state.IsEnded, Is.True);
+            Assert.That(state.TimedBombCountdownEvents.Single().EffectIndex, Is.Zero);
+            Assert.That(state.PersistentEffects[1].RemainingTriggers, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void TimedBombProjection_PreservesExpiredEffectIndicesAndCountdownWithoutReplayingTransientEvents()
+        {
+            var state = CreateBattleState();
+            var oldEffect = new PersistentEffectState("old", PlayerId.AI, "old", 0, "", new ResourceSet());
+            oldEffect.Expire();
+            state.PersistentEffects.Add(oldEffect);
+            state.Player.Hand.Add(TimedBombRules.CardId);
+            state.Player.Resources.Add(new ResourceSet(0, 0, 3, 0));
+            CreateSpellService(new CardDefinition[] { CreateTimedBombDefinition() })
+                .CastScriptedSpell(state, PlayerId.Player, TimedBombRules.CardId);
+            state.StartNextTurn(PlayerId.AI);
+            new TurnStartService().ResolveTurnStart(state);
+            Assert.That(state.TimedBombCountdownEvents.Single().EffectIndex, Is.EqualTo(1));
+            foreach (var viewer in new[] { PlayerId.Player, PlayerId.AI })
+            {
+                var view = new BattleStateViewFactory().CreateForPlayer(state, "timed-bomb", viewer);
+                var restored = BattleStateViewProjector.CreateLocalPerspectiveState(view);
+                Assert.That(restored.PersistentEffects.Count, Is.EqualTo(2));
+                Assert.That(restored.PersistentEffects[0].IsExpired, Is.True);
+                Assert.That(restored.PersistentEffects[1].RemainingTriggers, Is.EqualTo(2));
+                Assert.That(restored.PersistentEffects[1].OwnerId, Is.EqualTo(viewer == PlayerId.Player ? PlayerId.Player : PlayerId.AI));
+                Assert.That(restored.TimedBombCountdownEvents, Is.Empty);
+            }
         }
 
         [Test]

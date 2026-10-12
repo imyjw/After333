@@ -33,6 +33,7 @@
     <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\CardRarity.cs" Link="Shared\Infrastructure\Data\CardRarity.cs" />
     <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\CardUpgradeCost.cs" Link="Shared\Infrastructure\Data\CardUpgradeCost.cs" />
     <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\CardUpgradeRules.cs" Link="Shared\Infrastructure\Data\CardUpgradeRules.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\DaehwandanCardRules.cs" Link="Shared\Infrastructure\Data\DaehwandanCardRules.cs" />
     <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\ChargeTileFootprint.cs" Link="Shared\Infrastructure\Data\ChargeTileFootprint.cs" />
     <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\DamageSpellCardDefinition.cs" Link="Shared\Infrastructure\Data\DamageSpellCardDefinition.cs" />
     <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\ICardDefinitionProvider.cs" Link="Shared\Infrastructure\Data\ICardDefinitionProvider.cs" />
@@ -41,6 +42,12 @@
     <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\PersistentResourceSpellCardDefinition.cs" Link="Shared\Infrastructure\Data\PersistentResourceSpellCardDefinition.cs" />
     <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\ScriptedSpellCardDefinition.cs" Link="Shared\Infrastructure\Data\ScriptedSpellCardDefinition.cs" />
     <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\SpellCardDefinition.cs" Link="Shared\Infrastructure\Data\SpellCardDefinition.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\TrapSpellCardDefinition.cs" Link="Shared\Infrastructure\Data\TrapSpellCardDefinition.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\TrapReturnCardRules.cs" Link="Shared\Infrastructure\Data\TrapReturnCardRules.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\TrapMirrorFieldCardRules.cs" Link="Shared\Infrastructure\Data\TrapMirrorFieldCardRules.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\ExplosiveReactiveArmourCardRules.cs" Link="Shared\Infrastructure\Data\ExplosiveReactiveArmourCardRules.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\IronDomeCardRules.cs" Link="Shared\Infrastructure\Data\IronDomeCardRules.cs" />
+    <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\SummonTrapCardRules.cs" Link="Shared\Infrastructure\Data\SummonTrapCardRules.cs" />
     <Compile Include="..\..\Assets\Project333\Runtime\Infrastructure\Data\UnitCardDefinition.cs" Link="Shared\Infrastructure\Data\UnitCardDefinition.cs" />
     <Content Include="..\..\Assets\Project333\Resources\Project333\Data\cards.json" Link="Data\cards.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Update="Data\pve_ai_decks.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

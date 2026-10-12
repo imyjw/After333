@@ -48,6 +48,13 @@ namespace Project333.Runtime.Application.Online
         DemonKingRevived = 37,
         HeroGrowth = 38,
         CardDrawn = 39,
+        StunApplied = 40,
+        StunCleared = 41,
+        FreezeApplied = 42,
+        FreezeCleared = 43,
+        TrapInstalled = 44,
+        TrapTriggered = 45,
+        ActiveEffectActivated = 46,
     }
 
     public enum BattleCombatLogResourceType

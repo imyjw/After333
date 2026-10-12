@@ -1,0 +1,58 @@
+{
+    "CardId": "BlueDragon",
+    "Owner": "AI",
+    "VisualKey": "BlueDragon",
+    "SpriteName": "Idle_0",
+    "BodyShader": "UI/Default",
+    "OriginalPngSize": {
+        "x": 2560,
+        "y": 512
+    },
+    "ImportedTextureSize": {
+        "x": 2048,
+        "y": 410
+    },
+    "ImportedSpriteRect": {
+        "serializedVersion": "2",
+        "x": 0.0,
+        "y": 0.0,
+        "width": 409.6000061035156,
+        "height": 410.0
+    },
+    "OriginalNormalizedAlpha": {
+        "serializedVersion": "2",
+        "x": 0.134765625,
+        "y": 0.02734375,
+        "width": 0.775390625,
+        "height": 0.6328125
+    },
+    "ManifestNormalizedAlpha": {
+        "serializedVersion": "2",
+        "x": 0.13450291752815247,
+        "y": 0.02734375,
+        "width": 0.7738791704177856,
+        "height": 0.6328125
+    },
+    "BodyVisibleRect": {
+        "serializedVersion": "2",
+        "x": -186.08779907226563,
+        "y": -241.0546875,
+        "width": 395.06341552734377,
+        "height": 322.734375
+    },
+    "StarsVisibleRect": {
+        "serializedVersion": "2",
+        "x": -129.66229248046876,
+        "y": 92.97540283203125,
+        "width": 275.06207275390627,
+        "height": 80.67050170898438
+    },
+    "IceVisibleRect": {
+        "serializedVersion": "2",
+        "x": -217.76510620117188,
+        "y": -253.9640655517578,
+        "width": 457.3802490234375,
+        "height": 361.4625244140625
+    },
+    "BodyAnimatorSpeed": 0.0
+}

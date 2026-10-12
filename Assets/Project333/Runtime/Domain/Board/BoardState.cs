@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Project333.Runtime.Domain.Cards;
+using Project333.Runtime.Domain.Battle;
+using Project333.Runtime.Domain.Resources;
 
 namespace Project333.Runtime.Domain.Board
 {
@@ -10,7 +12,21 @@ namespace Project333.Runtime.Domain.Board
         public const int RowCount = 2;
 
         private readonly OccupantState[,] _tiles = new OccupantState[ColumnCount, RowCount];
+        private bool _refreshingOrcChieftainAuras;
+        private ResourceSet _playerResources = null!;
+        private ResourceSet _aiResources = null!;
 
+        // Battle construction rebinds these to that state's own resources after copy/restore.
+        internal void BindOwnerResources(ResourceSet playerResources, ResourceSet aiResources)
+        {
+            _playerResources = playerResources;
+            _aiResources = aiResources;
+        }
+
+        internal int GetOwnerGold(PlayerId ownerId) =>
+            (ownerId == PlayerId.Player ? _playerResources : _aiResources)?.Gold ?? 0;
+
+        // Retained as a cast counter for older snapshots; never grants exposure on placement.
         public int FalloutStacks { get; private set; }
 
         public void RestoreFalloutStacks(int stacks) => FalloutStacks = Math.Max(0, stacks);
@@ -18,7 +34,7 @@ namespace Project333.Runtime.Domain.Board
         public void AddFalloutStack()
         {
             FalloutStacks++;
-            foreach (var occupant in EnumerateOccupants()) occupant.ApplyFalloutExposure(FalloutStacks);
+            foreach (var occupant in EnumerateOccupants()) occupant.AddFalloutStack();
         }
 
         public bool IsInside(TileCoord coord)
@@ -44,7 +60,7 @@ namespace Project333.Runtime.Domain.Board
             return _tiles[coord.Column, coord.Row];
         }
 
-        public void Place(TileCoord coord, OccupantState occupant)
+        public void Place(TileCoord coord, OccupantState occupant, bool synchronizeAuras = true)
         {
             if (!IsInside(coord))
             {
@@ -59,10 +75,10 @@ namespace Project333.Runtime.Domain.Board
             _tiles[coord.Column, coord.Row] = occupant;
             occupant.Position = coord;
             occupant.AttachToBoard(this);
-            occupant.ApplyFalloutExposure(FalloutStacks);
+            if (synchronizeAuras) RefreshOrcChieftainAuras();
         }
 
-        public OccupantState Remove(TileCoord coord)
+        public OccupantState Remove(TileCoord coord, bool synchronizeAuras = true)
         {
             if (!IsInside(coord))
             {
@@ -72,7 +88,44 @@ namespace Project333.Runtime.Domain.Board
             var occupant = _tiles[coord.Column, coord.Row];
             _tiles[coord.Column, coord.Row] = null;
             occupant?.DetachFromBoard(this);
+            if (synchronizeAuras)
+            {
+                occupant?.ReconcileOrcChieftainAuras(Array.Empty<OccupantState>());
+                RefreshOrcChieftainAuras();
+            }
             return occupant;
+        }
+
+        // Only stat deltas are synchronized here. Defeated occupants and destruction effects
+        // remain the shared resolver's responsibility after all direct damage has completed.
+        public void RefreshOrcChieftainAuras()
+        {
+            if (_refreshingOrcChieftainAuras) return;
+            var relevant = false;
+            foreach (var occupant in EnumerateOccupants())
+            {
+                if (OrcChieftainRules.IsActiveSource(occupant)) { relevant = true; break; }
+                foreach (var buff in occupant.CombatStatBuffs)
+                    if (OrcChieftainRules.IsAura(buff)) { relevant = true; break; }
+                if (relevant) break;
+            }
+            if (!relevant) return;
+            _refreshingOrcChieftainAuras = true;
+            try
+            {
+                var changed = true;
+                while (changed)
+                {
+                    var occupants = new List<OccupantState>(EnumerateOccupants());
+                    var sources = new List<OccupantState>();
+                    foreach (var occupant in occupants)
+                        if (OrcChieftainRules.IsActiveSource(occupant)) sources.Add(occupant);
+                    changed = false;
+                    foreach (var occupant in occupants)
+                        changed |= occupant.ReconcileOrcChieftainAuras(sources);
+                }
+            }
+            finally { _refreshingOrcChieftainAuras = false; }
         }
 
         public void Move(TileCoord from, TileCoord to)
@@ -90,7 +143,7 @@ namespace Project333.Runtime.Domain.Board
             var occupant = _tiles[from.Column, from.Row];
             if (occupant == null)
             {
-                throw new InvalidOperationException("Cannot move from an empty tile.");
+                throw new InvalidOperationException("대상 타일이 비어있습니다.");
             }
 
             if (_tiles[to.Column, to.Row] != null)

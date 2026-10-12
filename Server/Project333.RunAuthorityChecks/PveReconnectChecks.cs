@@ -20,7 +20,7 @@ static class PveReconnectChecks
 
     public static async Task Run(Action<string> pass, CancellationToken ct)
     {
-        foreach (var grace in new[] { TimeSpan.FromSeconds(60), TimeSpan.Zero })
+        foreach (var grace in new[] { TimeSpan.FromSeconds(70), TimeSpan.Zero })
         {
             var manager = new BattleSessionManager();
             var session = manager.GetOrCreate("pve-grace-" + Guid.NewGuid().ToString("N"), true);
@@ -30,13 +30,13 @@ static class PveReconnectChecks
             Require(session.TryGetCurrentTurnTimer(out var actor, out var version, out var turnDeadline), "Started battle must have a timer.");
             var started = DateTimeOffset.UtcNow;
             var detached = session.DetachConnection(original, grace)!;
-            Require(detached.Reserved && detached.DeadlineUtc >= started.AddSeconds(60) &&
-                    detached.DeadlineUtc <= DateTimeOffset.UtcNow.AddSeconds(60), "Explicit/default reconnect grace must last 60 seconds.");
+            Require(detached.Reserved && detached.DeadlineUtc >= started.AddSeconds(70) &&
+                    detached.DeadlineUtc <= DateTimeOffset.UtcNow.AddSeconds(70), "Explicit/default reconnect grace must last 70 seconds.");
             Require(manager.FindReconnectStatus(original.AccountId) == null, "PvP-only discovery must exclude PvE.");
             var status = manager.FindReconnectStatus(original.AccountId, useServerAiOpponent: true);
-            Require(status?.MatchId == session.MatchId && status.RemainingSeconds is >= 59 and <= 60, "PvE discovery must recover the account's pending battle.");
+            Require(status?.MatchId == session.MatchId && status.RemainingSeconds is >= 69 and <= 70, "PvE discovery must recover the account's pending battle.");
             Require(manager.FindReconnectStatus(Guid.NewGuid().ToString(), useServerAiOpponent: true) == null, "Another account must not discover the seat.");
-            Require(!session.TryCreateExpiredDisconnectForfeitEnvelope(detached.SeatId, detached.IdentityKey, detached.DeadlineUtc, out _), "An early timeout callback cannot consume the 60-second grace.");
+            Require(!session.TryCreateExpiredDisconnectForfeitEnvelope(detached.SeatId, detached.IdentityKey, detached.DeadlineUtc, out _), "An early timeout callback cannot consume the 70-second grace.");
             Require(session.DetachConnection(original, TimeSpan.FromMinutes(3)) == null, "Duplicate cleanup must not extend grace.");
             Require(!session.TryAddConnection(Connection(), out _), "Another account cannot claim a disconnected PvE seat.");
             manager.RemoveIfEmpty(session);
@@ -55,7 +55,7 @@ static class PveReconnectChecks
             Require(!session.HasPendingReconnectReservations &&
                 !session.TryCreateExpiredDisconnectForfeitEnvelope(detached.SeatId, detached.IdentityKey, detached.DeadlineUtc, out _), "A canceled reservation's callback cannot forfeit the restored battle.");
         }
-        pass("PvE explicit/default 60-second grace supports account discovery, protects the original participant and rejects premature/stale forfeits");
+        pass("PvE explicit/default 70-second grace supports account discovery, protects the original participant and rejects premature/stale forfeits");
 
         var expired = new BattleSession("pve-expired-" + Guid.NewGuid().ToString("N"), true);
         var owner = Connection();
@@ -132,7 +132,7 @@ static class PveReconnectChecks
                 Require(Field(discovery, "BattleMode").GetString() == "pve" &&
                     Field(discovery, "GameMode").GetString() == "ai_challenge" &&
                     Field(discovery, "AiChallengeAttemptId").GetString() == challengeAttemptId &&
-                    Field(discovery, "RemainingSeconds").GetInt32() is >= 50 and <= 60, "Fresh app must discover a PvE battle with its remaining 60-second grace.");
+                    Field(discovery, "RemainingSeconds").GetInt32() is >= 60 and <= 70, "Fresh app must discover a PvE battle with its remaining 70-second grace.");
                 Require(!Field(await Status(http, owner, "/pvp/reconnect-status", ct), "HasReconnectableBattle").GetBoolean(), "Legacy PvP discovery must not offer a PvE battle.");
                 Require(!Field(await Status(http, outsider, "/battle/reconnect-status", ct), "HasReconnectableBattle").GetBoolean(), "Authenticated discovery must not reveal another account's PvE battle.");
                 if (attempt == 0)

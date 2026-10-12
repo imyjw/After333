@@ -56,6 +56,19 @@ namespace Project333.Runtime.Presentation.Cards
                 return artwork;
             }
 
+            // Keep the dedicated portrait first; share the existing Orc portrait
+            // only while the user has not supplied an OrcChieftain image.
+            if (string.Equals(cardId, "OrcChieftain", StringComparison.Ordinal))
+                return LoadArtworkAtPath($"{ResourceFolder}/OrcWarrior", cardId);
+
+            // Reuse Skeleton only until the user supplies a dedicated archer portrait.
+            if (string.Equals(cardId, "SkeletonArcher", StringComparison.Ordinal))
+                return LoadArtworkAtPath($"{ResourceFolder}/Skeleton", cardId);
+
+            // Use the canonical identifier; dedicated art wins.
+            if (string.Equals(cardId, "ElfElder", StringComparison.Ordinal))
+                return LoadArtworkAtPath($"{ResourceFolder}/ElfLongbowScout", cardId);
+
             var displayCaseCardId = ToDisplayCaseCardId(cardId);
             if (!string.Equals(displayCaseCardId, cardId, StringComparison.Ordinal))
             {

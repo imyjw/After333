@@ -37,7 +37,7 @@ namespace Project333.Runtime.Application.Online
                     var localOwnerId = ToLocalOwnerId(view, occupantView.OwnerId);
                     var occupant = CreateOccupant(view, occupantView, localOwnerId);
                     var board = localOwnerId == PlayerId.Player ? playerBoard : aiBoard;
-                    board.Place(occupant.Position, occupant);
+                    board.Place(occupant.Position, occupant, synchronizeAuras: false);
 
                     if (occupant.Kind == OccupantKind.Master)
                     {
@@ -53,6 +53,9 @@ namespace Project333.Runtime.Application.Online
                 }
             }
 
+            // Wire stats already include aura deltas. Attach every source before one idempotent reconciliation.
+            playerBoard.RefreshOrcChieftainAuras();
+            aiBoard.RefreshOrcChieftainAuras();
             EnsureMasterPlaced(playerBoard, playerMaster);
             EnsureMasterPlaced(aiBoard, aiMaster);
 
@@ -62,6 +65,7 @@ namespace Project333.Runtime.Application.Online
             var projectedState = new BattleState(playerState, aiState, playerBoard, aiBoard);
             ApplyTurnState(projectedState, view);
             ApplyPersistentEffects(projectedState, view);
+            ApplyArmedTraps(projectedState, view);
             if (view.HasPendingRobotFusion && !string.IsNullOrWhiteSpace(view.PendingRobotFusionCardId))
             {
                 projectedState.RestorePendingRobotFusion(
@@ -243,6 +247,7 @@ namespace Project333.Runtime.Application.Online
                 ToLocalOwnerId(stateView, view.DemonKingRevivalCountdownPlayerId),
                 view.DemonKingRevivalEligibleAfterTurnNumber,
                 view.DemonKingRevivalCount);
+            occupant.RestoreActionDebuffs(view.StunTurnEndsRemaining, view.FreezeTurnEndsRemaining);
             var invincibleEffects = new List<InvincibleEffectState>();
             if (view.InvincibleEffects != null)
             {
@@ -270,10 +275,11 @@ namespace Project333.Runtime.Application.Online
                     if (buff == null) continue;
                     combatStatBuffs.Add(new CombatStatBuffState(
                         buff.SourceCardId, buff.AttackBonus, buff.MaxHpBonus,
-                        buff.PhysicalDefenseBonus, buff.MagicDefenseBonus));
+                        buff.PhysicalDefenseBonus, buff.MagicDefenseBonus, buff.SourceRuntimeId));
                 }
             }
             occupant.RestoreCombatStatBuffs(combatStatBuffs);
+            occupant.RestoreErasedOrcChieftainSources(view.ErasedOrcChieftainSourceRuntimeIds);
             occupant.WasSummonedThisTurn = view.WasSummonedThisTurn;
             occupant.HasSummoningSickness = view.HasSummoningSickness;
             occupant.RemainingAttacksThisTurn = view.RemainingAttacksThisTurn;
@@ -307,6 +313,26 @@ namespace Project333.Runtime.Application.Online
 
             battleState.SetActivePlayer(activePlayerId);
             battleState.SetPhase(view.Phase);
+        }
+
+        private static void ApplyArmedTraps(BattleState battleState, BattleStateViewDto view)
+        {
+            // Opponent details are never accepted, even if a malformed view includes a private list.
+            battleState.Player.RestoreHiddenTrapCount(0);
+            battleState.AI.RestoreHiddenTrapCount(view.Opponent?.TrapCount ?? 0);
+            if (view.Player?.VisibleArmedTraps != null)
+            {
+                foreach (var trap in view.Player.VisibleArmedTraps)
+                {
+                    if (trap == null || trap.OwnerId != view.ViewerId ||
+                        string.IsNullOrWhiteSpace(trap.RuntimeId) || string.IsNullOrWhiteSpace(trap.CardId)) continue;
+                    battleState.ArmedTraps.Add(new ArmedTrapState(trap.RuntimeId, PlayerId.Player,
+                        trap.CardId, trap.TriggerType, trap.EffectType, ToResourceSet(trap.ActivationCost),
+                        trap.InstalledTurn, trap.UpgradeLevel, trap.IsTemporaryReplicate, trap.EffectAmount));
+                }
+            }
+            // Restoring a snapshot presents state; it never replays installation or trigger cues.
+            battleState.ClearTrapEvents();
         }
 
         private static void ApplyPersistentEffects(BattleState battleState, BattleStateViewDto view)

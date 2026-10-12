@@ -31,6 +31,18 @@ namespace Project333.Runtime.Application.Services
                 copy.RestoreRuntimeState(effect.OwnerTurnStartsRemaining, effect.IsExpired, effect.RemainingTriggers);
                 result.PersistentEffects.Add(copy);
             }
+            // Observation copies retain only the AI's own secret identities. Repeated search
+            // copies preserve already-hidden counts without turning them into synthetic cards.
+            foreach (var trap in source.ArmedTraps)
+            {
+                if (trap == null || hidePrivateZones && trap.OwnerId != PlayerId.AI) continue;
+                result.ArmedTraps.Add(new ArmedTrapState(trap.RuntimeId, trap.OwnerId, trap.CardId,
+                    trap.TriggerType, trap.EffectType, trap.ActivationCost, trap.InstalledTurn,
+                    trap.UpgradeLevel, trap.IsTemporaryReplicate, trap.EffectAmount));
+            }
+            result.Player.RestoreHiddenTrapCount(hidePrivateZones
+                ? source.GetArmedTrapCount(PlayerId.Player) : source.Player.HiddenTrapCount);
+            result.AI.RestoreHiddenTrapCount(source.AI.HiddenTrapCount);
             result.RestoreRuntimeState(source.TurnNumber, source.ActivePlayerId, source.Phase);
             result.Counters.Restore(source.Counters.ActionSequence);
             if (source.PendingRobotFusion != null)
@@ -65,7 +77,9 @@ namespace Project333.Runtime.Application.Services
             var board = new BoardState();
             board.RestoreFalloutStacks(source.FalloutStacks);
             foreach (var occupant in source.EnumerateOccupants())
-                board.Place(occupant.Position, ReferenceEquals(occupant, originalMaster) ? master : occupant.CloneDetached());
+                board.Place(occupant.Position, ReferenceEquals(occupant, originalMaster) ? master : occupant.CloneDetached(),
+                    synchronizeAuras: false);
+            board.RefreshOrcChieftainAuras();
             return board;
         }
 
@@ -93,6 +107,19 @@ namespace Project333.Runtime.Application.Services
                     AppendOccupantKey(key, o, includePositionAndHp: true);
                 }
             }
+            // Only public enemy counts enter the key. Own installation order and captured
+            // rules are significant, whereas random hand/runtime GUIDs are not.
+            key.Append("|enemy-traps:").Append(state.GetArmedTrapCount(PlayerId.Player));
+            foreach (var trap in state.ArmedTraps)
+                if (trap != null && trap.OwnerId == PlayerId.AI)
+                {
+                    var cost = trap.ActivationCost;
+                    key.Append("|own-trap:").Append(trap.CardId).Append(',').Append(trap.TriggerType)
+                        .Append(',').Append(trap.EffectType).Append(',').Append(trap.InstalledTurn)
+                        .Append(',').Append(trap.UpgradeLevel).Append(',').Append(trap.IsTemporaryReplicate).Append(',').Append(trap.EffectAmount)
+                        .Append(',').Append(cost.Mana).Append(',').Append(cost.Qi)
+                        .Append(',').Append(cost.Power).Append(',').Append(cost.Gold);
+                }
             foreach (var effect in state.PersistentEffects)
                 key.Append('|').Append(effect.EffectId).Append(',').Append(effect.OwnerId).Append(',')
                     .Append(effect.TargetRow).Append(',').Append(effect.TargetStartColumn).Append(',')
@@ -124,6 +151,7 @@ namespace Project333.Runtime.Application.Services
             key.Append(',').Append(o.MaxHp).Append(',').Append(o.RemainingAttacksThisTurn)
                 .Append(',').Append(o.HasSummoningSickness).Append(',').Append(o.WasSummonedThisTurn)
                 .Append(',').Append(o.IsDrained).Append(',').Append(o.IsErasure).Append(',').Append(o.IsSealbound)
+                .Append(',').Append(o.StunTurnEndsRemaining).Append(',').Append(o.FreezeTurnEndsRemaining)
                 .Append(',').Append(o.SealboundOwnerTurnStartsRemaining).Append(',').Append(o.EndureUsed)
                 .Append(',').Append(o.HidingRevealed).Append(',').Append(o.IsUnderHuanShu)
                 .Append(',').Append(o.HuanShuEligibleAfterTurnNumber).Append(',').Append(o.PhysicalDefense)
@@ -144,9 +172,11 @@ namespace Project333.Runtime.Application.Services
             if (o is UnitState u) key.Append(',').Append(string.Join("|", u.Races)).Append(',').Append(u.SciencePowerUpkeep);
             if (o is BuildingState b) key.Append(',').Append(b.SciencePowerUpkeep).Append(',').Append(b.CanAttackAsBuilding);
             foreach (var buff in o.CombatStatBuffs)
-                key.Append('~').Append(buff.SourceCardId).Append(',').Append(buff.AttackBonus)
+                key.Append('~').Append(buff.SourceCardId).Append(',').Append(buff.SourceRuntimeId).Append(',').Append(buff.AttackBonus)
                     .Append(',').Append(buff.MaxHpBonus).Append(',').Append(buff.PhysicalDefenseBonus)
                     .Append(',').Append(buff.MagicDefenseBonus);
+            foreach (var runtimeId in o.ErasedOrcChieftainSourceRuntimeIds)
+                key.Append("~erased-chief,").Append(runtimeId);
             foreach (var effect in o.InvincibleEffects)
                 key.Append('!').Append(effect.Duration).Append(',').Append(effect.OwnerTurnsRemaining)
                     .Append(',').Append(effect.AppliedTurnNumber).Append(',').Append(effect.AppliedActivePlayerId);

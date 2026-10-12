@@ -30,7 +30,7 @@ public sealed partial class PvpMatchmakingService
         {
             challenge.Parameters.AddWithValue("account", account);
             if ((bool)(await challenge.ExecuteScalarAsync(ct))!)
-                throw new InvalidOperationException("This account already has an active AI challenge.");
+                throw new InvalidOperationException("This account already has an active Gold Dungeon.");
         }
 
         // The same account cannot obtain several pending seats through parallel sockets.

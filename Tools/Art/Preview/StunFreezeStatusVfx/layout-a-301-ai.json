@@ -1,0 +1,58 @@
+{
+    "CardId": "A-301",
+    "Owner": "AI",
+    "VisualKey": "A-301",
+    "SpriteName": "Idle_0",
+    "BodyShader": "UI/Default",
+    "OriginalPngSize": {
+        "x": 3072,
+        "y": 512
+    },
+    "ImportedTextureSize": {
+        "x": 3072,
+        "y": 512
+    },
+    "ImportedSpriteRect": {
+        "serializedVersion": "2",
+        "x": 0.0,
+        "y": 0.0,
+        "width": 512.0,
+        "height": 512.0
+    },
+    "OriginalNormalizedAlpha": {
+        "serializedVersion": "2",
+        "x": 0.150390625,
+        "y": 0.03125,
+        "width": 0.685546875,
+        "height": 0.568359375
+    },
+    "ManifestNormalizedAlpha": {
+        "serializedVersion": "2",
+        "x": 0.150390625,
+        "y": 0.03125,
+        "width": 0.685546875,
+        "height": 0.568359375
+    },
+    "BodyVisibleRect": {
+        "serializedVersion": "2",
+        "x": -178.30078125,
+        "y": -239.0625,
+        "width": 349.62890625,
+        "height": 289.86328125
+    },
+    "StarsVisibleRect": {
+        "serializedVersion": "2",
+        "x": -128.14828491210938,
+        "y": 60.94602966308594,
+        "width": 243.90380859375,
+        "height": 71.53240966796875
+    },
+    "IceVisibleRect": {
+        "serializedVersion": "2",
+        "x": -206.27114868164063,
+        "y": -250.65704345703126,
+        "width": 405.569580078125,
+        "height": 324.64691162109377
+    },
+    "BodyAnimatorSpeed": 0.0
+}

@@ -30,7 +30,7 @@ namespace Project333.Tests.EditMode
 
             var exception = Assert.Throws<System.InvalidOperationException>(() => service.EndTurn(battleState));
 
-            Assert.That(exception!.Message, Is.EqualTo("Turns can only end during the Main phase."));
+            Assert.That(exception!.Message, Is.EqualTo("자신의 턴에만 턴을 종료할 수 있습니다."));
         }
 
         private static BattleState CreateBattleStateInMainPhase(PlayerId firstPlayerId)

@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>블루 드래곤 · After333 디자인 미리보기</title>
+<style>
+:root{color-scheme:dark;--ink:#edf8ff;--muted:#8caabd;--line:#264251;--aqua:#66e5ff;--panel:#10222e}
+*{box-sizing:border-box}body{margin:0;background:#07131d;color:var(--ink);font-family:"Segoe UI","Malgun Gothic",system-ui,sans-serif;background-image:radial-gradient(ellipse at 50% 0,#153c50 0,transparent 65%);min-height:100vh}
+button{font:inherit;cursor:pointer;color:inherit}button:focus-visible{outline:2px solid var(--aqua);outline-offset:4px}
+.shell{max-width:1180px;margin:auto;padding:40px 30px 26px}
+header{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:27px}
+.eyebrow{color:var(--aqua);font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase}
+h1{font-size:36px;letter-spacing:-1.6px;margin:10px 0 9px;font-weight:650}
+.sub{color:var(--muted);font-size:13px;line-height:1.8;margin:0}.edition{font-family:Consolas,monospace;border-left:1px solid var(--line);padding-left:20px;color:#7496ad;font-size:11px;line-height:1.9;white-space:nowrap}.edition strong{display:block;color:#cce4ef;font-size:14px;letter-spacing:2px}
+.studio{border:1px solid #345568;border-radius:16px;background:linear-gradient(140deg,#112b39,#0a1824 80%);overflow:hidden;box-shadow:0 25px 90px #0005}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid #254253;background:#0b1a27a0}.live{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:600}.dot{width:6px;height:6px;border-radius:50%;background:var(--aqua);box-shadow:0 0 12px #66e5ff88}.tools{display:flex;gap:7px}.tool{border:1px solid #2c485a;background:#122938;border-radius:7px;padding:7px 12px;font-size:11px;color:#adc4d3}.tool:hover{border-color:#64c5e2;color:white}.tool[aria-pressed=true]{color:var(--aqua);border-color:#407e93}
+.viewport{position:relative}.viewport canvas{width:100%;display:block;image-rendering:pixelated;aspect-ratio:1000/440}.caption{position:absolute;top:22px;left:28px;pointer-events:none}.caption small{display:block;color:#63879f;font-size:10px;letter-spacing:2px;margin-bottom:7px}.caption span{font-size:18px;color:#d8f2ff;letter-spacing:-.6px}.status{position:absolute;right:26px;top:24px;color:#74d9f7;font:11px Consolas,monospace;letter-spacing:.3px}.loading{position:absolute;inset:0;display:grid;place-items:center;background:#0b1c28;color:#8ecbdf;font-size:14px}.loading[hidden]{display:none}
+.transport{padding:0 26px 21px}.timeline{height:3px;display:flex;gap:4px;margin-bottom:11px}.seg{height:100%;border-radius:5px;background:#213e50;overflow:hidden;position:relative}.seg:nth-child(1){flex:25}.seg:nth-child(2){flex:38}.seg:nth-child(3){flex:40}.seg::after{content:"";display:block;height:100%;width:var(--fill,0%);background:var(--aqua);box-shadow:0 0 8px #6edfff}.timeline-labels{display:flex;justify-content:space-between;font-size:10px;color:#577c96;gap:10px}.timeline-labels strong{font-weight:500;color:#92b5c9}
+.motion-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:15px}.motion{background:#0b1c29;border:1px solid #233f51;border-radius:10px;overflow:hidden;padding:0;text-align:left;transition:background .2s,border-color .2s}.motion:hover{background:#102b3a;border-color:#4f8ca5}.motion[aria-pressed=true]{background:linear-gradient(145deg,#174057,#0c2534);border-color:#5cb6d2;box-shadow:inset 0 0 0 1px #66e5ff18}.motion canvas{width:100%;height:110px;display:block;image-rendering:pixelated}.motion-label{padding:0 14px 13px;display:flex;justify-content:space-between;align-items:center}.motion-label b{font-size:12px;font-weight:600}.motion-label small{font:10px Consolas,monospace;color:#7399b1}.motion[aria-pressed=true] .motion-label small{color:var(--aqua)}.number{color:#64d6f3;font:9px Consolas,monospace;margin-right:5px}
+.foot{display:flex;justify-content:space-between;gap:20px;margin-top:20px;line-height:1.8;font-size:11px;color:#6d8ea4}.foot p{margin:0}.foot strong{font-weight:500;color:#a4c8db}.note{max-width:790px}.kbd{display:inline-block;border:1px solid #304659;border-radius:3px;padding:0 5px;font:10px Consolas,monospace;color:#b1c8d4}
+@media(max-width:680px){.shell{padding:24px 14px}header{margin-bottom:20px}h1{font-size:28px}.edition{display:none}.sub{font-size:11px}.toolbar{padding:12px}.tools{gap:4px}.tool{padding:7px 8px;font-size:10px}.caption{top:13px;left:17px}.caption small{font-size:8px}.caption span{font-size:13px}.status{right:15px;top:17px;font-size:9px}.motion-grid{gap:6px}.motion canvas{height:75px}.motion-label{padding:0 7px 9px;display:block}.motion-label b{font-size:11px}.motion-label small{display:block;margin-top:5px;font-size:9px}.number{display:none}.transport{padding:0 16px 16px}.timeline-labels{font-size:8px}.foot{display:block}.shortcuts{display:none}}
+</style>
+</head>
+<body>
+<main class="shell">
+<header><div><div class="eyebrow">After333 · Creature study 01</div><h1>블루 드래곤</h1><p class="sub">심호흡으로 모은 수압, 날아가는 물대포, 목표에 닿는 순간 터지는 파도.</p></div><div class="edition"><strong>BLUE DRAGON</strong>ANIMATION · WATER VFX · SOUND<br>2026.09 / DESIGN PREVIEW</div></header>
+<section class="studio" aria-label="블루 드래곤 애니메이션 미리보기">
+<div class="toolbar"><div class="live"><span class="dot"></span>모션 스튜디오</div><div class="tools">
+<button class="tool" id="pause" aria-pressed="false" title="스페이스 키">일시 정지</button>
+<button class="tool" id="flip" aria-pressed="false">방향 전환</button>
+<button class="tool" id="sound" aria-pressed="false">소리 켜기</button>
+</div></div>
+<div class="viewport"><canvas id="stage" width="1000" height="440" aria-label="블루 드래곤과 물대포 공격 연출" role="img"></canvas><div class="caption"><small id="stateTag">WATER CANNON</small><span id="stateTitle">물대포 공격</span></div><div id="status" class="status" aria-live="off">READY</div><div id="loading" class="loading">블루 드래곤을 불러오는 중…</div></div>
+<div class="transport"><div class="timeline" aria-hidden="true"><div class="seg"></div><div class="seg"></div><div class="seg"></div></div><div class="timeline-labels"><span><strong>수압 충전</strong> 0.25초</span><span><strong>물대포 비행</strong> 0.38초</span><span><strong>명중 · 물보라 · 타격음</strong> 0.40초</span></div></div>
+</section>
+<nav class="motion-grid" aria-label="애니메이션 선택">
+<button class="motion" data-state="idle" aria-pressed="false"><canvas width="200" height="110" aria-hidden="true"></canvas><div class="motion-label"><b><span class="number">01</span>평상시</b><small>06 FPS</small></div></button>
+<button class="motion" data-state="attack" aria-pressed="true"><canvas width="200" height="110" aria-hidden="true"></canvas><div class="motion-label"><b><span class="number">02</span>공격</b><small>12 FPS</small></div></button>
+<button class="motion" data-state="hurt" aria-pressed="false"><canvas width="200" height="110" aria-hidden="true"></canvas><div class="motion-label"><b><span class="number">03</span>피격</b><small>15 FPS</small></div></button>
+<button class="motion" data-state="run" aria-pressed="false"><canvas width="200" height="110" aria-hidden="true"></canvas><div class="motion-label"><b><span class="number">04</span>이동</b><small>12 FPS</small></div></button>
+<button class="motion" data-state="death" aria-pressed="false"><canvas width="200" height="110" aria-hidden="true"></canvas><div class="motion-label"><b><span class="number">05</span>사망</b><small>08 FPS</small></div></button>
+</nav>
+<footer class="foot"><p class="note"><strong>디자인 확인용 미리보기.</strong> 프로젝트에 저장된 실제 스프라이트와 WAV를 사용합니다. Unity 게임 실행 화면과는 별개이며, 여기의 표적은 연출 확인용입니다. 소리는 버튼을 누른 뒤 재생됩니다.</p><p class="shortcuts"><span class="kbd">1–5</span> 모션 &nbsp; <span class="kbd">Space</span> 정지</p></footer>
+</main>
+<script>
+'use strict';
+const assetRoot = '../../Assets/Project333/Resources/Project333/';
+const atlas = new Image(), water = new Image();
+atlas.src = '../../Tools/Art/Source/BlueDragon/DragonAtlas.png';
+water.src = assetRoot + 'Presentation/BlueDragon/WaterAtlas.png';
+const canvas = document.getElementById('stage'), ctx = canvas.getContext('2d');
+const buttons = [...document.querySelectorAll('.motion')], miniContexts = buttons.map(b => b.querySelector('canvas').getContext('2d'));
+const status = document.getElementById('status'), segments = [...document.querySelectorAll('.seg')];
+const motions = {
+ idle:{row:0,fps:6,length:1,title:'평상시 · 호흡과 꼬리',tag:'IDLE / BREATHING'},
+ attack:{row:1,fps:12,length:1.65,title:'물대포 공격',tag:'WATER CANNON'},
+ hurt:{row:2,fps:15,length:1.25,title:'피격 · 몸을 움츠리는 반동',tag:'HIT / RECOIL'},
+ run:{row:3,fps:12,length:.5,title:'이동 · 날개를 펼친 질주',tag:'RUN / ADVANCE'},
+ death:{row:4,fps:8,length:1.8,title:'사망 · 무너지는 자세',tag:'DEATH / COLLAPSE'}
+};
+const audioNames = {charge:['WaterCannonCharge',.26],launch:['WaterCannonLaunch',.55],impact:['WaterCannonImpact',.65],hurt:['DragonHurt',.45],death:['DragonDeath',.50]};
+const clips = Object.fromEntries(Object.entries(audioNames).map(([key,[name,gain]])=>{
+ const a=new Audio(assetRoot+'Audio/BlueDragon/'+name+'.wav');a.preload='auto';a.volume=gain;return [key,a];
+}));
+let selected='attack', paused=matchMedia('(prefers-reduced-motion: reduce)').matches, flipped=false, sound=false, ready=false, time=0, globalTime=0, last=0, fired=new Set();
+function stopSounds(){Object.values(clips).forEach(a=>{a.pause();a.currentTime=0;});}
+function soundAt(key,t,threshold){
+ if(paused||t<threshold||fired.has(key))return;
+ fired.add(key);
+ if(sound){const a=clips[key];a.currentTime=0;a.play().catch(()=>{document.getElementById('sound').textContent='소리 재시도';});}
+}
+function reset(){time=0;fired.clear();stopSounds();}
+function choose(state){
+ selected=state;reset();buttons.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.state===state)));
+ document.getElementById('stateTitle').textContent=motions[state].title;
+ document.getElementById('stateTag').textContent=motions[state].tag;
+ document.querySelector('.transport').style.opacity=state==='attack'?'1':'.35';
+}
+function pauseUI(){const b=document.getElementById('pause');b.textContent=paused?'다시 재생':'일시 정지';b.setAttribute('aria-pressed',String(paused));}
+buttons.forEach(b=>b.addEventListener('click',()=>choose(b.dataset.state)));
+document.getElementById('pause').addEventListener('click',()=>{paused=!paused;if(paused)stopSounds();pauseUI();});
+document.getElementById('flip').addEventListener('click',e=>{flipped=!flipped;e.currentTarget.setAttribute('aria-pressed',String(flipped));});
+document.getElementById('sound').addEventListener('click',e=>{
+ sound=!sound;e.currentTarget.textContent=sound?'소리 끄기':'소리 켜기';e.currentTarget.setAttribute('aria-pressed',String(sound));
+ // Prime audio under the user gesture so file and browser previews can play later cues.
+ if(sound){Object.values(clips).forEach(a=>{a.muted=true;const p=a.play();if(p)p.then(()=>{a.pause();a.currentTime=0;a.muted=false;}).catch(()=>{a.muted=false;});});reset();}
+ else stopSounds();
+});
+document.addEventListener('keydown',e=>{
+ if(e.target.tagName==='BUTTON')return;
+ if(e.code==='Space'){e.preventDefault();document.getElementById('pause').click();}
+ if(/^[1-5]$/.test(e.key))choose(Object.keys(motions)[Number(e.key)-1]);
+});
+document.addEventListener('visibilitychange',()=>{last=0;if(document.hidden)stopSounds();});
+pauseUI();
+function drawCell(c,image,columns,rows,index,x,y,w,h){
+ const cw=image.naturalWidth/columns,ch=image.naturalHeight/rows;
+ c.imageSmoothingEnabled=false;
+ c.drawImage(image,(index%columns)*cw,Math.floor(index/columns)*ch,cw,ch,Math.round(x),Math.round(y),w,h);
+}
+function frameFor(state,t){
+ const m=motions[state];
+ if(state==='idle'||state==='run')return Math.floor(t*m.fps)%6;
+ if(state==='death')return Math.min(5,Math.floor(t*m.fps));
+ if(state==='attack'&&t>=.5)return Math.floor((t-.5)*6)%6;
+ if(state==='hurt'&&t>=.4)return Math.floor((t-.4)*6)%6;
+ return Math.min(5,Math.floor(t*m.fps));
+}
+function rowFor(state,t){return (state==='attack'&&t>=.5)||(state==='hurt'&&t>=.4)?0:motions[state].row;}
+function floor(c){
+ const bg=c.createLinearGradient(0,0,0,440);bg.addColorStop(0,'#0b1c2b');bg.addColorStop(.72,'#122d3c');bg.addColorStop(1,'#0a1b29');c.fillStyle=bg;c.fillRect(0,0,1000,440);
+ const haze=c.createRadialGradient(330,260,20,360,220,360);haze.addColorStop(0,'#22557448');haze.addColorStop(1,'#10263500');c.fillStyle=haze;c.fillRect(0,0,1000,440);
+ c.strokeStyle='#34546a22';c.lineWidth=1;
+ for(let i=-5;i<10;i++){c.beginPath();c.moveTo(i*150,440);c.lineTo(500+(i*150-500)*.28,250);c.stroke();}
+ for(let i=0;i<5;i++){const y=270+i*i*9;c.beginPath();c.moveTo(0,y);c.lineTo(1000,y);c.stroke();}
+ for(const x of [265,755]){
+  c.fillStyle='#0a2030';c.strokeStyle='#345e7380';c.beginPath();c.ellipse(x,370,158,43,0,0,Math.PI*2);c.fill();c.stroke();
+  c.strokeStyle='#3a789144';c.beginPath();c.ellipse(x,370,137,34,0,0,Math.PI*2);c.stroke();
+ }
+ // Restrained drifting atmospheric specks, independent of the attack.
+ for(let i=0;i<25;i++){const x=(i*97+Math.sin(globalTime*.4+i)*7)%1000;const y=110+(i*53)%240;const a=.10+.08*Math.sin(globalTime+i);c.fillStyle='rgba(111,207,237,'+a+')';c.fillRect(x,y,i%3===0?2:1,2);}
+}
+function dummy(c,hit){
+ const shift=hit>0?Math.sin(hit*80)*9*Math.exp(-hit*11):0;
+ c.save();c.translate(755+shift,350);
+ c.fillStyle='#0004';c.beginPath();c.ellipse(0,18,48,10,0,0,Math.PI*2);c.fill();
+ c.fillStyle='#526474';c.fillRect(-6,-70,12,80);c.fillRect(-34,6,68,9);
+ c.fillStyle=hit>0&&hit<.06?'#b0eaff':'#284558';c.strokeStyle='#638598';c.lineWidth=3;
+ c.beginPath();c.ellipse(0,-76,40,56,0,0,Math.PI*2);c.fill();c.stroke();
+ for(const r of [26,12]){c.strokeStyle='#83acbd';c.lineWidth=2;c.beginPath();c.ellipse(0,-76,r,r*1.25,0,0,Math.PI*2);c.stroke();}
+ c.fillStyle='#b2d6e4';c.fillRect(-3,-79,6,6);
+ c.restore();
+}
+function main(t){
+ floor(ctx);ctx.save();if(flipped){ctx.translate(1000,0);ctx.scale(-1,1);}
+ const impact=selected==='attack'&&t>=.63&&t<1.1?t-.63:0;
+ dummy(ctx,impact);
+ const size=300, x=100+(selected==='run'?Math.sin(t*Math.PI*4)*12:0), y=76;
+ let alpha=1;if(selected==='death'&&t>1.45)alpha=Math.max(0,1-(t-1.45)/.22);
+ ctx.globalAlpha=alpha;
+ if(selected==='hurt'&&t<.14){ctx.shadowColor='#99e9ff';ctx.shadowBlur=14;}
+ drawCell(ctx,atlas,6,5,rowFor(selected,t)*6+frameFor(selected,t),x,y,size,size);
+ ctx.shadowBlur=0;ctx.globalAlpha=1;
+ if(selected==='attack'){
+  const sx=363,sy=225,tx=753,ty=267;
+  if(t<.25){
+   const glow=ctx.createRadialGradient(sx,sy,1,sx,sy,10+22*t/.25);glow.addColorStop(0,'#b7faffb0');glow.addColorStop(1,'#31ceff00');ctx.fillStyle=glow;ctx.fillRect(sx-36,sy-36,72,72);
+  }
+  if(t>=.25&&t<.63){
+   const p=(t-.25)/.38,px=sx+(tx-sx)*p,py=sy+(ty-sy)*p-Math.sin(p*Math.PI)*14;
+   ctx.save();ctx.translate(px,py);ctx.rotate(Math.atan2(ty-sy,tx-sx));const waterSize=100+60*Math.min(1,p*4);drawCell(ctx,water,4,3,Math.floor((t-.25)*18)%4,-waterSize*.96,-waterSize*.5,waterSize,waterSize);ctx.restore();
+  }
+  if(t>=.63&&t<1.03){const f=Math.min(7,Math.floor((t-.63)/.4*8));drawCell(ctx,water,4,3,4+f,tx-126,160,252,225);}
+ }
+ ctx.restore();
+ if(selected==='attack'){
+  status.textContent=t<.25?'01  CHARGE':t<.63?'02  IN FLIGHT':t<1.03?'03  IMPACT':'04  RECOVER';
+  const phases=[[0,.25],[.25,.38],[.63,.4]];segments.forEach((s,i)=>s.style.setProperty('--fill',(Math.min(1,Math.max(0,(t-phases[i][0])/phases[i][1]))*100)+'%'));
+  soundAt('charge',t,0);soundAt('launch',t,.25);soundAt('impact',t,.63);
+ }else{
+  status.textContent=motions[selected].tag.split(' / ')[0]+'  '+String(frameFor(selected,t)+1).padStart(2,'0')+' / 06';
+  segments.forEach(s=>s.style.setProperty('--fill','0%'));
+  if(selected==='hurt')soundAt('hurt',t,0);if(selected==='death')soundAt('death',t,0);
+ }
+}
+function minis(t){
+ buttons.forEach((b,i)=>{
+  const c=miniContexts[i],state=b.dataset.state,m=motions[state],mt=t%m.length;c.clearRect(0,0,200,110);
+  c.fillStyle='#0003';c.beginPath();c.ellipse(100,94,47,7,0,0,Math.PI*2);c.fill();
+  c.save();if(flipped){c.translate(200,0);c.scale(-1,1);}
+  drawCell(c,atlas,6,5,rowFor(state,mt)*6+frameFor(state,mt),45,-8,112,112);c.restore();
+ });
+}
+function tick(now){
+ if(!last)last=now;const dt=Math.min(.05,(now-last)/1000);last=now;
+ if(ready&&!document.hidden){
+  if(!paused){time+=dt;globalTime+=dt;if(time>=motions[selected].length){time%=motions[selected].length;fired.clear();}}
+  main(time);minis(globalTime);
+ }
+ requestAnimationFrame(tick);
+}
+Promise.all([atlas.decode(),water.decode()]).then(()=>{
+ ready=true;document.getElementById('loading').hidden=true;requestAnimationFrame(tick);
+}).catch(()=>{document.getElementById('loading').textContent='이미지를 불러오지 못했습니다. 프로젝트의 docs/previews 폴더에서 열어 주세요.';});
+</script>
+</body>
+</html>

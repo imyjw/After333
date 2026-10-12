@@ -4,6 +4,7 @@ using Project333.Runtime.Application.Services;
 using Project333.Runtime.Infrastructure.Data;
 using Project333.Runtime.Presentation.Battle;
 using Project333.Runtime.Presentation.Cards;
+using Project333.Runtime.Presentation.Tutorial;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -76,6 +77,7 @@ namespace Project333.Runtime.Presentation.Hand
         private BattleHighlightState _lastHighlightState = BattleHighlightState.None;
         private Vector3 _textBaseScale = Vector3.one;
         private Vector3 _artworkBaseScale = Vector3.one;
+        private Project333.Runtime.Presentation.Draft.CardHoldPreview _holdPreview;
         private string _lastArtworkCardId = string.Empty;
 
         private Canvas _legacyCanvas;
@@ -110,11 +112,19 @@ namespace Project333.Runtime.Presentation.Hand
         private bool _targetRuntimeVisible;
         private bool _runtimeLayoutInitialized;
         private bool _isRuntimeDragActive;
+        private int _runtimeDragPointerId = int.MinValue;
+        private string _interactionCardId = string.Empty;
+        private string _interactionRuntimeId = string.Empty;
         private Vector2 _runtimeDragAnchoredPosition;
         private bool _suppressNextRuntimeClick;
 #if UNITY_EDITOR
         private bool _editorStatOverlayTemplateEnsureQueued;
 #endif
+
+        private HandPresenter _interactionHand;
+        public Image TutorialArtwork => _runtimeCardImage != null ? _runtimeCardImage : _artworkImage;
+
+        public void SetHandInteractionOwner(HandPresenter hand) => _interactionHand = hand;
 
         private bool HasRuntimeVisual => _runtimeCardRect != null;
 
@@ -155,8 +165,28 @@ namespace Project333.Runtime.Presentation.Hand
             ApplyPulse();
         }
 
+        private void OnDisable() => CancelRuntimeDrag();
+
+        private void OnApplicationFocus(bool focused)
+        {
+            if (!focused) CancelRuntimeDrag();
+        }
+
+        private void OnApplicationPause(bool paused)
+        {
+            if (paused) CancelRuntimeDrag();
+        }
+
         private void OnDestroy()
         {
+            // The visual lives outside this source object and may be disabled later during scene unload.
+            if (_runtimeDragRelay != null)
+            {
+                _runtimeDragRelay.BeginDrag = null;
+                _runtimeDragRelay.Drag = null;
+                _runtimeDragRelay.EndDrag = null;
+                _runtimeDragRelay.CancelDrag = null;
+            }
             if (_createdRuntimeVisualAtRuntime && _runtimeCardRect != null)
             {
                 Destroy(_runtimeCardRect.gameObject);
@@ -745,7 +775,15 @@ namespace Project333.Runtime.Presentation.Hand
                 return;
             }
 
+            var cardId = _handCardView.CardId ?? string.Empty;
+            var runtimeId = _handCardView.RuntimeId ?? string.Empty;
+            var changed = !string.Equals(_interactionCardId, cardId, StringComparison.Ordinal) ||
+                          !string.Equals(_interactionRuntimeId, runtimeId, StringComparison.Ordinal);
+            // Slots are pooled by index. A different card must not inherit the old pointer.
+            _interactionCardId = cardId;
+            _interactionRuntimeId = runtimeId;
             _hasCard = _handCardView.HasCard;
+            if (changed || (!_hasCard && _isRuntimeDragActive)) CancelRuntimeDrag();
             _label = string.IsNullOrWhiteSpace(_handCardView.Label)
                 ? _label
                 : _handCardView.Label;
@@ -862,6 +900,7 @@ namespace Project333.Runtime.Presentation.Hand
             _runtimeDragRelay.BeginDrag = HandleRuntimeBeginDrag;
             _runtimeDragRelay.Drag = HandleRuntimeDrag;
             _runtimeDragRelay.EndDrag = HandleRuntimeEndDrag;
+            _runtimeDragRelay.CancelDrag = CancelRuntimeDrag;
 
             var glowObject = new GameObject("PlayableGlow", typeof(RectTransform), typeof(Image));
             var glowRect = glowObject.GetComponent<RectTransform>();
@@ -957,6 +996,23 @@ namespace Project333.Runtime.Presentation.Hand
         {
             if (_runtimeButton != null)
             {
+                if (_holdPreview == null)
+                {
+                    _holdPreview = _runtimeButton.GetComponent<Project333.Runtime.Presentation.Draft.CardHoldPreview>()
+                        ?? _runtimeButton.gameObject.AddComponent<Project333.Runtime.Presentation.Draft.CardHoldPreview>();
+                    _holdPreview.Configure(
+                        () => isActiveAndEnabled && _handCardView != null && _handCardView.HasCard
+                            ? _handCardView.CardId + "|" + _handCardView.RuntimeId : null,
+                        owner =>
+                        {
+                            var id = _handCardView.CardId;
+                            CardStatDisplay? stats = TryResolveRuntimeStats(id, out var value) ? value : (CardStatDisplay?)null;
+                            Project333.Runtime.Presentation.Draft.DeckCardPreviewOverlay.ShowFor(
+                                owner, id, null, _runtimeFallbackText != null ? _runtimeFallbackText.font : null, stats,
+                                ResolvePreviewDefinition(id), _handCardView, () => _interactionHand?.PreviewBattleState);
+                        },
+                        () => _suppressNextRuntimeClick = false);
+                }
                 _runtimeButton.onClick.RemoveListener(NotifyRuntimeCardClicked);
                 _runtimeButton.onClick.AddListener(NotifyRuntimeCardClicked);
             }
@@ -969,6 +1025,7 @@ namespace Project333.Runtime.Presentation.Hand
             _runtimeDragRelay.BeginDrag = HandleRuntimeBeginDrag;
             _runtimeDragRelay.Drag = HandleRuntimeDrag;
             _runtimeDragRelay.EndDrag = HandleRuntimeEndDrag;
+            _runtimeDragRelay.CancelDrag = CancelRuntimeDrag;
         }
 
         private void EnsureArtworkImage()
@@ -1123,8 +1180,9 @@ namespace Project333.Runtime.Presentation.Hand
             if (_isRuntimeDragActive)
             {
                 _runtimeCardRect.anchoredPosition = _runtimeDragAnchoredPosition;
-                _runtimeCardRect.localRotation = Quaternion.identity;
-                _runtimeCardRect.localScale = Vector3.one * _runtimeDragAbsoluteScale;
+                var dragT = 1f - Mathf.Exp(-18f * Time.unscaledDeltaTime);
+                _runtimeCardRect.localRotation = Quaternion.Slerp(_runtimeCardRect.localRotation, Quaternion.identity, dragT);
+                _runtimeCardRect.localScale = Vector3.Lerp(_runtimeCardRect.localScale, Vector3.one * _runtimeDragAbsoluteScale, dragT);
                 _runtimeCanvasGroup.alpha = 1f;
                 _runtimeCanvasGroup.blocksRaycasts = false;
                 _runtimeCanvasGroup.interactable = false;
@@ -1133,7 +1191,7 @@ namespace Project333.Runtime.Presentation.Hand
                 return;
             }
 
-            var lerpT = Mathf.Clamp01(Time.unscaledDeltaTime * _layoutLerpSpeed);
+            var lerpT = 1f - Mathf.Exp(-Mathf.Max(1f, _layoutLerpSpeed) * Time.unscaledDeltaTime);
 
             _runtimeCardRect.sizeDelta = Vector2.Lerp(_runtimeCardRect.sizeDelta, _targetRuntimeSize, lerpT);
             _runtimeCardRect.anchoredPosition = Vector2.Lerp(_runtimeCardRect.anchoredPosition, _targetRuntimeAnchoredPosition, lerpT);
@@ -1225,6 +1283,7 @@ namespace Project333.Runtime.Presentation.Hand
 
         private void NotifyRuntimeCardClicked()
         {
+            if (_holdPreview != null && _holdPreview.SuppressClick) return;
             if (_suppressNextRuntimeClick)
             {
                 _suppressNextRuntimeClick = false;
@@ -1236,19 +1295,39 @@ namespace Project333.Runtime.Presentation.Hand
 
         private void HandleRuntimeBeginDrag(PointerEventData eventData)
         {
-            if (_handCardView == null || !_handCardView.HasCard)
+            SyncFromHandCardView();
+            if (!isActiveAndEnabled || _handCardView == null || !_handCardView.HasCard ||
+                eventData == null || eventData.button != PointerEventData.InputButton.Left || _isRuntimeDragActive)
             {
                 return;
             }
 
+            if (_interactionHand != null && !_interactionHand.IsExpanded)
+            {
+                _interactionHand.SetExpanded(true);
+                _holdPreview?.CancelHold();
+                _suppressNextRuntimeClick = true;
+                return;
+            }
+            if (_holdPreview != null && !_holdPreview.TryBeginDrag()) return;
+            _runtimeDragPointerId = eventData.pointerId;
             _isRuntimeDragActive = true;
             UpdateRuntimeDragPosition(eventData.position);
-            _handCardView.NotifyDragStarted(eventData.position);
+            try
+            {
+                _handCardView.NotifyDragStarted(eventData.position);
+            }
+            catch
+            {
+                CancelRuntimeDrag();
+                throw;
+            }
         }
 
         private void HandleRuntimeDrag(PointerEventData eventData)
         {
-            if (!_isRuntimeDragActive || _handCardView == null)
+            SyncFromHandCardView();
+            if (!OwnsRuntimeDrag(eventData) || _handCardView == null)
             {
                 return;
             }
@@ -1259,14 +1338,50 @@ namespace Project333.Runtime.Presentation.Hand
 
         private void HandleRuntimeEndDrag(PointerEventData eventData)
         {
-            _suppressNextRuntimeClick = true;
-
-            if (_handCardView != null)
-            {
-                _handCardView.NotifyDragEnded(eventData.position);
-            }
-
+            SyncFromHandCardView();
+            if (!OwnsRuntimeDrag(eventData)) return;
+            // External drop callbacks may replace/disable the slot or throw.
+            // Release visual ownership first so neither outcome leaves a dragged card behind.
             _isRuntimeDragActive = false;
+            _runtimeDragPointerId = int.MinValue;
+            _suppressNextRuntimeClick = true;
+            RestoreRuntimeCardAfterDrag(snapToLayout: false);
+            _handCardView?.NotifyDragEnded(eventData.position);
+        }
+
+        private bool OwnsRuntimeDrag(PointerEventData eventData) =>
+            _isRuntimeDragActive && eventData != null && eventData.pointerId == _runtimeDragPointerId;
+
+        private void CancelRuntimeDrag()
+        {
+            if (this == null) return;
+            var wasDragging = _isRuntimeDragActive;
+            _isRuntimeDragActive = false;
+            _runtimeDragPointerId = int.MinValue;
+            _runtimeDragAnchoredPosition = Vector2.zero;
+            _suppressNextRuntimeClick = false;
+            _holdPreview?.CancelHold();
+            RestoreRuntimeCardAfterDrag(snapToLayout: wasDragging);
+            if (wasDragging) _handCardView?.NotifyDragCancelled();
+        }
+
+        private void RestoreRuntimeCardAfterDrag(bool snapToLayout)
+        {
+            if (!HasRuntimeVisual) return;
+            if (snapToLayout)
+            {
+                _runtimeCardRect.anchoredPosition = _targetRuntimeAnchoredPosition;
+                _runtimeCardRect.sizeDelta = _targetRuntimeSize;
+                _runtimeCardRect.localRotation = Quaternion.Euler(0f, 0f, _targetRuntimeRotationDegrees);
+                _runtimeCardRect.localScale = Vector3.one * _targetRuntimeScale;
+            }
+            _targetRuntimeSortingOrder = ResolveRuntimeSortingOrder(_runtimeCardRect.GetSiblingIndex());
+            ApplyRuntimeSortingOrder();
+            var visible = isActiveAndEnabled && _runtimeCardRect.gameObject.activeInHierarchy &&
+                          _targetRuntimeVisible && _hasCard;
+            _runtimeCanvasGroup.alpha = visible ? 1f : 0f;
+            _runtimeCanvasGroup.blocksRaycasts = visible;
+            _runtimeCanvasGroup.interactable = visible;
         }
 
         private void UpdateRuntimeDragPosition(Vector2 screenPosition)
@@ -1410,6 +1525,15 @@ namespace Project333.Runtime.Presentation.Hand
             return _emptyLabel;
         }
 
+        private static CardDefinition ResolvePreviewDefinition(string cardId)
+        {
+            var definitions = GetRuntimeCardDefinitionProvider()?.GetAll();
+            if (definitions != null)
+                foreach (var definition in definitions)
+                    if (definition.CardId == cardId) return definition;
+            return null;
+        }
+
         private bool TryResolveRuntimeStats(string cardId, out CardStatDisplay stats)
         {
             stats = default;
@@ -1423,7 +1547,7 @@ namespace Project333.Runtime.Presentation.Hand
             try
             {
                 return CardStatDisplay.TryCreate(provider.GetRequired(cardId),
-                    AccountSessionState.GetOwnedCardUpgradeLevel(cardId), out stats,
+                    TutorialRuntimeIsolation.IsActive ? 0 : AccountSessionState.GetOwnedCardUpgradeLevel(cardId), out stats,
                     _handCardView?.SpellPower ?? 0);
             }
             catch (Exception)

@@ -1,0 +1,58 @@
+{
+    "CardId": "Gwangma",
+    "Owner": "Player",
+    "VisualKey": "Gwangma",
+    "SpriteName": "Idle_0",
+    "BodyShader": "UI/Default",
+    "OriginalPngSize": {
+        "x": 2048,
+        "y": 512
+    },
+    "ImportedTextureSize": {
+        "x": 2048,
+        "y": 512
+    },
+    "ImportedSpriteRect": {
+        "serializedVersion": "2",
+        "x": 0.0,
+        "y": 0.0,
+        "width": 512.0,
+        "height": 512.0
+    },
+    "OriginalNormalizedAlpha": {
+        "serializedVersion": "2",
+        "x": 0.1953125,
+        "y": 0.0234375,
+        "width": 0.591796875,
+        "height": 0.556640625
+    },
+    "ManifestNormalizedAlpha": {
+        "serializedVersion": "2",
+        "x": 0.1953125,
+        "y": 0.0234375,
+        "width": 0.591796875,
+        "height": 0.556640625
+    },
+    "BodyVisibleRect": {
+        "serializedVersion": "2",
+        "x": -155.390625,
+        "y": -243.046875,
+        "width": 301.81640625,
+        "height": 283.88671875
+    },
+    "StarsVisibleRect": {
+        "serializedVersion": "2",
+        "x": -112.09661865234375,
+        "y": 50.775901794433597,
+        "width": 210.5494842529297,
+        "height": 61.75019073486328
+    },
+    "IceVisibleRect": {
+        "serializedVersion": "2",
+        "x": -179.53598022460938,
+        "y": -254.40237426757813,
+        "width": 350.1070556640625,
+        "height": 317.95318603515627
+    },
+    "BodyAnimatorSpeed": 0.0
+}

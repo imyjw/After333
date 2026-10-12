@@ -121,7 +121,7 @@ public sealed class BattleResultStore(DbConnectionFactory connectionFactory) : I
         {
             wallet.Parameters.AddWithValue("account", accountId);
             if (await wallet.ExecuteScalarAsync(cancellationToken) is not Guid)
-                throw new InvalidOperationException("The AI challenge wallet is missing.");
+                throw new InvalidOperationException("The Gold Dungeon wallet is missing.");
         }
         string status;
         await using (var attempt = new NpgsqlCommand("""
@@ -143,7 +143,7 @@ public sealed class BattleResultStore(DbConnectionFactory connectionFactory) : I
         // A refunded, canceled attempt can never be revived by delayed result delivery.
         if (status == "canceled") return false;
         if (status != "active")
-            throw new InvalidOperationException("Only a joined, unfinished AI challenge can record a result.");
+            throw new InvalidOperationException("Only a joined, unfinished Gold Dungeon can record a result.");
         var reward = run.Won ? AiChallengeService.WinResourceGold : 0;
         await using (var settle = new NpgsqlCommand("""
             update ai_challenge_attempts set status='completed', result_id=@result, won=@won,

@@ -11,12 +11,9 @@ namespace Project333.Runtime.Application.Services
 {
     public sealed class SpellService
     {
-        private const string DaehwandanEffectId = "daehwandan";
+        private const string DaehwandanEffectId = DaehwandanCardRules.EffectId;
         private const string CheonraJimangEffectId = "cheonra_jimang";
         private const string FirewallEffectId = "firewall";
-        private const int DaehwandanMasterAttackBonus = 30;
-        private const int DaehwandanQiGain = 3;
-        private const int DaehwandanOwnerTurnStarts = 3;
 
         private readonly ICardDefinitionProvider _cardDefinitionProvider;
         private readonly ICardUpgradeLevelProvider _cardUpgradeLevelProvider = ZeroCardUpgradeLevelProvider.Instance;
@@ -197,12 +194,12 @@ namespace Project333.Runtime.Application.Services
 
             if (battleState.Phase != PhaseType.Main)
             {
-                throw new InvalidOperationException("Spells can only be cast during the main phase.");
+                throw new InvalidOperationException("자신의 행동 턴에만 행동할 수 있습니다.");
             }
 
             if (battleState.ActivePlayerId != casterId)
             {
-                throw new InvalidOperationException("Only the active player can cast spells.");
+                throw new InvalidOperationException("자신의 턴에만 행동할 수 있습니다.");
             }
         }
 
@@ -229,7 +226,7 @@ namespace Project333.Runtime.Application.Services
             var declaredTarget = targetBoard.GetOccupant(targetCoord);
             if (declaredTarget == null)
             {
-                throw new InvalidOperationException("Damage spell target tile is empty.");
+                throw new InvalidOperationException("대상 타일이 비어있습니다.");
             }
 
             EnsureSingleTargetSpellCanTarget(casterId, targetOwnerId, declaredTarget);
@@ -332,7 +329,7 @@ namespace Project333.Runtime.Application.Services
                         throw new InvalidOperationException("This scripted spell does not use a board target.");
                     }
 
-                    CastDaehwandan(battleState, casterId, cardId, definition.Cost, handCardRuntimeId);
+                    CastDaehwandan(battleState, casterId, definition, handCardRuntimeId);
                     return;
 
                 case CheonraJimangEffectId:
@@ -380,11 +377,34 @@ namespace Project333.Runtime.Application.Services
                         turnStartResourceGain: new ResourceSet()));
                     return;
 
+                case ManaShieldRules.EffectId:
+                    if (!hasTarget) throw new InvalidOperationException("사용 가능한 대상이 아닙니다.");
+                    CastManaShield(battleState, casterId, cardId, definition, targetOwnerId, targetCoord, handCardRuntimeId);
+                    return;
+
+                case PlasmaShieldRules.EffectId:
+                    if (!hasTarget) throw new InvalidOperationException("사용 가능한 대상이 아닙니다.");
+                    CastPlasmaShield(battleState, casterId, cardId, definition, targetOwnerId, targetCoord, handCardRuntimeId);
+                    return;
+
+                case FireSpearRules.EffectId:
+                    if (!hasTarget) throw new InvalidOperationException("사용 가능한 대상이 아닙니다.");
+                    CastFireSpear(battleState, casterId, cardId, definition, targetOwnerId, targetCoord, handCardRuntimeId);
+                    return;
+
+                case MeteorRules.EffectId:
+                    if (hasTarget) throw new InvalidOperationException("Meteor does not use a board target.");
+                    CastMeteor(battleState, casterId, cardId, definition, handCardRuntimeId);
+                    return;
+
+                case EarthquakeRules.EffectId:
+                    if (hasTarget) throw new InvalidOperationException("Earthquake does not use a board target.");
+                    CastEarthquake(battleState, casterId, cardId, definition, handCardRuntimeId);
+                    return;
+
                 case NuclearRules.EffectId:
                     if (hasTarget) throw new InvalidOperationException("Nuclear does not use a board target.");
-                    ConsumeSpellCard(battleState.GetPlayer(casterId), cardId, definition.Cost, handCardRuntimeId);
-                    battleState.GetOpponentBoard(casterId).AddFalloutStack();
-                    OccupantDestructionService.DestroyUnsealedSummons(battleState);
+                    CastNuclear(battleState, casterId, cardId, definition, handCardRuntimeId);
                     return;
 
                 case TimedBombRules.EffectId:
@@ -474,7 +494,7 @@ namespace Project333.Runtime.Application.Services
                 case GuRules.EffectId:
                     if (!hasTarget)
                     {
-                        throw new InvalidOperationException("Gu requires an enemy Unit target.");
+                        throw new InvalidOperationException("대상이 적 유닛이 아닙니다.");
                     }
 
                     CastGu(
@@ -490,7 +510,7 @@ namespace Project333.Runtime.Application.Services
                 case HuanShuRules.EffectId:
                     if (!hasTarget)
                     {
-                        throw new InvalidOperationException("HuanShu requires an enemy Unit target.");
+                        throw new InvalidOperationException("대상이 적 유닛이 아닙니다.");
                     }
 
                     CastHuanShu(
@@ -508,6 +528,144 @@ namespace Project333.Runtime.Application.Services
                         $"Unsupported scripted spell effect id '{definition.EffectId}'.");
             }
         }
+
+        private void CastFireSpear(
+            BattleState battleState,
+            PlayerId casterId,
+            string cardId,
+            ScriptedSpellCardDefinition definition,
+            PlayerId targetOwnerId,
+            TileCoord targetCoord,
+            string handCardRuntimeId)
+        {
+            if (!FireSpearRules.IsLegalTarget(battleState, casterId, targetOwnerId, targetCoord))
+                throw new InvalidOperationException("사용 가능한 대상이 아닙니다.");
+
+            var baseDamage = CardLevelSpellRules.ApplyDamageBonus(definition.Damage,
+                _cardUpgradeLevelProvider.GetUpgradeLevel(casterId, definition.CardId));
+            // Both cells are one simultaneous area hit, including a friendly target column.
+            var damage = SpellPowerRules.ApplyCurrent(battleState, casterId, baseDamage, DamageType.Magic);
+            ConsumeSpellCard(battleState.GetPlayer(casterId), cardId, definition.Cost, handCardRuntimeId);
+            var board = battleState.GetBoard(targetOwnerId);
+            var affected = new HashSet<OccupantState>();
+            for (var row = 0; row < BoardState.RowCount; row++)
+            {
+                var target = board.GetOccupant(new TileCoord(targetCoord.Column, row));
+                if (target == null || !affected.Add(target)) continue;
+                var actualDamage = DamageResolutionRules.ApplyEffectDamage(target, damage, DamageType.Magic);
+                BattleValuePopupRecorder.RecordDamage(battleState, target, actualDamage,
+                    BattleValueChangeCause.Spell, DamageType.Magic, casterId, sourceCardId: cardId);
+            }
+            // Area damage bypasses Shielder/Hiding; ordinary recipient protections still apply.
+            // Process every direct packet before destruction chains, revival and Master outcome.
+            OccupantDestructionService.ResolveDefeatedOccupants(battleState);
+        }
+
+        private void CastManaShield(BattleState battleState, PlayerId casterId, string cardId,
+            ScriptedSpellCardDefinition definition, PlayerId targetOwnerId, TileCoord targetCoord,
+            string handCardRuntimeId)
+        {
+            if (!ManaShieldRules.IsLegalTarget(battleState, casterId, targetOwnerId, targetCoord))
+                throw new InvalidOperationException("사용 가능한 대상이 아닙니다.");
+            var target = battleState.GetBoard(targetOwnerId).GetOccupant(targetCoord);
+            var bonus = ManaShieldRules.GetDefenseBonus(definition.EffectAmount,
+                _cardUpgradeLevelProvider.GetUpgradeLevel(casterId, definition.CardId));
+            ConsumeSpellCard(battleState.GetPlayer(casterId), cardId, definition.Cost, handCardRuntimeId);
+            // A permanent attributed stat buff: no damage, Shielder redirection, turn timer or hit event.
+            target.ApplyCombatStatBuff(ManaShieldRules.CardId, magicDefenseBonus: bonus);
+        }
+
+        private void CastPlasmaShield(BattleState battleState, PlayerId casterId, string cardId,
+            ScriptedSpellCardDefinition definition, PlayerId targetOwnerId, TileCoord targetCoord,
+            string handCardRuntimeId)
+        {
+            if (!PlasmaShieldRules.IsLegalTarget(battleState, casterId, targetOwnerId, targetCoord))
+                throw new InvalidOperationException("사용 가능한 대상이 아닙니다.");
+            var target = battleState.GetBoard(targetOwnerId).GetOccupant(targetCoord);
+            var bonus = PlasmaShieldRules.GetDefenseBonus(definition.EffectAmount,
+                _cardUpgradeLevelProvider.GetUpgradeLevel(casterId, definition.CardId));
+            ConsumeSpellCard(battleState.GetPlayer(casterId), cardId, definition.Cost, handCardRuntimeId);
+            // A permanent attributed stat buff: no damage, Shielder redirection, turn timer or hit event.
+            target.ApplyCombatStatBuff(PlasmaShieldRules.CardId, physicalDefenseBonus: bonus);
+        }
+
+        private void CastMeteor(
+            BattleState battleState,
+            PlayerId casterId,
+            string cardId,
+            ScriptedSpellCardDefinition definition,
+            string handCardRuntimeId)
+        {
+            var baseDamage = CardLevelSpellRules.ApplyDamageBonus(definition.Damage,
+                _cardUpgradeLevelProvider.GetUpgradeLevel(casterId, definition.CardId));
+            // A simultaneous area hit reads current allied SpellPower once, then
+            // gives its full bonus to each target before normal Magic mitigation.
+            var damage = SpellPowerRules.ApplyCurrent(battleState, casterId, baseDamage, DamageType.Magic);
+            ConsumeSpellCard(battleState.GetPlayer(casterId), cardId, definition.Cost, handCardRuntimeId);
+            var targets = new List<OccupantState>(battleState.GetOpponentBoard(casterId).EnumerateOccupants());
+            var affected = new HashSet<OccupantState>();
+            foreach (var target in targets)
+            {
+                if (!affected.Add(target)) continue;
+                var actualDamage = DamageResolutionRules.ApplyEffectDamage(target, damage, DamageType.Magic);
+                BattleValuePopupRecorder.RecordDamage(battleState, target, actualDamage,
+                    BattleValueChangeCause.Spell, DamageType.Magic, casterId, sourceCardId: cardId);
+            }
+            // Resolve every area packet before revival, destruction chains and Master defeat.
+            OccupantDestructionService.ResolveDefeatedOccupants(battleState);
+        }
+
+        private void CastEarthquake(
+            BattleState battleState,
+            PlayerId casterId,
+            string cardId,
+            ScriptedSpellCardDefinition definition,
+            string handCardRuntimeId)
+        {
+            var damage = CardLevelSpellRules.ApplyDamageBonus(definition.Damage,
+                _cardUpgradeLevelProvider.GetUpgradeLevel(casterId, definition.CardId));
+            ConsumeSpellCard(battleState.GetPlayer(casterId), cardId, definition.Cost, handCardRuntimeId);
+            // Resolve each current enemy once, multiplying building damage before ordinary
+            // physical mitigation. All packets land before destruction chains and Master defeat.
+            var targets = new List<OccupantState>(battleState.GetOpponentBoard(casterId).EnumerateOccupants());
+            var affected = new HashSet<OccupantState>();
+            foreach (var target in targets)
+            {
+                if (!affected.Add(target)) continue;
+                var incoming = target.Kind == OccupantKind.Building
+                    ? checked(damage * EarthquakeRules.BuildingDamageMultiplier) : damage;
+                var actualDamage = DamageResolutionRules.ApplyEffectDamage(target, incoming, DamageType.Physical);
+                BattleValuePopupRecorder.RecordDamage(battleState, target, actualDamage,
+                    BattleValueChangeCause.Spell, DamageType.Physical, casterId, sourceCardId: cardId);
+            }
+            OccupantDestructionService.ResolveDefeatedOccupants(battleState);
+        }
+
+        private void CastNuclear(
+            BattleState battleState,
+            PlayerId casterId,
+            string cardId,
+            ScriptedSpellCardDefinition definition,
+            string handCardRuntimeId)
+        {
+            var upgradeLevel = _cardUpgradeLevelProvider.GetUpgradeLevel(casterId, definition.CardId);
+            var damage = CardLevelSpellRules.ApplyDamageBonus(definition.Damage, upgradeLevel);
+            ConsumeSpellCard(battleState.GetPlayer(casterId), cardId, definition.Cost, handCardRuntimeId);
+            var targetBoard = battleState.GetOpponentBoard(casterId);
+            targetBoard.AddFalloutStack();
+
+            // One enemy-wide packet per occupant, including the Master. All damage lands
+            // before destruction chains and Master defeat; Fixed never receives SpellPower.
+            var targets = new List<OccupantState>(targetBoard.EnumerateOccupants());
+            foreach (var target in targets)
+            {
+                var actualDamage = DamageResolutionRules.ApplyEffectDamage(target, damage, DamageType.Fixed);
+                BattleValuePopupRecorder.RecordDamage(battleState, target, actualDamage,
+                    BattleValueChangeCause.Spell, DamageType.Fixed, casterId, sourceCardId: cardId);
+            }
+            OccupantDestructionService.ResolveDefeatedOccupants(battleState);
+        }
+
 
         private static void BeginRobotFusion(
             BattleState battleState,
@@ -531,25 +689,17 @@ namespace Project333.Runtime.Application.Services
             battleState.BeginRobotFusion(casterId, cardId);
         }
 
-        private static void CastDaehwandan(
+        private void CastDaehwandan(
             BattleState battleState,
             PlayerId casterId,
-            string cardId,
-            ResourceSet cost,
+            ScriptedSpellCardDefinition definition,
             string handCardRuntimeId)
         {
             var caster = battleState.GetPlayer(casterId);
-            ConsumeSpellCard(caster, cardId, cost, handCardRuntimeId);
-            caster.Master.ApplyCombatStatBuff(cardId, attackBonus: DaehwandanMasterAttackBonus);
-
-            battleState.PersistentEffects.Add(new PersistentEffectState(
-                sourceCardId: cardId,
-                ownerId: casterId,
-                effectId: DaehwandanEffectId,
-                appliedTurn: battleState.TurnNumber,
-                endConditionText: "At the start of your next three turns, gain qi +3.",
-                turnStartResourceGain: new ResourceSet(mana: 0, qi: DaehwandanQiGain, power: 0, gold: 0),
-                ownerTurnStartsRemaining: DaehwandanOwnerTurnStarts));
+            var bonus = DaehwandanCardRules.GetAttackBonus(definition.EffectAmount,
+                _cardUpgradeLevelProvider.GetUpgradeLevel(casterId, definition.CardId));
+            ConsumeSpellCard(caster, definition.CardId, definition.Cost, handCardRuntimeId);
+            caster.Master.ApplyCombatStatBuff(definition.CardId, attackBonus: bonus);
         }
 
         private static void CastCheonraJimang(
@@ -565,12 +715,12 @@ namespace Project333.Runtime.Application.Services
             var target = targetBoard.GetOccupant(targetCoord);
             if (target == null)
             {
-                throw new InvalidOperationException("Scripted spell target tile is empty.");
+                throw new InvalidOperationException("대상 타일이 비어있습니다.");
             }
 
             if (target.Kind != OccupantKind.Unit)
             {
-                throw new InvalidOperationException("Cheonra Jimang can only target non-Master units.");
+                throw new InvalidOperationException("이 대상에게는 사용할 수 없습니다.");
             }
 
             EnsureSingleTargetSpellCanTarget(casterId, targetOwnerId, target);
@@ -600,13 +750,13 @@ namespace Project333.Runtime.Application.Services
         {
             if (!GuRules.TryFindDestination(battleState, casterId, out var destination))
             {
-                throw new InvalidOperationException("Gu requires an empty tile on the caster's field.");
+                throw new InvalidOperationException("고독을 사용하려면 내 필드에 빈 타일이 필요합니다.");
             }
 
             if (!GuRules.IsLegalTarget(battleState, casterId, targetOwnerId, targetCoord))
             {
                 throw new InvalidOperationException(
-                    "Gu can only target a living, non-Sealbound, non-Hiding enemy Unit.");
+                    "유효한 대상이 아닙니다.");
             }
 
             var targetBoard = battleState.GetBoard(targetOwnerId);
@@ -614,7 +764,9 @@ namespace Project333.Runtime.Application.Services
             var caster = battleState.GetPlayer(casterId);
             ConsumeSpellCard(caster, cardId, cost, handCardRuntimeId);
 
-            targetBoard.Remove(targetCoord);
+            // Keep source-bound bonuses until both boards are assembled. A controlled
+            // chieftain retains its own aura without a transient -10/+10 HP exchange.
+            targetBoard.Remove(targetCoord, synchronizeAuras: false);
             target.TransferOwnership(casterId);
             target.SetBattleTurnContext(battleState.ActivePlayerId, battleState.TurnNumber);
 
@@ -624,7 +776,11 @@ namespace Project333.Runtime.Application.Services
                 ? target.EffectiveMaxAttacksPerTurn
                 : 0;
 
-            battleState.GetBoard(casterId).Place(destination, target);
+            var casterBoard = battleState.GetBoard(casterId);
+            casterBoard.Place(destination, target, synchronizeAuras: false);
+            targetBoard.RefreshOrcChieftainAuras();
+            casterBoard.RefreshOrcChieftainAuras();
+            OccupantDestructionService.ResolveDefeatedOccupants(battleState);
         }
 
         private static void CastHuanShu(
@@ -643,7 +799,7 @@ namespace Project333.Runtime.Application.Services
                     targetCoord))
             {
                 throw new InvalidOperationException(
-                    "HuanShu can only target a living, non-Sealbound, non-Hiding enemy Unit.");
+                    "유효한 대상이 아닙니다.");
             }
 
             var target = battleState.GetBoard(targetOwnerId).GetOccupant(targetCoord);
@@ -782,12 +938,12 @@ namespace Project333.Runtime.Application.Services
         {
             if (target.IsSealbound)
             {
-                throw new InvalidOperationException("Sealbound occupants cannot be targeted by spells.");
+                throw new InvalidOperationException("봉인된 유닛은 대상이 될 수 없습니다.");
             }
 
             if (targetOwnerId != casterId && target.IsHiding)
             {
-                throw new InvalidOperationException("Hiding units cannot be targeted by enemy single-target spells.");
+                throw new InvalidOperationException("은신한 유닛은 대상이 될 수 없습니다.");
             }
         }
 
@@ -866,12 +1022,12 @@ namespace Project333.Runtime.Application.Services
         {
             if (!caster.Hand.Contains(cardId, handCardRuntimeId))
             {
-                throw new InvalidOperationException("The spell card is not in the caster's hand.");
+                throw new InvalidOperationException("해당 카드가 핸드에 없습니다.");
             }
 
             if (!caster.Resources.CanAfford(cost))
             {
-                throw new InvalidOperationException("The player cannot afford this card.");
+                throw new InvalidOperationException("자원이 부족합니다.");
             }
 
             caster.Resources.Spend(cost);

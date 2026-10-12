@@ -21,21 +21,31 @@ namespace Project333.Tests.EditMode
             "BiochemicalBomb",
             "BlueDragon",
             "Cerberus",
+            "Daehwandan",
             "DemonKing",
+            "Earthquake",
             "ElfLongbowScout",
+            "ElfElder",
             "firebolt",
             "Firewall",
+            "FireSpear",
             "GaebangBranch",
             "Goblin",
             "GoldMiner",
             "Golem",
             "Gwangma",
+            "GaebangChief",
             "Hero",
             "Inn",
             "ManaPond",
+            "ManaCannon",
             "MerchantCaravan",
             "ManaWeaver",
+            "Meteor",
+            "Nuclear",
             "NuclearPowerPlant",
+            "OrcBerserker",
+            "OrcChieftain",
             "OrcWarrior",
             "PowerPlant",
             "RedDragon",
@@ -43,6 +53,8 @@ namespace Project333.Tests.EditMode
             "Shaolin_1st_Disciple",
             "Shieldbearer",
             "Skeleton",
+            "SkeletonArcher",
+            "SummonTrap",
             "TimedBomb",
             "Vampire",
             "Werewolf",
@@ -51,18 +63,62 @@ namespace Project333.Tests.EditMode
 
         private static readonly string[] ExpectedNonUpgradeableCardIds =
         {
+            "PlasmaShield",
+            "ManaShield",
             "CheonraJimang",
-            "Daehwandan",
             "Gu",
             "HuanShu",
+            "MagicAmplificationCircle",
             "ManaStone",
             "ManaStoneBundle",
             "Microreactor",
             "PowerBank",
             "RobotFusion",
             "TenThousandYearSnowGinseng",
+            "TrapReturn",
+            "TrapMirrorField",
+            "ExplosiveReactiveArmour",
+            "IronDome",
         };
 
+        [TestCase(1, 3)]
+        [TestCase(2, 6)]
+        [TestCase(3, 10)]
+        [TestCase(4, 20)]
+        [TestCase(5, 30)]
+        [TestCase(6, 33)]
+        [TestCase(7, 33)]
+        [TestCase(8, 33)]
+        [TestCase(9, 33)]
+        [TestCase(10, 33)]
+        [TestCase(11, 33)]
+        [TestCase(12, 33)]
+        [TestCase(13, 33)]
+        public void TryGetNextUpgradeCost_AllTargetLevelsUseConfirmedSchedule(int targetLevel, int amount)
+        {
+            Assert.That(CardUpgradeRules.TryGetNextUpgradeCost(targetLevel - 1, out var cost), Is.True);
+            Assert.That(cost.LevelFrom, Is.EqualTo(targetLevel - 1));
+            Assert.That(cost.LevelTo, Is.EqualTo(targetLevel));
+            Assert.That(cost.RequiredCopyCount, Is.EqualTo(amount));
+            Assert.That(cost.RequiredResourceGold, Is.EqualTo(amount));
+        }
+
+        [TestCase(-1)]
+        [TestCase(int.MinValue)]
+        public void TryGetNextUpgradeCost_NegativeLevelRetainsFirstLevelNormalization(int currentLevel)
+        {
+            Assert.That(CardUpgradeRules.TryGetNextUpgradeCost(currentLevel, out var cost), Is.True);
+            Assert.That(cost.LevelFrom, Is.EqualTo(0)); Assert.That(cost.LevelTo, Is.EqualTo(1));
+            Assert.That(cost.RequiredCopyCount, Is.EqualTo(3)); Assert.That(cost.RequiredResourceGold, Is.EqualTo(3));
+        }
+
+        [TestCase(14)]
+        [TestCase(int.MaxValue)]
+        public void TryGetNextUpgradeCost_OverMaxLevelCannotCharge(int currentLevel)
+        {
+            Assert.That(CardUpgradeRules.TryGetNextUpgradeCost(currentLevel, out var cost), Is.False);
+            Assert.That(cost, Is.EqualTo(default(CardUpgradeCost)));
+        }
         [Test]
         public void TryGetNextUpgradeCost_FromLevelZero_UsesTargetLevelCost()
         {
@@ -83,8 +139,8 @@ namespace Project333.Tests.EditMode
             Assert.That(hasCost, Is.True);
             Assert.That(cost.LevelFrom, Is.EqualTo(12));
             Assert.That(cost.LevelTo, Is.EqualTo(13));
-            Assert.That(cost.RequiredCopyCount, Is.EqualTo(39));
-            Assert.That(cost.RequiredResourceGold, Is.EqualTo(39));
+            Assert.That(cost.RequiredCopyCount, Is.EqualTo(33));
+            Assert.That(cost.RequiredResourceGold, Is.EqualTo(33));
         }
 
         [Test]
@@ -340,6 +396,29 @@ namespace Project333.Tests.EditMode
                 Assert.That(occupant.MaxHp, Is.EqualTo(expectedHealth[level]), $"Summoned {cardId} Lv.{level} max HP");
                 Assert.That(occupant.CurrentHp, Is.EqualTo(expectedHealth[level]), $"Summoned {cardId} Lv.{level} current HP");
             }
+        }
+
+        [Test]
+        public void Nuclear_JsonDefinitionIsUpgradeableAndAddsOneImmediateDamageAtEveryLevel()
+        {
+            var database = JsonCardDefinitionDatabase.FromJson(File.ReadAllText(
+                Path.Combine(Application.dataPath, "Project333/Resources/Project333/Data/cards.json")));
+            var record = database.Cards.Single(card => card.Id == NuclearRules.CardId);
+            var definition = (ScriptedSpellCardDefinition)record.ToDefinition();
+
+            Assert.That(CardUpgradeRules.IsCardUpgradeable(definition), Is.True);
+            Assert.That(record.IncludeInDraft, Is.True);
+            Assert.That(record.IncludeInRewards, Is.True);
+            Assert.That(definition.Damage, Is.EqualTo(100));
+            Assert.That(definition.DamageType, Is.EqualTo(DamageType.Fixed));
+            for (var level = 0; level <= 13; level++)
+            {
+                var damage = CardLevelSpellRules.ApplyDamageBonus(definition.Damage, level);
+                Assert.That(damage, Is.EqualTo(100 + level), $"Nuclear Lv.{level} immediate damage");
+                if (level > 0)
+                    Assert.That(damage - CardLevelSpellRules.ApplyDamageBonus(definition.Damage, level - 1), Is.EqualTo(1));
+            }
+            Assert.That(NuclearRules.FalloutDamage, Is.EqualTo(10), "Card upgrades do not increase fallout ticks.");
         }
 
         [Test]

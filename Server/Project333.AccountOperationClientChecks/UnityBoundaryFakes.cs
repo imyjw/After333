@@ -8,14 +8,13 @@ namespace Project333.Runtime.Presentation
         public static string ResolveHttpUrl(string value)=>Url;
     }
 }
-// Only the storage/HTTP/JSON boundaries are faked. The production pending-request
-// implementation is linked verbatim. This is not a Unity scene or native API test.
-
+// Unity storage, transport, DTOs and /me application are substitute boundaries.
+// Actual pending metadata, recovery, transport and shop client code are linked verbatim.
 namespace UnityEngine
 {
     public class MonoBehaviour { protected static void DontDestroyOnLoad(object o){} }
     public class GameObject(string name){ public T AddComponent<T>() where T:new()=>new T(); }
-    public enum RuntimeInitializeLoadType { BeforeSceneLoad }
+    public enum RuntimeInitializeLoadType { BeforeSceneLoad, AfterSceneLoad, SubsystemRegistration }
     public class RuntimeInitializeOnLoadMethodAttribute(RuntimeInitializeLoadType type):Attribute {}
     public static class Time { public static float unscaledTime; }
     public enum NetworkReachability { NotReachable, ReachableViaLocalAreaNetwork }
@@ -25,7 +24,7 @@ namespace UnityEngine
         public static Dictionary<string,string> Values = new();
         public static int Saves;
         public static bool HasKey(string key)=>Values.ContainsKey(key);
-        public static string GetString(string key)=>Values[key];
+        public static string GetString(string key,string fallback="")=>Values.TryGetValue(key,out var value)?value:fallback;
         public static void SetString(string key,string value)=>Values[key]=value;
         public static void DeleteKey(string key)=>Values.Remove(key);
         public static void Save()=>Saves++;
@@ -51,13 +50,15 @@ namespace UnityEngine.Networking
         public int timeout;
         public long responseCode;
         public Result result;
-        public string Url;
-        public UnityWebRequest(string url,string verb){ Url=url; }
-        public void SetRequestHeader(string name,string value){ }
+        public string Url, Method;
+        public readonly Dictionary<string,string> Headers=new();
+        public UnityWebRequest(string url,string verb){Url=url;Method=verb;}
+        public static UnityWebRequest Get(string url)=>new(url,"GET"){downloadHandler=new DownloadHandlerBuffer()};
+        public void SetRequestHeader(string name,string value)=>Headers[name]=value;
         public bool CompleteOnSend = true; public int SendCount, AbortCount; private Operation operation;
-        public Operation SendWebRequest(){SendCount++; operation=new Operation(); OnSend(this); operation.isDone=CompleteOnSend; return operation;}
-        public void Abort(){AbortCount++; if(operation!=null)operation.isDone=true;}
-        public void Dispose(){ }
+        public Operation SendWebRequest(){SendCount++;operation=new Operation();OnSend(this);operation.isDone=CompleteOnSend;return operation;}
+        public void Abort(){AbortCount++;if(operation!=null)operation.isDone=true;}
+        public void Dispose(){}
         public class Operation{public bool isDone;}
     }
 }
@@ -66,10 +67,12 @@ namespace Project333.Runtime.Application.Accounts
     static class AccountSessionState
     {
         public static string AccountId, SessionToken="test";
-        public static bool IsAuthenticated=>true;
+        public static bool Authenticated=true;
+        public static bool IsAuthenticated=>Authenticated;
         public static IEnumerable<string> OwnedCardIds=>new[]{"firebolt","Firewall"};
         public static int Applied;
-        public static void ApplyMeResponse(MeResponse me)=>Applied++;
+        public static MeResponse LastApplied;
+        public static void ApplyMeResponse(MeResponse me){Applied++;LastApplied=me;}
     }
     public class MeResponse
     {
@@ -77,10 +80,26 @@ namespace Project333.Runtime.Application.Accounts
         public object ResolvedWallet = new(), ResolvedCollectionSummary = new();
     }
     public class AccountDto { public string ResolvedId; }
+    public class AuthAccountDto
+    {
+        public string Id,id;
+        public string ResolvedId=>Id??id;
+    }
+    public class WalletDto
+    {
+        public long ResourceGold,resourceGold;
+        public long ResolvedResourceGold=>ResourceGold!=0?ResourceGold:resourceGold;
+    }
     public class GuestAuthClient(string url)
     {
         public static Func<Task<MeResponse>> OnGetMe;
-        public Task<MeResponse> GetMeAsync(string token,CancellationToken ct)=>OnGetMe();
+        public static Func<string,string,CancellationToken,Task<MeResponse>> OnGetMeWithContext;
+        public static int GetMeCount;
+        public Task<MeResponse> GetMeAsync(string token,CancellationToken ct)
+        {
+            GetMeCount++;
+            return OnGetMeWithContext!=null?OnGetMeWithContext(url,token,ct):OnGetMe();
+        }
     }
     class ApiErrorEnvelope{public ApiError error;public ApiError ResolvedError=>error;}
     class ApiError{public string code;public string ResolvedCode=>code;}

@@ -269,7 +269,7 @@ namespace Project333.Tests.EditMode
 
             Attack(state, attacker, target);
 
-            Assert.That(attacker.CurrentHp, Is.EqualTo(90));
+            Assert.That(attacker.CurrentHp, Is.EqualTo(95));
             Assert.That(state.AIBoard.GetOccupant(shielder.Position), Is.Null);
             Assert.That(target.CurrentHp, Is.EqualTo(97));
             Assert.That(Counters(state), Has.Length.EqualTo(5));
@@ -277,7 +277,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void Counterattack_DoesNotApplyFlyingReductionToAnyCounterHit()
+        public void Counterattack_AppliesFlyingReductionToEveryCounterHit()
         {
             var state = State();
             var attacker = Unit(state, PlayerId.Player, attack: 1, hp: 100, flying: true, physicalDefense: 1);
@@ -285,8 +285,8 @@ namespace Project333.Tests.EditMode
 
             Attack(state, attacker, defender);
 
-            Assert.That(attacker.CurrentHp, Is.EqualTo(88));
-            Assert.That(Counters(state).Select(e => e.Amount), Is.EqualTo(new[] { 4, 4, 4 }));
+            Assert.That(attacker.CurrentHp, Is.EqualTo(94));
+            Assert.That(Counters(state).Select(e => e.Amount), Is.EqualTo(new[] { 2, 2, 2 }));
         }
 
         [Test]

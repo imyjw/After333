@@ -4,7 +4,7 @@
 
 - The active project is C:/Project_333. Use it as the working directory for After333 commands.
 - Public name: After333. Preserve internal Project333 namespaces, assets, environment variables, database names, switches and PlayerPrefs keys.
-- Current scope includes online accounts, server-owned economy/upgrades/gifts, draft and 33-win/3-loss runs, normal human/AI matchmaking, daily AI challenge and reconnect.
+- Current scope includes online accounts, server-owned economy/upgrades/gifts, draft and 33-win/3-loss runs, normal human/AI matchmaking, three Gold Dungeon attempts per paid run and reconnect.
 - Do not add ranked/MMR/seasons, paid purchases, new login providers, multi-tile rules or other undefined features without an explicit request and confirmed rules.
 - The user builds/installs client apps; do so only when explicitly requested. Server startup automation remains deferred.
 
@@ -41,6 +41,16 @@
 - Reuse already confirmed answers. Do not implement ambiguous levels; continue unrelated work.
 - Record accepted schedules in meta/card documentation and verify per-level gains, Lv.13 totals and actual battle values. Change existing cards only when requested.
 - Existing explicit schedules: Cerberus HP +1 at Lv.1–12, ATK +1 only at Lv.13; ManaPond HP +1 at Lv.1–13 and no ATK.
+
+## Summon animation authoring
+
+- Before creating or replacing summon animation sprites, read docs/unit_animation_authoring.md.
+- Every animation frame must be 512 x 512 px, with approximately 16 px of transparent space between the summon's bottom/contact baseline and the bottom of the frame. Apply this to Idle, Attack, BeAttacked, Run and Death; keep a consistent baseline across frames and do not re-center poses vertically or introduce large bottom margins.
+- Each individual animation frame must fit entirely within its 512 x 512 px cell, including the summon, weapons and any effects drawn into that frame. Never exceed either dimension, spill into adjacent cells, or merely crop overflowing artwork. Recompose/scale the artwork within the cell while preserving the approximately 16 px bottom margin. A multi-frame sprite sheet may be larger; the limit applies to each frame.
+- Preserve intentional motion relative to that baseline; do not independently normalize every moving frame in a way that removes the animation.
+- The user manually corrected BlueDragon and Gwangma sprites to this bottom-margin convention on 2026-09-27. Preserve those edits; archived/generated sources and old exporters are not the current art authority. Do not overwrite them or change runtime scale/position without a separate request.
+- Keep the established PNG -> AnimationClip -> Animator Controller -> card Board Animator Controller workflow.
+- All damaged occupants use the common UnitHit sound through TileTextView. Do not add per-character hurt/impact sounds that duplicate it. Character attack/cast sounds may remain distinct.
 
 ## Working practice
 

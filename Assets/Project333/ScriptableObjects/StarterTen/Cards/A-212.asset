@@ -23,14 +23,14 @@ MonoBehaviour:
   _affiliation: 2
   _chargeTileFootprint: 1
   _effectText: 
-  _specialEffectText: "4연타, 전력 -2"
+  _specialEffectText: "4\uC5F0\uD0C0, \uC804\uB825 -2"
   _hasReplicate: 0
   _boardSprite: {fileID: 4723107735738678597, guid: 421802be1083a9849b74ccaaf6cb4639, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: c9d0ec2e25d93f1448856b0001a54768, type: 2}
   _attackType: 0
   _damageType: 1
   _attack: 6
-  _health: 22
+  _health: 30
   _physicalDefense: 0
   _magicDefense: 0
   _hitsPerAttack: 4

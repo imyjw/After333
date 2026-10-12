@@ -1,97 +1,56 @@
-# PVE/PVP Battle Flow Stabilization Checklist
+# Current Battle Flow Verification Checklist
 
-## Purpose
+Updated 2026-10-09. This is a manual verification guide for the implemented server-backed loop, not a report that these steps were rerun today. The earlier prerequisite to defer accounts/DB until local PVE/PVP was stable is superseded: authentication, PostgreSQL, run persistence, rewards and upgrades are already implemented.
 
-This checklist defines the current stabilization target before deeper DB/account implementation continues.
+## Rules and execution boundary
 
-The goal is to make the PVE and PVP battle flows reliable enough that later account, ticket, reward, deck-save, and upgrade persistence can be connected without mixing too many bug sources.
+- [battle_modes.md](battle_modes.md): normal matchmaking, per-run Gold Dungeon, reconnect and canceled-battle handling.
+- [battle_rules.md](battle_rules.md): actions, damage, statuses and traps.
+- [draft_rules.md](draft_rules.md), [meta_rules.md](meta_rules.md): persisted deck and server-owned run/economy.
+- [online_pvp_prototype.md](online_pvp_prototype.md): filtered views, event sequencing and transport.
+- [account_operation_retries.md](account_operation_retries.md): silent recovery and idempotent operations.
+- [public_pvp_smoke_test_checklist.md](public_pvp_smoke_test_checklist.md): separate authorized multi-client checks.
 
-Related documents:
+Use existing approved test environments/accounts. This document does not authorize a production restart, deployment, account/currency change or client build/install. LocalBattleGateway remains a test/local compatibility path; the ordinary account-backed AI battle is server-resolved.
 
-- Account DB design: [account_persistence_db_design.md](./account_persistence_db_design.md)
-- PostgreSQL implementation plan: [postgresql_db_implementation_plan.md](./postgresql_db_implementation_plan.md)
-- Online PvP prototype: [online_pvp_prototype.md](./online_pvp_prototype.md)
-- Draft rules: [draft_rules.md](./draft_rules.md)
-- Battle rules: [battle_rules.md](./battle_rules.md)
+## Account, draft and normal battle
 
-## Current Priority
+1. Verify the existing account session loads its wallet, current run and card levels without opening a card detail or duplicating an operation.
+2. Start a new run with 3 tickets. Confirm exactly one spend and a persisted 3-card offer.
+3. Complete 33 picks: the first offer is Legendary, the remaining offers non-Legendary. Interrupt/reopen during a pick and verify the same offer/picks remain.
+4. Queue normal matchmaking with the completed deck. Confirm human priority and fallback AI after 20 seconds when no human joins.
+5. Check original account/seat/deck and upgrade levels, 333HP/3ATK Master, opening hands, mulligan and starting resources.
+6. Summon, cast, move/swap, attack and activate abilities. Confirm each accepted command pays once, each rejection preserves state, and both viewers converge after event presentation.
+7. End a turn repeatedly. Only the current turn ends; further actions stay locked until the next own turn while hand expansion and previews remain usable.
+8. Finish through lethal damage or surrender. The server records one result; the draft lobby retains its deck and updates run wins/losses once.
+9. At 33 wins or 3 losses, verify one run-end claim using final wins ×3 Resource Gold and the actual reward pool. Retry/reopen must not double-grant.
 
-Stabilize battle flow before continuing into guest login, account persistence, rewards, or card collection storage.
+<a id="separate-daily-ai-challenge"></a>
+## Separate per-run Gold Dungeon
 
-The PostgreSQL migration file and migration runner can stay in the project, but they should remain dormant unless `PROJECT333_DB_CONNECTION` is explicitly configured.
+1. Start a run with exactly 3 tickets and complete its 33-card deck. Verify `RunId`, `RunLimit=3`, `RemainingAttempts=3` and any `PendingAttempt` come from the server; incomplete or ended runs cannot start a new challenge.
+2. Start three challenges. Each accepted start consumes one attempt; retries and reconnect resume the same reservation without another debit. A fourth distinct start is rejected.
+3. Cross KST midnight, restart and log in again. The same run keeps the same usage. Existing pre-change attempts for that run count across all dates; three or more leave zero. A new paid run has its own three attempts.
+4. Win: award Resource Gold10 once. Lose: no victory reward. Neither result changes the normal run's wins/losses or ends it.
+5. For server interruption/cancellation, refund only the original attempt's `RunId` once. Canceling an old-run attempt must not add an attempt to the new run; ordinary disconnect loss does not refund.
+6. Ensure the status has no next-midnight reset timestamp and the UI never replenishes attempts locally. `challenge_day` remains audit data only.
 
-## PVE Flow Target
+## Reconnect and interruption
 
-Expected PVE loop:
+1. In an authorized normal human/AI battle and Gold Dungeon, interrupt the client connection. Observe the deadline starting at server detection, with a 70-second grace.
+2. Rejoin within that deadline. Restore the authenticated account's original seat, run/deck, remaining resources/statuses, hand and recent structured combat log.
+3. Restore ongoing persistent effects and private traps without replaying installation/central card previews or leaking enemy trap identities.
+4. After deadline/finished result, show final status rather than entering an invalid battle or charging a fresh challenge attempt.
+5. Server outage/maintenance cancellation must produce no win/loss; the mode-specific challenge refund follows battle_modes.md. Current startup policy cancels unfinished persisted matches rather than resuming old live sessions.
 
-1. Start scene spends tickets and enters Draft scene.
-2. Draft scene creates a 33-card deck.
-3. Player presses PVE battle.
-4. Battle scene starts local player-vs-AI battle using the drafted deck.
-5. AI acts sequentially, one action at a time.
-6. HP/resource/state changes are visible after each resolved action.
-7. Battle ends with Victory or Defeat.
-8. Battle scene returns to Draft scene.
-9. Draft scene keeps the current drafted deck visible.
-10. Draft scene displays updated win/loss and last battle result.
+## Current presentation and rule regression checks
 
-## PVP Flow Target
+- Hidden hand/trap identities remain filtered per viewer; only successful trap activation reveals its real card.
+- Return and Mirror Field activate in install order before attack damage; unaffordable traps remain armed; canceled accepted attacks still spend their attack use and any already paid ManaCannon fee.
+- Stun blocks attack/counter/active; Freeze also blocks movement/front-row blocking and pauses the occupant Animator. Status VFX continues until expiry; animation resumes on thaw.
+- Meteor, Earthquake, Nuclear, TimedBomb and FireSpear use visible tile-background Canvas anchors in the actual battle scene. FireSpear traverses the selected owner's two-tile column at 1.5× speed. Verify effect impact and the subsequent StateView stay ordered.
+- Damage/kill/revival/popups/audio are emitted once. The common UnitHit sound plays for actual hurt, while character attack/cast audio remains separate.
+- Compact hand exceptions cover both fields, End Turn and gear; affordable tile hints follow actual legality and use the reduced 0.65 maximum white overlay.
+- Long-press trait/effect panels and current owned-card stats/races/flip table remain readable. Notices use the shared dark theme; Your Turn retains its original gold banner.
 
-Expected PVP loop:
-
-1. Start scene spends tickets and enters Draft scene.
-2. Draft scene creates a 33-card deck.
-3. Player presses PVP battle.
-4. Battle scene enters matchmaking.
-5. Server assigns external seats as PlayerA/PlayerB.
-6. Server owns the true `BattleState`.
-7. Clients send commands only.
-8. Server broadcasts battle events and filtered StateView messages.
-9. Client plays battle event animations before applying the following StateView.
-10. Both clients converge to the same visible board state.
-11. Battle ends with Victory or Defeat.
-12. Battle scene returns to Draft scene.
-13. Draft scene keeps the current drafted deck visible.
-14. Draft scene displays updated win/loss and last battle result.
-
-## First Locked Checks
-
-These checks should stay covered by EditMode tests where possible:
-
-- A completed draft deck can queue a battle start.
-- The queued battle start preserves whether the launch mode is PVE or PVP.
-- An incomplete draft deck cannot queue a battle start.
-- Recording a battle result does not lose the completed draft deck.
-
-## Manual Smoke Test Order
-
-### PVE Smoke Test
-
-1. Open Game Start scene.
-2. Start game and draft 33 cards.
-3. Press PVE battle.
-4. Play until at least one AI turn runs.
-5. Confirm each AI action animates and applies HP/state before the next AI action.
-6. Force or naturally reach Victory/Defeat.
-7. Confirm Draft scene returns with deck list, win/loss, and last result intact.
-
-### PVP Smoke Test
-
-1. Start local PvP server.
-2. Open two clients or two testers.
-3. Draft or provide matching test decks.
-4. Press PVP battle or connect both clients to matchmaking.
-5. Confirm both clients receive PlayerA/PlayerB labels.
-6. Use card, move, attack, cast Firebolt, and end turn.
-7. Confirm both clients converge to the same board after each command.
-8. Confirm animations do not duplicate and StateView does not apply before the related animation finishes.
-9. Finish the battle through normal lethal damage or surrender.
-10. Confirm Draft scene returns with deck list, win/loss, and last result intact.
-
-## Do Not Continue DB Work Until
-
-- PVE battle start and return are stable.
-- PVP matchmaking and StateView projection are stable.
-- AI action sequencing applies damage/state after each action.
-- Firebolt and normal attack event animations do not duplicate.
-- Draft scene reliably preserves the current run deck after battle return.
+Prior task-specific automated proof is indexed in the relevant feature documents and codex_handoff.md. Documentation edits alone do not replace device or multi-client testing.

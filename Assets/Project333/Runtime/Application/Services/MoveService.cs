@@ -18,27 +18,27 @@ namespace Project333.Runtime.Application.Services
             var occupant = board.GetOccupant(from);
             if (occupant == null)
             {
-                throw new InvalidOperationException("Cannot move from an empty tile.");
+                throw new InvalidOperationException("대상 타일이 비어있습니다.");
             }
 
             if (occupant.OwnerId != playerId)
             {
-                throw new InvalidOperationException("Cannot move an enemy occupant.");
+                throw new InvalidOperationException("상대 유닛은 이동시킬 수 없습니다.");
             }
 
             if (occupant.CannotMoveDueToState)
             {
-                throw new InvalidOperationException("This occupant cannot move in its current state.");
+                throw new InvalidOperationException("이 유닛은 이동 불가 상태입니다.");
             }
 
             if (!occupant.CanMove)
             {
-                throw new InvalidOperationException("This occupant cannot move.");
+                throw new InvalidOperationException("이 유닛은 이동 불가능합니다.");
             }
 
             if (!board.IsInside(to))
             {
-                throw new InvalidOperationException("Cannot move outside the board.");
+                throw new InvalidOperationException("비정상적인 이동입니다.");
             }
 
             if (board.IsEmpty(to))
@@ -50,17 +50,17 @@ namespace Project333.Runtime.Application.Services
             var targetOccupant = board.GetOccupant(to);
             if (targetOccupant.OwnerId != playerId)
             {
-                throw new InvalidOperationException("Cannot move onto an enemy occupant.");
+                throw new InvalidOperationException("상대 소환물 위로 이동할 수 없습니다.");
             }
 
             if (targetOccupant.CannotMoveDueToState)
             {
-                throw new InvalidOperationException("Cannot swap with an occupant in its current state.");
+                throw new InvalidOperationException("대상 유닛은 이동 불가 상태입니다.");
             }
 
             if (!targetOccupant.CanMove)
             {
-                throw new InvalidOperationException("Cannot swap with an immobile occupant.");
+                throw new InvalidOperationException("대상 유닛은 이동 불가 상태입니다.");
             }
 
             board.Swap(from, to);

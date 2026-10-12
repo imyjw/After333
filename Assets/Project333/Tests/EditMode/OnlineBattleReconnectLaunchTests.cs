@@ -101,8 +101,10 @@ namespace Project333.Tests.EditMode
             finally { Object.DestroyImmediate(root); }
         }
 
-        [Test]
-        public void RelaunchReconnect_KeepsRetryingBeforeFirstStateView_WithoutExtendingGraceTo60()
+        [TestCase(23)]
+        [TestCase(65)]
+        [TestCase(70)]
+        public void RelaunchReconnect_KeepsRetryingBeforeFirstStateView_WithoutExtendingServerGrace(int remainingSeconds)
         {
             var root = new GameObject("RelaunchReconnectTest");
             root.SetActive(false);
@@ -111,13 +113,13 @@ namespace Project333.Tests.EditMode
                 var tester = root.AddComponent<OnlineBattleConnectionTester>();
                 var testerType = typeof(OnlineBattleConnectionTester);
                 var startedAt = UnityEngine.Time.unscaledTime;
-                testerType.GetMethod("BeginPveReconnectFromDraft", PrivateInstance).Invoke(tester, new object[] { 23 });
+                testerType.GetMethod("BeginPveReconnectFromDraft", PrivateInstance).Invoke(tester, new object[] { remainingSeconds });
                 testerType.GetField("_nextAutomaticReconnectAttemptRealtime", PrivateInstance).SetValue(tester, float.MaxValue);
                 testerType.GetMethod("MonitorAutomaticReconnect", PrivateInstance).Invoke(tester, null);
                 Assert.That(testerType.GetField("_currentProjectedBattleState", PrivateInstance).GetValue(tester), Is.Null);
                 Assert.That(testerType.GetField("_isAutomaticReconnectActive", PrivateInstance).GetValue(tester), Is.True);
                 var deadline = (float)testerType.GetField("_automaticReconnectDeadlineRealtime", PrivateInstance).GetValue(tester);
-                Assert.That(deadline - startedAt, Is.EqualTo(23f).Within(0.1f));
+                Assert.That(deadline - startedAt, Is.EqualTo((float)remainingSeconds).Within(0.1f));
             }
             finally { Object.DestroyImmediate(root); }
         }

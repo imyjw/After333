@@ -18,7 +18,6 @@ namespace Project333.Runtime.Application.Accounts
         public string DeckId;
         public string Status;
         public int RemainingAttempts;
-        public string ResetsAtUtc;
         public bool Replayed;
         public int RewardGold;
         public bool? Won;
@@ -30,10 +29,14 @@ namespace Project333.Runtime.Application.Accounts
     [Serializable]
     public sealed class AiChallengeStatusResponse
     {
-        public int DailyLimit = 3;
+        public int RunLimit = 3;
         public int RemainingAttempts;
-        public string ResetsAtUtc;
+        public string RunId;
         public AiChallengeAttemptResponse PendingAttempt;
+
+        public bool IsForRun(string runId) => !string.IsNullOrWhiteSpace(runId) &&
+            !string.IsNullOrWhiteSpace(RunId) &&
+            string.Equals(RunId, runId, StringComparison.OrdinalIgnoreCase);
     }
 
     public sealed class AiChallengeClient
@@ -75,7 +78,7 @@ namespace Project333.Runtime.Application.Accounts
                 () => { PlayerPrefs.DeleteKey(key); PlayerPrefs.Save(); });
             if (response == null || string.IsNullOrWhiteSpace(response.AttemptId) ||
                 string.IsNullOrWhiteSpace(response.MatchId))
-                throw new InvalidOperationException("AI 도전 응답을 확인하지 못했습니다.");
+                throw new InvalidOperationException("골드 던전 응답을 확인하지 못했습니다.");
             if (!string.Equals(accountId, AccountSessionState.AccountId, StringComparison.OrdinalIgnoreCase))
                 throw new OperationCanceledException("The signed-in account changed.");
             PlayerPrefs.DeleteKey(key);
@@ -120,7 +123,8 @@ namespace Project333.Runtime.Application.Accounts
                 catch { }
                 var code = error?.ResolvedError?.ResolvedCode;
                 if (request.responseCode >= 400 && request.responseCode < 500 &&
-                    (code == "ai_challenge_daily_limit" || code == "ai_challenge_limit_reached" ||
+                    (code == "ai_challenge_run_limit" || code == "ai_challenge_daily_limit" ||
+                     code == "ai_challenge_limit_reached" ||
                      code == "active_run_not_found" || code == "run_not_found" ||
                      code == "run_not_active" || code == "deck_not_found" ||
                      code == "draft_not_complete" || code == "ai_challenge_deck_invalid" ||

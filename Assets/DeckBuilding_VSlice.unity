@@ -653,7 +653,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 22
     m_FontStyle: 0
     m_BestFit: 0
@@ -2743,6 +2743,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Presentation.SafeAreaFitter
   _fullBleedElements: []
+  _screenCenteredElements: []
 --- !u!1 &440277896
 GameObject:
   m_ObjectHideFlags: 0
@@ -6611,6 +6612,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Presentation.SafeAreaFitter
   _fullBleedElements: []
+  _screenCenteredElements: []
 --- !u!1 &979663895
 GameObject:
   m_ObjectHideFlags: 0
@@ -9120,7 +9122,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 28
     m_FontStyle: 1
     m_BestFit: 0
@@ -9769,7 +9771,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 22
     m_FontStyle: 0
     m_BestFit: 1
@@ -10980,7 +10982,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 23
     m_FontStyle: 0
     m_BestFit: 1
@@ -11089,10 +11091,6 @@ MonoBehaviour:
   _battleModeButtonFontSize: 24
   _pveBattleButtonColor: {r: 0.26, g: 0.24, b: 0.13, a: 1}
   _pvpBattleButtonColor: {r: 0.1, g: 0.22, b: 0.46, a: 1}
-  _pveBattleButtonReadyLabel: "PVE \uC2DC\uC791"
-  _pvpBattleButtonReadyLabel: "PVP \uB9E4\uCE6D"
-  _pveBattleButtonLockedLabelFormat: "PVE \uC7A0\uAE40 ({0}/33)"
-  _pvpBattleButtonLockedLabelFormat: "PVP \uC7A0\uAE40 ({0}/33)"
   _returnToStartButtonPosition: {x: 0, y: -204}
   _returnToStartButtonSize: {x: 340, y: 72}
   _returnToStartButtonLabelPadding: {x: 12, y: 12}
@@ -11109,7 +11107,6 @@ MonoBehaviour:
   _claimRewardsScreenOffset: {x: 0, y: 0}
   _claimRewardsCanvasSortingOrder: 3350
   _claimRewardsButtonReadyLabel: "\uBCF4\uC0C1 \uBC1B\uAE30"
-  _claimRewardsButtonSyncingLabel: "\uBCF4\uC0C1 \uBC1B\uAE30"
   _claimRewardsButtonClaimingLabel: "\uBCF4\uC0C1 \uBC1B\uAE30"
   _claimRewardsButtonClaimedLabel: "\uC218\uB839 \uC644\uB8CC"
   _rewardClaimToastAnchor: {x: 0.5, y: 0.5}
@@ -11488,7 +11485,7 @@ MonoBehaviour:
           m_FloatArgument: 0
           m_StringArgument: 
           m_BoolArgument: 0
-        m_CallState: 2
+        m_CallState: 0
 --- !u!114 &1693364913
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12680,7 +12677,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 25
     m_FontStyle: 0
     m_BestFit: 1
@@ -12792,7 +12789,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 38
     m_FontStyle: 0
     m_BestFit: 1
@@ -13362,7 +13359,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 27
     m_FontStyle: 0
     m_BestFit: 1

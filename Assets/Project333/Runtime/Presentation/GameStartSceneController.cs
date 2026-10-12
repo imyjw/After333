@@ -15,7 +15,7 @@ using UnityEditor.SceneManagement;
 
 namespace Project333.Runtime.Presentation.Startup
 {
-    public sealed class GameStartSceneController : MonoBehaviour
+    public sealed partial class GameStartSceneController : MonoBehaviour
     {
         [SerializeField, HideInInspector] private int _pixelMenuLayoutVersion = 0;
         public int PixelMenuLayoutVersion => _pixelMenuLayoutVersion;
@@ -215,10 +215,19 @@ namespace Project333.Runtime.Presentation.Startup
 
         private bool IsAccountAuthBusy => _isGameIdAuthBusy || _isGoogleAuthBusy || _isLoggingOut;
 
-        public bool IsAccountLoggedIn => AccountSessionState.IsAuthenticated;
+        private bool HasPendingRunRewardPresentation =>
+            _useServerAccount &&
+            AccountSessionState.IsAuthenticated &&
+            AccountSessionState.IsLatestRunCompleted &&
+            string.Equals(
+                PendingRunRewardPresentation.GetPendingRunId(AccountServerUrl, AccountSessionState.AccountId),
+                AccountSessionState.LatestRunId,
+                StringComparison.OrdinalIgnoreCase);
+
+        public bool IsAccountLoggedIn => !IsTutorialPracticeMode && AccountSessionState.IsAuthenticated;
 
         public bool CanLogoutAccount =>
-            _useServerAccount &&
+            !IsTutorialPracticeMode && _useServerAccount &&
             AccountSessionState.IsAuthenticated &&
             !_isAuthenticating &&
             !_isGameIdAuthBusy &&
@@ -228,6 +237,8 @@ namespace Project333.Runtime.Presentation.Startup
 
         private void Awake()
         {
+            if (TryInitializeTutorialPractice()) return;
+            EnsureTutorialEntryButton();
             _useServerAccount = true;
             LoadSavedAccountCredentials();
             AutoAssignBackgroundImage();
@@ -263,6 +274,8 @@ namespace Project333.Runtime.Presentation.Startup
 
         private void OnEnable()
         {
+            if (TryInitializeTutorialPractice()) return;
+            EnsureTutorialEntryButton();
             _useServerAccount = true;
             LoadSavedAccountCredentials();
             AutoAssignBackgroundImage();
@@ -297,6 +310,7 @@ namespace Project333.Runtime.Presentation.Startup
 
         private void OnDisable()
         {
+            UnbindTutorialEntryButton();
             CancelAccountRestore();
             CancelGameIdAuth();
             CancelGoogleAuth();
@@ -306,6 +320,7 @@ namespace Project333.Runtime.Presentation.Startup
 
         private void Update()
         {
+            if (IsTutorialPracticeMode) return;
             UpdatePvpReconnectCountdown();
         }
 
@@ -452,6 +467,7 @@ namespace Project333.Runtime.Presentation.Startup
 
         public async void StartGameFromUi()
         {
+            if (IsTutorialPracticeMode) { InvokeTutorialStart(); return; }
             DraftRunSessionState.ConfigureSceneNames(_draftSceneName, _battleSceneName);
 
             if (!_useServerAccount)
@@ -466,18 +482,21 @@ namespace Project333.Runtime.Presentation.Startup
 
         public void UseLocalServerEndpointFromUi()
         {
+            if (IsTutorialPracticeMode) return;
             SetServerHttpUrlInputText(_localServerHttpUrl);
             ApplyServerEndpointFromUi();
         }
 
         public void UseTestServerEndpointFromUi()
         {
+            if (IsTutorialPracticeMode) return;
             SetServerHttpUrlInputText(_testServerHttpUrl);
             ApplyServerEndpointFromUi();
         }
 
         public void ApplyServerEndpointFromUi()
         {
+            if (IsTutorialPracticeMode) return;
             var requestedUrl = GetInputText(_serverHttpUrlInput);
             if (string.IsNullOrWhiteSpace(requestedUrl))
             {
@@ -496,6 +515,7 @@ namespace Project333.Runtime.Presentation.Startup
 
         public void ResetServerEndpointFromUi()
         {
+            if (IsTutorialPracticeMode) return;
             var previousUrl = AccountServerUrl;
             Project333.Runtime.Presentation.Project333ServerEndpointSettings.ClearOverrides();
             var newUrl = AccountServerUrl;
@@ -505,6 +525,7 @@ namespace Project333.Runtime.Presentation.Startup
 
         public async void RegisterGameIdFromUi()
         {
+            if (IsTutorialPracticeMode) return;
             await RegisterGameIdAsync(
                 GetInputText(_gameIdInput),
                 GetInputText(_gameIdPasswordInput),
@@ -546,6 +567,7 @@ namespace Project333.Runtime.Presentation.Startup
 
         public async void LoginGameIdFromUi()
         {
+            if (IsTutorialPracticeMode) return;
             await LoginGameIdAsync(
                 GetInputText(_gameIdInput),
                 GetInputText(_gameIdPasswordInput));
@@ -568,11 +590,13 @@ namespace Project333.Runtime.Presentation.Startup
 
         public async void LoginGoogleFromUi()
         {
+            if (IsTutorialPracticeMode) return;
             await RunGoogleAuthActionAsync();
         }
 
         public async void LogoutAccountFromSettingsMenu()
         {
+            if (IsTutorialPracticeMode) return;
             if (!CanLogoutAccount)
             {
                 return;
@@ -757,6 +781,7 @@ namespace Project333.Runtime.Presentation.Startup
 
         public void OpenOwnedCardsSceneFromUi()
         {
+            if (IsTutorialPracticeMode) return;
             var sceneName = string.IsNullOrWhiteSpace(_ownedCardsSceneName)
                 ? "OwnedCards_VSlice"
                 : _ownedCardsSceneName;
@@ -773,6 +798,7 @@ namespace Project333.Runtime.Presentation.Startup
 
         public void OpenShopSceneFromUi()
         {
+            if (IsTutorialPracticeMode) return;
             var sceneName = string.IsNullOrWhiteSpace(_shopSceneName)
                 ? "Shop_VSlice"
                 : _shopSceneName;
@@ -789,6 +815,7 @@ namespace Project333.Runtime.Presentation.Startup
 
         public async void ReconnectPvpBattleFromUi()
         {
+            if (IsTutorialPracticeMode) return;
             if (!CanReconnectPvpBattle())
             {
                 const string status = "이전 전투가 이미 종료되었습니다.";
@@ -961,6 +988,8 @@ namespace Project333.Runtime.Presentation.Startup
 
         private void RefreshUi()
         {
+            if (IsTutorialPracticeMode) { RefreshTutorialPracticeUi(); return; }
+            RefreshTutorialEntryButton();
             if (_ticketText != null)
             {
                 AccountWalletView.ShowSession(_ticketText);
@@ -1042,6 +1071,7 @@ namespace Project333.Runtime.Presentation.Startup
 
         private async void StartAccountRestoreIfNeeded()
         {
+            if (IsTutorialPracticeMode) return;
             if (!_useServerAccount || _isAuthenticating || IsAccountAuthBusy)
             {
                 return;
@@ -1311,9 +1341,11 @@ namespace Project333.Runtime.Presentation.Startup
                 return;
             }
 
-            if (AccountSessionState.HasUnclaimedLatestRunRewards)
+            if (AccountSessionState.HasUnclaimedLatestRunRewards || HasPendingRunRewardPresentation)
             {
-                SetStatus("이전 런 보상을 먼저 수령해야 새 게임을 시작할 수 있습니다.");
+                SetStatus(HasPendingRunRewardPresentation
+                    ? "이전 런의 보상 결과를 확인합니다."
+                    : "이전 런 보상을 먼저 수령해야 새 게임을 시작할 수 있습니다.");
                 RefreshUi();
                 SceneManager.LoadScene(_draftSceneName);
                 return;
@@ -1392,9 +1424,9 @@ namespace Project333.Runtime.Presentation.Startup
                     : "드래프트 이어하기";
             }
 
-            if (_useServerAccount && AccountSessionState.HasUnclaimedLatestRunRewards)
+            if (_useServerAccount && (AccountSessionState.HasUnclaimedLatestRunRewards || HasPendingRunRewardPresentation))
             {
-                return "보상 수령하기";
+                return HasPendingRunRewardPresentation ? "보상 확인하기" : "보상 수령하기";
             }
 
             return $"게임 시작 (-{_ticketCost} Tickets)";
@@ -1439,9 +1471,11 @@ namespace Project333.Runtime.Presentation.Startup
                         return BuildResumeStatusText(displayName);
                     }
 
-                    if (AccountSessionState.HasUnclaimedLatestRunRewards)
+                    if (AccountSessionState.HasUnclaimedLatestRunRewards || HasPendingRunRewardPresentation)
                     {
-                        return $"{displayName} 계정의 이전 런 보상을 먼저 수령해야 새 게임을 시작할 수 있습니다.";
+                        return HasPendingRunRewardPresentation
+                            ? $"{displayName} 계정의 이전 런 보상 결과를 확인해주세요."
+                            : $"{displayName} 계정의 이전 런 보상을 먼저 수령해야 새 게임을 시작할 수 있습니다.";
                     }
 
                     if (AccountSessionState.IsLatestRunRewardClaimed)
@@ -1508,7 +1542,7 @@ namespace Project333.Runtime.Presentation.Startup
                 return $"서버 계정: {displayName}\nActive Run: {AccountSessionState.ActiveRunStatus}  W:{AccountSessionState.ActiveRunWins} L:{AccountSessionState.ActiveRunLosses}\n{serverStatusLine}";
             }
 
-            if (AccountSessionState.HasUnclaimedLatestRunRewards)
+            if (AccountSessionState.HasUnclaimedLatestRunRewards || HasPendingRunRewardPresentation)
             {
                 return $"서버 계정: {displayName}\nRewards Pending: W:{AccountSessionState.LatestRunWins} L:{AccountSessionState.LatestRunLosses}\n{serverStatusLine}";
             }
@@ -1663,7 +1697,7 @@ namespace Project333.Runtime.Presentation.Startup
                    !_authFailed &&
                    AccountSessionState.IsAuthenticated &&
                    (AccountSessionState.HasResumableRun ||
-                     AccountSessionState.HasUnclaimedLatestRunRewards ||
+                     AccountSessionState.HasUnclaimedLatestRunRewards || HasPendingRunRewardPresentation ||
                      AccountSessionState.Tickets >= _ticketCost);
         }
 
@@ -1995,9 +2029,9 @@ namespace Project333.Runtime.Presentation.Startup
                 return "Waiting for server account.";
             }
 
-            if (AccountSessionState.HasUnclaimedLatestRunRewards)
+            if (AccountSessionState.HasUnclaimedLatestRunRewards || HasPendingRunRewardPresentation)
             {
-                return "Click Game Start, then claim rewards in Draft scene.";
+                return "Click Game Start, then open or confirm the reward chest in Draft scene.";
             }
 
             if (AccountSessionState.HasResumableRun)
@@ -2085,8 +2119,10 @@ namespace Project333.Runtime.Presentation.Startup
                 {
                     var challenge = await new AiChallengeClient(AccountServerUrl).GetStatusAsync(
                         AccountSessionState.SessionToken, cancellationToken);
-                    var pending = challenge?.PendingAttempt;
-                    if (pending == null || !string.Equals(pending.Status, "reserved", StringComparison.OrdinalIgnoreCase)) return;
+                    var pending = challenge != null && challenge.IsForRun(AccountSessionState.ActiveRunId)
+                        ? challenge.PendingAttempt : null;
+                    if (pending == null || !string.Equals(pending.RunId, AccountSessionState.ActiveRunId, StringComparison.OrdinalIgnoreCase) ||
+                        !string.Equals(pending.Status, "reserved", StringComparison.OrdinalIgnoreCase)) return;
                     _pendingAiChallengeReservation = true;
                     response = new PvpReconnectStatusResponse
                     {

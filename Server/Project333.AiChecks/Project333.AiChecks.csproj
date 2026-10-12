@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Project333.PvpServer/Project333.PvpServer.csproj" />
+    <Compile Include="../../Assets/Project333/Runtime/Application/Online/BattleStateViewProjector.cs" Link="Shared/BattleStateViewProjector.cs" />
   </ItemGroup>
 </Project>

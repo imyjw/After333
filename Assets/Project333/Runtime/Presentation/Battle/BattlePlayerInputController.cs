@@ -98,6 +98,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void LateUpdate()
         {
+            ApplyQueuedHandCollapse();
             RefreshHighlights();
         }
 
@@ -135,6 +136,7 @@ namespace Project333.Runtime.Presentation.Battle
                     handCardView.DragStarted += HandleHandCardDragStarted;
                     handCardView.Dragged += HandleHandCardDragged;
                     handCardView.DragEnded += HandleHandCardDragEnded;
+                    handCardView.DragCancelled += HandleHandCardDragCancelled;
                 }
             }
 
@@ -190,6 +192,14 @@ namespace Project333.Runtime.Presentation.Battle
                 ClearCardSelection();
                 ClearUnitSelection();
                 ClearHandCardDragState();
+                return;
+            }
+
+            // Inspection stays available while commands are locked; destination hints do not.
+            if (_battleBootstrapper.IsBusy || battleState.Phase != PhaseType.Main ||
+                battleState.ActivePlayerId != PlayerId.Player)
+            {
+                HighlightSelectedHandCard();
                 return;
             }
 
@@ -267,6 +277,7 @@ namespace Project333.Runtime.Presentation.Battle
                     handCardView.DragStarted -= HandleHandCardDragStarted;
                     handCardView.Dragged -= HandleHandCardDragged;
                     handCardView.DragEnded -= HandleHandCardDragEnded;
+                    handCardView.DragCancelled -= HandleHandCardDragCancelled;
                 }
             }
 
@@ -294,18 +305,42 @@ namespace Project333.Runtime.Presentation.Battle
             }
         }
 
+        private bool _backgroundPointerStartedOverHandPreservingTarget;
+        private bool _collapseHandAfterClick;
+
+        private static bool IsHandPointerTarget(GameObject target) => target != null &&
+            (target.GetComponentInParent<HandCardView>() != null ||
+             target.GetComponentInParent<HandCardRuntimeDragRelay>() != null);
+
+        private static bool IsHandExpansionPreservingTarget(GameObject target)
+        {
+            if (target == null) return false;
+            if (IsHandPointerTarget(target) || target.GetComponentInParent<PreserveExpandedHand>(true) != null)
+                return true;
+
+            // Tile interaction surfaces can live outside the TileView hierarchy.
+            var relay = target.GetComponentInParent<TileLongPressRelay>();
+            var tile = relay != null ? relay.TileView : target.GetComponentInParent<TileView>();
+            return tile != null;
+        }
+
+        private void ApplyQueuedHandCollapse()
+        {
+            if (!_collapseHandAfterClick) return;
+            _collapseHandAfterClick = false;
+            _handPresenter?.SetExpanded(false);
+            ClearCardSelection();
+        }
+
         private void HandleHandCardClicked(HandCardView handCardView)
         {
+            if (_battleBootstrapper != null && !_battleBootstrapper.TutorialHandInputAllowed(handCardView?.CardId)) return;
             if (handCardView == null)
             {
                 return;
             }
 
-            if (_battleBootstrapper != null && _battleBootstrapper.IsBusy)
-            {
-                _interactionStatus = "Animations are still resolving.";
-                return;
-            }
+            // Inspection is local UI only; drag and gameplay commands keep their busy/turn guards.
 
             if (!handCardView.HasCard || string.IsNullOrWhiteSpace(handCardView.CardId))
             {
@@ -322,6 +357,14 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
+            if (_handPresenter != null && !_handPresenter.IsExpanded)
+            {
+                _handPresenter.SetExpanded(true);
+                ClearCardSelection();
+                _battleBootstrapper?.TutorialHandInputCompleted(_handPresenter.IsExpanded, null);
+                return;
+            }
+
             if (_selectedSlotIndex == handCardView.SlotIndex &&
                 _selectedCardId == handCardView.CardId &&
                 _selectedHandCardRuntimeId == handCardView.RuntimeId)
@@ -332,6 +375,7 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             SetCardSelection(handCardView.CardId, handCardView.RuntimeId, handCardView.SlotIndex);
+            _battleBootstrapper?.TutorialHandInputCompleted(true, _selectedCardId);
             _interactionStatus = BuildSelectionMessage(_selectedCardId, _selectedSlotIndex);
         }
 
@@ -402,7 +446,9 @@ namespace Project333.Runtime.Presentation.Battle
             _backgroundDeselectPointerId = pointerId;
             _backgroundDeselectPointerStartPosition = screenPosition;
             _backgroundDeselectPointerMovedTooFar = false;
-            _backgroundDeselectPointerStartedOverPreservingTarget = IsSelectionPreservingScreenTarget(screenPosition);
+            var pointerTarget = ResolveTopScreenTarget(screenPosition);
+            _backgroundPointerStartedOverHandPreservingTarget = IsHandExpansionPreservingTarget(pointerTarget);
+            _backgroundDeselectPointerStartedOverPreservingTarget = IsSelectionPreservingPointerTarget(pointerTarget);
         }
 
         private void UpdateBackgroundDeselectPointer(int pointerId, Vector2 screenPosition)
@@ -430,6 +476,9 @@ namespace Project333.Runtime.Presentation.Battle
             var shouldTryDeselect = !_backgroundDeselectPointerMovedTooFar &&
                                     !_backgroundDeselectPointerStartedOverPreservingTarget &&
                                     !_isDraggingCard;
+            if (!_backgroundDeselectPointerMovedTooFar && !_backgroundPointerStartedOverHandPreservingTarget &&
+                !_isDraggingCard && !IsHandExpansionPreservingTarget(ResolveTopScreenTarget(screenPosition)))
+                _collapseHandAfterClick = true;
             ResetBackgroundDeselectPointer();
 
             if (shouldTryDeselect)
@@ -445,6 +494,7 @@ namespace Project333.Runtime.Presentation.Battle
             _backgroundDeselectPointerStartPosition = Vector2.zero;
             _backgroundDeselectPointerMovedTooFar = false;
             _backgroundDeselectPointerStartedOverPreservingTarget = false;
+            _backgroundPointerStartedOverHandPreservingTarget = false;
         }
 
         private bool IsSelectionPreservingScreenTarget(Vector2 screenPosition)
@@ -497,6 +547,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void HandleHandCardDragStarted(HandCardView handCardView, Vector2 screenPosition)
         {
+            if (_battleBootstrapper != null && !_battleBootstrapper.TutorialHandInputAllowed(handCardView?.CardId)) return;
             if (handCardView == null || !handCardView.HasCard || string.IsNullOrWhiteSpace(handCardView.CardId))
             {
                 return;
@@ -514,7 +565,10 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
+            if (_handPresenter != null && !_handPresenter.IsExpanded)
+            { _handPresenter.SetExpanded(true); _battleBootstrapper?.TutorialHandInputCompleted(_handPresenter.IsExpanded, null); return; }
             SetCardSelection(handCardView.CardId, handCardView.RuntimeId, handCardView.SlotIndex);
+            _battleBootstrapper?.TutorialHandInputCompleted(true, _selectedCardId);
             _isDraggingCard = true;
             _draggedCardId = handCardView.CardId;
             _draggedHandCardRuntimeId = handCardView.RuntimeId;
@@ -538,6 +592,16 @@ namespace Project333.Runtime.Presentation.Battle
 
             _dragCurrentScreenPosition = screenPosition;
             _dragHoveredTileView = ResolveLegalDragHoverTile(screenPosition);
+        }
+
+        private void HandleHandCardDragCancelled(HandCardView handCardView)
+        {
+            if (!_isDraggingCard || handCardView == null || handCardView.SlotIndex != _draggedSlotIndex) return;
+            if (_selectedSlotIndex == _draggedSlotIndex &&
+                _selectedHandCardRuntimeId == _draggedHandCardRuntimeId)
+                ClearCardSelection();
+            ClearHandCardDragState();
+            RefreshHighlights();
         }
 
         private void HandleHandCardDragEnded(HandCardView handCardView, Vector2 screenPosition)
@@ -766,7 +830,7 @@ namespace Project333.Runtime.Presentation.Battle
                         return;
                     }
 
-                    if (playerOccupant != null)
+                    if (playerOccupant != null && !IsSelectedTrapCard())
                     {
                         ClearCardSelection();
 
@@ -901,157 +965,26 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void HighlightCardTargets(BattleState battleState)
         {
-            if (battleState.Phase != PhaseType.Main || battleState.ActivePlayerId != PlayerId.Player)
+            if (_boardPresenter == null || _battleBootstrapper == null || _battleBootstrapper.IsBusy ||
+                !TryGetPlayableCardDefinition(battleState, _selectedCardId, out var definition))
             {
                 return;
             }
 
-            if (!_battleBootstrapper.TryGetCardDefinition(_selectedCardId, out var definition) ||
-                definition == null ||
-                !battleState.Player.Hand.Contains(_selectedCardId) ||
-                !battleState.Player.Resources.CanAfford(definition.Cost))
-            {
-                return;
-            }
-
-            switch (definition.CardType)
-            {
-                case CardType.Unit:
-                case CardType.Building:
-                    foreach (var tileView in _boardPresenter.PlayerTileViews)
-                    {
-                        if (tileView == null)
-                        {
-                            continue;
-                        }
-
-                        if (battleState.PlayerBoard.GetOccupant(tileView.Coord) == null)
-                        {
-                            tileView.SetHighlight(BattleHighlightState.Playable);
-                        }
-                    }
-
-                    break;
-
-                case CardType.Spell:
-                    if (definition is DamageSpellCardDefinition)
-                    {
-                        HighlightOccupiedTiles(_boardPresenter.PlayerTileViews, battleState.PlayerBoard, allowHiding: true);
-                        HighlightOccupiedTiles(_boardPresenter.AITileViews, battleState.AIBoard, allowHiding: false);
-                    }
-                    else if (definition is ScriptedSpellCardDefinition scriptedSpellDefinition &&
-                             string.Equals(scriptedSpellDefinition.EffectId, "cheonra_jimang", StringComparison.Ordinal))
-                    {
-                        HighlightCheonraJimangTargets(battleState);
-                    }
-                    else if (definition is ScriptedSpellCardDefinition firewallDefinition &&
-                             string.Equals(firewallDefinition.EffectId, "firewall", StringComparison.Ordinal))
-                    {
-                        HighlightAllTiles(_boardPresenter.PlayerTileViews, BattleHighlightState.SpellTarget);
-                        HighlightAllTiles(_boardPresenter.AITileViews, BattleHighlightState.SpellTarget);
-                    }
-                    else if (IsBiochemicalBombDefinition(definition))
-                    {
-                        HighlightAllTiles(_boardPresenter.AITileViews, BattleHighlightState.SpellTarget);
-                    }
-                    else if (IsGuDefinition(definition))
-                    {
-                        HighlightGuTargets(battleState);
-                    }
-                    else if (IsHuanShuDefinition(definition))
-                    {
-                        HighlightHuanShuTargets(battleState);
-                    }
-
-                    break;
-            }
+            var highlight = definition.CardType == CardType.Spell
+                ? BattleHighlightState.SpellTarget
+                : BattleHighlightState.Playable;
+            HighlightCardTargetsOnTiles(battleState, _boardPresenter.PlayerTileViews, highlight);
+            HighlightCardTargetsOnTiles(battleState, _boardPresenter.AITileViews, highlight);
         }
 
-        private void HighlightCheonraJimangTargets(BattleState battleState)
+        private void HighlightCardTargetsOnTiles(BattleState battleState, TileView[] tiles, BattleHighlightState highlight)
         {
-            HighlightUnitSpellTargets(_boardPresenter.PlayerTileViews, battleState.PlayerBoard, allowHiding: true);
-            HighlightUnitSpellTargets(_boardPresenter.AITileViews, battleState.AIBoard, allowHiding: false);
-        }
-
-        private void HighlightGuTargets(BattleState battleState)
-        {
-            if (!GuRules.TryFindDestination(battleState, PlayerId.Player, out _))
+            foreach (var tileView in tiles)
             {
-                return;
-            }
-
-            foreach (var tileView in _boardPresenter.AITileViews)
-            {
-                if (tileView != null &&
-                    GuRules.IsLegalTarget(
-                        battleState,
-                        PlayerId.Player,
-                        PlayerId.AI,
-                        tileView.Coord))
-                {
-                    tileView.SetHighlight(BattleHighlightState.SpellTarget);
-                }
-            }
-        }
-
-        private void HighlightHuanShuTargets(BattleState battleState)
-        {
-            foreach (var tileView in _boardPresenter.AITileViews)
-            {
-                if (tileView != null &&
-                    HuanShuRules.IsLegalTarget(
-                        battleState,
-                        PlayerId.Player,
-                        PlayerId.AI,
-                        tileView.Coord))
-                {
-                    tileView.SetHighlight(BattleHighlightState.SpellTarget);
-                }
-            }
-        }
-
-        private static void HighlightUnitSpellTargets(
-            TileView[] tileViews,
-            BoardState boardState,
-            bool allowHiding)
-        {
-            foreach (var tileView in tileViews)
-            {
-                if (tileView == null)
-                {
-                    continue;
-                }
-
-                var occupant = boardState.GetOccupant(tileView.Coord);
-                if (occupant?.Kind == OccupantKind.Unit &&
-                    occupant.CanBeAffected &&
-                    (allowHiding || !occupant.IsHiding))
-                {
-                    tileView.SetHighlight(BattleHighlightState.SpellTarget);
-                }
-            }
-        }
-
-        private static void HighlightOccupiedTiles(
-            TileView[] tileViews,
-            BoardState boardState,
-            bool allowHiding)
-        {
-            foreach (var tileView in tileViews)
-            {
-                var occupant = tileView == null ? null : boardState.GetOccupant(tileView.Coord);
-                if (occupant?.CanBeAffected == true && (allowHiding || !occupant.IsHiding))
-                {
-                    tileView.SetHighlight(BattleHighlightState.SpellTarget);
-                }
-            }
-        }
-
-        private static void HighlightAllTiles(TileView[] tileViews, BattleHighlightState highlightState)
-        {
-            foreach (var tileView in tileViews)
-            {
-                tileView?.SetHighlight(highlightState);
+                // Selection hints and actual tile use share one legality check.
+                if (CanCardUseOnTile(battleState, _selectedCardId, tileView))
+                    tileView.SetHighlight(highlight);
             }
         }
 
@@ -1067,6 +1000,9 @@ namespace Project333.Runtime.Presentation.Battle
                 return false;
             }
 
+            if (definition.HasTrap)
+                return CanInstallTrapOnMaster(battleState, definition, occupant);
+
             if (definition is DamageSpellCardDefinition)
             {
                 return occupant.CanBeAffected;
@@ -1081,6 +1017,13 @@ namespace Project333.Runtime.Presentation.Battle
             {
                 return true;
             }
+
+            if (string.Equals(scriptedSpellDefinition.EffectId, PlasmaShieldRules.EffectId, StringComparison.Ordinal))
+                return PlasmaShieldRules.IsLegalTarget(battleState, PlayerId.Player, occupant.OwnerId, occupant.Position);
+            if (string.Equals(scriptedSpellDefinition.EffectId, ManaShieldRules.EffectId, StringComparison.Ordinal))
+                return ManaShieldRules.IsLegalTarget(battleState, PlayerId.Player, occupant.OwnerId, occupant.Position);
+            if (string.Equals(scriptedSpellDefinition.EffectId, FireSpearRules.EffectId, StringComparison.Ordinal))
+                return FireSpearRules.IsLegalTarget(battleState, PlayerId.Player, occupant.OwnerId, occupant.Position);
 
             if (string.Equals(scriptedSpellDefinition.EffectId, GuRules.EffectId, StringComparison.Ordinal))
             {
@@ -1231,6 +1174,31 @@ namespace Project333.Runtime.Presentation.Battle
                     }
                 }
 
+                return;
+            }
+
+            if (_battleBootstrapper != null &&
+                _battleBootstrapper.TryGetCardDefinition(_draggedCardId, out var spearDefinition) &&
+                IsFireSpearDefinition(spearDefinition))
+            {
+                var tiles = _dragHoveredTileView.OwnerId == PlayerId.Player
+                    ? _boardPresenter.PlayerTileViews : _boardPresenter.AITileViews;
+                foreach (var tile in tiles)
+                    if (tile != null && tile.Coord.Column == _dragHoveredTileView.Coord.Column)
+                        tile.SetHighlight(BattleHighlightState.DragHoverTarget);
+                return;
+            }
+
+            if (_battleBootstrapper != null &&
+                _battleBootstrapper.TryGetCardDefinition(_draggedCardId, out var firewallDefinition) &&
+                firewallDefinition is ScriptedSpellCardDefinition firewall &&
+                string.Equals(firewall.EffectId, "firewall", StringComparison.Ordinal))
+            {
+                var tiles = _dragHoveredTileView.OwnerId == PlayerId.Player
+                    ? _boardPresenter.PlayerTileViews : _boardPresenter.AITileViews;
+                foreach (var tile in tiles)
+                    if (tile != null && tile.Coord.Row == _dragHoveredTileView.Coord.Row)
+                        tile.SetHighlight(BattleHighlightState.DragHoverTarget);
                 return;
             }
 
@@ -1415,8 +1383,9 @@ namespace Project333.Runtime.Presentation.Battle
             return RobotFusionRules.IsEligibleRobot(battleState?.PlayerBoard?.GetOccupant(coord));
         }
 
-        private static bool CanOccupantAct(OccupantState occupant)
+        private bool CanOccupantAct(OccupantState occupant)
         {
+            if (_battleBootstrapper?.TutorialAllowsImmobileSelection(occupant) == true) return true;
             return CanOccupantMove(occupant) || CanOccupantAttack(occupant);
         }
 
@@ -1479,6 +1448,9 @@ namespace Project333.Runtime.Presentation.Battle
                            battleState.PlayerBoard.GetOccupant(tileView.Coord) == null;
 
                 case CardType.Spell:
+                    if (definition.HasTrap)
+                        return tileView.OwnerId == PlayerId.Player && CanInstallTrapOnMaster(battleState, definition,
+                            battleState.PlayerBoard.GetOccupant(tileView.Coord));
                     if (definition is DamageSpellCardDefinition)
                     {
                         var board = tileView.OwnerId == PlayerId.Player
@@ -1504,6 +1476,21 @@ namespace Project333.Runtime.Presentation.Battle
                     {
                         return tileView.OwnerId == PlayerId.Player || tileView.OwnerId == PlayerId.AI;
                     }
+
+                    if (definition is ScriptedSpellCardDefinition earthquakeDefinition &&
+                        (string.Equals(earthquakeDefinition.EffectId, EarthquakeRules.EffectId, StringComparison.Ordinal) ||
+                         string.Equals(earthquakeDefinition.EffectId, MeteorRules.EffectId, StringComparison.Ordinal)))
+                    {
+                        // Whole enemy field includes empty tiles; the command itself is untargeted.
+                        return tileView.OwnerId == PlayerId.AI;
+                    }
+
+                    if (definition is ScriptedSpellCardDefinition plasmaShield && plasmaShield.EffectId == PlasmaShieldRules.EffectId)
+                        return PlasmaShieldRules.IsLegalTarget(battleState, PlayerId.Player, tileView.OwnerId, tileView.Coord);
+                    if (definition is ScriptedSpellCardDefinition manaShield && manaShield.EffectId == ManaShieldRules.EffectId)
+                        return ManaShieldRules.IsLegalTarget(battleState, PlayerId.Player, tileView.OwnerId, tileView.Coord);
+                    if (IsFireSpearDefinition(definition))
+                        return FireSpearRules.IsLegalTarget(battleState, PlayerId.Player, tileView.OwnerId, tileView.Coord);
 
                     if (IsBiochemicalBombDefinition(definition))
                     {
@@ -1542,6 +1529,7 @@ namespace Project333.Runtime.Presentation.Battle
                 return false;
             }
 
+            if (definition.HasTrap) return false;
             if (definition is DamageSpellCardDefinition)
             {
                 return false;
@@ -1550,6 +1538,9 @@ namespace Project333.Runtime.Presentation.Battle
             if (definition is ScriptedSpellCardDefinition scriptedSpellDefinition &&
                 (string.Equals(scriptedSpellDefinition.EffectId, "cheonra_jimang", StringComparison.Ordinal) ||
                  string.Equals(scriptedSpellDefinition.EffectId, "firewall", StringComparison.Ordinal) ||
+                 string.Equals(scriptedSpellDefinition.EffectId, FireSpearRules.EffectId, StringComparison.Ordinal) ||
+                 string.Equals(scriptedSpellDefinition.EffectId, PlasmaShieldRules.EffectId, StringComparison.Ordinal) ||
+                 string.Equals(scriptedSpellDefinition.EffectId, ManaShieldRules.EffectId, StringComparison.Ordinal) ||
                  string.Equals(scriptedSpellDefinition.EffectId, BiochemicalBombRules.EffectId, StringComparison.Ordinal) ||
                  string.Equals(scriptedSpellDefinition.EffectId, GuRules.EffectId, StringComparison.Ordinal) ||
                  string.Equals(scriptedSpellDefinition.EffectId, HuanShuRules.EffectId, StringComparison.Ordinal)))
@@ -1580,17 +1571,17 @@ namespace Project333.Runtime.Presentation.Battle
 
             if (battleState.Phase != PhaseType.Main || battleState.ActivePlayerId != PlayerId.Player)
             {
-                return "You can only use cards during your main phase.";
+                return "자신의 행동 턴에만 행동할 수 있습니다.";
             }
 
             if (string.IsNullOrWhiteSpace(cardId))
             {
-                return "No card is selected.";
+                return "카드가 선택되지 않았습니다.";
             }
 
             if (!battleState.Player.Hand.Contains(cardId))
             {
-                return $"Card '{cardId}' is not in your hand.";
+                return "해당 카드가 핸드에 없습니다.";
             }
 
             if (!_battleBootstrapper.TryGetCardDefinition(cardId, out var definition) || definition == null)
@@ -1600,7 +1591,7 @@ namespace Project333.Runtime.Presentation.Battle
 
             if (!battleState.Player.Resources.CanAfford(definition.Cost))
             {
-                return $"Not enough resources to use '{cardId}'.";
+                return "자원이 부족합니다.";
             }
 
             if (!IsCardBoardConditionMet(battleState, definition))
@@ -1622,8 +1613,13 @@ namespace Project333.Runtime.Presentation.Battle
                     return "환술을 부여할 수 있는 상대방 유닛이 없습니다.";
                 }
 
-                return $"Card '{cardId}' cannot be used in the current board state.";
+                if (definition.HasTrap) return HasDuplicateTrap(battleState, definition.CardId)
+                    ? "이미 설치된 트랩입니다." : "마스터가 살아있지 않습니다.";
+
+                return "해당 카드를 사용할 수 없는 상태입니다.";
             }
+
+            if (definition.HasTrap) return "내 마스터에 트랩을 설치하세요.";
 
             if (dragReleasedUpwardEnough && !CanCardCastWithoutTarget(battleState, cardId))
             {
@@ -1675,6 +1671,9 @@ namespace Project333.Runtime.Presentation.Battle
 
         private static bool IsCardBoardConditionMet(BattleState battleState, CardDefinition definition)
         {
+            if (definition.HasTrap)
+                return battleState?.Player.Master?.IsAlive == true && !HasDuplicateTrap(battleState, definition.CardId);
+
             if (IsRobotFusionDefinition(definition))
             {
                 return RobotFusionRules.CountLivingRobots(battleState?.PlayerBoard) >=
@@ -1688,6 +1687,24 @@ namespace Project333.Runtime.Presentation.Battle
 
             return !IsHuanShuDefinition(definition) ||
                    HuanShuRules.CanCast(battleState, PlayerId.Player);
+        }
+
+        private bool IsSelectedTrapCard() => _battleBootstrapper != null &&
+            _battleBootstrapper.TryGetCardDefinition(_selectedCardId, out var definition) && definition?.HasTrap == true;
+
+        private static bool CanInstallTrapOnMaster(BattleState battle, CardDefinition definition, OccupantState occupant)
+        {
+            return battle != null && battle.Phase == PhaseType.Main && battle.ActivePlayerId == PlayerId.Player &&
+                   occupant != null && occupant.OwnerId == PlayerId.Player && occupant.Kind == OccupantKind.Master &&
+                   occupant.IsAlive && ReferenceEquals(battle.Player.Master, occupant) && IsCardBoardConditionMet(battle, definition);
+        }
+
+        private static bool HasDuplicateTrap(BattleState battle, string cardId)
+        {
+            if (battle == null) return false;
+            foreach (var trap in battle.ArmedTraps)
+                if (trap.OwnerId == PlayerId.Player && string.Equals(trap.CardId, cardId, StringComparison.Ordinal)) return true;
+            return false;
         }
 
         private bool IsRobotFusionCard(BattleState battleState, string cardId)
@@ -1715,6 +1732,9 @@ namespace Project333.Runtime.Presentation.Battle
             return definition is ScriptedSpellCardDefinition scriptedSpell &&
                    string.Equals(scriptedSpell.EffectId, HuanShuRules.EffectId, StringComparison.Ordinal);
         }
+
+        private static bool IsFireSpearDefinition(CardDefinition definition) =>
+            definition is ScriptedSpellCardDefinition spell && spell.EffectId == FireSpearRules.EffectId;
 
         private static bool IsBiochemicalBombDefinition(CardDefinition definition)
         {

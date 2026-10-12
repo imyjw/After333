@@ -97,7 +97,7 @@ namespace Project333.Tests.EditMode
                 maxAttacksPerTurn: 1,
                 canAttackOnSummon: false);
 
-            Assert.That(asset.SpecialEffectText, Is.EqualTo("전력 -2"));
+            Assert.That(asset.SpecialEffectText, Is.EqualTo("전력 소모:2"));
         }
 
         [Test]
@@ -122,7 +122,7 @@ namespace Project333.Tests.EditMode
                 canAttackOnSummon: false,
                 hasShielder: true);
 
-            Assert.That(asset.SpecialEffectText, Is.EqualTo("Shielder" + System.Environment.NewLine + "전력 -3"));
+            Assert.That(asset.SpecialEffectText, Is.EqualTo("Shielder" + System.Environment.NewLine + "전력 소모:3"));
         }
 
         [Test]
@@ -141,9 +141,74 @@ namespace Project333.Tests.EditMode
                 canAttackOnSummon: false,
                 races: new[] { UnitRace.Robot });
 
-            Assert.That(asset.SpecialEffectText, Is.EqualTo("전력 -1"));
+            Assert.That(asset.SpecialEffectText, Is.EqualTo("전력 소모:1"));
         }
 
+        [TestCase("속공, 전력-2", "속공\n전력 소모:2")]
+        [TestCase("전력 -2\n복제", "전력 소모:2\n복제")]
+        [TestCase("전력소모: 2", "전력 소모:2")]
+        [TestCase("전력 소모:2\n속공", "전력 소모:2\n속공")]
+        [TestCase("전력 소모:2, 전력 -2", "전력 소모:2")]
+        public void UnitCardDefinitionAsset_PowerConsumptionCanonicalizesNativeTextWithoutDuplicates(
+            string explicitText, string expected)
+        {
+            var asset = ScriptableObject.CreateInstance<UnitCardDefinitionAsset>();
+            try
+            {
+                asset.ConfigureBaseForTests("power-consumer-unit", "Power consumer unit", new ResourceSetData());
+                asset.ConfigureMetadataForTests(CardRarity.Common, CardAffiliation.ScienceCivilization,
+                    ChargeTileFootprint.OneByOne, string.Empty, explicitText);
+                asset.ConfigureForTests(AttackType.Melee, 1, 1, true, true, 2,
+                    new ResourceSetData(), 1, false);
+                Assert.That(asset.SpecialEffectText.Replace("\r\n", "\n"), Is.EqualTo(expected));
+                Assert.That(((UnitCardDefinition)asset.ToDefinition()).SciencePowerUpkeep, Is.EqualTo(2));
+            }
+            finally
+            {
+                Object.DestroyImmediate(asset);
+            }
+        }
+
+        [TestCase("", "전력 소모:1")]
+        [TestCase("전력 -1", "전력 소모:1")]
+        [TestCase("전력소모: 1", "전력 소모:1")]
+        [TestCase("전력 소모:1", "전력 소모:1")]
+        public void BuildingCardDefinitionAsset_PowerConsumptionIsExposedWithoutDuplicates(
+            string explicitText, string expected)
+        {
+            var asset = ScriptableObject.CreateInstance<BuildingCardDefinitionAsset>();
+            try
+            {
+                asset.ConfigureBaseForTests("power-consumer-building", "Power consumer building", new ResourceSetData());
+                asset.ConfigureMetadataForTests(CardRarity.Common, CardAffiliation.ScienceCivilization,
+                    ChargeTileFootprint.OneByOne, string.Empty, explicitText);
+                asset.ConfigureForTests(false, 0, 10, new ResourceSetData(), false,
+                    sciencePowerUpkeep: 1);
+                Assert.That(asset.SpecialEffectText, Is.EqualTo(expected));
+                Assert.That(((BuildingCardDefinition)asset.ToDefinition()).SciencePowerUpkeep, Is.EqualTo(1));
+            }
+            finally
+            {
+                Object.DestroyImmediate(asset);
+            }
+        }
+
+        [TestCase("Assets/Project333/ScriptableObjects/StarterTen/Cards/A-111.asset", 1)]
+        [TestCase("Assets/Project333/ScriptableObjects/StarterTen/Cards/A-212.asset", 2)]
+        [TestCase("Assets/Project333/ScriptableObjects/StarterTen/Cards/A-301.asset", 1)]
+        [TestCase("Assets/Project333/ScriptableObjects/SampleBattle/Cards/SampleTeslaSentinel.asset", 2)]
+        public void NativePowerConsumerAsset_UsesCanonicalPresentationAndPreservesAmount(string path, int amount)
+        {
+            var asset = UnityEditor.AssetDatabase.LoadAssetAtPath<UnitCardDefinitionAsset>(path);
+            Assert.That(asset, Is.Not.Null, path);
+            var text = asset.SpecialEffectText;
+            Assert.That(text, Does.Contain($"전력 소모:{amount}"));
+            Assert.That(text, Does.Not.Contain("전력 -"));
+            Assert.That(text, Does.Not.Contain("전력-"));
+            Assert.That(text.Split(new[] { '\r', '\n' }, System.StringSplitOptions.RemoveEmptyEntries)
+                .Count(line => line == $"전력 소모:{amount}"), Is.EqualTo(1));
+            Assert.That(((UnitCardDefinition)asset.ToDefinition()).SciencePowerUpkeep, Is.EqualTo(amount));
+        }
         [Test]
         public void DamageSpellCardDefinitionAsset_ToDefinition_MapsDamageAndCost()
         {

@@ -75,6 +75,8 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.Player.Resources.Mana, Is.Zero);
             Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(3));
 
+            battleState.StartNextTurn(PlayerId.AI);
+            service.ResolveTurnStart(battleState);
             battleState.StartNextTurn(PlayerId.Player);
             service.ResolveTurnStart(battleState);
 
@@ -84,16 +86,18 @@ namespace Project333.Tests.EditMode
             Assert.That(unit.RemainingAttacksThisTurn, Is.Zero);
             Assert.That(battleState.Player.Resources.Mana, Is.Zero,
                 "An occupant released last in turn start must not grant resources during that turn start.");
-            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(4),
+            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(6),
                 "Sealbound upkeep must not be paid during the release turn start.");
 
+            battleState.StartNextTurn(PlayerId.AI);
+            service.ResolveTurnStart(battleState);
             battleState.StartNextTurn(PlayerId.Player);
             service.ResolveTurnStart(battleState);
 
             Assert.That(unit.HasSummoningSickness, Is.False);
             Assert.That(unit.RemainingAttacksThisTurn, Is.EqualTo(1));
             Assert.That(battleState.Player.Resources.Mana, Is.EqualTo(5));
-            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(4),
+            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(8),
                 "The next applicable upkeep may use gold as a substitute for power.");
             Assert.That(unit.IsDrained, Is.False);
         }

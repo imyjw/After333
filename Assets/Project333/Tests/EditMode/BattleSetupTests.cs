@@ -28,8 +28,8 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.PlayerBoard.GetOccupant(new TileCoord(2, 1)), Is.SameAs(battleState.Player.Master));
             Assert.That(battleState.AIBoard.GetOccupant(new TileCoord(2, 1)), Is.SameAs(battleState.AI.Master));
 
-            AssertResources(battleState.Player.Resources);
-            AssertResources(battleState.AI.Resources);
+            AssertResources(battleState.Player.Resources, 3);
+            AssertResources(battleState.AI.Resources, 4);
 
             Assert.That(battleState.Player.Hand.Count, Is.EqualTo(3));
             Assert.That(battleState.AI.Hand.Count, Is.EqualTo(3));
@@ -41,7 +41,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void CreateInitialState_AIFirst_GivesBothPlayersThreeOpeningCards()
+        public void CreateInitialState_AIFirst_GivesFirstPlayerThreeGoldAndSecondPlayerFourGold()
         {
             var service = new BattleSetupService();
             var request = CreateRequest(PlayerId.AI);
@@ -49,6 +49,8 @@ namespace Project333.Tests.EditMode
             var battleState = service.CreateInitialState(request);
 
             Assert.That(battleState.ActivePlayerId, Is.EqualTo(PlayerId.AI));
+            AssertResources(battleState.AI.Resources, 3);
+            AssertResources(battleState.Player.Resources, 4);
             Assert.That(battleState.Player.Hand.Count, Is.EqualTo(3));
             Assert.That(battleState.AI.Hand.Count, Is.EqualTo(3));
             Assert.That(battleState.Player.Deck.Count, Is.EqualTo(7));
@@ -70,6 +72,27 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.Player.HasUsedMulligan, Is.False);
             Assert.That(battleState.AI.HasUsedMulligan, Is.False);
             Assert.That(battleState.Phase, Is.EqualTo(PhaseType.Mulligan));
+        }
+
+        [TestCase(PlayerId.Player)]
+        [TestCase(PlayerId.AI)]
+        public void HumanMulligan_PreservesGoldAssignedBeforeEitherConfirmation(PlayerId first)
+        {
+            var state = new BattleSetupService().CreateInitialState(new BattleSetupRequest(
+                CreateDeck("P"), CreateDeck("A"), first, aiMulliganEnabled: true));
+            var second = state.GetOpponent(first).Id;
+            var mulligan = new MulliganService();
+            AssertResources(state.GetPlayer(first).Resources, 3);
+            AssertResources(state.GetPlayer(second).Resources, 4);
+            mulligan.PassMulligan(state, second);
+            Assert.That(state.Phase, Is.EqualTo(PhaseType.Mulligan));
+            AssertResources(state.GetPlayer(first).Resources, 3);
+            AssertResources(state.GetPlayer(second).Resources, 4);
+            mulligan.ApplyMulligan(state, first,
+                new[] { state.GetPlayer(first).Hand.CardIds[0] }, new NoOpDeckShuffler());
+            Assert.That(state.Phase, Is.EqualTo(PhaseType.TurnStart));
+            AssertResources(state.GetPlayer(first).Resources, 3);
+            AssertResources(state.GetPlayer(second).Resources, 4);
         }
 
         [Test]
@@ -211,12 +234,12 @@ namespace Project333.Tests.EditMode
             Assert.That(masterState.HasSummoningSickness, Is.False);
         }
 
-        private static void AssertResources(Project333.Runtime.Domain.Resources.ResourceSet resources)
+        private static void AssertResources(Project333.Runtime.Domain.Resources.ResourceSet resources, int expectedGold)
         {
             Assert.That(resources.Mana, Is.EqualTo(0));
             Assert.That(resources.Qi, Is.EqualTo(0));
             Assert.That(resources.Power, Is.EqualTo(0));
-            Assert.That(resources.Gold, Is.EqualTo(3));
+            Assert.That(resources.Gold, Is.EqualTo(expectedGold));
         }
 
         private sealed class ReverseDeckShuffler : IDeckShuffler

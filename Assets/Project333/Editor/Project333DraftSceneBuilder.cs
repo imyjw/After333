@@ -267,7 +267,7 @@ namespace Project333.Editor
             }
 
             UnityEventTools.AddPersistentListener(startDraftButton.onClick, controller.BeginDraftFromUi);
-            UnityEventTools.AddPersistentListener(startBattleButton.onClick, controller.StartBattleFromUi);
+            UnityEventTools.AddPersistentListener(startBattleButton.onClick, controller.StartPveBattleFromUi);
             UnityEventTools.AddPersistentListener(returnToStartButton.onClick, controller.ReturnToStartSceneFromUi);
             UnityEventTools.AddPersistentListener(claimRewardsButton.onClick, controller.ClaimRewardsFromUi);
 

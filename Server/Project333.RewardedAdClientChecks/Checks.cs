@@ -170,6 +170,7 @@ Require(PendingRewardedAd.Load(url,owner).AttemptId==id && AccountSessionState.A
 Reply("granted");await new RewardedAdRecovery().RecoverAsync();
 Require(!PendingRewardedAd.HasPending(url,owner)&&AccountSessionState.Applied==1,"Late verified reward was lost after previous-process retry eligibility.");
 Pass("previous-process completion marker releases only after server pending, retains identity and accepts late verified reward");
+await TutorialRewardedAdIsolationChecks.RunAsync();
 Console.WriteLine($"PASS: {passes} ad recovery groups; production storage/recovery/client/transport code, simulated Unity and SDK boundaries; no real ad, server or account used.");
 void Require(bool ok,string message){if(!ok)throw new Exception(message);}
 void Throws(Action action){try{action();}catch(InvalidOperationException){return;}throw new Exception("Expected rejection.");}

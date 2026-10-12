@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3009c6625a5e04942abb529a14d6fb06, type: 3}
+  m_Name: ManaShield
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.ScriptedSpellCardDefinitionAsset
+  _cardId: ManaShield
+  _displayName: "\uB9C8\uB098\uC274\uB4DC"
+  _rarity: 0
+  _cost:
+    _mana: 1
+    _qi: 0
+    _power: 0
+    _gold: 0
+  _affiliation: 1
+  _chargeTileFootprint: 0
+  _effectText: "\uC120\uD0DD\uD55C \uC720\uB2DB(\uB9C8\uC2A4\uD130 \uC81C\uC678)
+    \uB610\uB294 \uAC74\uBB3C\uC758 \uB9C8\uBC95 \uBC29\uC5B4\uB825\uC744 \uC601\uAD6C\uC801\uC73C\uB85C
+    10 \uC99D\uAC00\uC2DC\uD0A8\uB2E4. \uC911\uCCA9 \uAC00\uB2A5."
+  _specialEffectText: 
+  _hasReplicate: 0
+  _boardSprite: {fileID: 0}
+  _boardAnimatorController: {fileID: 0}
+  _effectId: mana_shield
+  _damage: 0
+  _damageType: 0
+  _triggerCount: 0
+  _effectAmount: 10

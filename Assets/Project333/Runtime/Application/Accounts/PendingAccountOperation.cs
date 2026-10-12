@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
+using Project333.Runtime.Presentation.Tutorial;
 
 namespace Project333.Runtime.Application.Accounts
 {
@@ -42,9 +43,21 @@ namespace Project333.Runtime.Application.Accounts
         [Serializable] private sealed class PendingIndex { public List<string> Cards = new List<string>(); }
         public static bool HasAnyPending(string baseUrl)
         {
-            foreach (var card in PendingCards(baseUrl))
-                if (HasPending(baseUrl, card == "" ? "ticket_purchase" : "card_upgrade", card)) return true;
+            foreach (var work in PendingWork(baseUrl))
+                if (HasPending(baseUrl, work.Operation, work.CardId)) return true;
             return false;
+        }
+        public readonly struct PendingWorkItem
+        {
+            public string Operation { get; }
+            public string CardId { get; }
+            public PendingWorkItem(string operation, string cardId) { Operation = operation; CardId = cardId; }
+        }
+        public static IEnumerable<PendingWorkItem> PendingWork(string baseUrl)
+        {
+            foreach (var card in PendingCards(baseUrl))
+                yield return new PendingWorkItem(card == "" ? "ticket_purchase" : "card_upgrade", card);
+            yield return new PendingWorkItem(ServerShopClient.OperationType, null);
         }
         public static IEnumerable<string> PendingCards(string baseUrl)
         {
@@ -112,6 +125,8 @@ namespace Project333.Runtime.Application.Accounts
             request.SetRequestHeader("Accept", "application/json");
             request.SetRequestHeader("Authorization", "Bearer " + sessionToken);
             await AccountHttpTransport.SendAsync(request, ct);
+            ct.ThrowIfCancellationRequested();
+            TutorialRuntimeIsolation.ThrowIfActive();
             if (request.result != UnityWebRequest.Result.Success)
             {
                 string code = null;

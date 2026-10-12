@@ -41,3 +41,7 @@ Button/state labels and wallet/price numbers remain data-driven. Font, font size
 images and RectTransform settings are not rewritten by normal account refresh.
 The purchase cost is taken from ShopSceneController's existing configured cost;
 the server remains authoritative for payment and grants.
+
+## Current scope (2026-10-01)
+
+This is the implemented ticket shop and server-verified rewarded-ticket flow. It is not a card inventory shop, pack/crafting screen or paid-purchase implementation. Purchase/upgrade recovery is automatic and does not add a manual recovery button or a transient recovery notice. Shared notice/confirmation styling follows [notice_ui.md](notice_ui.md); economic authority and retries follow [meta_rules.md](meta_rules.md) and [account_operation_retries.md](account_operation_retries.md).

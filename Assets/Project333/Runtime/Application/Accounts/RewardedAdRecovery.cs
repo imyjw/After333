@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Project333.Runtime.Application.Ads;
 using Project333.Runtime.Presentation;
+using Project333.Runtime.Presentation.Tutorial;
 using UnityEngine;
 
 namespace Project333.Runtime.Application.Accounts
@@ -14,7 +16,9 @@ namespace Project333.Runtime.Application.Accounts
         private static RewardedAdRecovery s_instance;
         private static IRewardedAdService s_observed;
         private static Action s_rewarded, s_closed;
+        private static readonly Queue<Action> DeferredSdkEvents = new Queue<Action>();
         private readonly CancellationTokenSource _lifetime = new CancellationTokenSource();
+        private CancellationTokenSource _attempt;
         private bool _busy;
         private float _nextAttempt;
         private string _lastDiagnostic;
@@ -34,8 +38,8 @@ namespace Project333.Runtime.Application.Accounts
         {
             StopObserving();
             s_observed = service;
-            s_rewarded = () => { PendingRewardedAd.MarkRewarded(url, owner, id); RequestCheck(); };
-            s_closed = () => { PendingRewardedAd.MarkClosed(url, owner, id); RequestCheck(); };
+            s_rewarded = () => RecordSdkEvent(() => PendingRewardedAd.MarkRewarded(url, owner, id));
+            s_closed = () => RecordSdkEvent(() => PendingRewardedAd.MarkClosed(url, owner, id));
             service.Rewarded += s_rewarded;
             service.Closed += s_closed;
         }
@@ -44,6 +48,44 @@ namespace Project333.Runtime.Application.Accounts
         {
             if (s_observed != null) { s_observed.Rewarded -= s_rewarded; s_observed.Closed -= s_closed; }
             s_observed = null;
+        }
+
+        private static void RecordSdkEvent(Action mark)
+        {
+            // A real ad started before entry can still report completion. Retain its signal
+            // without writing account intent metadata until the tutorial has been left.
+            if (TutorialRuntimeIsolation.IsActive) DeferredSdkEvents.Enqueue(mark);
+            else mark();
+            RequestCheck();
+        }
+        private static void FlushDeferredSdkEvents()
+        {
+            while (!TutorialRuntimeIsolation.IsActive && DeferredSdkEvents.Count > 0)
+                DeferredSdkEvents.Dequeue().Invoke();
+        }
+        private void OnEnable()
+        {
+            TutorialRuntimeIsolation.Changed += HandleTutorialChanged;
+            if (!TutorialRuntimeIsolation.IsActive) FlushDeferredSdkEvents();
+        }
+        private void OnDisable()
+        {
+            TutorialRuntimeIsolation.Changed -= HandleTutorialChanged;
+            _attempt?.Cancel();
+        }
+        private void HandleTutorialChanged(bool active)
+        {
+            if (active) _attempt?.Cancel();
+            else
+            {
+                FlushDeferredSdkEvents();
+                _nextAttempt = 0f;
+            }
+        }
+        private static void EnsureRecoveryAllowed(CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            TutorialRuntimeIsolation.ThrowIfActive();
         }
 
         public static void RequestCheck() { if (s_instance != null) s_instance._nextAttempt = 0f; }
@@ -55,7 +97,7 @@ namespace Project333.Runtime.Application.Accounts
         }
         private void Update()
         {
-            if (_busy || Time.unscaledTime < _nextAttempt || !AccountSessionState.IsAuthenticated ||
+            if (TutorialRuntimeIsolation.IsActive || _busy || Time.unscaledTime < _nextAttempt || !AccountSessionState.IsAuthenticated ||
                 UnityEngine.Application.internetReachability == NetworkReachability.NotReachable) return;
             _nextAttempt = Time.unscaledTime + 5f;
             _ = RecoverAsync();
@@ -71,18 +113,21 @@ namespace Project333.Runtime.Application.Accounts
 
         internal async Task RecoverAsync()
         {
-            if (_busy || !AccountSessionState.IsAuthenticated || (s_observed?.IsShowing ?? false)) return;
+            if (TutorialRuntimeIsolation.IsActive || _busy || !AccountSessionState.IsAuthenticated || (s_observed?.IsShowing ?? false)) return;
             _busy = true;
             var url = Project333ServerEndpointSettings.ResolveHttpUrl(Project333ServerEndpointSettings.LocalHttpUrl);
             var owner = AccountSessionState.AccountId;
             var token = AccountSessionState.SessionToken;
-            var ct = _lifetime.Token;
+            using var attempt = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+            _attempt = attempt;
+            var ct = attempt.Token;
             try
             {
+                EnsureRecoveryAllowed(ct);
                 var pending = PendingRewardedAd.Load(url, owner);
                 if (pending == null) { TraceState("no_saved_attempt", false); return; }
                 var response = await new RewardedTicketClient(url).GetAttemptAsync(token, pending.AttemptId, ct);
-                ct.ThrowIfCancellationRequested();
+                EnsureRecoveryAllowed(ct);
                 if (AccountSessionState.AccountId != owner || AccountSessionState.SessionToken != token ||
                     Project333ServerEndpointSettings.ResolveHttpUrl(Project333ServerEndpointSettings.LocalHttpUrl) != url ||
                     PendingRewardedAd.Load(url, owner)?.AttemptId != pending.AttemptId) return;
@@ -92,6 +137,7 @@ namespace Project333.Runtime.Application.Accounts
                 if (status == "granted")
                 {
                     if (response.ResolvedWallet == null) { TraceState("granted_without_wallet", true); return; }
+                    EnsureRecoveryAllowed(ct);
                     AccountSessionState.ApplyRewardedAdWallet(response.ResolvedWallet);
                 }
                 else if (status == "pending")
@@ -100,6 +146,7 @@ namespace Project333.Runtime.Application.Accounts
                     // this attempt is pending and no ad is showing, allow an explicit retry.
                     // Keep the attempt for late rewards; a live observer preserves a Rewarded flag
                     // that may have arrived while this request was in flight.
+                    EnsureRecoveryAllowed(ct);
                     if (!(s_observed?.IsShowing ?? false))
                         PendingRewardedAd.MarkClosed(url, owner, pending.AttemptId, previousProcess: s_observed == null);
                     var latest = PendingRewardedAd.Load(url, owner);
@@ -107,6 +154,7 @@ namespace Project333.Runtime.Application.Accounts
                     return;
                 }
                 else if (status != "expired" && status != "rejected") { TraceState("unknown_server_status", true); return; }
+                EnsureRecoveryAllowed(ct);
                 PendingRewardedAd.Clear(url, owner, pending.AttemptId);
                 TraceState($"resolved: {status}", false);
                 Resolved?.Invoke(url, owner, response);
@@ -117,7 +165,11 @@ namespace Project333.Runtime.Application.Accounts
                 // Do not log response bodies, account/attempt IDs or session credentials.
                 TraceState($"retry_after_error: {ex.GetType().Name}", true);
             }
-            finally { _busy = false; }
+            finally
+            {
+                if (ReferenceEquals(_attempt, attempt)) _attempt = null;
+                _busy = false;
+            }
         }
     }
 }

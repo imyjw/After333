@@ -29,7 +29,7 @@ MonoBehaviour:
   _boardAnimatorController: {fileID: 9100000, guid: 2e15f1178132d4c4e92eb0581ea0e21a, type: 2}
   _attackType: 1
   _damageType: 2
-  _attack: 5
+  _attack: 1
   _health: 10
   _physicalDefense: 0
   _magicDefense: 0

@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using Project333.Runtime.Application.Accounts;
 using Project333.Runtime.Application.Services;
+using Project333.Runtime.Application.Tutorial;
 using Project333.Runtime.Domain.Cards;
 using Project333.Runtime.Infrastructure.Data;
 using Project333.Runtime.Presentation.Cards;
@@ -18,7 +19,7 @@ using UnityEditor.SceneManagement;
 
 namespace Project333.Runtime.Presentation.OwnedCards
 {
-    public sealed class OwnedCardsSceneController : MonoBehaviour
+    public sealed partial class OwnedCardsSceneController : MonoBehaviour
     {
         [SerializeField, HideInInspector] private int _collectionVisualVersion;
         public int CollectionVisualVersion => _collectionVisualVersion;
@@ -113,6 +114,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
         private void OnEnable()
         {
+            if (TryInitializeTutorialCollection()) return;
             AccountOperationRecovery.Resolved += OnOperationResolved;
             if (!AccountSessionState.IsAuthenticated)
             {
@@ -129,6 +131,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
         private void LateUpdate()
         {
+            ResizeCardDetailWindow();
             RefreshDetailStatOverlayLayoutIfNeeded();
         }
 
@@ -139,6 +142,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
         private void OnDisable()
         {
+            CloseCardDetailFromUi();
             AccountOperationRecovery.Resolved -= OnOperationResolved;
             CancelRefresh();
             CancelUpgrade();
@@ -146,6 +150,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
         private void OnDestroy()
         {
+            ResetDetailArtworkFlipToFront();
             CancelRefresh();
             CancelUpgrade();
         }
@@ -183,6 +188,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
         public async void RefreshOwnedCardsFromUi()
         {
+            if (IsTutorialCollectionMode) { TryInitializeTutorialCollection(); return; }
             if (_isRefreshing || _isUpgradingCard)
             {
                 return;
@@ -207,6 +213,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
                 var meResponse = await client.GetMeAsync(
                     AccountSessionState.SessionToken,
                     _refreshCancellation.Token);
+                if (IsTutorialCollectionMode) return;
                 AccountSessionState.ApplyMeResponse(meResponse);
                 PresentOwnedCards(meResponse);
                 SetStatus("보유 카드 목록을 불러왔습니다.");
@@ -232,6 +239,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
         public void ReturnToStartSceneFromUi()
         {
+            if (IsTutorialCollectionMode) return;
             var sceneName = string.IsNullOrWhiteSpace(_startSceneName)
                 ? "GameStart_VSlice"
                 : _startSceneName;
@@ -263,20 +271,24 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
         public void SelectCardFromGrid(string cardId)
         {
-            if (string.IsNullOrWhiteSpace(cardId))
+            if (IsTutorialCollectionMode && (cardId != TutorialUpgradePractice.CardId || !TutorialCollectionActionAllowed(TutorialAction.SelectUpgradeCard))) return;
+            if (string.IsNullOrWhiteSpace(cardId) || !HasCardEntry(cardId))
             {
                 return;
             }
 
+            if (!_isCardDetailOpen || !string.Equals(_selectedCardId, cardId, StringComparison.Ordinal))
+                ResetDetailArtworkFlipToFront();
             _selectedCardId = cardId;
             RenderCurrentPage();
             RenderSelectedCardDetail();
+            OpenCardDetail();
+            if (IsTutorialCollectionMode) _tutorialCollectionCompleted?.Invoke(TutorialAction.SelectUpgradeCard);
         }
-
-        private bool HasPendingUpgrade => PendingAccountOperation.HasPending(AccountServerUrl, "card_upgrade", _selectedCardId);
 
         public async void UpgradeSelectedCardFromUi()
         {
+            if (IsTutorialCollectionMode) { UpgradeTutorialCard(); return; }
             if (_isUpgradingCard || _isRefreshing || PendingAccountOperation.HasAnyPending(AccountServerUrl))
             {
                 return;
@@ -296,6 +308,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
                 return;
             }
 
+            var requestedCardId = _selectedCardId;
             CancelUpgrade();
             _upgradeCancellation = new CancellationTokenSource();
             _isUpgradingCard = true;
@@ -308,13 +321,14 @@ namespace Project333.Runtime.Presentation.OwnedCards
                 var client = new ServerCardCollectionClient(AccountServerUrl);
                 var response = await client.UpgradeCardAsync(
                     AccountSessionState.SessionToken,
-                    _selectedCardId,
+                    requestedCardId,
                     _upgradeCancellation.Token);
+                if (IsTutorialCollectionMode) return;
                 AccountSessionState.ApplyUpgradeCardResponse(response);
                 ApplyUpgradeResponseToOwnedCards(response);
 
                 var upgradedCard = response.ResolvedUpgradedCard;
-                var upgradedCardId = upgradedCard?.ResolvedCardId ?? _selectedCardId;
+                var upgradedCardId = upgradedCard?.ResolvedCardId ?? requestedCardId;
                 var upgradedLevel = upgradedCard?.ResolvedUpgradeLevel ?? 0;
                 SetStatus($"{ResolveDisplayName(upgradedCardId)} Lv.{upgradedLevel} 강화 완료");
             }
@@ -324,7 +338,8 @@ namespace Project333.Runtime.Presentation.OwnedCards
             catch (Exception ex)
             {
                 Debug.LogWarning($"After333 card upgrade failed: {ex.Message}");
-                SetStatus(HasPendingUpgrade ? string.Empty : $"강화 실패: {ex.Message}");
+                SetStatus(PendingAccountOperation.HasPending(AccountServerUrl, "card_upgrade", requestedCardId)
+                    ? string.Empty : $"강화 실패: {ex.Message}");
             }
             finally
             {
@@ -416,6 +431,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
         private void RebuildCardGridEntries()
         {
             _cardGridEntries.Clear();
+            if (IsTutorialCollectionMode) { RebuildTutorialCardEntries(); return; }
             var seenCardIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             if (_cardCatalogAsset?.Cards != null)
@@ -526,7 +542,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
                 : $"Lv.{safeUpgradeLevel}  MAX";
         }
 
-        private static bool IsGridCardUpgradeReady(
+        private bool IsGridCardUpgradeReady(
             int copyCount,
             int upgradeLevel,
             CardDefinitionAsset cardAsset)
@@ -540,7 +556,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
             var safeUpgradeLevel = Mathf.Max(0, upgradeLevel);
             return CardUpgradeRules.TryGetNextUpgradeCost(safeUpgradeLevel, out var cost) &&
                    safeCopyCount >= cost.RequiredCopyCount &&
-                   AccountSessionState.ResourceGold >= cost.RequiredResourceGold;
+                   DisplayedCollectionGold >= cost.RequiredResourceGold;
         }
 
         private bool HasCardEntry(string cardId)
@@ -575,6 +591,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
                     _detailArtworkImage.enabled = false;
                 }
 
+                RefreshDetailUpgradeTable(null);
                 RefreshUpgradeButtonState();
                 return;
             }
@@ -597,19 +614,18 @@ namespace Project333.Runtime.Presentation.OwnedCards
                 _detailStatLayoutDirty = true;
             }
 
-            var title = string.Equals(displayName, _selectedCardId, StringComparison.Ordinal)
-                ? displayName
-                : $"{displayName}({_selectedCardId})";
+            var title = displayName;
             var ownership = BuildUpgradePreviewText(copyCount, upgradeLevel, cardAsset);
             SetDetailText(
                 title,
                 ownership,
                 BuildDetailMetaText(cardAsset, upgradeLevel));
             RefreshDetailStatOverlay(cardAsset, upgradeLevel);
+            RefreshDetailUpgradeTable(cardAsset);
             RefreshUpgradeButtonState();
         }
 
-        private static string BuildUpgradePreviewText(
+        private string BuildUpgradePreviewText(
             int copyCount,
             int upgradeLevel,
             CardDefinitionAsset cardAsset)
@@ -626,7 +642,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
                 return $"보유: x{safeCopyCount}    Lv.{safeUpgradeLevel}\n강화: 최대 레벨 ({CardUpgradeRules.MaxLevel})";
             }
 
-            var serverGold = AccountSessionState.ResourceGold;
+            var serverGold = DisplayedCollectionGold;
             var hasEnoughCopies = safeCopyCount >= cost.RequiredCopyCount;
             var hasEnoughGold = serverGold >= cost.RequiredResourceGold;
             var status = hasEnoughCopies && hasEnoughGold
@@ -674,7 +690,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
             try
             {
-                var definition = cardAsset.ToDefinition();
+                var definition = ResolveCurrentDefinition(cardAsset);
                 return definition is UnitCardDefinition || definition is BuildingCardDefinition;
             }
             catch (Exception)
@@ -692,7 +708,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
             try
             {
-                return CardUpgradeRules.IsCardUpgradeable(cardAsset.ToDefinition());
+                return CardUpgradeRules.IsCardUpgradeable(ResolveCurrentDefinition(cardAsset));
             }
             catch (Exception)
             {
@@ -737,9 +753,9 @@ namespace Project333.Runtime.Presentation.OwnedCards
                 return false;
             }
 
-            if (AccountSessionState.ResourceGold < cost.RequiredResourceGold)
+            if (DisplayedCollectionGold < cost.RequiredResourceGold)
             {
-                blockedReason = $"골드 부족 {AccountSessionState.ResourceGold}/{cost.RequiredResourceGold}";
+                blockedReason = $"골드 부족 {DisplayedCollectionGold}/{cost.RequiredResourceGold}";
                 return false;
             }
 
@@ -755,7 +771,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
             }
 
             var canUpgrade = TryGetSelectedUpgradeCost(out var cost, out var stateText);
-            var isInteractable = canUpgrade && !PendingAccountOperation.HasAnyPending(AccountServerUrl) && !_isRefreshing && !_isUpgradingCard;
+            var isInteractable = canUpgrade && (IsTutorialCollectionMode ? TutorialCollectionActionAllowed(TutorialAction.UpgradePracticeCard) : !PendingAccountOperation.HasAnyPending(AccountServerUrl)) && !_isRefreshing && !_isUpgradingCard;
             _upgradeButton.interactable = isInteractable;
 
             if (_upgradeButtonLabel != null)
@@ -810,7 +826,6 @@ namespace Project333.Runtime.Presentation.OwnedCards
             EnsureDetailPanelUi();
 
             if (_detailArtworkImage == null ||
-                !_detailArtworkImage.enabled ||
                 _detailArtworkImage.sprite == null)
             {
                 SetDetailStatOverlayVisible(false);
@@ -834,6 +849,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
             }
 
             _detailStatLayoutDirty = true;
+            ResizeCardDetailWindow();
             RefreshDetailStatOverlayLayoutIfNeeded();
             SetDetailStatOverlayVisible(true, statDisplay.HasHp);
         }
@@ -881,6 +897,9 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
         private void SetDetailStatOverlayVisible(bool visible, bool showHp = true)
         {
+            _detailFrontShowsStats = visible;
+            _detailFrontShowsHp = showHp;
+            visible = visible && !_detailArtworkBackVisible;
             if (_detailAttackValueText != null)
             {
                 _detailAttackValueText.enabled = visible;
@@ -906,7 +925,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
             CardDefinition definition;
             try
             {
-                definition = cardAsset.ToDefinition();
+                definition = ResolveCurrentDefinition(cardAsset);
             }
             catch (Exception)
             {
@@ -926,7 +945,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
             CardDefinition definition = null;
             try
             {
-                definition = cardAsset.ToDefinition();
+                definition = ResolveCurrentDefinition(cardAsset);
             }
             catch (Exception ex)
             {
@@ -935,10 +954,15 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
             var builder = new StringBuilder();
             builder.AppendLine($"타입: {FormatCardType(definition.CardType)}");
-            builder.AppendLine($"희귀도: {FormatRarity(cardAsset.Rarity)}");
-            builder.AppendLine($"비용: {FormatCost(cardAsset.Cost)}");
-            builder.AppendLine($"소속: {FormatAffiliation(cardAsset.Affiliation)}");
-            builder.AppendLine($"차지 타일: {FormatChargeTileFootprint(cardAsset.ChargeTileFootprint)}");
+            var record = ResolveCurrentRecord(cardAsset.CardId);
+            builder.AppendLine($"희귀도: {FormatRarity(record?.Rarity ?? cardAsset.Rarity)}");
+            builder.AppendLine($"비용: {FormatCost(record == null ? cardAsset.Cost : new ResourceSetData(record.Cost.Mana, record.Cost.Qi, record.Cost.Power, record.Cost.Gold))}");
+            if (definition is UnitCardDefinition raceUnit)
+            {
+                builder.AppendLine($"종족: {FormatUnitRaces(raceUnit.Races)}");
+            }
+            builder.AppendLine($"소속: {FormatAffiliation(record?.Affiliation ?? cardAsset.Affiliation)}");
+            builder.AppendLine($"차지 타일: {FormatChargeTileFootprint(record?.ChargeTileFootprint ?? cardAsset.ChargeTileFootprint)}");
 
             if (definition is UnitCardDefinition unit)
             {
@@ -964,15 +988,30 @@ namespace Project333.Runtime.Presentation.OwnedCards
             else if (definition is DamageSpellCardDefinition damageSpell)
             {
                 builder.AppendLine($"데미지 속성: {FormatDamageType(damageSpell.DamageType)}");
-                builder.AppendLine($"피해량: {damageSpell.Damage}");
+                builder.AppendLine($"피해량: {FormatLeveledStat(damageSpell.Damage, CardLevelSpellRules.ApplyDamageBonus(damageSpell.Damage, upgradeLevel))}");
+            }
+
+            else if (definition is TrapSpellCardDefinition trap && trap.CardId == SummonTrapCardRules.CardId)
+            {
+                builder.AppendLine("데미지 속성: 물리");
+                builder.AppendLine($"피해량: {FormatLeveledStat(trap.Damage, CardLevelSpellRules.ApplyDamageBonus(trap.Damage, upgradeLevel))}");
+                builder.AppendLine($"발동 비용: 골드 {trap.ActivationCost.Gold}");
+            }
+
+            if (definition is ScriptedSpellCardDefinition scripted && scripted.Damage > 0 && scripted.DamageType != DamageType.None)
+            {
+                builder.AppendLine($"데미지 속성: {FormatDamageType(scripted.DamageType)}");
+                builder.AppendLine($"피해량: {FormatLeveledStat(scripted.Damage, CardLevelSpellRules.ApplyDamageBonus(scripted.Damage, upgradeLevel))}");
             }
 
             builder.AppendLine();
+            var effectText = CardStatDisplay.GetEffectText(definition, record?.EffectText ?? cardAsset.EffectText, upgradeLevel);
             var hasRulesText = false;
-            if (!string.IsNullOrWhiteSpace(cardAsset.EffectText))
+            if (!string.IsNullOrWhiteSpace(effectText))
             {
-                builder.AppendLine("효과");
-                builder.AppendLine(cardAsset.EffectText.Trim());
+                builder.AppendLine(upgradeLevel > 0 && definition.CardId != NuclearRules.CardId && definition.CardId != EarthquakeRules.CardId && definition.CardId != MeteorRules.CardId &&
+                    CardStatDisplay.TryGetSpellDamage(definition, 0, 0, out _) ? "효과 (기본 수치)" : "효과");
+                builder.AppendLine(effectText.Trim());
                 builder.AppendLine();
                 hasRulesText = true;
             }
@@ -980,7 +1019,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
             if (!string.IsNullOrWhiteSpace(cardAsset.SpecialEffectText))
             {
                 builder.AppendLine("특수효과");
-                builder.AppendLine(cardAsset.SpecialEffectText.Trim());
+                builder.AppendLine(CardStatDisplay.GetEffectText(definition, record?.SpecialEffectText ?? cardAsset.SpecialEffectText, upgradeLevel).Trim());
                 hasRulesText = true;
             }
 
@@ -1036,6 +1075,53 @@ namespace Project333.Runtime.Presentation.OwnedCards
                 default:
                     return rarity.ToString();
             }
+        }
+
+        private static string s_ownedCardJson;
+        private static Dictionary<string, JsonCardDefinitionRecord> s_ownedCardRecords;
+
+        private static JsonCardDefinitionRecord ResolveCurrentRecord(string cardId)
+        {
+            var source = Resources.Load<TextAsset>("Project333/Data/cards");
+            if (source == null || string.IsNullOrWhiteSpace(cardId)) return null;
+            if (s_ownedCardRecords == null || !string.Equals(s_ownedCardJson, source.text, StringComparison.Ordinal))
+            {
+                var records = new Dictionary<string, JsonCardDefinitionRecord>(StringComparer.Ordinal);
+                foreach (var card in JsonCardDefinitionDatabase.FromJson(source.text).Cards)
+                    if (card != null) records.Add(card.Id, card);
+                s_ownedCardRecords = records;
+                s_ownedCardJson = source.text;
+            }
+            return s_ownedCardRecords.TryGetValue(cardId, out var record) ? record : null;
+        }
+
+        private static CardDefinition ResolveCurrentDefinition(CardDefinitionAsset asset)
+        {
+            // Assets still supply artwork/controllers and localized keyword text; gameplay values use the battle DB.
+            return ResolveCurrentRecord(asset.CardId)?.ToDefinition() ?? asset.ToDefinition();
+        }
+
+        private static string FormatUnitRaces(IReadOnlyList<UnitRace> races)
+        {
+            if (races == null || races.Count == 0) return "없음";
+            var names = new string[races.Count];
+            for (var i = 0; i < races.Count; i++)
+            {
+                switch (races[i])
+                {
+                    case UnitRace.Robot: names[i] = "로봇"; break;
+                    case UnitRace.Goblin: names[i] = "고블린"; break;
+                    case UnitRace.Human: names[i] = "인간"; break;
+                    case UnitRace.Dragon: names[i] = "드래곤"; break;
+                    case UnitRace.Vampire: names[i] = "뱀파이어"; break;
+                    case UnitRace.Undead: names[i] = "언데드"; break;
+                    case UnitRace.Orc: names[i] = "오크"; break;
+                    case UnitRace.Beast: names[i] = "야수"; break;
+                    case UnitRace.Elf: names[i] = "엘프"; break;
+                    default: names[i] = races[i].ToString(); break;
+                }
+            }
+            return string.Join(", ", names);
         }
 
         private static string FormatAffiliation(CardAffiliation affiliation)
@@ -1202,7 +1288,8 @@ namespace Project333.Runtime.Presentation.OwnedCards
                 return;
             }
 
-            AccountWalletView.ShowSession(_accountText);
+            if (IsTutorialCollectionMode) RefreshTutorialCollectionWallet();
+            else AccountWalletView.ShowSession(_accountText);
         }
 
         private void SetOwnedCardsText(string text)
@@ -1216,6 +1303,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
 
         private void SetStatus(string status)
         {
+            if (_detailStatusText != null) _detailStatusText.text = status ?? string.Empty;
             if (_statusText != null)
             {
                 _statusText.text = status ?? string.Empty;
@@ -1288,6 +1376,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
             EnsureCardGridSlots();
             EnsurePageButtonUi(parent);
             EnsureDetailPanelUi();
+            ApplyCollectionGalleryLayout();
         }
 
         private void EnsureDetailPanelUi()
@@ -1301,7 +1390,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
             var applyDefaultPanelLayout = false;
             if (_detailPanelRoot == null)
             {
-                if (transform.Find("DetailPanel") is RectTransform existingPanel)
+                if ((transform.Find("CardDetailModal/DetailPanel") ?? transform.Find("DetailPanel")) is RectTransform existingPanel)
                 {
                     _detailPanelRoot = existingPanel;
                 }
@@ -1416,6 +1505,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
                 applyDefaultPanelLayout);
             ConfigureUpgradeButton();
             RefreshUpgradeButtonState();
+            ApplyCardDetailModalLayout();
         }
 
         private void EnsureDetailStatOverlayUi(RectTransform artworkRoot)
@@ -2063,7 +2153,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
                 _backButtonLabel = _backButton.GetComponentInChildren<Text>(true);
             }
 
-            if (_upgradeButton == null && transform.Find("DetailPanel/UpgradeButton") is RectTransform upgradeButtonTransform)
+            if (_upgradeButton == null && (transform.Find("CardDetailModal/DetailPanel/UpgradeButton") ?? transform.Find("DetailPanel/UpgradeButton")) is RectTransform upgradeButtonTransform)
             {
                 _upgradeButton = upgradeButtonTransform.GetComponent<Button>();
             }
@@ -2104,6 +2194,8 @@ namespace Project333.Runtime.Presentation.OwnedCards
             ConfigureText(_pageText, 20, FontStyle.Bold, TextAnchor.MiddleCenter);
             ConfigureUpgradeButton();
             RefreshUpgradeButtonState();
+            ApplyCollectionGalleryLayout();
+            ApplyCardDetailModalLayout();
         }
 
         private static void RegisterEditorCreatedObject(GameObject gameObject)
@@ -2195,6 +2287,7 @@ namespace Project333.Runtime.Presentation.OwnedCards
         private sealed class CardGridSlot
         {
             private readonly RectTransform _root;
+            public RectTransform Root => _root;
             private readonly Image _backgroundImage;
             private readonly Button _button;
             private readonly Outline _upgradeReadyOutline;

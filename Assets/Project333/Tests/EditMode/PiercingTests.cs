@@ -434,7 +434,7 @@ namespace Project333.Tests.EditMode
             new AttackService().Attack(battleState, PlayerId.Player, attacker.Position, front.Position);
 
             Assert.That(rear.CurrentHp, Is.EqualTo(15));
-            Assert.That(rear.IsHiding, Is.True, "Piercing damage is not a normal-attack declaration against the rear occupant.");
+            Assert.That(rear.IsHiding, Is.False, "Receiving Piercing reveals Hiding without granting critical counterattacks.");
         }
 
         [Test]

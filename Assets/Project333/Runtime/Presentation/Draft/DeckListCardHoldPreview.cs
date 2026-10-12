@@ -16,6 +16,7 @@ namespace Project333.Runtime.Presentation.Draft
         private const float HoldSeconds = 0.4f;
         private readonly List<CardTextRange> _entries = new List<CardTextRange>();
         private Text _text;
+        private DeckListColumnsView _columns;
         private ScrollRect _scrollRect;
         private Func<string, CardDefinitionAsset> _resolver;
         private string _configuredText;
@@ -24,19 +25,39 @@ namespace Project333.Runtime.Presentation.Draft
         private Vector2 _pressPosition;
         private float _pressedAt;
         private bool _previewShown;
+        private int? _upgradeLevelOverride;
+        private Action<string> _previewReleased;
 
         public static void Configure(Text text, IReadOnlyList<string> cardIds,
             Func<string, CardDefinitionAsset> resolver, string emptyText,
-            string linePrefix = "", bool includeSummary = false)
+            string linePrefix = "", bool includeSummary = false, int? upgradeLevelOverride = null,
+            Action<string> previewReleased = null, bool namesAndCostsOnly = false)
         {
             if (text == null) return;
             var relay = text.GetComponent<DeckListCardHoldPreview>();
             if (relay == null) relay = text.gameObject.AddComponent<DeckListCardHoldPreview>();
+            if (relay._upgradeLevelOverride != upgradeLevelOverride || relay._previewReleased != previewReleased)
+                relay.CancelHold();
+            relay._upgradeLevelOverride = upgradeLevelOverride;
+            relay._previewReleased = previewReleased;
             relay._text = text;
             relay._resolver = resolver;
             var nextEntries = new List<CardTextRange>();
             Action<string, int, int> record = (cardId, start, length) =>
                 nextEntries.Add(new CardTextRange(cardId, start, length));
+            if (namesAndCostsOnly)
+            {
+                relay._entries.Clear();
+                if (relay._columns == null)
+                    relay._columns = text.gameObject.AddComponent<DeckListColumnsView>();
+                if (relay._columns.Configure(text, cardIds, resolver, emptyText)) relay.CancelHold();
+                text.supportRichText = false;
+                text.raycastTarget = true;
+                relay._configuredText = text.text;
+                relay.BindScrollRect();
+                return;
+            }
+            if (relay._columns != null) relay._columns.Clear();
             var nextText = includeSummary
                 ? DraftDeckListFormatter.BuildDeckBuildingPanelText(cardIds, resolver, emptyText, record)
                 : DraftDeckListFormatter.BuildDeckListText(cardIds, resolver, emptyText, linePrefix,
@@ -87,7 +108,7 @@ namespace Project333.Runtime.Presentation.Draft
             }
             if (_previewShown || now - _pressedAt < HoldSeconds) return;
             var asset = _resolver?.Invoke(_heldCardId);
-            DeckCardPreviewOverlay.ShowFor(this, _heldCardId, asset, _text.font);
+            DeckCardPreviewOverlay.ShowFor(this, _heldCardId, asset, _text.font, upgradeLevelOverride: _upgradeLevelOverride);
             _previewShown = true;
         }
 
@@ -105,7 +126,16 @@ namespace Project333.Runtime.Presentation.Draft
 
         public void OnPointerUp(PointerEventData eventData)
         {
-            if (OwnsPointer(eventData)) CancelHold();
+            if (!OwnsPointer(eventData)) return;
+            var completed = _previewShown && eventData.button == PointerEventData.InputButton.Left &&
+                !HasMoved(eventData.position) && DeckCardPreviewOverlay.IsVisibleFor(this) &&
+                TryGetCardAtScreenPoint(eventData.position, eventData.pressEventCamera, out var releasedCardId) &&
+                string.Equals(releasedCardId, _heldCardId, StringComparison.Ordinal);
+            var cardId = _heldCardId;
+            var notifyReleased = _previewReleased;
+            if (_previewShown && notifyReleased != null) eventData.eligibleForClick = false;
+            CancelHold();
+            if (completed) notifyReleased?.Invoke(cardId);
         }
 
         public void OnPointerExit(PointerEventData eventData)
@@ -168,6 +198,59 @@ namespace Project333.Runtime.Presentation.Draft
 
         public void HidePreview() => CancelHold();
 
+        // Uses the same rendered characters as hold hit testing, without adding replacement list rows.
+        // Bounds are in this Text's local coordinates; callers may clip them against its viewport.
+        public bool TryGetCardLocalBounds(string cardId, out Rect bounds)
+        {
+            bounds = default;
+            if (_text == null || _text.font == null || !isActiveAndEnabled ||
+                string.IsNullOrWhiteSpace(cardId) ||
+                !string.Equals(_text.text, _configuredText, StringComparison.Ordinal)) return false;
+
+            if (_columns != null && _columns.HasRows)
+                return _columns.TryGetCardBounds(cardId, out bounds);
+
+            foreach (var entry in _entries)
+            {
+                if (!string.Equals(entry.CardId, cardId, StringComparison.Ordinal)) continue;
+                var generator = _text.cachedTextGenerator;
+                generator.Populate(_text.text, _text.GetGenerationSettings(_text.rectTransform.rect.size));
+                var lines = generator.lines;
+                var characters = generator.characters;
+                var left = float.PositiveInfinity;
+                var right = float.NegativeInfinity;
+                var bottom = float.PositiveInfinity;
+                var top = float.NegativeInfinity;
+                for (var lineIndex = 0; lineIndex < lines.Count; lineIndex++)
+                {
+                    var line = lines[lineIndex];
+                    var first = Mathf.Max(line.startCharIdx, entry.Start);
+                    var lineEnd = lineIndex + 1 < lines.Count
+                        ? lines[lineIndex + 1].startCharIdx : characters.Count;
+                    var last = Mathf.Min(entry.End, Mathf.Min(lineEnd,
+                        Mathf.Min(characters.Count, _configuredText.Length)));
+                    var hasVisibleCharacter = false;
+                    for (var i = first; i < last; i++)
+                    {
+                        if (char.IsWhiteSpace(_configuredText[i])) continue;
+                        var character = characters[i];
+                        left = Mathf.Min(left, character.cursorPos.x);
+                        right = Mathf.Max(right, character.cursorPos.x + character.charWidth);
+                        hasVisibleCharacter = true;
+                    }
+                    if (!hasVisibleCharacter) continue;
+                    bottom = Mathf.Min(bottom, line.topY - line.height);
+                    top = Mathf.Max(top, line.topY);
+                }
+                if (right <= left || top <= bottom) return false;
+                var pixelsPerUnit = Mathf.Max(0.001f, _text.pixelsPerUnit);
+                bounds = Rect.MinMaxRect(left / pixelsPerUnit, bottom / pixelsPerUnit,
+                    right / pixelsPerUnit, top / pixelsPerUnit);
+                return true;
+            }
+            return false;
+        }
+
         private void CancelHold()
         {
             DeckCardPreviewOverlay.HideFor(this);
@@ -179,7 +262,7 @@ namespace Project333.Runtime.Presentation.Draft
         private bool TryGetCardAtScreenPoint(Vector2 point, Camera eventCamera, out string cardId)
         {
             cardId = null;
-            if (_text == null || _text.font == null || _entries.Count == 0 ||
+            if (_text == null || _text.font == null || (_entries.Count == 0 && (_columns == null || !_columns.HasRows)) ||
                 !string.Equals(_text.text, _configuredText, StringComparison.Ordinal) ||
                 !RectTransformUtility.RectangleContainsScreenPoint(_text.rectTransform, point, eventCamera))
                 return false;
@@ -196,6 +279,9 @@ namespace Project333.Runtime.Presentation.Draft
                     (RectTransform)mask.transform, point, eventCamera)) return false;
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
                 _text.rectTransform, point, eventCamera, out var local)) return false;
+
+            if (_columns != null && _columns.HasRows)
+                return _columns.TryGetCardAtPoint(local, out cardId);
 
             var generator = _text.cachedTextGenerator;
             generator.Populate(_text.text, _text.GetGenerationSettings(_text.rectTransform.rect.size));

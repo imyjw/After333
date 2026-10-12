@@ -6,7 +6,6 @@ namespace Project333.Runtime.Infrastructure.Data
     public static class CardUpgradeRules
     {
         public const int MaxLevel = 13;
-        public const int CostMultiplier = 3;
         private const string FireboltCardId = "firebolt";
         private const string FirewallCardId = "Firewall";
 
@@ -27,6 +26,12 @@ namespace Project333.Runtime.Infrastructure.Data
                     return string.Equals(cardDefinition.CardId, FireboltCardId, StringComparison.OrdinalIgnoreCase) ||
                            string.Equals(cardDefinition.CardId, FirewallCardId, StringComparison.OrdinalIgnoreCase) ||
                            string.Equals(cardDefinition.CardId, BiochemicalBombRules.CardId, StringComparison.OrdinalIgnoreCase) ||
+                           string.Equals(cardDefinition.CardId, NuclearRules.CardId, StringComparison.OrdinalIgnoreCase) ||
+                           string.Equals(cardDefinition.CardId, EarthquakeRules.CardId, StringComparison.OrdinalIgnoreCase) ||
+                           string.Equals(cardDefinition.CardId, MeteorRules.CardId, StringComparison.OrdinalIgnoreCase) ||
+                           string.Equals(cardDefinition.CardId, FireSpearRules.CardId, StringComparison.OrdinalIgnoreCase) ||
+                           string.Equals(cardDefinition.CardId, SummonTrapCardRules.CardId, StringComparison.OrdinalIgnoreCase) ||
+                           string.Equals(cardDefinition.CardId, DaehwandanCardRules.CardId, StringComparison.OrdinalIgnoreCase) ||
                            string.Equals(cardDefinition.CardId, TimedBombRules.CardId, StringComparison.OrdinalIgnoreCase);
 
                 default:
@@ -49,7 +54,15 @@ namespace Project333.Runtime.Infrastructure.Data
             }
 
             var nextLevel = normalizedCurrentLevel + 1;
-            var requiredAmount = nextLevel * CostMultiplier;
+            var requiredAmount = nextLevel switch
+            {
+                1 => 3,
+                2 => 6,
+                3 => 10,
+                4 => 20,
+                5 => 30,
+                _ => 33,
+            };
             cost = new CardUpgradeCost(
                 normalizedCurrentLevel,
                 nextLevel,

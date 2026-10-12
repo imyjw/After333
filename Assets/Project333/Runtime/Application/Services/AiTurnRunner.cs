@@ -14,7 +14,8 @@ namespace Project333.Runtime.Application.Services
             _aiDecisionService = aiDecisionService ?? throw new ArgumentNullException(nameof(aiDecisionService));
         }
 
-        public void RunAiTurn(BattleFlowController battleFlowController, Action<string> logEntryCallback = null)
+        public void RunAiTurn(BattleFlowController battleFlowController, Action<string> logEntryCallback = null,
+            Func<string, string> cardNameResolver = null)
         {
             if (battleFlowController == null)
             {
@@ -26,10 +27,12 @@ namespace Project333.Runtime.Application.Services
                 battleFlowController.ResolveTurnStart,
                 battleFlowController.EndTurn,
                 battleFlowController.ExecuteCommand,
-                logEntryCallback);
+                logEntryCallback,
+                cardNameResolver);
         }
 
-        public void RunAiTurn(IBattleGateway battleGateway, Action<string> logEntryCallback = null)
+        public void RunAiTurn(IBattleGateway battleGateway, Action<string> logEntryCallback = null,
+            Func<string, string> cardNameResolver = null)
         {
             if (battleGateway == null)
             {
@@ -41,7 +44,8 @@ namespace Project333.Runtime.Application.Services
                 battleGateway.ResolveTurnStart,
                 battleGateway.EndTurn,
                 battleGateway.ExecuteCommand,
-                logEntryCallback);
+                logEntryCallback,
+                cardNameResolver);
         }
 
         private void RunAiTurnCore(
@@ -49,7 +53,8 @@ namespace Project333.Runtime.Application.Services
             Action resolveTurnStart,
             Action endTurn,
             Action<PlayerId, IBattleCommand> executeCommand,
-            Action<string> logEntryCallback)
+            Action<string> logEntryCallback,
+            Func<string, string> cardNameResolver)
         {
             var actionCount = 0;
             while (true)
@@ -85,8 +90,10 @@ namespace Project333.Runtime.Application.Services
                     return;
                 }
 
+                var commandLog = logEntryCallback == null ? null :
+                    CombatLogFormatter.FormatCommand(PlayerId.AI, command, battleState, cardNameResolver);
                 executeCommand(PlayerId.AI, command);
-                logEntryCallback?.Invoke(CombatLogFormatter.FormatCommand(PlayerId.AI, command));
+                logEntryCallback?.Invoke(commandLog);
             }
         }
     }

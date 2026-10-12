@@ -112,7 +112,7 @@ namespace Project333.Tests.EditMode
 
         [TestCase(PlayerId.Player)]
         [TestCase(PlayerId.AI)]
-        public void Daehwandan_RecordsMasterAttackSeparatelyFromResourceEffect(PlayerId viewer)
+        public void Daehwandan_RecordsMasterAttackWithoutResourceEffect(PlayerId viewer)
         {
             var state=State();state.Player.Hand.Add("Daehwandan");
             state.Player.Resources.Add(new ResourceSet(0,5,0,0));
@@ -121,9 +121,7 @@ namespace Project333.Tests.EditMode
             Assert.That(buff.SourceCardId,Is.EqualTo("Daehwandan"));
             Assert.That(buff.AttackBonus,Is.EqualTo(30));
             AssertMasterTooltip();
-            state.PersistentEffects.Single().Expire();
-            Assert.That(state.Player.Master.CombatStatBuffs.Single().AttackBonus,Is.EqualTo(30));
-            AssertMasterTooltip();
+            Assert.That(state.PersistentEffects, Is.Empty);
 
             void AssertMasterTooltip()
             {

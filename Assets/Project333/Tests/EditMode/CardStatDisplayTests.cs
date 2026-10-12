@@ -59,6 +59,80 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
+        public void Nuclear_EveryLevelDisplaysImmediateDamageWithoutChangingFalloutOrAddingSpellPower()
+        {
+            var record = JsonCardDefinitionDatabase.FromJson(Resources.Load<TextAsset>("Project333/Data/cards").text)
+                .Cards.Find(card => card.Id == NuclearRules.CardId);
+            var definition = record.ToDefinition();
+            for (var level = 0; level <= 13; level++)
+            {
+                Assert.That(CardStatDisplay.TryCreate(definition, level, out var stats, spellPower: 999), Is.True);
+                Assert.That(stats.Attack, Is.EqualTo(100 + level), $"Nuclear Lv.{level}");
+                Assert.That(stats.HasHp, Is.False);
+                var text = CardStatDisplay.GetEffectText(definition, record.EffectText, level);
+                Assert.That(text, Does.Contain("고정 데미지 " + (100 + level) + "을 입힌다."));
+                Assert.That(text, Does.Contain("사용 당시 상대 전장에 있는 유닛(마스터 포함)에 영구 낙진 +1중첩.").And.Contain("중첩당 고정 피해 10."));
+                if (level > 0) Assert.That(text, Does.Not.Contain("고정 데미지 100을"));
+            }
+            var resourceSpell = new ScriptedSpellCardDefinition("PowerBank", "Power Bank", new ResourceSet(), "power_bank");
+            Assert.That(CardStatDisplay.GetEffectText(resourceSpell, "고정 데미지 100을 입힌다.", 13),
+                Is.EqualTo("고정 데미지 100을 입힌다."), "Only Nuclear uses the immediate-hit description projection.");
+        }
+
+        [TestCase("전력 -2", "전력 소모:2")]
+        [TestCase("전력-2", "전력 소모:2")]
+        [TestCase("전력소모: 2", "전력 소모:2")]
+        [TestCase("전력 소모: 2", "전력 소모:2")]
+        [TestCase("전력 -20", "전력 소모:2")]
+        [TestCase("비행\n전력 -2\n복제", "비행\n전력 소모:2\n복제")]
+        [TestCase("4연타, 전력 -2", "4연타, 전력 소모:2")]
+        public void PowerConsumer_RemoteLegacyLabelsUseTypedAmountWithoutChangingOtherEffects(string text, string expected)
+        {
+            var unit = new UnitCardDefinition("power-consumer", "Power consumer", new ResourceSet(),
+                AttackType.Melee, 10, 20, true, true, 2);
+            Assert.That(CardStatDisplay.GetEffectText(unit, text, 13), Is.EqualTo(expected));
+            Assert.That(unit.SciencePowerUpkeep, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void BuildingPowerConsumer_RemoteLegacyLabelUsesTypedAmount()
+        {
+            var building = new BuildingCardDefinition("RobotFactory", "Robot factory", new ResourceSet(),
+                false, 0, 10, sciencePowerUpkeep: 1);
+            Assert.That(CardStatDisplay.GetEffectText(building, "전력 -1", 13), Is.EqualTo("전력 소모:1"));
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase("내 턴 시작 시 전력 -2 비용을 지불한다.")]
+        [TestCase("속공")]
+        public void PowerConsumer_OrdinaryEffectSentencesAndEmptyTextAreUnchanged(string text)
+        {
+            var unit = new UnitCardDefinition("power-consumer", "Power consumer", new ResourceSet(),
+                AttackType.Melee, 10, 20, true, true, 2);
+            Assert.That(CardStatDisplay.GetEffectText(unit, text, 13), Is.EqualTo(text));
+        }
+
+        [Test]
+        public void RobotFusion_RemoteLegacyReferenceUsesNewNameOnly()
+        {
+            var definition = new ScriptedSpellCardDefinition(RobotFusionRules.CardId, "로봇 합체",
+                new ResourceSet(), RobotFusionRules.EffectId);
+            Assert.That(CardStatDisplay.GetEffectText(definition, "전력 유지비가 가장 높은 로봇이 남는다.", 0),
+                Is.EqualTo("전력 소모가 가장 높은 로봇이 남는다."));
+        }
+
+        [Test]
+        public void SpellPowerCostAndOrdinaryUnitWithoutPowerConsumptionAreUnchanged()
+        {
+            const string text = "전력 -2";
+            var spell = new ScriptedSpellCardDefinition("PowerBank", "PowerBank", new ResourceSet(), "power_bank");
+            var unit = new UnitCardDefinition("unit", "Unit", new ResourceSet(),
+                AttackType.Melee, 10, 20, true, false, 0);
+            Assert.That(CardStatDisplay.GetEffectText(spell, text, 0), Is.EqualTo(text));
+            Assert.That(CardStatDisplay.GetEffectText(unit, text, 0), Is.EqualTo(text));
+        }
+        [Test]
         public void UnitsAndBuildings_KeepExistingStatsAndHp()
         {
             var unit = new UnitCardDefinition("unit", "Unit", new ResourceSet(),

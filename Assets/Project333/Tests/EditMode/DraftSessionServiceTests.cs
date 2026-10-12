@@ -9,6 +9,26 @@ namespace Project333.Tests.EditMode
 {
     public sealed class DraftSessionServiceTests
     {
+        [Test]
+        public void CurrentCatalog_NuclearCanBePickedFromLegendaryOpeningAndStaysOutOfLaterOffers()
+        {
+            var catalog = UnityEditor.AssetDatabase.LoadAssetAtPath<CardDefinitionCatalogAsset>(
+                "Assets/Project333/ScriptableObjects/StarterTen/StarterTenCardCatalog.asset");
+            var found = false;
+            for (var seed = 0; seed < 64 && !found; seed++)
+            {
+                var service = new DraftSessionService(catalog, new System.Random(seed));
+                var opening = service.BeginDraft();
+                if (!opening.CandidateCards.Any(card => card.CardId == NuclearRules.CardId)) continue;
+                var next = service.SelectCard(NuclearRules.CardId);
+                Assert.That(service.DeckState.CardIds.Single(), Is.EqualTo(NuclearRules.CardId));
+                Assert.That(next.NextOffer.CandidateCards.All(card => card.Rarity != CardRarity.Legendary), Is.True);
+                Assert.That(next.NextOffer.CandidateCards.Any(card => card.CardId == NuclearRules.CardId), Is.False);
+                found = true;
+            }
+            Assert.That(found, Is.True, "The actual registered catalog never offered Nuclear in the opening pick.");
+        }
+
         [TestCase(false)]
         [TestCase(true)]
         public void RarityRoll_UsesExactSlotWeightsAndRenormalizesUnavailableRarities(bool excludeUnique)

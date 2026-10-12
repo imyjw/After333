@@ -24,7 +24,8 @@ namespace Project333.Runtime.Application.Services
         private const double ScoreTieEpsilon = 0.0001;
         private readonly AiActionGenerator _generator;
         private readonly AiBattleSimulation _simulation;
-        private readonly AiPositionEvaluator _evaluator = new AiPositionEvaluator();
+        private readonly AiPositionEvaluator _evaluator;
+        private readonly AiProducerProtectionPolicy _protectionPolicy;
         private readonly AiSearchOptions _options;
         private readonly HashSet<string> _visited = new HashSet<string>();
         private int _turn = -1;
@@ -49,7 +50,9 @@ namespace Project333.Runtime.Application.Services
                 options.MaxSimulations < 4 || options.MaxMilliseconds < 1) throw new ArgumentOutOfRangeException(nameof(options));
             _options = new AiSearchOptions { MaxDepth = options.MaxDepth, BeamWidth = Math.Min(12, options.BeamWidth),
                 MaxSimulations = options.MaxSimulations, MaxMilliseconds = options.MaxMilliseconds };
-            _generator = new AiActionGenerator(provider, targeting);
+            _protectionPolicy = new AiProducerProtectionPolicy(provider);
+            _evaluator = new AiPositionEvaluator(_protectionPolicy);
+            _generator = new AiActionGenerator(provider, targeting, _protectionPolicy);
             _simulation = new AiBattleSimulation(provider, levels ?? ZeroCardUpgradeLevelProvider.Instance);
         }
 
@@ -68,7 +71,8 @@ namespace Project333.Runtime.Application.Services
                 if (++_decisions >= 64 || _turnSearchMilliseconds >= 500) return new EndTurnCommand();
                 var observation = AiBattleStateCopy.Create(battleState, true);
                 _visited.Add(AiBattleStateCopy.PositionKey(observation));
-                var root = new Node { States = new[] { observation, observation }, Depth = 0 };
+                var root = new Node { States = new[] { observation, observation }, Depth = 0,
+                    MasterExposureHp = observation.AI.Master.CurrentHp };
                 var end = new AiAction(-1, new EndTurnCommand());
                 var best = Expand(root, end, watch);
                 if (best == null) return new EndTurnCommand();
@@ -76,7 +80,7 @@ namespace Project333.Runtime.Application.Services
                 for (var depth = 1; depth <= _options.MaxDepth && frontier.Count > 0; depth++)
                 {
                     var next = new List<Node>();
-                    var seen = new HashSet<string>();
+                    var seen = new Dictionary<string, Node>();
                     var fraction = depth == _options.MaxDepth ? 1.0 : depth == 1 ? 0.5 : 0.8;
                     foreach (var parent in frontier)
                     {
@@ -89,7 +93,13 @@ namespace Project333.Runtime.Application.Services
                             var node = Expand(parent, action, watch);
                             if (node == null) continue;
                             var key = AiBattleStateCopy.PositionKey(node.States[0]) + "|" + AiBattleStateCopy.PositionKey(node.States[1]);
-                            if (!seen.Add(key) || _visited.Contains(AiBattleStateCopy.PositionKey(node.States[0]))) continue;
+                            if (_visited.Contains(AiBattleStateCopy.PositionKey(node.States[0]))) continue;
+                            if (seen.TryGetValue(key, out var previous))
+                            {
+                                if (!IsPreferred(node, previous)) continue;
+                                next.Remove(previous);
+                            }
+                            seen[key] = node;
                             if (IsPreferred(node, best)) best = node;
                             if (!node.States[0].IsEnded && node.States[0].ActivePlayerId == PlayerId.AI) next.Add(node);
                         }
@@ -120,7 +130,10 @@ namespace Project333.Runtime.Application.Services
         {
             var node = new Node { First = parent.First ?? action.Commands[0], States = new BattleState[2],
                 Depth = parent.Depth + action.Commands.Length, Cost = parent.Cost + action.Commands.Length * 0.25,
-                Focus = parent.Focus };
+                Focus = parent.Focus, ProtectionFocus = parent.ProtectionFocus, MasterExposureHp = parent.MasterExposureHp };
+            if (parent.First == null && action.Commands[0] is MoveOccupantCommand firstMove)
+                node.ProtectionFocus = _protectionPolicy.CreateFocus(parent.States[0], firstMove);
+            var protectionFocusIsValid = node.ProtectionFocus != null;
             var firstFocus = parent.First == null ? CreateAttackFocus(parent.States[0], action.Commands[0]) : null;
             var focusIsValid = firstFocus != null;
             double total = 0, worst = double.MaxValue;
@@ -130,7 +143,7 @@ namespace Project333.Runtime.Application.Services
                 var escapeOnly = false;
                 if (action.Commands[0] is MoveOccupantCommand move)
                 {
-                    movementScore = AiMovementPolicy.Score(parent.States[sample], move);
+                    movementScore = AiMovementPolicy.ScoreUsingCardCosts(parent.States[sample], move, _protectionPolicy);
                     escapeOnly = movementScore <= 0;
                     if (escapeOnly && !AiMovementPolicy.IsHazardEscapeCandidate(parent.States[sample], move)) return null;
                 }
@@ -139,6 +152,12 @@ namespace Project333.Runtime.Application.Services
                 var after = _simulation.Apply(parent.States[sample], action, sample);
                 if (after == null) return null;
                 node.States[sample] = after;
+                node.ActionPreferenceScores[sample] = parent.ActionPreferenceScores[sample] +
+                    _evaluator.EvaluateProducerAttack(parent.States[sample], after, action.Commands[0]);
+                node.EnemyMasterHpScores[sample] = parent.EnemyMasterHpScores[sample] +
+                    _evaluator.EvaluateEnemyMasterHpChange(parent.States[sample].Player.Master.CurrentHp, after.Player.Master.CurrentHp);
+                node.OwnMasterHpScores[sample] = parent.OwnMasterHpScores[sample] +
+                    _evaluator.EvaluateOwnMasterHpChange(parent.States[sample].AI.Master.CurrentHp, after.AI.Master.CurrentHp);
                 if (firstFocus != null)
                 {
                     var targetAfter = after.PlayerBoard.GetOccupant(firstFocus.Target);
@@ -174,26 +193,47 @@ namespace Project333.Runtime.Application.Services
                 var score = after.IsEnded ? _evaluator.Evaluate(after) :
                     projected.IsEnded ? _evaluator.Evaluate(projected) * 0.9 :
                     survivalForecast == null
-                        ? _evaluator.EvaluateBeforeTurnStart(immediate, projected) * 0.25 + _evaluator.Evaluate(projected) * 0.75
+                        ? _evaluator.EvaluateBeforeTurnStartForPlanning(immediate, projected, node.MasterExposureHp) * 0.25 +
+                          _evaluator.EvaluateForPlanning(projected, node.MasterExposureHp) * 0.75
                         // Remove doomed future material from both terms, without treating a hypothetical
                         // opponent pass (or its terminal result) as a guaranteed attack or victory.
-                        : _evaluator.EvaluateWithSurvivalForecast(immediate, projected, survivalForecast.AIBoard) * 0.25 +
-                          _evaluator.EvaluateWithSurvivalForecast(projected, projected, survivalForecast.AIBoard) * 0.75;
+                        : _evaluator.EvaluateWithSurvivalForecastForPlanning(immediate, projected,
+                            survivalForecast.AIBoard, node.MasterExposureHp) * 0.25 +
+                          _evaluator.EvaluateWithSurvivalForecastForPlanning(projected, projected,
+                            survivalForecast.AIBoard, node.MasterExposureHp) * 0.75;
                 if (!after.IsEnded && !projected.IsEnded)
                 {
                     if (action.Commands[0] is MoveOccupantCommand protectionMove)
                     {
                         movementScore = survivalForecast == null
-                            ? AiMovementPolicy.ScoreBeforeTurnStart(parent.States[sample], protectionMove, projected)
-                            : AiMovementPolicy.ScoreWithSurvivalForecast(parent.States[sample], protectionMove,
-                                projected, survivalForecast.AIBoard);
+                            ? AiMovementPolicy.ScoreForPlanningBeforeTurnStart(parent.States[sample], protectionMove, projected, _protectionPolicy)
+                            : AiMovementPolicy.ScoreForPlanningWithSurvivalForecast(parent.States[sample], protectionMove,
+                                projected, survivalForecast.AIBoard, _protectionPolicy);
                         // Escape has no flat bonus: keep movement/cover costs and compare resolved board value.
-                        if (!escapeOnly) movementScore = Math.Max(0, movementScore);
+                        // Known-producer cover is already in state value; retain its -4 move cost.
+                        if (!escapeOnly && _protectionPolicy.CreateFocus(parent.States[sample], protectionMove) == null)
+                            movementScore = Math.Max(0, movementScore);
                     }
-                    score += movementScore;
+                    // Only actual path changes are carried to children. A projected end turn
+                    // must not be credited repeatedly at every search depth.
+                    var immediateMasterScore = action.Commands[0] is EndTurnCommand
+                        ? parent.EnemyMasterHpScores[sample] : node.EnemyMasterHpScores[sample];
+                    var projectedMasterScore = node.EnemyMasterHpScores[sample] +
+                        _evaluator.EvaluateEnemyMasterHpChange(after.Player.Master.CurrentHp, projected.Player.Master.CurrentHp);
+                    var immediateOwnMasterScore = action.Commands[0] is EndTurnCommand
+                        ? parent.OwnMasterHpScores[sample] : node.OwnMasterHpScores[sample];
+                    var projectedOwnMasterScore = node.OwnMasterHpScores[sample] +
+                        _evaluator.EvaluateOwnMasterHpChange(after.AI.Master.CurrentHp, projected.AI.Master.CurrentHp);
+                    score += (immediateMasterScore + immediateOwnMasterScore) * 0.25 +
+                        (projectedMasterScore + projectedOwnMasterScore) * 0.75;
+                    score += movementScore + node.ActionPreferenceScores[sample];
                 }
+                if (node.ProtectionFocus != null)
+                    protectionFocusIsValid &= AiProducerProtectionPolicy.IsValidFocus(node.ProtectionFocus,
+                        projected.AIBoard, survivalForecast?.AIBoard);
                 if (after.IsEnded || projected.IsEnded)
                 {
+                    protectionFocusIsValid = false;
                     focusIsValid = false;
                     node.Focus = null;
                 }
@@ -201,6 +241,7 @@ namespace Project333.Runtime.Application.Services
                 worst = Math.Min(worst, score);
             }
             if (parent.First == null) node.Focus = focusIsValid ? firstFocus : null;
+            if (!protectionFocusIsValid) node.ProtectionFocus = null;
             // Do not choose an optimistic random outcome and present it as a guaranteed kill.
             node.Score = total * 0.375 + worst * 0.25 - node.Cost;
             return node;
@@ -209,6 +250,13 @@ namespace Project333.Runtime.Application.Services
         {
             if (candidate.Score > incumbent.Score + ScoreTieEpsilon) return true;
             if (Math.Abs(candidate.Score - incumbent.Score) > ScoreTieEpsilon) return false;
+            var protection = candidate.ProtectionFocus;
+            var priorProtection = incumbent.ProtectionFocus;
+            if (protection != null && priorProtection != null)
+            {
+                if (protection.Cost != priorProtection.Cost) return protection.Cost > priorProtection.Cost;
+                if (protection.GuardHp != priorProtection.GuardHp) return protection.GuardHp > priorProtection.GuardHp;
+            }
             var focus = candidate.Focus;
             var previous = incumbent.Focus;
             return focus != null && previous != null && focus.Attacker.Equals(previous.Attacker) &&
@@ -277,11 +325,16 @@ namespace Project333.Runtime.Application.Services
         private sealed class Node
         {
             public BattleState[] States = Array.Empty<BattleState>();
+            public double[] ActionPreferenceScores = new double[2];
+            public double[] EnemyMasterHpScores = new double[2];
+            public double[] OwnMasterHpScores = new double[2];
+            public int MasterExposureHp;
             public IBattleCommand? First;
             public int Depth;
             public double Cost;
             public double Score;
             public AttackFocus? Focus;
+            public AiProducerProtectionFocus? ProtectionFocus;
         }
     }
 }

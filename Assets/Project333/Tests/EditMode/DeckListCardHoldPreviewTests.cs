@@ -87,6 +87,36 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
+        public void CardBounds_IdentifyTheDisplayedGroupedRowAndAllWrappedLines()
+        {
+            AddCard("long", "Bravo Charlie Delta Echo Foxtrot Golf Hotel India Juliet Kilo Lima", 5);
+            _text.rectTransform.sizeDelta = new Vector2(135, 2000);
+            Configure(new[] { "cheap", "long", "long" }, summary: true);
+            Assert.That(Relay.TryGetCardLocalBounds("long", out var bounds), Is.True);
+            Assert.That(bounds.Contains(LocalPointForText("Bravo")), Is.True);
+            Assert.That(bounds.Contains(LocalPointForText("Hotel")), Is.True);
+            Assert.That(bounds.Contains(LocalPointForText("Lima")), Is.True);
+            Assert.That(bounds.Contains(LocalPointForText("Alpha")), Is.False);
+            Assert.That(bounds.Contains(LocalPointForText("CARD LIST")), Is.False);
+            Assert.That(bounds.height, Is.GreaterThan(_text.fontSize * 3));
+        }
+
+        [Test]
+        public void CardBounds_RejectMissingAndStaleEntriesWithoutChangingAnActiveHold()
+        {
+            Configure(new[] { "cheap" });
+            Relay.OnPointerDown(Pointer(PointForText("Alpha")));
+            Assert.That(Relay.TryGetCardLocalBounds("cheap", out _), Is.True);
+            Assert.That(HeldCard(), Is.EqualTo("cheap"));
+            Assert.That(Relay.TryGetCardLocalBounds("missing", out _), Is.False);
+            Assert.That(Relay.TryGetCardLocalBounds(null, out _), Is.False);
+            _text.text = "Unrelated";
+            Assert.That(Relay.TryGetCardLocalBounds("cheap", out _), Is.False);
+            Configure(Array.Empty<string>());
+            Assert.That(Relay.TryGetCardLocalBounds("cheap", out _), Is.False);
+        }
+
+        [Test]
         public void KoreanCardNames_ResolveWithTheGameFontAndWrappedRows()
         {
             _text.font = UnityEditor.AssetDatabase.LoadAssetAtPath<Font>(
@@ -150,6 +180,58 @@ namespace Project333.Tests.EditMode
             Assert.That(DeckCardPreviewOverlay.IsVisibleFor(Relay), Is.True);
             Relay.OnPointerUp(pointer);
             Assert.That(DeckCardPreviewOverlay.IsVisibleFor(Relay), Is.False);
+        }
+
+        [Test]
+        public void OptionalReleaseCallbackReportsDisplayedGroupedCardAfterClosing()
+        {
+            var released = new List<string>();
+            DeckListCardHoldPreview.Configure(_text, new[] { "cheap", "expensive", "cheap" },
+                id => _cards[id], "Empty", upgradeLevelOverride: 0,
+                previewReleased: id =>
+                {
+                    Assert.That(DeckCardPreviewOverlay.IsVisibleFor(Relay), Is.False);
+                    released.Add(id);
+                });
+            Canvas.ForceUpdateCanvases();
+            var pointer = Pointer(PointForText("Alpha"));
+            pointer.eligibleForClick = true;
+            Relay.OnPointerDown(pointer); Advance(.41f);
+            Assert.That(released, Is.Empty);
+            Relay.OnPointerUp(pointer); Relay.OnPointerUp(pointer);
+            Assert.That(released, Is.EqualTo(new[] { "cheap" }));
+            Assert.That(pointer.eligibleForClick, Is.False);
+        }
+
+        [TestCase("quick")]
+        [TestCase("move")]
+        [TestCase("exit")]
+        [TestCase("drag")]
+        [TestCase("focus")]
+        [TestCase("pause")]
+        [TestCase("hide")]
+        [TestCase("reconfigure")]
+        public void OptionalReleaseCallbackDoesNotReportInterruptedListPreviews(string interruption)
+        {
+            var callbacks = 0;
+            DeckListCardHoldPreview.Configure(_text, new[] { "cheap" }, id => _cards[id], "Empty",
+                upgradeLevelOverride: 0, previewReleased: _ => callbacks++);
+            Canvas.ForceUpdateCanvases();
+            var pointer = Pointer(PointForText("Alpha"));
+            Relay.OnPointerDown(pointer);
+            if (interruption != "quick") Advance(.41f);
+            switch (interruption)
+            {
+                case "move": pointer.position += Vector2.right * 100; Relay.OnPointerMove(pointer); break;
+                case "exit": Relay.OnPointerExit(pointer); break;
+                case "drag": Relay.OnBeginDrag(pointer); break;
+                case "focus": Invoke("OnApplicationFocus", false); break;
+                case "pause": Invoke("OnApplicationPause", true); break;
+                case "hide": Relay.HidePreview(); break;
+                case "reconfigure": Configure(new[] { "expensive" }); break;
+            }
+            Relay.OnPointerUp(pointer);
+            Assert.That(callbacks, Is.Zero);
         }
 
         [TestCase("exit")]
@@ -324,6 +406,110 @@ namespace Project333.Tests.EditMode
             return scroll;
         }
 
+        [TestCase(160f)]
+        [TestCase(280f)]
+        [TestCase(700f)]
+        public void NameCostColumns_ShowOnlyGroupedNamesAndRightAlignedCosts(float width)
+        {
+            _text.rectTransform.sizeDelta = new Vector2(width, 2000);
+            ConfigureColumns(new[] { "cheap", "expensive", "cheap" });
+            var labels = _text.GetComponentsInChildren<Text>();
+            Assert.That(Array.ConvertAll(labels, t => t.text), Is.EquivalentTo(new[]
+                { "", "- 1x Zulu", "9M", "- 2x Alpha", "1M" }));
+            foreach (var label in labels)
+            {
+                if (label.name != "CardCost") continue;
+                Assert.That(label.alignment, Is.EqualTo(TextAnchor.UpperRight));
+                var rect = label.rectTransform;
+                Assert.That(rect.anchoredPosition.x + rect.rect.width, Is.EqualTo(width).Within(.01f));
+                var pointer = Pointer(ScreenPoint(label, rect.rect.center));
+                Relay.OnPointerDown(pointer);
+                Assert.That(HeldCard(), Is.EqualTo(label.text == "9M" ? "expensive" : "cheap"));
+                Advance(.41f);
+                Assert.That(DeckCardPreviewOverlay.IsVisibleFor(Relay), Is.True);
+                Relay.OnPointerUp(pointer);
+                Assert.That(DeckCardPreviewOverlay.IsVisibleFor(Relay), Is.False);
+            }
+        }
+
+        [Test]
+        public void NameCostColumns_WrappedNamesHaveEnoughHeightAndDoNotOverlapCostColumn()
+        {
+            AddCard("long", "Bravo Charlie Delta Echo Foxtrot Golf Hotel India Juliet Kilo Lima", 5);
+            _text.rectTransform.sizeDelta = new Vector2(230, 2000);
+            ConfigureColumns(new[] { "cheap", "long" });
+            var view = _text.GetComponent<DeckListColumnsView>();
+            Assert.That(Relay.TryGetCardLocalBounds("long", out var bounds), Is.True);
+            Assert.That(bounds.height, Is.GreaterThan(_text.fontSize * 3));
+            Assert.That(Relay.TryGetCardLocalBounds("cheap", out var cheapBounds), Is.True);
+            Assert.That(cheapBounds.yMax, Is.LessThan(bounds.yMin));
+            var row = _text.transform.GetChild(0);
+            var name = row.Find("CardName").GetComponent<Text>();
+            var cost = row.Find("CardCost").GetComponent<Text>();
+            Assert.That(name.rectTransform.rect.width, Is.LessThan(cost.rectTransform.anchoredPosition.x));
+            Assert.That(view.ContentHeight, Is.GreaterThan(bounds.height + cheapBounds.height));
+            // A width change reflows rows and preserves the cost's right edge.
+            _text.rectTransform.sizeDelta = new Vector2(500, 2000);
+            view.RefreshLayout();
+            Assert.That(Relay.TryGetCardLocalBounds("long", out var wideBounds), Is.True);
+            Assert.That(wideBounds.height, Is.LessThan(bounds.height));
+            Assert.That(cost.rectTransform.anchoredPosition.x + cost.rectTransform.rect.width,
+                Is.EqualTo(500).Within(.01f));
+        }
+
+        [Test]
+        public void NameCostColumns_RefreshKeepsHoldAndSwitchToEmptyRemovesRows()
+        {
+            ConfigureColumns(new[] { "cheap" });
+            Relay.TryGetCardLocalBounds("cheap", out var bounds);
+            var pointer = Pointer(ScreenPoint(_text, bounds.center));
+            Relay.OnPointerDown(pointer);
+            Advance(.41f);
+            ConfigureColumns(new[] { "cheap" });
+            Assert.That(DeckCardPreviewOverlay.IsVisibleFor(Relay), Is.True);
+            ConfigureColumns(Array.Empty<string>());
+            Assert.That(_text.text, Is.EqualTo("Empty"));
+            Assert.That(_text.transform.childCount, Is.Zero);
+            Assert.That(DeckCardPreviewOverlay.IsVisibleFor(Relay), Is.False);
+            Assert.That(Relay.TryGetCardLocalBounds("cheap", out _), Is.False);
+        }
+
+        [Test]
+        public void NameCostColumns_CostFormattingIncludesMixedResourcesAndFree()
+        {
+            _cards["cheap"].ConfigureBaseForTests("cheap", "Alpha", new ResourceSetData(0, 3, 0, 1));
+            _cards["expensive"].ConfigureBaseForTests("expensive", "Zulu", default);
+            ConfigureColumns(new[] { "cheap", "expensive" });
+            var labels = _text.GetComponentsInChildren<Text>();
+            Assert.That(Array.ConvertAll(labels, t => t.text), Does.Contain("3Q 1G"));
+            Assert.That(Array.ConvertAll(labels, t => t.text), Does.Contain("Free"));
+        }
+
+        [Test]
+        public void NameCostColumns_ClippedRowsCannotStartHoldAndWheelStillScrolls()
+        {
+            var scroll = CreateScrollView();
+            var ids = new List<string>();
+            for (var i = 0; i < 20; i++) { AddCard("row" + i, "Row " + i, i); ids.Add("row" + i); }
+            ConfigureColumns(ids);
+            Relay.TryGetCardLocalBounds("row0", out var hidden);
+            Relay.OnPointerDown(Pointer(ScreenPoint(_text, hidden.center)));
+            Assert.That(HeldCard(), Is.Null);
+            var pointer = Pointer(Vector2.zero);
+            pointer.scrollDelta = Vector2.down;
+            Relay.OnScroll(pointer);
+            Assert.That(scroll.content.anchoredPosition.y, Is.GreaterThan(0));
+        }
+
+        private void ConfigureColumns(IReadOnlyList<string> ids)
+        {
+            DeckListCardHoldPreview.Configure(_text, ids, id => _cards[id], "Empty", namesAndCostsOnly: true);
+            Canvas.ForceUpdateCanvases();
+        }
+
+        private static Vector2 ScreenPoint(Text text, Vector2 local) =>
+            RectTransformUtility.WorldToScreenPoint(null, text.rectTransform.TransformPoint(local));
+
         private void AddCard(string id, string displayName, int cost)
         {
             var card = ScriptableObject.CreateInstance<UnitCardDefinitionAsset>();
@@ -362,6 +548,13 @@ namespace Project333.Tests.EditMode
             var local = new Vector2(character.cursorPos.x + character.charWidth * 0.5f,
                 line.topY - line.height * 0.5f) / _text.pixelsPerUnit;
             return RectTransformUtility.WorldToScreenPoint(null, _text.rectTransform.TransformPoint(local));
+        }
+
+        private Vector2 LocalPointForText(string word)
+        {
+            Assert.That(RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                _text.rectTransform, PointForText(word), null, out var local), Is.True);
+            return local;
         }
 
         private PointerEventData Pointer(Vector2 position, int id = -1) => new PointerEventData(_events.GetComponent<EventSystem>())

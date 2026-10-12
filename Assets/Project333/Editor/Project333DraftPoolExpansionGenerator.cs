@@ -43,7 +43,7 @@ namespace Project333.Editor
         private static UnitCardDefinitionAsset CreateBlueDragon()
         {
             var asset = LoadOrCreate<UnitCardDefinitionAsset>($"{CardsRoot}/BlueDragon.asset");
-            asset.ConfigureBaseForTests("BlueDragon", "블루 드래곤", new ResourceSetData(8, 0, 0, 0));
+            asset.ConfigureBaseForTests("BlueDragon", "블루 드래곤", new ResourceSetData(9, 0, 0, 0));
             asset.ConfigureMetadataForTests(
                 CardRarity.Legendary,
                 CardAffiliation.Fantasy,
@@ -68,24 +68,26 @@ namespace Project333.Editor
         private static UnitCardDefinitionAsset CreateRedDragon()
         {
             var asset = LoadOrCreate<UnitCardDefinitionAsset>($"{CardsRoot}/RedDragon.asset");
-            asset.ConfigureBaseForTests("RedDragon", "레드 드래곤", new ResourceSetData(9, 0, 0, 0));
+            asset.ConfigureBaseForTests("RedDragon", "레드 드래곤", new ResourceSetData(10, 0, 0, 0));
             asset.ConfigureMetadataForTests(
                 CardRarity.Legendary,
                 CardAffiliation.Fantasy,
                 ChargeTileFootprint.OneByOne,
-                "내 턴 종료 시 상대방 타일 전체에 33 마법 피해",
+                "내 턴 종료 시 상대방 타일 전체에 20 마법 피해",
                 "비행");
             asset.ConfigureForTests(
                 attackType: AttackType.Melee,
                 attack: 50,
-                health: 50,
+                health: 40,
                 canMove: true,
                 isScience: false,
                 sciencePowerUpkeep: 0,
                 turnStartResourceGain: new ResourceSetData(0, 0, 0, 0),
                 maxAttacksPerTurn: 1,
                 canAttackOnSummon: false,
-                hasFlying: true);
+                hasFlying: true,
+                damageType: DamageType.Magic,
+                races: new[] { UnitRace.Dragon });
             EditorUtility.SetDirty(asset);
             return asset;
         }
@@ -93,7 +95,7 @@ namespace Project333.Editor
         private static UnitCardDefinitionAsset CreateGoblin()
         {
             var asset = LoadOrCreate<UnitCardDefinitionAsset>($"{CardsRoot}/Goblin.asset");
-            asset.ConfigureBaseForTests("Goblin", "고블린", new ResourceSetData(1, 0, 0, 0));
+            asset.ConfigureBaseForTests("Goblin", "고블린", new ResourceSetData(2, 0, 0, 0));
             asset.ConfigureMetadataForTests(
                 CardRarity.Common,
                 CardAffiliation.Fantasy,
@@ -102,14 +104,15 @@ namespace Project333.Editor
                 string.Empty);
             asset.ConfigureForTests(
                 attackType: AttackType.Melee,
-                attack: 10,
-                health: 10,
+                attack: 20,
+                health: 20,
                 canMove: true,
                 isScience: false,
                 sciencePowerUpkeep: 0,
                 turnStartResourceGain: new ResourceSetData(0, 0, 0, 0),
                 maxAttacksPerTurn: 1,
-                canAttackOnSummon: false);
+                canAttackOnSummon: false,
+                races: new[] { UnitRace.Goblin });
             EditorUtility.SetDirty(asset);
             return asset;
         }

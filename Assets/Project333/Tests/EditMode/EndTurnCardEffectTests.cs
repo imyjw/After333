@@ -74,12 +74,12 @@ namespace Project333.Tests.EditMode
             battleState.PlayerBoard.Place(new TileCoord(0, 0), redDragon);
             battleState.AIBoard.Place(new TileCoord(0, 0), frontEnemy);
             battleState.AIBoard.Place(new TileCoord(0, 1), backEnemy);
-            battleState.AI.Master.CurrentHp = 30;
+            battleState.AI.Master.CurrentHp = 20;
 
             service.EndTurn(battleState);
 
-            Assert.That(frontEnemy.CurrentHp, Is.EqualTo(67));
-            Assert.That(backEnemy.CurrentHp, Is.EqualTo(67));
+            Assert.That(frontEnemy.CurrentHp, Is.EqualTo(80));
+            Assert.That(backEnemy.CurrentHp, Is.EqualTo(80));
             Assert.That(battleState.AI.Master.CurrentHp, Is.LessThanOrEqualTo(0));
             Assert.That(battleState.IsEnded, Is.True);
             Assert.That(battleState.Result.Winner, Is.EqualTo(PlayerId.Player));

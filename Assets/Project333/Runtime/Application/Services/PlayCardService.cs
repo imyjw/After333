@@ -13,6 +13,7 @@ namespace Project333.Runtime.Application.Services
         private readonly ICardUpgradeLevelProvider _cardUpgradeLevelProvider;
 
         internal ICardDefinitionProvider CardDefinitionProvider => _cardDefinitionProvider;
+        internal ICardUpgradeLevelProvider CardUpgradeLevelProvider => _cardUpgradeLevelProvider;
 
         public PlayCardService(ICardDefinitionProvider cardDefinitionProvider)
             : this(cardDefinitionProvider, new SummonService(), ZeroCardUpgradeLevelProvider.Instance)
@@ -71,6 +72,7 @@ namespace Project333.Runtime.Application.Services
             TileCoord targetCoord,
             string handCardRuntimeId)
         {
+            battleState.ClearSummonedOccupant();
             var playerState = battleState.GetPlayer(playerId);
             EnsureCardCanBeAfforded(playerState, definition);
             EnsureSummonTargetIsValid(battleState, playerId, targetCoord);
@@ -129,6 +131,9 @@ namespace Project333.Runtime.Application.Services
                 battleState.TurnNumber,
                 battleState.ActivePlayerId);
 
+            battleState.RecordSummonedOccupant(unit);
+            TrapService.TryResolveAcceptedUnitSummon(battleState, unit);
+
             return unit;
         }
 
@@ -139,6 +144,7 @@ namespace Project333.Runtime.Application.Services
             TileCoord targetCoord,
             string handCardRuntimeId)
         {
+            battleState.ClearSummonedOccupant();
             var playerState = battleState.GetPlayer(playerId);
             EnsureCardCanBeAfforded(playerState, definition);
             EnsureSummonTargetIsValid(battleState, playerId, targetCoord);
@@ -207,24 +213,25 @@ namespace Project333.Runtime.Application.Services
 
             if (battleState.Phase != PhaseType.Main)
             {
-                throw new InvalidOperationException("Cards can only be played during the main phase.");
+                throw new InvalidOperationException("자신의 행동 턴에만 행동할 수 있습니다.");
             }
 
             if (battleState.ActivePlayerId != playerId)
             {
-                throw new InvalidOperationException("Only the active player can play cards.");
+                throw new InvalidOperationException("자신의 턴에만 행동할 수 있습니다.");
             }
 
+            battleState.ClearSummonedOccupant();
             var playerState = battleState.GetPlayer(playerId);
             if (!playerState.Hand.Contains(cardId, handCardRuntimeId))
             {
-                throw new InvalidOperationException("The specified card is not in the player's hand.");
+                throw new InvalidOperationException("해당 카드가 핸드에 없습니다.");
             }
 
             var board = battleState.GetBoard(playerId);
             if (!board.IsInside(targetCoord))
             {
-                throw new InvalidOperationException("Cannot play a card outside the board.");
+                throw new InvalidOperationException("해당 위치에 카드를 사용할 수 없습니다.");
             }
         }
 
@@ -232,7 +239,7 @@ namespace Project333.Runtime.Application.Services
         {
             if (!playerState.Resources.CanAfford(definition.Cost))
             {
-                throw new InvalidOperationException("The player cannot afford this card.");
+                throw new InvalidOperationException("자원이 부족합니다.");
             }
         }
 
@@ -241,7 +248,7 @@ namespace Project333.Runtime.Application.Services
             var board = battleState.GetBoard(playerId);
             if (!board.IsEmpty(targetCoord))
             {
-                throw new InvalidOperationException("Cannot summon onto an occupied tile.");
+                throw new InvalidOperationException("해당 타일에는 소환물이 이미 존재합니다.");
             }
         }
 

@@ -241,11 +241,19 @@ if ($null -ne $serverStatus) {
         Add-SmokeFailure $failures "PvP block is missing from /server/status."
     }
     else {
-        if ($serverStatus.PvP.ReconnectGraceSeconds -ne 60) {
-            Add-SmokeFailure $failures "PvP.ReconnectGraceSeconds=$($serverStatus.PvP.ReconnectGraceSeconds), expected 60."
+        if ($serverStatus.PvP.ReconnectGraceSeconds -ne 70) {
+            Add-SmokeFailure $failures "PvP.ReconnectGraceSeconds=$($serverStatus.PvP.ReconnectGraceSeconds), expected 70."
         }
 
-        Write-Host "[public-smoke] pvp reconnectGrace=$($serverStatus.PvP.ReconnectGraceSeconds) startupRecovery=$($serverStatus.PvP.StartupRecoveryEnabled) verboseTransport=$($serverStatus.PvP.VerboseTransportLogsEnabled)"
+        if ($serverStatus.PvP.StartupRecoveryEnabled -ne $false) {
+            Add-SmokeFailure $failures "PvP.StartupRecoveryEnabled=$($serverStatus.PvP.StartupRecoveryEnabled), expected false."
+        }
+
+        if ($serverStatus.PvP.InterruptedBattlePolicy -ne 'cancel_without_result') {
+            Add-SmokeFailure $failures "PvP.InterruptedBattlePolicy=$($serverStatus.PvP.InterruptedBattlePolicy), expected cancel_without_result."
+        }
+
+        Write-Host "[public-smoke] pvp reconnectGrace=$($serverStatus.PvP.ReconnectGraceSeconds) startupRecovery=$($serverStatus.PvP.StartupRecoveryEnabled) interruptedBattlePolicy=$($serverStatus.PvP.InterruptedBattlePolicy) verboseTransport=$($serverStatus.PvP.VerboseTransportLogsEnabled)"
     }
 
     if ($null -eq $serverStatus.Audit) {
@@ -369,7 +377,7 @@ Write-Host "  1. Two different accounts can log in."
 Write-Host "  2. Both accounts have a 33-card draft deck."
 Write-Host "  3. PvP matchmaking starts the same battle on both clients."
 Write-Host "  4. Unit play, move, spell, attack, and end turn sync on both clients."
-Write-Host "  5. Reconnect within 60 seconds restores the same battle."
+Write-Host "  5. Reconnect within 70 seconds restores the same battle."
 Write-Host "  6. Reconnect timeout records the correct forfeit result."
 
 if ($failures.Count -gt 0) {

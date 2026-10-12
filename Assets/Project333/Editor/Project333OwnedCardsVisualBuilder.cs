@@ -41,7 +41,12 @@ namespace Project333.Editor
             {
                 if (FindController(scene)?.CollectionVisualVersion >= 1) return;
             }
-            else if (File.ReadAllText(ScenePath).Contains("_collectionVisualVersion: 1")) return;
+            else
+            {
+                var savedVersion = System.Text.RegularExpressions.Regex.Match(
+                    File.ReadAllText(ScenePath), @"(?m)^\s*_collectionVisualVersion:\s*(\d+)\s*$");
+                if (savedVersion.Success && int.TryParse(savedVersion.Groups[1].Value, out var version) && version >= 1) return;
+            }
             ApplyPixelCollectionLayout();
         }
 
@@ -187,6 +192,7 @@ namespace Project333.Editor
                 serialized.FindProperty("_upgradeButtonUnavailableColor").colorValue = Color.white;
                 serialized.FindProperty("_collectionVisualVersion").intValue = 1;
                 serialized.ApplyModifiedPropertiesWithoutUndo();
+                controller.MaterializeOwnedCardsUiForEditor();
                 EditorSceneManager.MarkSceneDirty(scene);
                 if (closeAfter || !wasDirty) EditorSceneManager.SaveScene(scene);
             }

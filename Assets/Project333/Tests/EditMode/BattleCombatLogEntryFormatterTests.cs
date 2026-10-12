@@ -483,6 +483,25 @@ namespace Project333.Tests.EditMode
             Assert.That(roundTripped.StateView.CombatLogEntries[0].TargetCoord.Column, Is.EqualTo(1));
         }
 
+        [TestCase(PlayerId.Player, "플레이어의")]
+        [TestCase(PlayerId.AI, "상대방의")]
+        public void Format_ActiveEffectSurvivesWireRoundTripWithSourceAndResult(PlayerId owner, string prefix)
+        {
+            var original = new BattleCombatLogEntryDto
+            {
+                Sequence = 12,
+                EntryType = BattleCombatLogEntryType.ActiveEffectActivated,
+                SourceOwnerId = owner,
+                SourceCardId = "PowerPlant",
+                SourceCoord = new TileCoordDto { Column = 3, Row = 1 }
+            };
+            var entry = Newtonsoft.Json.JsonConvert.DeserializeObject<BattleCombatLogEntryDto>(
+                Newtonsoft.Json.JsonConvert.SerializeObject(original));
+            Assert.That(BattleCombatLogEntryFormatter.Format(entry, ResolveCardName),
+                Is.EqualTo(prefix + " 발전소(3,1) 액티브 발동: 골드 1 소모, 전력 2 획득"));
+            Assert.That(entry.Sequence, Is.EqualTo(12));
+        }
+
         private static string ResolveCardName(string cardId)
         {
             return cardId switch

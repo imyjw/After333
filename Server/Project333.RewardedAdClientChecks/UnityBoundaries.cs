@@ -13,7 +13,7 @@ namespace UnityEngine
     public static class Debug { public static void Log(object value) { } public static void LogWarning(object value) { } }
     public class MonoBehaviour { protected static void DontDestroyOnLoad(object o){} }
     public class GameObject { public GameObject(string name){} public T AddComponent<T>() where T:new()=>new T(); }
-    public enum RuntimeInitializeLoadType { BeforeSceneLoad }
+    public enum RuntimeInitializeLoadType { BeforeSceneLoad, AfterSceneLoad, SubsystemRegistration }
     public class RuntimeInitializeOnLoadMethodAttribute : Attribute { public RuntimeInitializeOnLoadMethodAttribute(RuntimeInitializeLoadType type){} }
     public static class Time { public static float unscaledTime; }
     public enum NetworkReachability { NotReachable, ReachableViaLocalAreaNetwork }

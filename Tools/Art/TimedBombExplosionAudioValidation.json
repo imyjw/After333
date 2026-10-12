@@ -1,0 +1,43 @@
+{
+  "cue": "TimedBomb quiet dynamite pressure burst and short low body",
+  "source": "Original deterministic DSP; no external recording, third-party sample or model used.",
+  "samples": 42336,
+  "duration_seconds": 0.96,
+  "channels": 1,
+  "sample_rate": 44100,
+  "format": "WAV PCM16",
+  "attack_seconds": 0.016,
+  "release_seconds": 0.12,
+  "peak_dbfs": -14.000100374307355,
+  "rms_dbfs": -32.27736692077025,
+  "dc_average": 6.055075024801587e-08,
+  "clipped_samples": 0,
+  "first_sample": 0,
+  "last_sample": 0,
+  "max_sample_step": 0.017791748046875,
+  "spectral_energy_below_45hz_ratio": 0.0005088820763792381,
+  "spectral_energy_above_4khz_ratio": 4.1934064017555725e-07,
+  "window_seconds": 0.1,
+  "window_rms_dbfs": [
+    -24.44906190966982,
+    -29.151430070913822,
+    -31.868413801573805,
+    -39.26793732313982,
+    -42.358555951193665,
+    -44.87049742152745,
+    -49.53308988538658,
+    -53.57917039007998,
+    -57.72020961689414,
+    -71.67759167571062
+  ],
+  "filters_hz": {
+    "highpass": 60,
+    "lowpass": 1900
+  },
+  "seed": 333093036,
+  "sha256": "c91749acfa0413d2499aa8f532b78bb427fe96c83b3e33fdc91b29ccae729d5d",
+  "file_bytes": 84716,
+  "runtime_one_shot_gain_recommended": 0.3,
+  "passed": true,
+  "validation_limit": "File/waveform metrics only; device/in-game listening and subjective comfort are not claimed."
+}

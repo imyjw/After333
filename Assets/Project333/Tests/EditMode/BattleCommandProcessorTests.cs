@@ -380,7 +380,7 @@ namespace Project333.Tests.EditMode
                     PlayerId.AI,
                     new EndTurnCommand()));
 
-            Assert.That(exception!.Message, Is.EqualTo("Only the active player can execute commands."));
+            Assert.That(exception!.Message, Is.EqualTo("자신의 턴에만 행동할 수 있습니다."));
         }
 
         private static BattleCommandProcessor CreateProcessor(IEnumerable<CardDefinition> definitions)

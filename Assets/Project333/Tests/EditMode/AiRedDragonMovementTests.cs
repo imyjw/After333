@@ -18,14 +18,14 @@ namespace Project333.Tests.EditMode
         {
             var state = State();
             var producer = Unit(state, "producer", new TileCoord(0, 1), 100, producer: true);
-            var guard = Unit(state, "guard", new TileCoord(4, 0), 25);
+            var guard = Unit(state, "guard", new TileCoord(4, 0), 20);
             var move = new MoveOccupantCommand(guard.Position, new TileCoord(0, 0));
             var near = ProjectToEnemyMain(state, move);
             var future = ProjectEnemyTurnEnd(near);
 
             Assert.That(near.AIBoard.GetOccupant(move.To), Is.Not.Null);
             Assert.That(future.AIBoard.GetOccupant(move.To), Is.Null);
-            Assert.That(future.AIBoard.GetOccupant(producer.Position).CurrentHp, Is.EqualTo(67));
+            Assert.That(future.AIBoard.GetOccupant(producer.Position).CurrentHp, Is.EqualTo(80));
             Assert.That(ScoreNear(state, move, near), Is.EqualTo(46));
             Assert.That(ScoreFuture(state, move, near, future), Is.EqualTo(46));
         }
@@ -34,7 +34,7 @@ namespace Project333.Tests.EditMode
         public void SwappedRearProducerKilledAtEnemyTurnEnd_DoesNotEarnFutureProtectionBonus()
         {
             var state = State();
-            var producer = Unit(state, "producer", new TileCoord(0, 0), 25, producer: true);
+            var producer = Unit(state, "producer", new TileCoord(0, 0), 20, producer: true);
             var guard = Unit(state, "guard", new TileCoord(0, 1), 100);
             var move = new MoveOccupantCommand(producer.Position, guard.Position);
             var near = ProjectToEnemyMain(state, move);

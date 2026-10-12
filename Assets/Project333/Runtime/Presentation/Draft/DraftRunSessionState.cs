@@ -326,7 +326,7 @@ namespace Project333.Runtime.Presentation.Draft
         public static void RecordAiChallengeOutcome(bool won, bool draw)
         {
             PendingAiChallengeResultAttemptId = ActiveAiChallengeAttemptId;
-            LastBattleOutcomeText = draw ? "AI 도전 무승부" : won ? "AI 도전 승리" : "AI 도전 패배";
+            LastBattleOutcomeText = draw ? "골드 던전 무승부" : won ? "골드 던전 승리" : "골드 던전 패배";
         }
 
         public static void ApplyAiChallengeReceipt(AiChallengeAttemptResponse receipt)
@@ -334,9 +334,9 @@ namespace Project333.Runtime.Presentation.Draft
             if (receipt == null || !receipt.IsFinished ||
                 receipt.AttemptId != PendingAiChallengeResultAttemptId) return;
             LastBattleOutcomeText = receipt.Status == "completed"
-                ? receipt.Won == true ? $"AI 도전 승리 · 서버 골드 +{Math.Max(0, receipt.RewardGold)}"
-                    : "AI 도전 종료 · 보상 없음"
-                : "AI 도전 취소";
+                ? receipt.Won == true ? $"골드 던전 승리 · 서버 골드 +{Math.Max(0, receipt.RewardGold)}"
+                    : "골드 던전 종료 · 보상 없음"
+                : "골드 던전 취소";
             PendingAiChallengeResultAttemptId = string.Empty;
         }
 

@@ -12,7 +12,7 @@ namespace Project333.Runtime.Application.Services
     public sealed class TurnStartService
     {
         private const int BaseDrawCount = 1;
-        private const int BaseGoldGain = 1;
+        private const int BaseGoldGain = 3;
         private const string CheonraJimangEffectId = "cheonra_jimang";
         private const string FirewallEffectId = "firewall";
 
@@ -65,7 +65,10 @@ namespace Project333.Runtime.Application.Services
 
             battleState.ClearCardGenerationEvents();
             battleState.ClearResourceChangeEvents();
-            battleState.ClearAreaSpellEffectEvents();
+            // The online flow serializes EndTurn and the following TurnStart together.
+            // Preserve its pending Dragon activation until the event exporter consumes it.
+            battleState.AreaSpellEffectEvents.RemoveAll(effect => effect.EffectId != EndTurnService.RedDragonFlamesEffectId);
+            battleState.ClearTimedBombCountdownEvents();
 
             ResolveScriptedTurnStartEffects(battleState);
             if (battleState.IsEnded)
@@ -79,20 +82,22 @@ namespace Project333.Runtime.Application.Services
             GainBaseResources(battleState, activePlayer);
             GainOccupantResources(battleState);
 
+            // Resolve damage and destruction chains before charging any surviving occupant.
+            if (!battleState.IsEnded)
+            {
+                ResolveFallout(battleState);
+                if (!battleState.IsEnded) ResolveAreaDamageEffects(battleState);
+            }
+
             if (!battleState.IsEnded)
             {
                 _scienceUpkeepService.ResolveUpkeep(battleState);
+                OccupantDestructionService.ResolveDefeatedOccupants(battleState);
             }
 
             if (!battleState.IsEnded)
             {
                 _robotFactoryService.Resolve(battleState);
-            }
-
-            if (!battleState.IsEnded)
-            {
-                ResolveFallout(battleState);
-                if (!battleState.IsEnded) ResolveAreaDamageEffects(battleState);
             }
 
             if (!battleState.IsEnded)
@@ -103,15 +108,17 @@ namespace Project333.Runtime.Application.Services
             if (!battleState.IsEnded)
             {
                 ResolveSealboundOwnerTurnStarts(battleState);
-                battleState.SetPhase(PhaseType.Main);
+                OccupantDestructionService.ResolveDefeatedOccupants(battleState);
+                if (!battleState.IsEnded) battleState.SetPhase(PhaseType.Main);
             }
         }
 
         private static void ResolveScriptedTurnStartEffects(BattleState battleState)
         {
             var snapshot = new List<PersistentEffectState>(battleState.PersistentEffects);
-            foreach (var persistentEffect in snapshot)
+            for (var effectIndex = 0; effectIndex < snapshot.Count; effectIndex++)
             {
+                var persistentEffect = snapshot[effectIndex];
                 if (persistentEffect.IsExpired)
                 {
                     continue;
@@ -119,7 +126,7 @@ namespace Project333.Runtime.Application.Services
 
                 if (string.Equals(persistentEffect.EffectId, TimedBombRules.EffectId, StringComparison.Ordinal))
                 {
-                    ResolveTimedBomb(battleState, persistentEffect);
+                    ResolveTimedBomb(battleState, persistentEffect, effectIndex);
                     if (battleState.IsEnded)
                     {
                         return;
@@ -136,7 +143,7 @@ namespace Project333.Runtime.Application.Services
             }
         }
 
-        private static void ResolveTimedBomb(BattleState battleState, PersistentEffectState effect)
+        private static void ResolveTimedBomb(BattleState battleState, PersistentEffectState effect, int effectIndex)
         {
             if (effect.RemainingTriggers <= 0)
             {
@@ -144,9 +151,14 @@ namespace Project333.Runtime.Application.Services
                 return;
             }
 
+            var remainingTriggersBefore = effect.RemainingTriggers;
+            var valuePopupEventIndex = battleState.ValuePopupEvents.Count;
             if (effect.RemainingTriggers > 1)
             {
                 effect.ResolveTrigger();
+                battleState.RecordTimedBombCountdown(new BattleTimedBombCountdownEvent(effectIndex,
+                    effect.SourceCardId, effect.OwnerId, battleState.GetOpponent(effect.OwnerId).Id,
+                    remainingTriggersBefore, effect.RemainingTriggers, valuePopupEventIndex, valuePopupEventIndex));
                 return;
             }
 
@@ -179,6 +191,9 @@ namespace Project333.Runtime.Application.Services
 
             effect.ResolveTrigger();
             OccupantDestructionService.ResolveDefeatedOccupants(battleState);
+            battleState.RecordTimedBombCountdown(new BattleTimedBombCountdownEvent(effectIndex,
+                effect.SourceCardId, effect.OwnerId, targetPlayer.Id, remainingTriggersBefore,
+                effect.RemainingTriggers, valuePopupEventIndex, battleState.ValuePopupEvents.Count));
         }
 
         private static void ResolveCheonraJimang(BattleState battleState, PersistentEffectState persistentEffect)
@@ -231,7 +246,7 @@ namespace Project333.Runtime.Application.Services
             {
                 foreach (var occupant in battleState.GetBoard(owner).EnumerateOccupants())
                 {
-                    if (!occupant.IsAlive || occupant.IsSealbound || occupant.Kind == OccupantKind.Master || occupant.FalloutStacks <= 0) continue;
+                    if (!occupant.IsFalloutTarget || !occupant.IsAlive || occupant.IsSealbound || occupant.FalloutStacks <= 0) continue;
                     var damage = (int)Math.Min(int.MaxValue, (long)occupant.FalloutStacks * NuclearRules.FalloutDamage);
                     var actual = DamageResolutionRules.ApplyEffectDamage(occupant, damage, DamageType.Fixed);
                     BattleValuePopupRecorder.RecordDamage(battleState, occupant, actual, BattleValueChangeCause.Fallout,
@@ -286,7 +301,8 @@ namespace Project333.Runtime.Application.Services
                 effect.SourceCardId,
                 effect.OwnerId,
                 targetPlayerId,
-                targetCoords));
+                targetCoords,
+                battleState.ValuePopupEvents.Count));
 
             foreach (var occupant in targetBoard.EnumerateOccupants())
             {
@@ -358,7 +374,8 @@ namespace Project333.Runtime.Application.Services
                 effect.SourceCardId,
                 effect.OwnerId,
                 targetPlayer.Id,
-                targetCoords));
+                targetCoords,
+                battleState.ValuePopupEvents.Count));
 
             foreach (var target in targets)
             {
@@ -441,8 +458,8 @@ namespace Project333.Runtime.Application.Services
 
         private static void GainBaseResources(BattleState battleState, PlayerState playerState)
         {
-            // The first player keeps the initial 3 gold on the first battle turn.
-            var goldGain = battleState.TurnNumber == 1 ? 0 : BaseGoldGain;
+            // Opening Gold is already assigned during battle setup; neither first turn adds base Gold.
+            var goldGain = battleState.TurnNumber <= 2 ? 0 : BaseGoldGain;
             playerState.Resources.Add(new ResourceSet(
                 mana: 0,
                 qi: 0,

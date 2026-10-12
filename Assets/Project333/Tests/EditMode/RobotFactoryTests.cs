@@ -190,7 +190,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void ResolveTurnStart_RobotFactoryRunsBeforeFirewall_AndBaseDrawRunsAfterFirewall()
+        public void ResolveTurnStart_LethalFirewallStopsUpkeepFactoryAndBaseDraw()
         {
             var battleState = CreateTurnStartBattle();
             ClearHand(battleState.Player);
@@ -213,12 +213,35 @@ namespace Project333.Tests.EditMode
 
             CreateTurnStartService().ResolveTurnStart(battleState);
 
-            Assert.That(battleState.Player.Hand.Contains("Robot-A"), Is.True);
+            Assert.That(battleState.CardGenerationEvents, Is.Empty);
+            Assert.That(battleState.Player.Resources.Power, Is.EqualTo(1));
             Assert.That(battleState.Player.Deck.Count, Is.EqualTo(deckBefore));
             Assert.That(battleState.IsEnded, Is.True);
             Assert.That(battleState.Result.Winner, Is.EqualTo(PlayerId.AI));
         }
 
+        [Test]
+        public void ResolveTurnStart_FactoryDestroyedByFirewallPaysNoUpkeepAndGeneratesNoCard()
+        {
+            var state = CreateTurnStartBattle();
+            ClearHand(state.Player);
+            state.Player.Resources.Add(new ResourceSet(0, 0, 1, 0));
+            var factory = CreateFactory("doomed-factory", new TileCoord(0, 0));
+            state.PlayerBoard.Place(factory.Position, factory);
+            state.PersistentEffects.Add(new PersistentEffectState(
+                "Firewall", PlayerId.AI, "firewall", 2, "one trigger", new ResourceSet(),
+                targetRow: 0, remainingTriggers: 1, effectDamage: 50, effectDamageType: DamageType.Magic));
+            var deckBefore = state.Player.Deck.Count;
+
+            CreateTurnStartService().ResolveTurnStart(state);
+
+            Assert.That(state.PlayerBoard.GetOccupant(factory.Position), Is.Null);
+            Assert.That(state.Player.Resources.Power, Is.EqualTo(1));
+            Assert.That(state.CardGenerationEvents, Is.Empty);
+            Assert.That(state.Player.Hand.Contains("Robot-A"), Is.False);
+            Assert.That(state.Player.Deck.Count, Is.EqualTo(deckBefore - 1));
+            Assert.That(state.Phase, Is.EqualTo(PhaseType.Main));
+        }
         private static TurnStartService CreateTurnStartService()
         {
             var provider = new InMemoryCardDefinitionProvider(new CardDefinition[]

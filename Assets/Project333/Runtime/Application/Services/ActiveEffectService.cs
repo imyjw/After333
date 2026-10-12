@@ -22,7 +22,7 @@ namespace Project333.Runtime.Application.Services
                 state.ActivePlayerId != actor || state.PendingRobotFusion != null) return false;
             var occupant = state.GetBoard(actor).GetOccupant(source);
             return HasActiveEffect(occupant) && occupant.OwnerId == actor &&
-                occupant.IsAlive && !occupant.EffectsSuppressed &&
+                occupant.IsAlive && !occupant.CannotActivate &&
                 occupant.LastActiveEffectTurnNumber != state.TurnNumber;
         }
 
@@ -30,7 +30,7 @@ namespace Project333.Runtime.Application.Services
         {
             var occupant = state?.GetBoard(actor).GetOccupant(source);
             if (HasActiveEffect(occupant) && state.GetPlayer(actor).Resources.Gold < PowerPlantRules.TriggerGoldCost)
-                return "골드가 부족합니다";
+                return "자원이 부족합니다.";
             return string.Empty;
         }
 

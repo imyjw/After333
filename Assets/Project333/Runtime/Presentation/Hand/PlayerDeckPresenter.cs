@@ -72,6 +72,28 @@ namespace Project333.Runtime.Presentation.Hand
         private static Font s_runtimeKoreanFont;
 
         public int RemainingDeckCount => _remainingDeckCount;
+
+        public RectTransform DrawSourceRect
+        {
+            get
+            {
+                for (var i = _cardBackImages.Length - 1; i >= 0; i--)
+                    if (_cardBackImages[i] != null && _cardBackImages[i].gameObject.activeInHierarchy)
+                        return _cardBackImages[i].rectTransform;
+                return _deckRoot;
+            }
+        }
+
+        public Sprite DrawCardBackSprite
+        {
+            get
+            {
+                for (var i = _cardBackImages.Length - 1; i >= 0; i--)
+                    if (_cardBackImages[i] != null && _cardBackImages[i].sprite != null)
+                        return _cardBackImages[i].sprite;
+                return _cardBackSprite;
+            }
+        }
         public bool IsTooltipVisible =>
             _tooltipPanel != null && _tooltipPanel.gameObject.activeSelf;
         public string TooltipMessage => _tooltipText == null ? string.Empty : _tooltipText.text;
@@ -538,6 +560,7 @@ namespace Project333.Runtime.Presentation.Hand
             textOutline.effectColor = new Color(0f, 0f, 0f, 0.85f);
             textOutline.effectDistance = new Vector2(1f, -1f);
             textOutline.useGraphicAlpha = true;
+            NoticeTheme.Inline(_tooltipPanel, _tooltipText);
 
             if (wasCreated)
             {
@@ -647,6 +670,7 @@ namespace Project333.Runtime.Presentation.Hand
             _tooltipText.text = _remainingDeckCount <= 0
                 ? $"{TooltipSubject}에 남은 카드가 없습니다."
                 : $"{TooltipSubject}에 카드가 {_remainingDeckCount}장 남았습니다.";
+            NoticeTheme.Inline(_tooltipPanel, _tooltipText);
         }
 
         private Font ResolveTooltipFont()

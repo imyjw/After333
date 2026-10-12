@@ -89,6 +89,7 @@ namespace Project333.Runtime.Presentation.Draft
             }
 
             EnsureRuntimeFonts();
+            NoticeTheme.Dialog(_panelRect);
         }
 
         public void BindCancel(UnityAction action)

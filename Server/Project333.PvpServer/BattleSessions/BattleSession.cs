@@ -15,7 +15,7 @@ using ServerOnlineBattleCommandType = Project333.PvpServer.Messages.OnlineBattle
 
 namespace Project333.PvpServer.BattleSessions;
 
-public sealed class BattleSession
+public sealed partial class BattleSession
 {
     private static readonly PlayerIdDto[] SeatOrder = { PlayerIdDto.Player, PlayerIdDto.AI };
     private static readonly TimeSpan TurnDuration = TimeSpan.FromSeconds(73);
@@ -63,7 +63,7 @@ public sealed class BattleSession
         MatchId = matchId;
         _useServerAiOpponent = useServerAiOpponent;
         if (aiChallengeAttemptId == Guid.Empty || (aiChallengeAttemptId.HasValue && !useServerAiOpponent))
-            throw new ArgumentException("An AI challenge requires a valid attempt ID and a server AI opponent.", nameof(aiChallengeAttemptId));
+            throw new ArgumentException("A Gold Dungeon requires a valid attempt ID and a server AI opponent.", nameof(aiChallengeAttemptId));
         AiChallengeAttemptId = aiChallengeAttemptId;
         _firstPlayerSelector = firstPlayerSelector ?? new RandomFirstPlayerSelector();
         _resultOutbox = resultOutbox;
@@ -377,6 +377,11 @@ public sealed class BattleSession
                 throw new InvalidOperationException("Battle has not started yet.");
             }
 
+            // Bind intent to the observed turn. Nullable for older clients.
+            if (command.ExpectedTurnNumber.HasValue && command.CommandType != ServerOnlineBattleCommandType.Surrender &&
+                command.ExpectedTurnNumber.Value != _battleFlowController.CurrentBattleState.TurnNumber)
+                throw new InvalidOperationException("이전 턴의 명령은 실행할 수 없습니다.");
+
             var combatLogBeforeSnapshot = CaptureBattleSnapshot(_battleFlowController.CurrentBattleState);
 
             switch (command.CommandType)
@@ -410,6 +415,7 @@ public sealed class BattleSession
                 case ServerOnlineBattleCommandType.PlayUnitCard:
                 {
                     var actorId = ToRuntimePlayerId(command.ActorId);
+                    var beforeSnapshot = CaptureBattleSnapshot(_battleFlowController.CurrentBattleState);
                     _battleFlowController.ExecuteCommand(
                         actorId,
                         new PlayUnitCardCommand(
@@ -417,6 +423,7 @@ public sealed class BattleSession
                             ToTileCoord(command.TargetCoord, "target"),
                             command.HandCardRuntimeId));
                     battleEvents.Add(CreateCardPlayedEvent(command, actorId));
+                    CompleteTrapAwareSummonPresentation(battleEvents, beforeSnapshot, command.ActorId);
                     break;
                 }
 
@@ -450,6 +457,12 @@ public sealed class BattleSession
                     AppendBattleEndedEventIfNeeded(battleEvents);
                     break;
                 }
+
+                case ServerOnlineBattleCommandType.InstallTrap:
+                    _battleFlowController.ExecuteCommand(
+                        ToRuntimePlayerId(command.ActorId),
+                        new InstallTrapCommand(command.CardId, command.HandCardRuntimeId));
+                    break;
 
                 case ServerOnlineBattleCommandType.CastPersistentResourceSpell:
                     _battleFlowController.ExecuteCommand(
@@ -500,11 +513,19 @@ public sealed class BattleSession
                         AppendMovedOccupantEvents(battleEvents, beforeSnapshot, afterSnapshot);
                     }
 
+                    AppendValuePopupEvents(battleEvents, command.ActorId);
+                    if (!hasMultipleTargets)
+                    {
+                        AppendRemovedOccupantEvents(battleEvents, beforeSnapshot, afterSnapshot,
+                            suppressPendingRevival: command.CardId == EarthquakeRules.CardId || command.CardId == MeteorRules.CardId || command.CardId == FireSpearRules.CardId);
+                    }
+
+                    AppendBattleEndedEventIfNeeded(battleEvents);
                     break;
                 }
 
                 case ServerOnlineBattleCommandType.ActivateEffect:
-                    _battleFlowController.ExecuteCommand(ToRuntimePlayerId(command.ActorId),
+                    ExecuteActiveEffectCommand(ToRuntimePlayerId(command.ActorId),
                         new ActivateEffectCommand(ToTileCoord(command.SourceCoord, "source"), command.OccupantRuntimeId));
                     break;
 
@@ -530,7 +551,7 @@ public sealed class BattleSession
                         new AttackCommand(
                             ToTileCoord(command.SourceCoord, "source"),
                             ToTileCoord(command.TargetCoord, "target")));
-                    ApplyResolvedAttackTarget(attackEvent, battleEvents);
+                    CompleteTrapAwareAttackPresentation(attackEvent, battleEvents);
                     AppendValuePopupEvents(battleEvents, command.ActorId);
                     AppendRemovedOccupantEvents(battleEvents, beforeSnapshot, CaptureBattleSnapshot(_battleFlowController.CurrentBattleState));
                     AppendBattleEndedEventIfNeeded(battleEvents);
@@ -582,6 +603,7 @@ public sealed class BattleSession
             }
 
             AppendCardDrawEvents(battleEvents);
+            AppendTrapEvents(battleEvents);
             AppendCombatLogEntries(
                 battleEvents,
                 combatLogBeforeSnapshot,
@@ -1212,7 +1234,7 @@ public sealed class BattleSession
             }
 
             var safeGracePeriod = gracePeriod <= TimeSpan.Zero
-                ? TimeSpan.FromSeconds(60)
+                ? TimeSpan.FromSeconds(70)
                 : gracePeriod;
             disconnectedSeatId = disconnectedConnection.AssignedSeatId;
             reconnectDeadlineUtc = DateTimeOffset.UtcNow.Add(safeGracePeriod);
@@ -1624,13 +1646,17 @@ public sealed class BattleSession
         switch (command)
         {
             case PlayUnitCardCommand playUnitCardCommand:
+            {
+                var beforeSnapshot = CaptureBattleSnapshot(_battleFlowController.CurrentBattleState);
                 _battleFlowController.ExecuteCommand(actorId, playUnitCardCommand);
                 battleEvents.Add(CreateCardPlayedEvent(
                     playUnitCardCommand.CardId,
                     actorId,
                     actorDto,
                     playUnitCardCommand.TargetCoord));
+                CompleteTrapAwareSummonPresentation(battleEvents, beforeSnapshot, actorDto);
                 break;
+            }
 
             case PlayBuildingCardCommand playBuildingCardCommand:
                 _battleFlowController.ExecuteCommand(actorId, playBuildingCardCommand);
@@ -1657,6 +1683,10 @@ public sealed class BattleSession
                 AppendBattleEndedEventIfNeeded(battleEvents);
                 break;
             }
+
+            case InstallTrapCommand installTrapCommand:
+                _battleFlowController.ExecuteCommand(actorId, installTrapCommand);
+                break;
 
             case CastPersistentResourceSpellCommand castPersistentResourceSpellCommand:
                 _battleFlowController.ExecuteCommand(actorId, castPersistentResourceSpellCommand);
@@ -1707,7 +1737,8 @@ public sealed class BattleSession
                     AppendRemovedOccupantEvents(
                         battleEvents,
                         beforeSnapshot,
-                        afterSnapshot);
+                        afterSnapshot,
+                        suppressPendingRevival: castScriptedSpellCommand.CardId == EarthquakeRules.CardId || castScriptedSpellCommand.CardId == MeteorRules.CardId || castScriptedSpellCommand.CardId == FireSpearRules.CardId);
                 }
 
                 AppendBattleEndedEventIfNeeded(battleEvents);
@@ -1715,7 +1746,7 @@ public sealed class BattleSession
             }
 
             case ActivateEffectCommand active:
-                _battleFlowController.ExecuteCommand(actorId, active);
+                ExecuteActiveEffectCommand(actorId, active);
                 break;
 
             case MoveOccupantCommand moveOccupantCommand:
@@ -1736,7 +1767,7 @@ public sealed class BattleSession
                     attackCommand.TargetCoord);
                 battleEvents.Add(attackEvent);
                 _battleFlowController.ExecuteCommand(actorId, attackCommand);
-                ApplyResolvedAttackTarget(attackEvent, battleEvents);
+                CompleteTrapAwareAttackPresentation(attackEvent, battleEvents);
                 AppendValuePopupEvents(battleEvents, actorDto);
                 AppendRemovedOccupantEvents(battleEvents, beforeSnapshot, CaptureBattleSnapshot(_battleFlowController.CurrentBattleState));
                 AppendBattleEndedEventIfNeeded(battleEvents);
@@ -1768,6 +1799,7 @@ public sealed class BattleSession
             default:
                 throw new InvalidOperationException($"Server AI command resolution is not implemented yet for '{command.GetType().Name}'.");
         }
+        AppendTrapEvents(battleEvents);
     }
 
     private void AppendAiFallbackEndTurnEvents(List<BattleEventDto> battleEvents, string failureMessage)
@@ -1937,7 +1969,7 @@ public sealed class BattleSession
             ? damage : null;
     }
 
-    private static BattleEventDto CreateSpellCastEvent(ServerClientBattleCommandMessage command, int damageAmount, int? cardSpellDamage = null)
+    private BattleEventDto CreateSpellCastEvent(ServerClientBattleCommandMessage command, int damageAmount, int? cardSpellDamage = null)
     {
         return CreateSpellCastEvent(
             command.CardId ?? string.Empty,
@@ -1947,7 +1979,7 @@ public sealed class BattleSession
             damageAmount, cardSpellDamage);
     }
 
-    private static BattleEventDto CreateSpellCastEvent(
+    private BattleEventDto CreateSpellCastEvent(
         string cardId,
         PlayerIdDto sourceOwnerId,
         PlayerId targetOwnerId,
@@ -1961,6 +1993,9 @@ public sealed class BattleSession
             SourceOwnerId = sourceOwnerId,
             TargetOwnerId = ToDtoPlayerId(targetOwnerId),
             TargetCoord = ToServerTileCoord(targetCoord),
+            TargetRuntimeId = cardId == PlasmaShieldRules.CardId || cardId == ManaShieldRules.CardId
+                ? _battleFlowController?.CurrentBattleState?.GetBoard(targetOwnerId).GetOccupant(targetCoord)?.RuntimeId ?? string.Empty
+                : string.Empty,
             CardId = cardId ?? string.Empty,
             SourceCardId = cardId ?? string.Empty,
             Amount = Math.Max(0, damageAmount),
@@ -2005,7 +2040,17 @@ public sealed class BattleSession
 
     private BattleEventDto CreateCardPlayedEvent(string cardId, PlayerId actorId, PlayerIdDto sourceOwnerId, TileCoord targetCoord)
     {
-        var occupant = _battleFlowController?.CurrentBattleState?.GetBoard(actorId)?.GetOccupant(targetCoord);
+        var state = _battleFlowController?.CurrentBattleState;
+        var initialSummon = state?.LastSummonedOccupant;
+        var occupant = initialSummon != null && initialSummon.OwnerId == actorId &&
+            initialSummon.Position == targetCoord && string.Equals(initialSummon.CardId, cardId, StringComparison.Ordinal)
+            ? initialSummon : state?.GetBoard(actorId)?.GetOccupant(targetCoord);
+        // Preserve the initialized attack for the detached hit/death view only when
+        // this summon actually triggered a trap; ordinary CardPlayed keeps its contract.
+        var hasSummonTrapImpact = initialSummon != null && ReferenceEquals(occupant, initialSummon) &&
+            state!.TrapEvents.Any(entry => entry.Kind == BattleTrapEventKind.Triggered &&
+                string.Equals(entry.CardId, SummonTrapCardRules.CardId, StringComparison.Ordinal) &&
+                string.Equals(entry.TargetRuntimeId, initialSummon.RuntimeId, StringComparison.Ordinal));
         var baseAttack = 0;
         var baseHp = 0;
         if (_cardDefinitionProvider != null && !string.IsNullOrWhiteSpace(cardId))
@@ -2043,7 +2088,8 @@ public sealed class BattleSession
             SourceCardId = cardId ?? string.Empty,
             TargetRuntimeId = occupant?.RuntimeId ?? string.Empty,
             TargetCardId = cardId ?? string.Empty,
-            CardAttack = occupant?.BaseAttack ?? 0,
+            CardAttack = hasSummonTrapImpact ? state!.LastSummonedAttack :
+                cardId == GaebangChiefRules.CardId ? initialSummon != null && ReferenceEquals(occupant, initialSummon) ? state!.LastSummonedAttack : occupant?.Attack ?? 0 : occupant?.BaseAttack ?? 0,
             CardMaxHp = occupant?.MaxHp ?? 0,
             AttackBonus = Math.Max(0, (occupant?.BaseAttack ?? 0) - baseAttack),
             HpBonus = Math.Max(0, (occupant?.MaxHp ?? 0) - baseHp),
@@ -2194,15 +2240,21 @@ public sealed class BattleSession
             return;
         }
 
-        AppendAreaSpellEffectEvents(battleEvents, battleState);
-
         if (battleState.ValuePopupEvents == null)
         {
             return;
         }
 
-        foreach (var valuePopupEvent in battleState.ValuePopupEvents)
+        var countdownEventIndex = 0;
+        var areaEventIndex = 0;
+        for (var valuePopupIndex = 0; valuePopupIndex < battleState.ValuePopupEvents.Count; valuePopupIndex++)
         {
+            // A fully mitigated turn-end Dragon can share the next turn's bomb offset.
+            // Emit that earlier cue first; ordinary turn-start areas retain their order.
+            AppendAreaSpellEffectEvents(battleEvents, battleState, valuePopupIndex, ref areaEventIndex, redDragonTurnEndOnly: true);
+            AppendTimedBombCountdownEvents(battleEvents, battleState, valuePopupIndex, ref countdownEventIndex);
+            AppendAreaSpellEffectEvents(battleEvents, battleState, valuePopupIndex, ref areaEventIndex);
+            var valuePopupEvent = battleState.ValuePopupEvents[valuePopupIndex];
             if (valuePopupEvent == null ||
                 (valuePopupEvent.Amount <= 0 && !valuePopupEvent.IsInvinciblePrevented))
             {
@@ -2225,6 +2277,8 @@ public sealed class BattleSession
                 SourceRuntimeId = valuePopupEvent.SourceRuntimeId ?? string.Empty,
                 SourceCardId = valuePopupEvent.SourceCardId ?? string.Empty,
                 TargetRuntimeId = valuePopupEvent.RuntimeId ?? string.Empty,
+                TargetCardId = battleState.LastSummonedOccupant != null && battleState.LastSummonedOccupant.RuntimeId == valuePopupEvent.RuntimeId
+                    ? battleState.LastSummonedOccupant.CardId : string.Empty,
                 Amount = valuePopupEvent.Amount,
                 HpBefore = valuePopupEvent.HpBefore,
                 HpAfter = valuePopupEvent.HpAfter,
@@ -2238,20 +2292,59 @@ public sealed class BattleSession
             });
         }
 
+        AppendAreaSpellEffectEvents(battleEvents, battleState, battleState.ValuePopupEvents.Count, ref areaEventIndex, redDragonTurnEndOnly: true);
+        AppendTimedBombCountdownEvents(battleEvents, battleState, battleState.ValuePopupEvents.Count, ref countdownEventIndex);
+        AppendAreaSpellEffectEvents(battleEvents, battleState, battleState.ValuePopupEvents.Count, ref areaEventIndex);
+        battleState.ClearTimedBombCountdownEvents();
+        battleState.ClearAreaSpellEffectEvents();
         battleState.ClearValuePopupEvents();
+    }
+
+    private static void AppendTimedBombCountdownEvents(List<BattleEventDto> battleEvents,
+        BattleState battleState, int valuePopupIndex, ref int countdownEventIndex)
+    {
+        while (countdownEventIndex < battleState.TimedBombCountdownEvents.Count)
+        {
+            var countdown = battleState.TimedBombCountdownEvents[countdownEventIndex];
+            if (countdown != null && countdown.ValuePopupEventIndex > valuePopupIndex) break;
+            countdownEventIndex++;
+            if (countdown == null) continue;
+            battleEvents.Add(new BattleEventDto
+            {
+                EventType = BattleEventType.TimedBombCountdown,
+                RuntimeId = TimedBombRules.EffectId + ":" + countdown.EffectIndex,
+                CardId = countdown.SourceCardId,
+                SourceCardId = countdown.SourceCardId,
+                EffectId = TimedBombRules.EffectId,
+                SourceOwnerId = ToDtoPlayerId(countdown.SourceOwnerId),
+                TargetOwnerId = ToDtoPlayerId(countdown.TargetOwnerId),
+                EffectIndex = countdown.EffectIndex,
+                RemainingTriggersBefore = countdown.RemainingTriggersBefore,
+                RemainingTriggersAfter = countdown.RemainingTriggersAfter,
+                Message = "TimedBombCountdown"
+            });
+        }
     }
 
     private static void AppendAreaSpellEffectEvents(
         List<BattleEventDto> battleEvents,
-        BattleState battleState)
+        BattleState battleState,
+        int valuePopupIndex,
+        ref int areaEventIndex,
+        bool redDragonTurnEndOnly = false)
     {
         if (battleEvents == null || battleState?.AreaSpellEffectEvents == null)
         {
             return;
         }
 
-        foreach (var areaEffectEvent in battleState.AreaSpellEffectEvents)
+        while (areaEventIndex < battleState.AreaSpellEffectEvents.Count)
         {
+            var areaEffectEvent = battleState.AreaSpellEffectEvents[areaEventIndex];
+            if (areaEffectEvent != null && areaEffectEvent.ValuePopupEventIndex > valuePopupIndex) break;
+            if (redDragonTurnEndOnly && areaEffectEvent != null &&
+                areaEffectEvent.EffectId != EndTurnService.RedDragonFlamesEffectId) break;
+            areaEventIndex++;
             if (areaEffectEvent == null || areaEffectEvent.TargetCoords.Count == 0)
             {
                 continue;
@@ -2274,7 +2367,6 @@ public sealed class BattleSession
             });
         }
 
-        battleState.ClearAreaSpellEffectEvents();
     }
 
     private static void AppendMovedOccupantEvents(
@@ -2318,17 +2410,29 @@ public sealed class BattleSession
     private static void AppendRemovedOccupantEvents(
         List<BattleEventDto> battleEvents,
         ServerBattleSnapshot beforeSnapshot,
-        ServerBattleSnapshot afterSnapshot)
+        ServerBattleSnapshot afterSnapshot,
+        bool suppressPendingRevival = false)
     {
         if (battleEvents == null || beforeSnapshot == null || afterSnapshot == null)
         {
             return;
         }
 
+        // Direct destruction also resolves death effects and aura losses. Any Demon King
+        // left sealed by that resolution remains on the board, including chain targets.
+        suppressPendingRevival |= WasDestructionTrapTriggered(battleEvents);
         foreach (var beforeOccupant in beforeSnapshot.Occupants)
         {
+            // A successful return is not a death or destruction presentation.
+            if (WasReturnedByTrap(battleEvents, beforeOccupant.RuntimeId)) continue;
             var afterOccupant = afterSnapshot.FindByRuntimeId(beforeOccupant.RuntimeId);
-            if (afterOccupant != null && (beforeOccupant.CurrentHp <= 0 || afterOccupant.CurrentHp > 0))
+            // Mirror is effect damage: the sealed Demon King remains present for revival.
+            if (afterOccupant?.IsDemonKingRevivalPending == true &&
+                (WasReflectedByTrap(battleEvents, beforeOccupant.RuntimeId) || WasSummonTrapTriggered(battleEvents, beforeOccupant.RuntimeId))) continue;
+            // These enemy-wide spells leave a defeated, reviving Demon King on the board. Its
+            // HP loss still has feedback, but it is not an occupant removal/death cue.
+            if (afterOccupant != null && (beforeOccupant.CurrentHp <= 0 || afterOccupant.CurrentHp > 0 ||
+                (suppressPendingRevival && afterOccupant.IsDemonKingRevivalPending)))
             {
                 continue;
             }
@@ -2636,7 +2740,8 @@ public sealed class BattleSession
                 : new BattleSessionPendingRobotFusionSnapshot(
                     battleState.PendingRobotFusion.OwnerId.ToString(),
                     battleState.PendingRobotFusion.CardId),
-            battleState.Result.IsDraw);
+            battleState.Result.IsDraw,
+            CreateArmedTrapSnapshots(battleState));
     }
 
     private static BattleSessionPlayerSnapshot CreatePlayerSnapshot(PlayerState player)
@@ -2738,8 +2843,11 @@ public sealed class BattleSession
             CombatStatBuffs: occupant.CombatStatBuffs
                 .Select(buff => new BattleSessionCombatStatBuffSnapshot(
                     buff.SourceCardId, buff.AttackBonus, buff.MaxHpBonus,
-                    buff.PhysicalDefenseBonus, buff.MagicDefenseBonus))
-                .ToList());
+                    buff.PhysicalDefenseBonus, buff.MagicDefenseBonus, buff.SourceRuntimeId))
+                .ToList(),
+            ErasedOrcChieftainSourceRuntimeIds: occupant.ErasedOrcChieftainSourceRuntimeIds.ToArray(),
+            StunTurnEndsRemaining: occupant.StunTurnEndsRemaining,
+            FreezeTurnEndsRemaining: occupant.FreezeTurnEndsRemaining);
     }
 
     private static BattleSessionPersistentEffectSnapshot CreatePersistentEffectSnapshot(PersistentEffectState effect)
@@ -2851,6 +2959,8 @@ public sealed class BattleSession
         battleState.ClearCardDrawEvents();
         battleState.ClearResourceChangeEvents();
         battleState.ClearAreaSpellEffectEvents();
+        battleState.ClearTimedBombCountdownEvents();
+        RestoreArmedTraps(battleState, snapshot.ArmedTraps);
         return battleState;
     }
 
@@ -2883,10 +2993,12 @@ public sealed class BattleSession
         {
             if (board.IsInside(occupant.Position) && board.IsEmpty(occupant.Position))
             {
-                board.Place(occupant.Position, occupant);
+                board.Place(occupant.Position, occupant, synchronizeAuras: false);
             }
         }
 
+        // All persisted stats and source records are present before this idempotent reconciliation.
+        board.RefreshOrcChieftainAuras();
         var hand = new HandState();
         if (playerSnapshot?.HandCards != null)
         {
@@ -3014,7 +3126,8 @@ public sealed class BattleSession
             (snapshot.CombatStatBuffs ?? Array.Empty<BattleSessionCombatStatBuffSnapshot>())
                 .Select(buff => new CombatStatBuffState(
                     buff.SourceCardId, buff.AttackBonus, buff.MaxHpBonus,
-                    buff.PhysicalDefenseBonus, buff.MagicDefenseBonus)));
+                    buff.PhysicalDefenseBonus, buff.MagicDefenseBonus, buff.SourceRuntimeId)));
+        occupant.RestoreErasedOrcChieftainSources(snapshot.ErasedOrcChieftainSourceRuntimeIds ?? Array.Empty<string>());
         occupant.EndureUsed = snapshot.EndureUsed;
         occupant.RestoreOriginalCombatStats(
             snapshot.OriginalAttack ?? snapshot.BaseAttack,
@@ -3036,6 +3149,7 @@ public sealed class BattleSession
             ParseRuntimePlayerId(snapshot.DemonKingRevivalCountdownPlayerId, ownerId),
             snapshot.DemonKingRevivalEligibleAfterTurnNumber,
             snapshot.DemonKingRevivalCount);
+        occupant.RestoreActionDebuffs(snapshot.StunTurnEndsRemaining, snapshot.FreezeTurnEndsRemaining);
         occupant.RestoreInvincibleEffects(
             (snapshot.InvincibleEffects ?? Array.Empty<BattleSessionInvincibleEffectSnapshot>())
             .Where(effect => effect != null)
@@ -3260,16 +3374,40 @@ public sealed class BattleSession
         };
     }
 
+    private void ExecuteActiveEffectCommand(PlayerId actorId, ActivateEffectCommand command)
+    {
+        var source = _battleFlowController!.CurrentBattleState.GetBoard(actorId).GetOccupant(command.SourceCoord);
+        var cardId = source?.CardId ?? string.Empty;
+        _battleFlowController.ExecuteCommand(actorId, command);
+        // Record only successful activation, on both human and AI command paths.
+        AppendCombatLogRecord(new BattleCombatLogEntryDto
+        {
+            EntryType = BattleCombatLogEntryType.ActiveEffectActivated,
+            SourceOwnerId = actorId,
+            SourceCardId = cardId,
+            SourceCoord = new Project333.Runtime.Application.Online.TileCoordDto
+            {
+                Column = command.SourceCoord.Column,
+                Row = command.SourceCoord.Row
+            }
+        });
+        // Active commands have no animation event, so the generic event-log path may return early.
+        AppendResourceChangeCombatLogs();
+    }
+
     private void AppendCombatLogEntries(
-        IReadOnlyList<BattleEventDto> battleEvents,
+        List<BattleEventDto> battleEvents,
         ServerBattleSnapshot beforeSnapshot,
         ServerBattleSnapshot afterSnapshot)
     {
+        // Emit state changes on the shared command/AI/timer path. StateView remains authoritative.
+        AppendActionDebuffChangeEvents(battleEvents, beforeSnapshot, afterSnapshot);
         if (battleEvents == null || battleEvents.Count == 0)
         {
             return;
         }
 
+        AppendTrapCombatLogs(battleEvents);
         var cardPlayedEvent = battleEvents.FirstOrDefault(candidate =>
             candidate?.EventType == BattleEventType.CardPlayed);
         if (cardPlayedEvent != null)
@@ -3694,17 +3832,31 @@ public sealed class BattleSession
         ServerBattleSnapshot beforeSnapshot)
     {
         var ownerId = ToRuntimePlayerId(spellEvent.SourceOwnerId);
+        
+        var isShieldSpell =
+            spellEvent.CardId == PlasmaShieldRules.CardId ||
+            spellEvent.CardId == ManaShieldRules.CardId;
+
+        var shieldTarget = isShieldSpell && spellEvent.TargetCoord != null
+            ? beforeSnapshot?.FindByCoord(
+                ToRuntimePlayerId(spellEvent.TargetOwnerId),
+                ToRuntimeCoord(spellEvent.TargetCoord))
+            : null;
+        
         AppendCombatLogRecord(new BattleCombatLogEntryDto
         {
             EntryType = BattleCombatLogEntryType.SpellCast,
             SourceOwnerId = ownerId,
             TargetOwnerId = ToRuntimePlayerId(spellEvent.TargetOwnerId),
             SourceCardId = spellEvent.CardId ?? string.Empty,
+            TargetCardId = shieldTarget?.CardId ?? string.Empty,
             TargetCoord = CloneTileCoord(spellEvent.TargetCoord)
         });
 
-        if (string.Equals(spellEvent.CardId, "Daehwandan", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(spellEvent.CardId, DaehwandanCardRules.CardId, StringComparison.OrdinalIgnoreCase))
         {
+            var master = _battleFlowController!.CurrentBattleState.GetPlayer(ownerId).Master;
+            var beforeMaster = beforeSnapshot?.FindByRuntimeId(master.RuntimeId);
             AppendCombatLogRecord(new BattleCombatLogEntryDto
             {
                 EntryType = BattleCombatLogEntryType.AttackBuffApplied,
@@ -3712,7 +3864,7 @@ public sealed class BattleSession
                 TargetOwnerId = ownerId,
                 SourceCardId = spellEvent.CardId,
                 TargetCardId = "Master",
-                AttackBonus = 30
+                AttackBonus = Math.Max(0, master.BaseAttack - (beforeMaster?.BaseAttack ?? master.BaseAttack))
             });
         }
         else if (string.Equals(spellEvent.CardId, "CheonraJimang", StringComparison.OrdinalIgnoreCase))
@@ -3788,6 +3940,10 @@ public sealed class BattleSession
         var target = beforeSnapshot?.FindByRuntimeId(battleEvent.TargetRuntimeId);
         var targetCardId = target?.CardId ?? battleEvent.TargetCardId;
         var killed = battleEvent.HpAfter <= 0 || IsRemoved(allEvents, battleEvent.TargetRuntimeId);
+        var remaining = _battleFlowController?.CurrentBattleState?.GetBoard(targetOwnerId)
+            .EnumerateOccupants().FirstOrDefault(candidate => candidate.RuntimeId == battleEvent.TargetRuntimeId);
+        if (remaining?.IsDemonKingRevivalPending == true &&
+            WasSummonTrapTriggered(allEvents, battleEvent.TargetRuntimeId)) killed = false;
 
         AppendCombatLogRecord(new BattleCombatLogEntryDto
         {
@@ -3943,6 +4099,68 @@ public sealed class BattleSession
         }
     }
 
+    private static void AppendActionDebuffChangeEvents(
+        List<BattleEventDto> battleEvents,
+        ServerBattleSnapshot beforeSnapshot,
+        ServerBattleSnapshot afterSnapshot)
+    {
+        if (battleEvents == null || beforeSnapshot == null || afterSnapshot == null) return;
+        foreach (var after in afterSnapshot.Occupants)
+        {
+            var before = beforeSnapshot.FindByRuntimeId(after.RuntimeId);
+            AppendActionDebuffChangeEvent(battleEvents, after, "stun",
+                before?.StunTurnEndsRemaining ?? 0, after.StunTurnEndsRemaining);
+            AppendActionDebuffChangeEvent(battleEvents, after, "freeze",
+                before?.FreezeTurnEndsRemaining ?? 0, after.FreezeTurnEndsRemaining);
+        }
+    }
+
+    private static void AppendActionDebuffChangeEvent(
+        List<BattleEventDto> battleEvents, ServerOccupantSnapshot occupant,
+        string effectId, int beforeRemaining, int afterRemaining)
+    {
+        if (beforeRemaining == afterRemaining) return;
+        battleEvents.Add(new BattleEventDto
+        {
+            EventType = BattleEventType.StateChanged,
+            EffectId = effectId,
+            RuntimeId = occupant.RuntimeId,
+            CardId = occupant.CardId,
+            TargetRuntimeId = occupant.RuntimeId,
+            TargetCardId = occupant.CardId,
+            TargetOwnerId = ToDtoPlayerId(occupant.OwnerId),
+            TargetCoord = ToServerTileCoord(occupant.Coord),
+            Amount = afterRemaining
+        });
+    }
+
+    private void AppendActionDebuffChangeCombatLogs(
+        ServerBattleSnapshot beforeSnapshot, ServerBattleSnapshot afterSnapshot)
+    {
+        foreach (var after in afterSnapshot.Occupants)
+        {
+            var before = beforeSnapshot.FindByRuntimeId(after.RuntimeId);
+            AppendActionDebuffChangeCombatLog(after, before?.StunTurnEndsRemaining ?? 0,
+                after.StunTurnEndsRemaining, BattleCombatLogEntryType.StunApplied, BattleCombatLogEntryType.StunCleared);
+            AppendActionDebuffChangeCombatLog(after, before?.FreezeTurnEndsRemaining ?? 0,
+                after.FreezeTurnEndsRemaining, BattleCombatLogEntryType.FreezeApplied, BattleCombatLogEntryType.FreezeCleared);
+        }
+    }
+
+    private void AppendActionDebuffChangeCombatLog(
+        ServerOccupantSnapshot occupant, int beforeRemaining, int afterRemaining,
+        BattleCombatLogEntryType appliedType, BattleCombatLogEntryType clearedType)
+    {
+        if ((beforeRemaining > 0) == (afterRemaining > 0)) return;
+        AppendCombatLogRecord(new BattleCombatLogEntryDto
+        {
+            EntryType = afterRemaining > 0 ? appliedType : clearedType,
+            TargetOwnerId = occupant.OwnerId,
+            TargetCardId = occupant.CardId,
+            Amount = afterRemaining
+        });
+    }
+
     private void AppendStatusChangeCombatLogs(
         ServerBattleSnapshot beforeSnapshot,
         ServerBattleSnapshot afterSnapshot)
@@ -3952,6 +4170,7 @@ public sealed class BattleSession
             return;
         }
 
+        AppendActionDebuffChangeCombatLogs(beforeSnapshot, afterSnapshot);
         foreach (var before in beforeSnapshot.Occupants)
         {
             var after = afterSnapshot.FindByRuntimeId(before.RuntimeId);
@@ -4211,7 +4430,13 @@ public sealed class BattleSession
                 continue;
             }
 
-            snapshot.Occupants.Add(new ServerOccupantSnapshot(
+            snapshot.Occupants.Add(CreatePresentationOccupantSnapshot(occupant));
+        }
+    }
+
+    private static ServerOccupantSnapshot CreatePresentationOccupantSnapshot(OccupantState occupant)
+    {
+            return new ServerOccupantSnapshot(
                 occupant.RuntimeId,
                 occupant.CardId,
                 occupant.OwnerId,
@@ -4232,8 +4457,9 @@ public sealed class BattleSession
                 occupant.DemonKingRevivalTurnStartsRemaining,
                 occupant.DemonKingRevivalCountdownPlayerId,
                 occupant.DemonKingRevivalEligibleAfterTurnNumber,
-                occupant.DemonKingRevivalCount));
-        }
+                occupant.DemonKingRevivalCount,
+                occupant.StunTurnEndsRemaining,
+                occupant.FreezeTurnEndsRemaining);
     }
 
     private sealed class ServerBattleSnapshot
@@ -4297,7 +4523,9 @@ public sealed class BattleSession
             int demonKingRevivalTurnStartsRemaining,
             PlayerId demonKingRevivalCountdownPlayerId,
             int demonKingRevivalEligibleAfterTurnNumber,
-            int demonKingRevivalCount)
+            int demonKingRevivalCount,
+            int stunTurnEndsRemaining,
+            int freezeTurnEndsRemaining)
         {
             RuntimeId = runtimeId ?? string.Empty;
             CardId = cardId ?? string.Empty;
@@ -4320,6 +4548,8 @@ public sealed class BattleSession
             DemonKingRevivalCountdownPlayerId = demonKingRevivalCountdownPlayerId;
             DemonKingRevivalEligibleAfterTurnNumber = demonKingRevivalEligibleAfterTurnNumber;
             DemonKingRevivalCount = demonKingRevivalCount;
+            StunTurnEndsRemaining = stunTurnEndsRemaining;
+            FreezeTurnEndsRemaining = freezeTurnEndsRemaining;
         }
 
         public string RuntimeId { get; }
@@ -4363,6 +4593,10 @@ public sealed class BattleSession
         public int DemonKingRevivalEligibleAfterTurnNumber { get; }
 
         public int DemonKingRevivalCount { get; }
+
+        public int StunTurnEndsRemaining { get; }
+
+        public int FreezeTurnEndsRemaining { get; }
     }
 
     private sealed class ServerPersistentEffectSnapshot
@@ -4677,7 +4911,8 @@ public sealed record BattleSessionDomainSnapshot(
     BattleSessionBoardSnapshot AIBoard,
     IReadOnlyList<BattleSessionPersistentEffectSnapshot> PersistentEffects,
     BattleSessionPendingRobotFusionSnapshot? PendingRobotFusion = null,
-    bool IsDraw = false);
+    bool IsDraw = false,
+    IReadOnlyList<BattleSessionArmedTrapSnapshot>? ArmedTraps = null);
 
 public sealed record BattleSessionPendingRobotFusionSnapshot(
     string OwnerId,
@@ -4768,14 +5003,18 @@ public sealed record BattleSessionOccupantSnapshot(
     int LastActiveEffectTurnNumber = -1,
     int FalloutPlayerStacks = 0,
     int FalloutAiStacks = 0,
-    IReadOnlyList<BattleSessionCombatStatBuffSnapshot>? CombatStatBuffs = null);
+    IReadOnlyList<BattleSessionCombatStatBuffSnapshot>? CombatStatBuffs = null,
+    IReadOnlyList<string>? ErasedOrcChieftainSourceRuntimeIds = null,
+    int StunTurnEndsRemaining = 0,
+    int FreezeTurnEndsRemaining = 0);
 
 public sealed record BattleSessionCombatStatBuffSnapshot(
     string SourceCardId,
     int AttackBonus,
     int MaxHpBonus,
     int PhysicalDefenseBonus,
-    int MagicDefenseBonus);
+    int MagicDefenseBonus,
+    string SourceRuntimeId = "");
 
 public sealed record BattleSessionInvincibleEffectSnapshot(
     string Duration,

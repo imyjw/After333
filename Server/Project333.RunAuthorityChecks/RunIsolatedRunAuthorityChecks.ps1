@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$ServerOutput,
-    [string]$PostgresBin = 'C:\Program Files\PostgreSQL\18\bin'
+    [string]$PostgresBin = 'C:\Program Files\PostgreSQL\18\bin',
+    [switch]$GoldDungeonOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -136,7 +137,9 @@ try {
         -RedirectStandardError (Join-Path $runRoot 'server.err.log')
     Wait-TestServer $server
     $harnessDll = Join-Path $harnessArtifacts 'bin\RunAuthorityChecks\release\RunAuthorityChecks.dll'
-    $harness = Start-Process dotnet -ArgumentList @('"' + $harnessDll + '"') -WindowStyle Hidden -PassThru `
+    $harnessArguments = @('"' + $harnessDll + '"')
+    if ($GoldDungeonOnly) { $harnessArguments += '--gold-dungeon-only' }
+    $harness = Start-Process dotnet -ArgumentList $harnessArguments -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput (Join-Path $runRoot 'checks.log') -RedirectStandardError (Join-Path $runRoot 'checks.err.log')
     $null = $harness.Handle
     $harnessTimer = [Diagnostics.Stopwatch]::StartNew()
@@ -149,6 +152,10 @@ try {
     $harness.Refresh()
     if ($harness.ExitCode -ne 0) { throw 'Run authority checks failed. See checks.log and checks.err.log.' }
     Get-Content -LiteralPath (Join-Path $runRoot 'checks.log')
+    if ($GoldDungeonOnly) {
+        Write-Output 'Gold Dungeon-only checks passed; the runner will stop only its own isolated server and PostgreSQL cluster.'
+        return
+    }
 
     # Keep real PvP/PvE sockets connected while the isolated HTTP server is killed.
     $restartClient = Start-Process dotnet -ArgumentList @('"' + $harnessDll + '"', '--server-restart-battles') -WindowStyle Hidden -PassThru `

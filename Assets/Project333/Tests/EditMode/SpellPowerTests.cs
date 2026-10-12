@@ -369,8 +369,8 @@ namespace Project333.Tests.EditMode
             Assert.That(back.CurrentHp, Is.EqualTo(67));
         }
 
-        [TestCase(false, 57)]
-        [TestCase(true, 67)]
+        [TestCase(false, 70)]
+        [TestCase(true, 80)]
         public void RedDragonEffect_UsesLiveUnsuppressedPower(bool suppressed, int expectedHp)
         {
             var state = CreateBattleState();
@@ -421,7 +421,7 @@ namespace Project333.Tests.EditMode
 
         [TestCase(0)]
         [TestCase(13)]
-        public void RealManaPond_PaysFiveManaAndImmediatelyGrantsTwentyPower(int level)
+        public void RealManaPond_PaysSixManaAndImmediatelyGrantsTwentyPower(int level)
         {
             var state = CreateBattleState();
             var database = JsonCardDefinitionDatabase.FromJson(System.IO.File.ReadAllText(
@@ -433,7 +433,7 @@ namespace Project333.Tests.EditMode
             var manaBefore = state.Player.Resources.Mana;
             var pond = new PlayCardService(provider, new SummonService(), upgrades)
                 .PlayBuildingCard(state, PlayerId.Player, "ManaPond", new TileCoord(0, 0));
-            Assert.That(state.Player.Resources.Mana, Is.EqualTo(manaBefore - 5));
+            Assert.That(state.Player.Resources.Mana, Is.EqualTo(manaBefore - 6));
             Assert.That(pond.CurrentHp, Is.EqualTo(20 + level));
             Assert.That(pond.Attack, Is.Zero);
             Assert.That(pond.SpellPower, Is.EqualTo(20));

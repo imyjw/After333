@@ -11,7 +11,7 @@ unchanged. TitleText and StatusText keep their existing live text content.
   on the right with room reserved for the global settings gear.
 - Three card choices: thin gold frames; existing 550 x 733 reference size,
   spacing 50, stat anchors and stat font size are preserved.
-- Right deck list: stronger heading, larger text, existing vertical scrolling.
+- Right deck list: each row shows only quantity/card name on the left and resource cost on the right. Costs use a separate, right-aligned UI column; no DECK/Left, Type, Rarity, Curve, CostSum, CARD LIST or rarity suffix is displayed inside DeckListScrollView. Names wrap within their column without overlapping costs. The panel heading and existing vertical scrolling remain.
 - Footer: a short selection hint, separated from the choices by a thin rule.
 - The existing responsive card/deck calculation and CanvasScaler remain active.
   Decorative header regions use proportional anchors inside the safe area.
@@ -40,3 +40,9 @@ Title, status, deck heading, deck list and Back button retain their scene font
 sizes and regions after applying the new layout. Their contents may still update
 with game state. Back Button Label controls the Back button's caption. The
 Interface Font is the bundled Korean fallback used when creating missing text.
+
+## Current data and preview behavior (2026-10-01)
+
+The 50-card draft pool is distinct from the 57 shared definitions and the 40-card actual random reward pool. Current rarity, account upgrades and offered cards follow server draft rules; dated layout sizes above are presentation defaults. Supported choice/deck-list long-press previews share trait/effect panels with the common card preview path. See [card_catalog.md](card_catalog.md), [draft_rules.md](draft_rules.md) and [occupant_status_tooltips.md](occupant_status_tooltips.md).## Name and cost columns (2026-10-09)
+
+DraftOverlayPresenter enables DeckListCardHoldPreview's namesAndCostsOnly mode for DeckBuilding, including the native scene reused by tutorial practice. DeckListColumnsView generates CardName and CardCost Text children from the same grouped, sorted draft IDs. Font, size and color come from the authored DeckListText; the cost column is measured from the current costs and anchored to the right edge as the viewport width changes. A row's height follows its wrapped name. Long-pressing either column uses the existing preview lifecycle, viewport clipping and ScrollRect forwarding. Tutorial guidance uses the whole row bounds. The completed-deck Draft lobby retains its existing display.

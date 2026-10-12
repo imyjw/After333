@@ -1,0 +1,9 @@
+Use case: stylized-concept
+Asset type: square transparent pixel-art spell-card illustration for the After333 strategy card game.
+Primary request: a defensive interceptor missile intercepts an incoming hostile missile in mid-air, both colliding in a dramatic explosion. This illustrates the card IronDome.
+Subject and action: exactly two recognizable futuristic missiles approaching one another from opposing diagonal flight paths. The incoming missile has a dark gunmetal body and angular fins; the defending missile has a light steel body and crisp cyan-blue exhaust. Their noses meet in a bright yellow-white explosion with orange flame, metal fragments, and compact smoky trails. The explosion is the focus, with enough intact missile body visible on both sides to read the interception immediately at small card size.
+Style/medium: detailed hand-crafted game pixel art, sharp square pixel clusters, controlled metallic shading and luminous pixel sparks, consistent with retro fantasy/science-fiction card illustrations. Clear silhouette and strong value contrast, no smooth vector art or photographic rendering.
+Composition/framing: a single centered dynamic action illustration; whole missiles, fins, contrails and explosion fit inside the square canvas with a generous transparent safety margin. No cropped missiles or cropped explosion. No extra scene or ground scenery.
+Background: genuine alpha transparency; preserve semi-transparent pixel smoke and luminous edge details. No black background rectangle, no checkerboard painted into the image.
+Text: none.
+Constraints: no card frame, UI, numbers, text, logos, national flags, people or buildings. Do not add a shield dome, launcher, gun, laser beam or more missiles. Readable interception rather than two parallel missiles flying together. One polished production-ready square image.

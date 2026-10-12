@@ -20,7 +20,7 @@ namespace Project333.Runtime.Application.Services
             var attacker = attackerBoard.GetOccupant(attackerCoord);
             if (attacker == null)
             {
-                throw new InvalidOperationException("Attacker tile is empty.");
+                throw new InvalidOperationException("공격자 타일이 비어있습니다.");
             }
 
             if (attacker.Attack <= 0)
@@ -92,6 +92,23 @@ namespace Project333.Runtime.Application.Services
             }
 
             return false;
+        }
+
+        // Empty means legal. Keep the reason tied to the same normal-attack targeting rules.
+        public string GetTargetRejectionMessage(BattleState battleState, PlayerId attackerOwnerId,
+            TileCoord attackerCoord, TileCoord targetCoord)
+        {
+            if (CanTarget(battleState, attackerOwnerId, attackerCoord, targetCoord)) return string.Empty;
+            var enemyBoard = battleState.GetOpponentBoard(attackerOwnerId);
+            var target = enemyBoard.GetOccupant(targetCoord);
+            if (target?.IsHiding == true) return "은신한 유닛은 지정할 수 없습니다.";
+            if (target?.IsSealbound == true) return "봉인된 대상은 지정할 수 없습니다.";
+            var attacker = battleState.GetBoard(attackerOwnerId).GetOccupant(attackerCoord);
+            if (target != null && attacker.Attack > 0 && attacker.AttackType == AttackType.Melee &&
+                !attacker.HasActiveFlying && targetCoord.Row == 1 &&
+                HasFrontRowBlocker(enemyBoard.GetOccupant(new TileCoord(targetCoord.Column, 0))))
+                return "대상은 전열의 소환물에 의해 보호받고 있습니다.";
+            return "대상은 지정 불가 상태입니다.";
         }
 
         private static bool HasFrontRowBlocker(OccupantState frontOccupant)

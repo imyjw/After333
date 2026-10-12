@@ -72,17 +72,31 @@ namespace Project333.Runtime.Application.Services
             BattleState near, BoardState futureAiBoard) =>
             ScoreCore(before, move, near.AIBoard, futureAiBoard);
 
+        // Distinct names preserve legacy reflection callers and unknown-card exact scores.
+        internal static double ScoreUsingCardCosts(BattleState state, MoveOccupantCommand move,
+            AiProducerProtectionPolicy policy) => ScoreCore(state, move, null, null, policy);
+
+        internal static double ScoreForPlanningBeforeTurnStart(BattleState state, MoveOccupantCommand move,
+            BattleState projected, AiProducerProtectionPolicy policy) =>
+            ScoreCore(state, move, projected.AIBoard, null, policy, true);
+
+        internal static double ScoreForPlanningWithSurvivalForecast(BattleState state, MoveOccupantCommand move,
+            BattleState near, BoardState futureAiBoard, AiProducerProtectionPolicy policy) =>
+            ScoreCore(state, move, near.AIBoard, futureAiBoard, policy, true);
+
         private static double ScoreCore(BattleState state, MoveOccupantCommand move,
-            BoardState? projectedBoard, BoardState? futureTargetBoard = null)
+            BoardState? projectedBoard, BoardState? futureTargetBoard = null,
+            AiProducerProtectionPolicy? policy = null, bool knownProducerCreditInState = false)
         {
             var board = state.AIBoard;
             var moving = board.GetOccupant(move.From);
             var swapped = board.GetOccupant(move.To);
             if (moving == null || move.From == move.To) return -MoveCost;
             double score = -MoveCost;
+            var movedExistingCover = false;
             foreach (var target in board.EnumerateOccupants())
             {
-                var value = ProtectionValue(target);
+                var value = policy == null ? ProtectionValue(target) : policy.ProtectionValue(target);
                 if (value <= 0) continue;
                 var beforeCover = Cover(board, target.Position);
                 var afterPosition = ReferenceEquals(target, moving) ? move.To :
@@ -92,24 +106,40 @@ namespace Project333.Runtime.Application.Services
                 var afterCover = Blocks(afterFront) ? afterFront : null;
                 // Reward new cover only, never exchanging one safe slot for another.
                 if (beforeCover == null && afterCover != null && ProtectionValue(afterCover) == 0)
-                    score += projectedBoard == null ? value :
-                        SurvivingProtectionValue(target, afterPosition, afterCover, projectedBoard, value,
-                            futureTargetBoard);
+                {
+                    var coverValue = policy == null ? value : policy.CoverValue(target, afterCover);
+                    var gain = projectedBoard == null ? coverValue :
+                        SurvivingProtectionValue(target, afterPosition, afterCover, projectedBoard, coverValue,
+                            futureTargetBoard, policy);
+                    // The evaluator carries known-producer cover as a state value exactly once.
+                    // Keep legacy bonuses for all other roles and missing metadata.
+                    if (!knownProducerCreditInState || policy == null || !policy.TryGetProducerCost(target, out _))
+                        score += gain;
+                }
                 if (beforeCover != null && afterCover == null)
+                {
                     score -= value * 2;
+                    movedExistingCover = true;
+                }
                 // Count both occupants of a swap: moving the rear card can pull its guard out too.
                 if (beforeCover != null &&
                     (ReferenceEquals(beforeCover, moving) || ReferenceEquals(beforeCover, swapped)))
+                {
                     score -= MovedCoverPenalty;
+                    movedExistingCover = true;
+                }
             }
-            return score;
+            // Expensive new production cannot justify stealing an established protector.
+            // A genuine hazard escape can still be simulated with these retained penalties.
+            return policy != null && movedExistingCover ? System.Math.Min(0, score) : score;
 
             OccupantState? At(TileCoord coord) => coord == move.From ? swapped :
                 coord == move.To ? moving : board.GetOccupant(coord);
         }
 
         private static double SurvivingProtectionValue(OccupantState target, TileCoord afterPosition,
-            OccupantState guard, BoardState projectedBoard, double originalValue, BoardState? futureTargetBoard)
+            OccupantState guard, BoardState projectedBoard, double originalValue, BoardState? futureTargetBoard,
+            AiProducerProtectionPolicy? policy = null)
         {
             var projectedTarget = projectedBoard.GetOccupant(afterPosition);
             var projectedGuard = projectedBoard.GetOccupant(new TileCoord(afterPosition.Column, 0));
@@ -123,7 +153,8 @@ namespace Project333.Runtime.Application.Services
                     return 0;
             }
             // Recheck the protected role too: a dead, sealed, or no-longer-wounded target earns no bonus.
-            return System.Math.Min(originalValue, ProtectionValue(projectedTarget));
+            return System.Math.Min(originalValue, policy == null ? ProtectionValue(projectedTarget) :
+                policy.CoverValue(projectedTarget, projectedGuard));
         }
 
         private static OccupantState? Cover(BoardState board, TileCoord rear)

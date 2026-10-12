@@ -1,0 +1,58 @@
+{
+    "CardId": "ManaCannon",
+    "Owner": "Player",
+    "VisualKey": "ManaCannon",
+    "SpriteName": "Idle_0",
+    "BodyShader": "UI/Default",
+    "OriginalPngSize": {
+        "x": 4096,
+        "y": 512
+    },
+    "ImportedTextureSize": {
+        "x": 4096,
+        "y": 512
+    },
+    "ImportedSpriteRect": {
+        "serializedVersion": "2",
+        "x": 0.0,
+        "y": 0.0,
+        "width": 512.0,
+        "height": 512.0
+    },
+    "OriginalNormalizedAlpha": {
+        "serializedVersion": "2",
+        "x": 0.134765625,
+        "y": 0.03125,
+        "width": 0.724609375,
+        "height": 0.5546875
+    },
+    "ManifestNormalizedAlpha": {
+        "serializedVersion": "2",
+        "x": 0.134765625,
+        "y": 0.03125,
+        "width": 0.724609375,
+        "height": 0.5546875
+    },
+    "BodyVisibleRect": {
+        "serializedVersion": "2",
+        "x": -186.26953125,
+        "y": -239.0625,
+        "width": 369.55078125,
+        "height": 282.890625
+    },
+    "StarsVisibleRect": {
+        "serializedVersion": "2",
+        "x": -133.25933837890626,
+        "y": 53.72931671142578,
+        "width": 257.80145263671877,
+        "height": 75.60832977294922
+    },
+    "IceVisibleRect": {
+        "serializedVersion": "2",
+        "x": -215.8336181640625,
+        "y": -250.37814331054688,
+        "width": 428.6789245605469,
+        "height": 316.8375244140625
+    },
+    "BodyAnimatorSpeed": 0.0
+}

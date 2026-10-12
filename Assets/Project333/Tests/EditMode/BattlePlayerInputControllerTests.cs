@@ -167,9 +167,9 @@ namespace Project333.Tests.EditMode
             Assert.That(button, Is.Not.Null);
             Assert.That(button.gameObject.activeSelf && button.interactable, Is.True);
             button.onClick.Invoke();
-            Assert.That(controller.InteractionStatus, Is.EqualTo("골드가 부족합니다"));
+            Assert.That(controller.InteractionStatus, Is.EqualTo("자원이 부족합니다."));
             var toast = (Text)typeof(BattleBootstrapper).GetField("_onlineErrorToastText", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(bootstrapper);
-            Assert.That(toast.text, Does.Contain("골드가 부족합니다"));
+            Assert.That(toast.text, Does.Contain("자원이 부족합니다."));
             Assert.That(button.gameObject.activeSelf && button.interactable, Is.True);
             Assert.That(plant.LastActiveEffectTurnNumber, Is.EqualTo(-1));
             Assert.That(state.Player.Resources.Power, Is.Zero);
@@ -232,6 +232,7 @@ namespace Project333.Tests.EditMode
 
             SetPrivateField(handPresenter, "_handCardViews", new[] { handCardView });
             SetPrivateField(controller, "_handPresenter", handPresenter);
+            handPresenter.SetExpanded(true); // Existing selection tests start with the hand open.
 
             controller.RebindViews();
             return controller;
@@ -264,6 +265,172 @@ namespace Project333.Tests.EditMode
             controller.RebindViews();
             return controller;
         }
+
+        [Test]
+        public void EndTurn_LocksButtonAndActionsUntilNextLocalMainPhase()
+        {
+            var bootstrapper = Track(new GameObject("TurnLock")).AddComponent<BattleBootstrapper>();
+            var flow = CreateFlowControllerInMainPhase();
+            SetPrivateField(bootstrapper, "_battleFlowController", flow);
+            SetPrivateField(bootstrapper, "_battleGateway", new LocalBattleGateway(flow));
+            SetPrivateField(bootstrapper, "_autoRunAiTurns", false);
+            SetPrivateField(bootstrapper, "_animateAttackSequences", false);
+            var presenter = Track(new GameObject("TurnButtonPresenter")).AddComponent<BattleScreenPresenter>();
+            var button = Track(new GameObject("EndTurn", typeof(RectTransform), typeof(Image), typeof(Button))).GetComponent<Button>();
+            SetPrivateField(presenter, "_battleBootstrapper", bootstrapper);
+            SetPrivateField(presenter, "_endTurnButton", button);
+            var turn = flow.CurrentBattleState.TurnNumber;
+            presenter.EndTurnFromUi();
+            Assert.That(button.interactable, Is.False);
+            Assert.That(bootstrapper.IsBusy, Is.True);
+            presenter.EndTurnFromUi();
+            Assert.That(flow.CurrentBattleState.TurnNumber, Is.EqualTo(turn + 1));
+            Assert.That(bootstrapper.TryMovePlayerOccupant(new TileCoord(2, 1), new TileCoord(1, 1), out _), Is.False);
+            flow.ResolveTurnStart();
+            bootstrapper.EndTurn(); // A player click cannot end the AI's turn.
+            Assert.That(flow.CurrentBattleState.TurnNumber, Is.EqualTo(turn + 1));
+            flow.EndTurn();
+            Assert.That(bootstrapper.CanPlayerEndTurn, Is.False);
+            flow.ResolveTurnStart();
+            InvokePrivateMethod(presenter, "RefreshEndTurnInteractable");
+            Assert.That(bootstrapper.IsBusy, Is.False);
+            Assert.That(button.interactable, Is.True);
+            Assert.That(flow.CurrentBattleState.TurnNumber, Is.EqualTo(turn + 2), "No buffered click runs on unlock.");
+        }
+        [Test]
+        public void EndTurn_HandInspectionRemainsAvailableWhileCommandsStayLocked()
+        {
+            var controller = CreateControllerWithHand(out var card);
+            var bootstrapper = Track(new GameObject("InspectionTurnLock")).AddComponent<BattleBootstrapper>();
+            var flow = CreateFlowControllerInMainPhase();
+            SetPrivateField(bootstrapper, "_battleFlowController", flow);
+            SetPrivateField(bootstrapper, "_battleGateway", new LocalBattleGateway(flow));
+            SetPrivateField(bootstrapper, "_autoRunAiTurns", false);
+            SetPrivateField(bootstrapper, "_animateAttackSequences", false);
+            SetPrivateField(controller, "_battleBootstrapper", bootstrapper);
+            bootstrapper.EndTurn();
+            Assert.That(bootstrapper.IsBusy, Is.True);
+            card.NotifyClicked();
+            Assert.That(controller.SelectedCardId, Is.EqualTo(card.CardId));
+            InvokePrivateMethod(controller, "HighlightSelectedHandCard");
+            Assert.That(card.HighlightState, Is.EqualTo(BattleHighlightState.Selected));
+            card.NotifyDragStarted(Vector2.zero);
+            Assert.That(typeof(BattlePlayerInputController).GetField("_isDraggingCard", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(controller), Is.False);
+            var pos = new TileCoord(2, 1);
+            Assert.That(bootstrapper.TryUsePlayerCardOnTile(card.CardId, PlayerId.AI, pos, out _), Is.False);
+            Assert.That(bootstrapper.TryAttackWithPlayerOccupant(pos, pos, out _), Is.False);
+            Assert.That(bootstrapper.TryMovePlayerOccupant(pos, new TileCoord(1,1), out _), Is.False);
+            Assert.That(bootstrapper.TryActivatePlayerEffect(pos, "master", out _), Is.False);
+            card.NotifyClicked();
+            Assert.That(controller.SelectedCardId, Is.Empty);
+        }
+
+        [Test]
+        public void CompactHand_FirstClickOnlyExpands_ThenCardCanBeSelected()
+        {
+            var controller = CreateControllerWithHand(out var card);
+            var hand = (HandPresenter)typeof(BattlePlayerInputController).GetField("_handPresenter", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(controller);
+            hand.SetExpanded(false);
+            card.NotifyClicked();
+            Assert.That(hand.IsExpanded, Is.True);
+            Assert.That(controller.SelectedCardId, Is.Empty);
+            card.NotifyClicked();
+            Assert.That(controller.SelectedCardId, Is.EqualTo(card.CardId));
+        }
+
+        [Test]
+        public void OutsideClick_CollapsesAfterDispatch_WhileHandPressAndDragDoNot()
+        {
+            var controller = CreateControllerWithHand(out var card);
+            var hand = (HandPresenter)typeof(BattlePlayerInputController).GetField("_handPresenter", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(controller);
+            card.NotifyClicked();
+            SetPrivateField(controller, "_isTrackingBackgroundDeselectPointer", true);
+            SetPrivateField(controller, "_backgroundDeselectPointerId", -1);
+            SetPrivateField(controller, "_backgroundDeselectPointerStartedOverPreservingTarget", true); // Board/button consumes its click first.
+            InvokePrivateMethod(controller, "EndBackgroundDeselectPointer", -1, Vector2.zero);
+            Assert.That(hand.IsExpanded, Is.True);
+            Assert.That(controller.SelectedCardId, Is.EqualTo(card.CardId));
+            InvokePrivateMethod(controller, "ApplyQueuedHandCollapse");
+            Assert.That(hand.IsExpanded, Is.False);
+            Assert.That(controller.SelectedCardId, Is.Empty);
+            hand.SetExpanded(true);
+            SetPrivateField(controller, "_isTrackingBackgroundDeselectPointer", true);
+            SetPrivateField(controller, "_backgroundDeselectPointerId", -1);
+            SetPrivateField(controller, "_backgroundPointerStartedOverHandPreservingTarget", true);
+            InvokePrivateMethod(controller, "EndBackgroundDeselectPointer", -1, Vector2.zero);
+            InvokePrivateMethod(controller, "ApplyQueuedHandCollapse");
+            Assert.That(hand.IsExpanded, Is.True);
+            SetPrivateField(controller, "_isTrackingBackgroundDeselectPointer", true);
+            SetPrivateField(controller, "_backgroundDeselectPointerId", -1);
+            SetPrivateField(controller, "_backgroundDeselectPointerMovedTooFar", true);
+            InvokePrivateMethod(controller, "EndBackgroundDeselectPointer", -1, Vector2.zero);
+            InvokePrivateMethod(controller, "ApplyQueuedHandCollapse");
+            Assert.That(hand.IsExpanded, Is.True);
+        }
+
+        [TestCase(PlayerId.Player, true)]
+        [TestCase(PlayerId.AI, true)]
+        public void HandCollapse_BothTileSidesAndDetachedSurfacesPreserveExpansion(PlayerId owner, bool expected)
+        {
+            var tile = Track(new GameObject("Tile")).AddComponent<TileView>();
+            tile.Configure(owner, 0, 0);
+            var child = new GameObject("TileImage");
+            child.transform.SetParent(tile.transform);
+            Assert.That(PreservesHand(child), Is.EqualTo(expected));
+            var surface = Track(new GameObject("DetachedSurface")).AddComponent<TileLongPressRelay>();
+            surface.Initialize(null, tile);
+            Assert.That(PreservesHand(surface.gameObject), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void HandCollapse_OnlyEndTurnAndGearButtonsAreRegistered()
+        {
+            var root = Track(new GameObject("Presenter"));
+            root.SetActive(false);
+            var presenter = root.AddComponent<BattleScreenPresenter>();
+            var endTurn = Track(new GameObject("EndTurn", typeof(RectTransform), typeof(Button))).GetComponent<Button>();
+            SetPrivateField(presenter, "_endTurnButton", endTurn);
+            SetPrivateField(presenter, "_endTurnButtonVisualVersion", 1);
+            InvokePrivateMethod(presenter, "ApplyEndTurnButtonVisual");
+            Assert.That(PreservesHand(endTurn.gameObject), Is.True);
+            var caption = new GameObject("Caption");
+            caption.transform.SetParent(endTurn.transform);
+            Assert.That(PreservesHand(caption), Is.True);
+
+            var settingsRoot = Track(new GameObject("Settings", typeof(RectTransform)));
+            settingsRoot.SetActive(false);
+            var settings = settingsRoot.AddComponent<Project333.Runtime.Presentation.Settings.GlobalSettingsMenuController>();
+            SetPrivateField(settings, "_safeAreaRoot", settingsRoot.GetComponent<RectTransform>());
+            InvokePrivateMethod(settings, "EnsureGearButton");
+            var gear = settingsRoot.GetComponentsInChildren<PreserveExpandedHand>(true).Single();
+            Assert.That(PreservesHand(gear.gameObject), Is.True);
+            var otherButton = Track(new GameObject("OtherButton", typeof(RectTransform), typeof(Button)));
+            Assert.That(PreservesHand(otherButton), Is.False);
+            Assert.That(PreservesHand(null), Is.False);
+        }
+
+        [TestCase(-1)]
+        [TestCase(0)]
+        public void HandCollapse_PreservedPointerDownSurvivesChangedReleaseTarget_ThenResets(int pointerId)
+        {
+            var controller = CreateControllerWithHand(out var card);
+            var hand = (HandPresenter)typeof(BattlePlayerInputController).GetField("_handPresenter", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(controller);
+            SetPrivateField(controller, "_isTrackingBackgroundDeselectPointer", true);
+            SetPrivateField(controller, "_backgroundDeselectPointerId", pointerId);
+            SetPrivateField(controller, "_backgroundPointerStartedOverHandPreservingTarget", true);
+            // Opening settings changes the top release target; the original press still wins.
+            InvokePrivateMethod(controller, "EndBackgroundDeselectPointer", pointerId, Vector2.zero);
+            InvokePrivateMethod(controller, "ApplyQueuedHandCollapse");
+            Assert.That(hand.IsExpanded, Is.True);
+            SetPrivateField(controller, "_isTrackingBackgroundDeselectPointer", true);
+            SetPrivateField(controller, "_backgroundDeselectPointerId", pointerId);
+            InvokePrivateMethod(controller, "EndBackgroundDeselectPointer", pointerId, Vector2.zero);
+            InvokePrivateMethod(controller, "ApplyQueuedHandCollapse");
+            Assert.That(hand.IsExpanded, Is.False);
+        }
+
+        private static bool PreservesHand(GameObject target) =>
+            (bool)typeof(BattlePlayerInputController).GetMethod("IsHandExpansionPreservingTarget", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { target });
 
         private static BattleFlowController CreateFlowControllerInMainPhase()
         {

@@ -21,7 +21,7 @@ MonoBehaviour:
     _power: 0
     _gold: 0
   _affiliation: 1
-  _chargeTileFootprint: 1
+  _chargeTileFootprint: 0
   _effectText: "\uB300\uC0C1 \uD558\uB098\uC5D0\uAC8C \uB9C8\uBC95 \uD53C\uD574 10"
   _specialEffectText: 
   _boardSprite: {fileID: 0}

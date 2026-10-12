@@ -52,7 +52,7 @@ public sealed record BattleResult(
         if (AiChallengeAttemptId.HasValue &&
             (AiChallengeAttemptId == Guid.Empty || !UseServerAiOpponent || runs.Length != 1 ||
              runs[0].OnlineSeatId != OnlineBattleSeatId.PlayerA))
-            throw new InvalidOperationException("Invalid AI challenge result binding.");
+            throw new InvalidOperationException("Invalid Gold Dungeon result binding.");
         return this with { Runs = Array.AsReadOnly(runs) };
     }
 

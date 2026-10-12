@@ -15,6 +15,8 @@ namespace Project333.Runtime.Application.Online
 
         public long Sequence { get; set; }
 
+        public int? ExpectedTurnNumber { get; set; }
+
         public PlayerId ActorId { get; set; }
 
         public OnlineBattleCommandType CommandType { get; set; }

@@ -9,6 +9,7 @@ using System.Text.Json.Serialization;
 #endif
 using Project333.Runtime.Domain.Cards;
 using Project333.Runtime.Domain.Resources;
+using Project333.Runtime.Domain.Effects;
 
 namespace Project333.Runtime.Infrastructure.Data
 {
@@ -86,6 +87,7 @@ namespace Project333.Runtime.Infrastructure.Data
         DamageSpell = 2,
         PersistentResourceSpell = 3,
         ScriptedSpell = 4,
+        TrapSpell = 5,
     }
 
     public sealed class JsonCardDefinitionRecord
@@ -202,9 +204,18 @@ namespace Project333.Runtime.Infrastructure.Data
 
         public int TriggerCount { get; set; }
 
+        public int EffectAmount { get; set; }
+
+        public bool HasTrap { get; set; }
+        public TrapTriggerType TrapTrigger { get; set; }
+        public TrapEffectType TrapEffect { get; set; }
+        public JsonResourceSet TrapActivationCost { get; set; } = new JsonResourceSet();
+
         public CardDefinition ToDefinition()
         {
             ValidateCoreFields();
+            if (HasTrap != (DefinitionType == JsonCardDefinitionKind.TrapSpell))
+                throw new InvalidOperationException($"Trap flag and definition kind must match: '{Id}'.");
             if (DefinitionType != JsonCardDefinitionKind.Unit && Races != null)
                 throw new InvalidOperationException($"Only Unit cards may define races: '{Id}'.");
 
@@ -296,7 +307,14 @@ namespace Project333.Runtime.Infrastructure.Data
                         Damage,
                         DamageType,
                         TriggerCount,
-                        HasReplicate);
+                        HasReplicate,
+                        EffectAmount);
+
+                case JsonCardDefinitionKind.TrapSpell:
+                    if (Cost != null && (Cost.Mana != 0 || Cost.Qi != 0 || Cost.Power != 0 || Cost.Gold != 0))
+                        throw new InvalidOperationException($"Trap installation cost must be zero: '{Id}'.");
+                    return new TrapSpellCardDefinition(Id, DisplayName, (TrapActivationCost ?? new JsonResourceSet()).ToRuntime(),
+                        TrapTrigger, TrapEffect, HasReplicate, Damage);
 
                 default:
                     throw new InvalidOperationException($"Unsupported JSON card definition type '{DefinitionType}'.");

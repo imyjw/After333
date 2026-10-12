@@ -139,7 +139,9 @@ using(var pending=PendingAccountOperation.Begin(url,kind,card,3))
     Require(PendingAccountOperation.HasPending(url,kind,card),"Recovery touched an active purchase.");
 }
 Pass("automatic recovery skips the original in-flight operation");
+await TutorialAccountIsolationChecks.RunAsync();
 await AccountHttpTransportChecks.RunAsync();
+await ShopCardPackClientChecks.RunAsync();
 Console.WriteLine($"PASS: {passes} client retry groups; production PendingAccountOperation code with in-memory Unity storage/HTTP/JSON boundaries, no real account or network access.");
 void Pass(string text){passes++;Console.WriteLine("PASS: "+text);}
 void Require(bool condition,string message){if(!condition)throw new InvalidOperationException(message);}

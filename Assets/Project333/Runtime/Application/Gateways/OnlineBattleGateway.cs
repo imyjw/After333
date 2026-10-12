@@ -12,6 +12,9 @@ namespace Project333.Runtime.Application.Gateways
     {
         private readonly IOnlineBattleMessageSender _messageSender;
         private long _nextSequence = 1;
+        private int? _endedTurnNumber;
+        private long? _pendingEndTurnSequence;
+        public bool IsAwaitingNextTurn => _endedTurnNumber.HasValue;
 
         public OnlineBattleGateway(
             string matchId,
@@ -51,6 +54,10 @@ namespace Project333.Runtime.Application.Gateways
         public void ApplyServerView(BattleStateViewDto view)
         {
             CurrentView = view;
+            if (view != null && view.MatchId == MatchId &&
+                (view.IsEnded || (_endedTurnNumber.HasValue && view.TurnNumber > _endedTurnNumber.Value &&
+                 view.ActivePlayerId == LocalPlayerId && view.Phase == PhaseType.Main)))
+                ClearEndTurnLock();
         }
 
         public void SetLocalPlayerId(PlayerId localPlayerId)
@@ -62,6 +69,7 @@ namespace Project333.Runtime.Application.Gateways
         {
             if (!string.IsNullOrWhiteSpace(matchId))
             {
+                if (MatchId != matchId) { ClearEndTurnLock(); CurrentView = null; }
                 MatchId = matchId;
             }
         }
@@ -142,6 +150,10 @@ namespace Project333.Runtime.Application.Gateways
                         ToServerOwnerId(castDamageSpellCommand.TargetOwnerId),
                         castDamageSpellCommand.TargetCoord,
                         true);
+
+                case InstallTrapCommand installTrapCommand:
+                    return CreateCardMessage(serverActorId, OnlineBattleCommandType.InstallTrap,
+                        installTrapCommand.CardId, installTrapCommand.HandCardRuntimeId);
 
                 case CastPersistentResourceSpellCommand castPersistentResourceSpellCommand:
                     return CreateCardMessage(
@@ -249,13 +261,49 @@ namespace Project333.Runtime.Application.Gateways
                 AccountId = AccountId,
                 Sequence = _nextSequence++,
                 ActorId = actorId,
+                ExpectedTurnNumber = CurrentView?.TurnNumber,
                 CommandType = commandType
             };
         }
 
         private void Send(ClientBattleCommandMessage message)
         {
-            _messageSender.Send(message);
+            var isGameplay = message.CommandType != OnlineBattleCommandType.Surrender &&
+                message.CommandType != OnlineBattleCommandType.ApplyMulligan &&
+                message.CommandType != OnlineBattleCommandType.PassMulligan;
+            if (isGameplay && IsAwaitingNextTurn)
+                throw new InvalidOperationException("턴 종료를 요청했습니다. 다음 내 턴을 기다려 주세요.");
+            if (isGameplay && CurrentView != null &&
+                (CurrentView.IsEnded || CurrentView.ActivePlayerId != LocalPlayerId || CurrentView.Phase != PhaseType.Main))
+                throw new InvalidOperationException("내 행동 턴이 아닙니다.");
+            var endTurn = message.CommandType == OnlineBattleCommandType.EndTurn;
+            if (endTurn)
+            {
+                if (CurrentView == null || CurrentView.HasPendingRobotFusion)
+                    throw new InvalidOperationException("현재 전투 상태를 확인하거나 로봇 합체 선택을 완료해 주세요.");
+                _endedTurnNumber = CurrentView.TurnNumber;
+                _pendingEndTurnSequence = message.Sequence;
+            }
+            try { _messageSender.Send(message); }
+            catch
+            {
+                // Synchronous enqueue failure can retry. Asynchronous failures recover through
+                // reconnect and a fresh authoritative view, never a timed EndTurn retry.
+                if (endTurn) RejectCommand(message.Sequence);
+                throw;
+            }
+        }
+
+        public void RejectCommand(long? sequence)
+        {
+            // An unrelated earlier error must not unlock a submitted EndTurn.
+            if (sequence.HasValue && sequence == _pendingEndTurnSequence) ClearEndTurnLock();
+        }
+
+        private void ClearEndTurnLock()
+        {
+            _endedTurnNumber = null;
+            _pendingEndTurnSequence = null;
         }
 
         private PlayerId ToServerOwnerId(PlayerId localPerspectiveOwnerId)

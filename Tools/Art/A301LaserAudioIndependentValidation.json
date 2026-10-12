@@ -1,0 +1,33 @@
+{
+    "file":  "C:\\Project_333\\Assets\\Project333\\Resources\\Project333\\Units\\A-301\\Audio\\LaserShot.wav",
+    "validation":  "Independent RIFF chunk and decoded PCM analysis; no numpy/scipy or synthesizer helper used.",
+    "format":  {
+                   "encoding":  1,
+                   "channels":  1,
+                   "sampleRate":  44100,
+                   "byteRate":  88200,
+                   "blockAlign":  2,
+                   "bitsPerSample":  16
+               },
+    "containerBytes":  22976,
+    "pcmBytes":  22932,
+    "samples":  11466,
+    "durationSeconds":  0.26,
+    "peakDbfs":  -14.000100374307355,
+    "rmsDbfs":  -25.01128922114518,
+    "dcOffset":  7.3901192588413569E-05,
+    "peakTimeSeconds":  0.015600907029478459,
+    "clippedSamples":  0,
+    "firstSample":  0,
+    "lastSample":  0,
+    "boundary64Samples":  {
+                              "firstPeak":  0.00323486328125,
+                              "lastPeak":  3.0517578125E-05,
+                              "firstMaxAdjacentStep":  0.00048828125,
+                              "lastMaxAdjacentStep":  3.0517578125E-05,
+                              "passed":  true
+                          },
+    "sha256":  "3cfff82da0af3e250f287386d77769dde4a42388127a036ce35d7d063d882b87",
+    "passed":  true,
+    "listening":  "No device/in-game listening validation; file and waveform checks only."
+}

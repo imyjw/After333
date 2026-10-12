@@ -1,0 +1,39 @@
+{
+  "note": "Signal measurements do not establish subjective musical quality or replace device listening.",
+  "tracks": [
+    {
+      "id": "After333_Lobby",
+      "seconds": 133.33333333333334,
+      "frames": 5880000,
+      "peakDbfs": -9,
+      "rmsDbfs": -24.97,
+      "clippedFrames": 0,
+      "dcLeft": -3.4929132785926872e-9,
+      "dcRight": -1.204094919217687e-8,
+      "stereoDifferenceRms": 0.02205144659102542,
+      "stereoCorrelation": 0.924027475156688,
+      "maxAdjacentSampleStep": 0.028411865234375,
+      "loopBoundaryStep": 0,
+      "minOneSecondRmsDbfs": -46.25,
+      "maxOneSecondRmsDbfs": -20.75,
+      "preview": "docs/audio/After333_Lobby_Preview.wav"
+    },
+    {
+      "id": "After333_Battle",
+      "seconds": 120,
+      "frames": 5292000,
+      "peakDbfs": -3,
+      "rmsDbfs": -17.1,
+      "clippedFrames": 0,
+      "dcLeft": -3.460042871315193e-11,
+      "dcRight": 1.7819220787273243e-9,
+      "stereoDifferenceRms": 0.058721255182899744,
+      "stereoCorrelation": 0.9115361611420769,
+      "maxAdjacentSampleStep": 0.06756591796875,
+      "loopBoundaryStep": 0.000030517578125,
+      "minOneSecondRmsDbfs": -22.17,
+      "maxOneSecondRmsDbfs": -15.09,
+      "preview": "docs/audio/After333_Battle_Preview.wav"
+    }
+  ]
+}

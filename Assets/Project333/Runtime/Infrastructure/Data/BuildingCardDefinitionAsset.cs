@@ -41,7 +41,7 @@ namespace Project333.Runtime.Infrastructure.Data
         {
             get
             {
-                var text = base.SpecialEffectText;
+                var text = NormalizePowerConsumptionSpecialEffectText(base.SpecialEffectText, _sciencePowerUpkeep);
                 if (_sealboundOwnerTurnStarts > 0 &&
                     text.IndexOf("Sealbound", StringComparison.OrdinalIgnoreCase) < 0 &&
                     !text.Contains("봉인"))

@@ -1,6 +1,18 @@
 # PostgreSQL DB Implementation Plan
 
+실제 적용 상태(2026-10-09): 사용자 요청으로 운영 DB에 `0023_ai_challenge_run_usage` 적용 완료(총23개/latest0023). 적용 전 전체 백업과 아카이브 읽기를 검증했고, 기존33개 테이블의 행 수·전체 행 해시 및 도전25건이 보존되었다. 이번에는 서버 배포·재시작이나 클라이언트 빌드·설치를 수행하지 않았다. 상세 [운영 적용 기록](battle_modes.md#운영-db-마이그레이션-적용-2026-10-09).
+
+실제 적용 상태(2026-10-02): 아래 소스 대조·단계별 계획과 별도로, 사용자 승인 후 운영 DB0020/0021/0022·카드팩 서버 적용 및 Android APK(versionCode5) 빌드를 완료했다. 최종 백업의 격리 복원34/34, 보호 테이블31개 불변과 대기열2행의 시작 시 상태 변경 검증은 [실제 적용 기록](shop_card_packs.md)을 따른다. 운영 DB 복원·초기화와 실기기 실행은 수행하지 않았다.
+
 > **Current authentication policy (2026-07-16):** Guest account creation, resume, and identity linking are disabled. Any guest-auth sections below are retained only as historical design context and must not be implemented or exposed. Current clients require Game ID or Google login, restore saved session/refresh credentials automatically, and otherwise show a non-dismissible login gate.
+
+## 현재 구현 기준 (2026-10-02 카드팩·마이그레이션 소스 대조)
+
+원래의 단계별 초안과 SQL 예시는 아래에 보존한다. 현재 실행 스키마는 `Persistence/Migrations/0001`~`0022`와 서버 서비스 코드가 기준이며, 아래 게스트 로그인·임시 덱 저장·스타트업 스냅샷 복원 계획은 현행 기능으로 구현하거나 실행하지 않는다.
+
+현재 제공하는 기능은 Game ID/Google 로그인, 세션·refresh 회전, 모바일 보안 저장, 서버 33장 드래프트와 런, Lv.0~13 강화, 런 종료 보상, 광고 티켓, 티켓/카드팩 구매와 강화 영수증·취소, 선물함, 사람 우선 전투/20초 AI 전환, 티켓 3개로 시작한 현재 런당 최대 3회 골드 던전이다. 완성된 진행 중 런을 사용하며 자정·재로그인은 횟수를 초기화하지 않는다. 카드팩은 구매 시 33계정 골드 차감·10장 지급을 원자적으로 확정하고, 개봉은 표시 연출이다. [카드팩 계약](shop_card_packs.md)을 따른다. 시작 씬 설정에서 확인 후 로그아웃이 가능하다. 상세 API는 [계정 설계의 현행 목록](account_persistence_db_design.md#implemented-api-direction)을 따른다.
+
+재접속은 실행 중인 서버의 원래 전투/좌석으로 70초 유예를 제공한다. 서버 중단 후 미완료 전투는 승패 없이 취소하고, 확정 결과 저널만 DB 영수증으로 멱등 재전달한다. `PROJECT333_ENABLE_PVP_STARTUP_RECOVERY`는 과거 호환 옵션이며 현재 스냅샷 복구를 켜지 않는다. 현재 운영 DB 버전·릴리스·OAuth 설정은 이번 문서 작업에서 조회하거나 변경하지 않았다.
 
 ## Document Purpose
 
@@ -10,6 +22,7 @@ Related documents:
 
 - Account persistence design: [account_persistence_db_design.md](./account_persistence_db_design.md)
 - Meta rules: [meta_rules.md](./meta_rules.md)
+- Card-pack purchase, receipts and opening: [shop_card_packs.md](./shop_card_packs.md)
 - Draft rules: [draft_rules.md](./draft_rules.md)
 - Online PvP prototype: [online_pvp_prototype.md](./online_pvp_prototype.md)
 
@@ -18,12 +31,12 @@ Related documents:
 - The real source of truth is a server DB.
 - The target DB is PostgreSQL.
 - Unity must not write authoritative account, ticket, card, reward, or run data directly.
-- Guest accounts are real server-side accounts.
+- Historical guest rows may remain in the schema; current guest creation, resume and linking are disabled.
 - Local Unity data is only cache or temporary demo data.
 - Run decks store `card_id` values only.
 - Each battle reads the account's current card upgrade levels from `user_card_collection`.
 
-## Implementation Goal
+## Original Implementation Goal (historical planning)
 
 The first DB implementation should not try to build every future meta feature at once.
 
@@ -82,7 +95,7 @@ Rule:
 
 - WebSocket battle session code should not run raw SQL.
 - Account/run/deck persistence should go through repositories or services.
-- Battle state can still remain in memory until resumable battles are intentionally implemented.
+- Live battle simulation stays in memory. Account-bound reconnect is implemented within the running process; server interruption cancels unfinished battles under the current policy.
 
 ## Configuration
 
@@ -92,7 +105,7 @@ Recommended environment variables:
 | --- | --- | --- |
 | `PROJECT333_DB_CONNECTION` | PostgreSQL connection string | `Host=localhost;Port=5432;Database=project333;Username=project333;Password=dev_password` |
 | `PROJECT333_JWT_SECRET` | Future auth token signing secret | Development-only random value |
-| `PROJECT333_CARD_DATA_VERSION` | Current card definition version | `cards-v1` |
+| `PROJECT333_CARD_DEFINITION_VERSION` | Optional current card-definition compatibility hint | `cards-v1` |
 
 Development rule:
 
@@ -101,17 +114,39 @@ Development rule:
 
 ## Migration Strategy
 
-Recommended migration folder:
+Current source migration folder (22 ordered migrations; applied target versions are verified separately):
 
 ```text
 Server/Project333.PvpServer/Persistence/Migrations/
   0001_account_meta_schema.sql
   0002_auth_sessions.sql
-    0003_card_upgrade_costs_seed.sql
-    0004_draft_current_offer.sql
-    0005_auth_identity_login_expansion.sql
-    0006_pvp_matchmaking_schema.sql
-  ```
+  0003_card_upgrade_costs_seed.sql
+  0004_draft_current_offer.sql
+  0005_auth_identity_login_expansion.sql
+  0006_pvp_matchmaking_schema.sql
+  0007_pvp_battle_snapshots.sql
+  0008_auth_refresh_tokens.sql
+  0009_rewarded_ads.sql
+  0010_disable_guest_accounts.sql
+  0011_pvp_draw_player_status.sql
+  0012_battle_result_receipts.sql
+  0013_pvp_match_reservations.sql
+  0014_single_active_draft_run.sql
+  0015_account_operation_receipts.sql
+  0016_account_operation_cancellations.sql
+  0017_gift_inbox.sql
+  0018_ai_challenges.sql
+  0019_matchmaking_ai_fallback.sql
+  0020_card_upgrade_costs_revision.sql
+  0021_card_upgrade_level2_cost_revision.sql
+  0022_card_pack_purchase_receipts.sql
+  0023_ai_challenge_run_usage.sql
+  0024_elf_elder_card_id.sql
+```
+
+The authoritative upgrade cost table is read by CardUpgradeService. Migration `0020` established the 13-row schedule; subsequent `0021` changes only target Lv.2 from 5/5 to 6/6. Current target Lv.1/2/3/4/5 costs are 3/6/10/20/30 copies and Resource Gold, and target Lv.6–13 costs remain 33/33. Client cost display alone cannot change DB charges. Apply through the existing migration runner on the intended server release; this documentation task does not connect to or migrate the live DB. Existing same-ID receipts retain their original paid cost. [Current costs](meta_rules.md#card-upgrade-costs).
+
+Apply `0022_card_pack_purchase_receipts.sql` after those earlier migrations for the card-pack service. It extends `account_operation_receipts.operation_type` to `ticket_purchase`, `card_upgrade`, and `card_pack_purchase`. The service uses the existing wallet, collection and ledger in one transaction; this migration does not create unopened pack inventory. Both `/shop/purchase-card-pack` and `/shop/card-pack-purchases/{requestId}` require the authenticated bearer account and use the account API rate-limit category (default 120 requests/60 seconds). Source presence does not prove application to the live DB; see [shop card packs](shop_card_packs.md).
 
 Recommended migration tracking table:
 
@@ -121,7 +156,7 @@ Each migration script should insert its version into `schema_migrations` after s
 
 ## Migration 0001 Draft
 
-This is a draft only. Do not run it automatically until the server migration runner is implemented.
+This SQL is the historical first-schema draft, including future unopened pack inventory/history examples. The fixed 33 Resource Gold pack grants cards at purchase commit through collection and operation receipts, not those inventory tables. The migration runner is implemented; run the versioned `Persistence/Migrations` files through that runner rather than executing this draft as the current schema.
 
 ```sql
 begin;
@@ -776,37 +811,28 @@ Server behavior:
 - Insert `deck_cards`.
 - Link to `draft_runs.completed_deck_id` when the run system is ready.
 
-## Verification Checklist
+## Current Verification Checklist
 
-Current verification checklist:
+These are checks to perform against the chosen release, not claims of a new deployment:
 
-- Server starts with PostgreSQL connection string.
-- Migrations `0001` through `0007` each run once and are recorded in `schema_migrations`.
-- Restarting the server does not reapply an already recorded migration.
-- `POST /auth/guest` creates `accounts`, `auth_identities`, `user_wallets`, and `auth_sessions`.
-- `GET /me` returns the same account.
-- Expired or revoked sessions cannot call `GET /me`.
-- A test deck can be saved and loaded in the same card order.
-- `POST /auth/register` creates a registered account and allows login with the same Game ID.
-- `POST /auth/link-game-id` keeps the same account id when linking a Game ID to a guest account.
-- Draft picks and the exact current offer survive client restart.
-- Run wins/losses, one-time reward claim, wallet changes, card rewards, and upgrades survive client restart.
-- PvP matchmaking rows identify both authenticated accounts and seats.
-- Reconnect within the grace period restores the same seat and latest battle state.
-- With startup recovery enabled, a persisted snapshot can recreate a missing in-memory battle session.
-
-Unity-facing verification:
-
-- Start screen can create/resume guest account.
-- Ticket count displayed on start screen comes from server response.
-- Draft and DeckBuilding scenes restore account/run data from the server.
-- Game ID register/login can create a session for the same account model as guest login.
-- Linking Game ID to a guest account keeps the same `account_id`.
-- Social login must preserve the same rule when provider integration is implemented.
+- The source migration set contains `0001`~`0024`; the actual target DB records each applied version once and an ordinary restart does not reapply it. `0020` established the 13 authoritative card_upgrade_costs transitions, followed by `0021` changing only Lv.1 -> Lv.2 to 6/6 on 2026-10-02. The next ordered migration, `0022`, permits card-pack purchase receipts without rewriting existing receipts. Migration `0023_ai_challenge_run_usage.sql` adds only an index for account/run usage queries, retaining `challenge_day` as audit data and preserving all prior attempts/results/rewards. Historical `0003`/`0020` and existing wallet/collection state remain unchanged by these migration definitions.
+- Game ID register/login and configured Google login authenticate registered accounts; guest creation/resume and public identity-link routes are not exposed.
+- `/me` rejects expired/revoked credentials and restores the same account, wallet, collection, current run/deck and upgrade levels after refresh.
+- The server generates all 33 offers/picks and the completed deck; current offer, pick order and active-run uniqueness survive client restart.
+- Ticket/card-pack purchase and upgrade RequestId receipts, ExpectedUpgradeLevel validation and durable cancellation prevent duplicate charges, including late requests. A pack commit grants the original ordered 10 cards once; receipt lookup and opening never draw or grant again.
+- A run-end reward is claimed once; ad S2S events, gift claims and Gold Dungeon results are independently idempotent.
+- Normal matchmaking reserves authenticated seats/decks and uses a 20-second default AI fallback; challenge admission is separate, at most three per active completed run started with 3 tickets and win Gold10. Status exposes `RunId`, `RunLimit`, `RemainingAttempts` and `PendingAttempt`, without a midnight reset timestamp. Existing run attempts count across dates; midnight/relogin do not replenish them.
+- Disconnect recovery before the 70-second deadline restores the original battle/seat/deck/upgrades; a stale socket cannot extend or terminate its replacement's reservation.
+- Server interruption cancels unfinished battles without win/loss; challenge refunds return to the admission's original run, never to a later run. Already-durable results are replayed before cancellation.
+- Mobile credential migration, login gate and start-scene confirmed logout are verified separately on actual signed device builds.
 
 ## Decisions Still Needed Later
 
 - Android Keystore and iOS Keychain storage are implemented; real-device migration verification and the user-facing lost-device/account-recovery policy are still needed.
-- Exact pack contents and probabilities.
+- Additional pack products or guarantees beyond the fixed 33 Resource Gold, 10 independent reward-eligible cards and 40/30/18/9/3% rarity probabilities.
 - Social login provider setup details for Naver, Kakao, and Google.
-- Hosted PostgreSQL backup/restore schedule and migration rollback policy.
+- Hosted PostgreSQL migration rollback/PITR and full host recovery remain future decisions. The laptop's nightly encrypted MYBOX backup and isolated restore records are described in [mybox_database_backup.md](mybox_database_backup.md); they do not prove a VPS schedule or current task execution.
+
+## ElfElder 카드 ID 통일 (2026-10-09 소스 변경)
+
+마이그레이션 `0024_elf_elder_card_id.sql`은 기존 카드 식별자를 공백 없는 `ElfElder`로 변환한다. 보유 카드 두 철자가 함께 있으면 잔여 수량을 합산하고 높은 강화 레벨을 유지한다. 덱 슬롯·드래프트 제시/선택·보상·카드팩·전투 JSON·거래 기록·성공 영수증 및 강화 요청 fingerprint를 같은 트랜잭션에서 변환하며 골드·티켓·수량 증감·요청 ID·결과를 바꾸지 않는다. JSON 오브젝트에 두 ID 키가 함께 있으면 임의 병합하지 않고 전체 롤백한 뒤 확인한다. 서버 업데이트 시 이전 실행본의 쓰기를 중지하고 새 클라이언트와 함께 적용해야 한다. 운영 DB는 여전히 0023이며 이번에는 0024를 운영에 적용하지 않았다.

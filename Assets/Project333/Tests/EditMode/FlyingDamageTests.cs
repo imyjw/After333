@@ -105,7 +105,7 @@ namespace Project333.Tests.EditMode
             var back = Unit(state, PlayerId.AI, new TileCoord(0, 1), flying: true, hiding: true);
             Attack(state, attacker, front);
             Assert.That(back.CurrentHp, Is.EqualTo(45));
-            Assert.That(back.IsHiding, Is.True);
+            Assert.That(back.IsHiding, Is.False, "Piercing reveals the hit recipient.");
         }
 
         [TestCase(false, 0)]
@@ -274,13 +274,13 @@ namespace Project333.Tests.EditMode
 
         [TestCase(false)]
         [TestCase(true)]
-        public void Attack_CounterattackAgainstFlyingIsNotHalved(bool defenderFlying)
+        public void Attack_CounterattackAgainstFlyingIsHalvedUnlessCounterattackerFlies(bool defenderFlying)
         {
             var state = State();
             var attacker = Unit(state, PlayerId.Player, new TileCoord(0, 0), attack: 10, flying: true, defense: 2);
             var target = Unit(state, PlayerId.AI, new TileCoord(0, 0), attack: 10, flying: defenderFlying);
             Attack(state, attacker, target);
-            Assert.That(attacker.CurrentHp, Is.EqualTo(42));
+            Assert.That(attacker.CurrentHp, Is.EqualTo(defenderFlying ? 42 : 46));
             Assert.That(target.CurrentHp, Is.EqualTo(40));
         }
 
@@ -333,6 +333,37 @@ namespace Project333.Tests.EditMode
         private static void Attack(BattleState state, OccupantState attacker, OccupantState target)
         {
             new AttackService().Attack(state, attacker.OwnerId, attacker.Position, target.Position);
+        }
+
+        [TestCase(DamageType.Physical)]
+        [TestCase(DamageType.Magic)]
+        [TestCase(DamageType.Fixed)]
+        public void Counterattack_EveryHitHalvesAfterDefenseAndLifeStealUsesReducedLoss(DamageType type)
+        {
+            var state = State();
+            var attacker = Unit(state, PlayerId.Player, new TileCoord(0, 0), attack: 1,
+                flying: true, defense: 2);
+            var defender = Unit(state, PlayerId.AI, new TileCoord(0, 0), attack: 9,
+                hits: 3, damageType: type, lifeSteal: true);
+            defender.CurrentHp = 10;
+            Attack(state, attacker, defender);
+            var perHit = type == DamageType.Fixed ? 4 : 3;
+            Assert.That(attacker.CurrentHp, Is.EqualTo(50 - 3 * perHit));
+            Assert.That(defender.CurrentHp, Is.EqualTo(9 + 3 * perHit));
+            Assert.That(state.ValuePopupEvents.Where(e => e.Cause == BattleValueChangeCause.Counterattack)
+                .Select(e => e.Amount), Is.EqualTo(Enumerable.Repeat(perHit, 3)));
+        }
+
+        [Test]
+        public void Counterattack_FlyingRoundingCanPreventEndureConsumption()
+        {
+            var state = State();
+            var attacker = Unit(state, PlayerId.Player, new TileCoord(0, 0), attack: 1,
+                flying: true, hp: 1, endure: true);
+            var defender = Unit(state, PlayerId.AI, new TileCoord(0, 0), attack: 1);
+            Attack(state, attacker, defender);
+            Assert.That(attacker.CurrentHp, Is.EqualTo(1));
+            Assert.That(attacker.EndureUsed, Is.False);
         }
 
         private static UnitState Unit(BattleState state, PlayerId owner, TileCoord coord,

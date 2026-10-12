@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Project333.Runtime.Application.Accounts;
 using Project333.Runtime.Presentation.Settings;
+using Project333.Runtime.Presentation.Tutorial;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -33,6 +34,8 @@ namespace Project333.Runtime.Presentation.Startup
         private GiftInboxAccountScope _scope;
         private int _generation;
         private bool _loading;
+        private bool _tutorialPracticeLoaded;
+        private bool IsTutorialPracticeMode => _tutorialPracticeLoaded || TutorialRuntimeIsolation.IsActive;
         private string _claimingId;
         private string _nextCursor;
         private long _unclaimedCount;
@@ -161,10 +164,12 @@ namespace Project333.Runtime.Presentation.Startup
             _refreshButton.onClick.AddListener(Refresh);
             if (!modalExists) _modalRoot.gameObject.SetActive(false);
             RefreshHeader();
+            if (IsTutorialPracticeMode && _giftButton != null) _giftButton.interactable = true;
         }
 
         private void Awake()
         {
+            _tutorialPracticeLoaded = TutorialRuntimeIsolation.IsActive;
             EnsureEditableHierarchy();
             Close();
         }
@@ -174,7 +179,7 @@ namespace Project333.Runtime.Presentation.Startup
         private void OnApplicationFocus(bool focused) { if (focused) _nextRefreshAt = 0; }
         private void Update()
         {
-            if (!UnityEngine.Application.isPlaying) return;
+            if (!UnityEngine.Application.isPlaying || IsTutorialPracticeMode) return;
             EnsureAccountScope();
             if (_scope.IsAuthenticated && !_loading && _claimingId == null && Time.unscaledTime >= _nextRefreshAt)
                 _ = RefreshAsync(false);
@@ -210,11 +215,12 @@ namespace Project333.Runtime.Presentation.Startup
         }
 
         private bool IsCurrent(int generation, GiftInboxAccountScope scope) =>
-            this != null && isActiveAndEnabled && generation == _generation &&
+            this != null && !IsTutorialPracticeMode && isActiveAndEnabled && generation == _generation &&
             scope.Matches(AccountSessionState.AccountId, AccountSessionState.SessionToken, ServerUrl);
 
         public void Open()
         {
+            if (IsTutorialPracticeMode) return;
             EnsureAccountScope();
             _modalRoot.gameObject.SetActive(true);
             if (!_scope.IsAuthenticated)
@@ -231,6 +237,7 @@ namespace Project333.Runtime.Presentation.Startup
 
         private async Task RefreshAsync(bool append)
         {
+            if (IsTutorialPracticeMode) return;
             EnsureAccountScope();
             if (!_scope.IsAuthenticated || _loading || _claimingId != null) return;
             var generation = _generation;
@@ -281,6 +288,7 @@ namespace Project333.Runtime.Presentation.Startup
 
         public async void Claim(string giftId)
         {
+            if (IsTutorialPracticeMode) return;
             EnsureAccountScope();
             if (_loading || _claimingId != null || !_scope.IsAuthenticated || !_items.Exists(x => x.ResolvedGiftId == giftId && x.CanClaim)) return;
             var generation = _generation;

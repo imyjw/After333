@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace Project333.Runtime.Infrastructure.Data
@@ -29,7 +31,7 @@ namespace Project333.Runtime.Infrastructure.Data
 
         public CardRarity Rarity => _rarity;
 
-        public ResourceSetData Cost => _cost;
+        public virtual ResourceSetData Cost => _cost;
 
         public CardAffiliation Affiliation => _affiliation;
 
@@ -55,7 +57,44 @@ namespace Project333.Runtime.Infrastructure.Data
             }
         }
 
+        protected static string NormalizePowerConsumptionSpecialEffectText(string text, int amount)
+        {
+            text = text?.Trim() ?? string.Empty;
+            if (amount <= 0)
+            {
+                return text;
+            }
+
+            var lines = new List<string>();
+            var hasPowerConsumption = false;
+            foreach (var segment in text.Split(new[] { '\r', '\n', ',' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var label = segment.Trim();
+                // Old native assets retain their serialized values; the typed amount is authoritative.
+                if (Regex.IsMatch(label, @"^전력\s*(?:소모\s*:\s*|-)\s*[0-9]+\s*$"))
+                {
+                    if (!hasPowerConsumption)
+                    {
+                        lines.Add($"전력 소모:{amount}");
+                        hasPowerConsumption = true;
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(label))
+                {
+                    lines.Add(label);
+                }
+            }
+
+            if (!hasPowerConsumption)
+            {
+                lines.Add($"전력 소모:{amount}");
+            }
+
+            return string.Join(Environment.NewLine, lines);
+        }
         public bool HasReplicate => _hasReplicate;
+
+        public virtual bool HasTrap => false;
 
         protected string RawSpecialEffectText => _specialEffectText;
 

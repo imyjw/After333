@@ -11,9 +11,12 @@ The following retained wording is historical where it conflicts with those sourc
 - Unit races supersede the legacy Robot special-effect/classification wording. Erasure does not suppress races; see battle_rules.md and unit_races.md.
 - Resource Gold is implemented persistent meta currency, not outside current scope.
 - The summarized turn sequence below is incomplete; use battle_rules.md for Timed Bomb, Power Plant, upkeep and Sealbound timing.
-- Broad whitelist prohibitions do not ban effects already explicitly locked in current battle/card rules, including revival, stat changes and persistent damage.
+- Broad whitelist prohibitions do not ban effects already explicitly locked in current battle/card rules, including revival, stat changes and persistent damage. Stun/Freeze were explicitly requested on 2026-10-01; use their current battle_rules.md definitions instead of the historical prohibition on adding such statuses.
 - Ad placement wording differs between older instructions and rewarded_ads.md; verify the current task, implementation and dedicated ad document before changing placement.
-- "Deferred shop" does not prohibit already confirmed server ticket purchases.
+- "Deferred shop" does not prohibit confirmed server ticket purchases or the 33 Resource Gold/10-card pack purchase and opening presentation. Pack rarity probabilities are fixed at 40/30/18/9/3%; see [shop_card_packs.md](shop_card_packs.md).
+- Confirmed current TrapSpell installation/activation, permanent defense spells, paid ManaCannon attacks, live Gold-based ATK and source-bound Orc auras are implemented features; the historical whitelist below does not prohibit them. Use battle_rules.md and the per-card definitions rather than asking again for already accepted behavior.
+- New cards still require explicit upgrade eligibility and Lv.1–13 increments. The current authoring/release process is in card_authoring_checklist.md, including native catalog, draft and actual reward-pool eligibility.
+- Current battle modes are normal human-first/20-second AI fallback plus a per-run Gold Dungeon. Reconnect is 70 seconds; historical offline-only or separate PVE/PVP launch descriptions below do not override battle_modes.md.
 - special_effects.md is descriptive and may record unresolved discrepancies; it does not override battle_rules.md.
 
 The unmodified original is in archive/AGENTS_Project333_before_2026-09-21.md. The content below is retained to avoid dropping implementation constraints during this harness-only cleanup.
@@ -56,6 +59,7 @@ User requirement confirmed 2026-09-12:
 ## Product Naming
 
 - The public game name is `After333`.
+- The separate three-attempt-per-paid-run mode is publicly named `골드 던전` / `Gold Dungeon`. Keep its existing `ai_challenge` mode key and `/ai-challenge/*` API routes; the public naming change does not rename internal identifiers. The 2026-10-09 rule change gives each 3-ticket run its own three attempts without midnight resets.
 - Player-facing titles, build names, server display names, and public test documents must use `After333`.
 - Existing internal identifiers remain `Project333` for compatibility unless a dedicated migration is explicitly requested.
 - Do not rename the `Project333` C# namespaces, assembly names, asset/resource paths, `PROJECT333_*` environment variables, PostgreSQL database name, command-line switches, or PlayerPrefs keys as part of a branding-only change.
@@ -67,12 +71,13 @@ Implement the current account-backed online PvP foundation:
 - server-backed guest account login and session restore
 - first-party Game ID, implemented Google login and extensible social-login account schema
 - account-owned tickets, Resource Gold, card collection, and card upgrade state
+- server-authoritative 33 Resource Gold card packs with atomic immediate 10-card grants, durable receipts/cancellation, saved request recovery and opening presentation (shop_card_packs.md)
 - server-verified rewarded video ticket grants
 - administrator gift inbox for tickets and Resource Gold; local-only dispatch and server-authoritative one-time claim (docs/gift_inbox.md)
 - draft deck building, draft resume data, and saved run decks
 - 33 wins / 3 losses run loop with run-end rewards
 - normal matchmaking with a human opponent first and a server AI fallback after 20 seconds
-- separate daily AI challenge using the current run deck: 3 admissions per KST day, 10 Resource Gold per win, no normal-run progression, server-cancellation refund only (docs/battle_modes.md)
+- separate Gold Dungeon using the completed active run deck: 3 admissions per run started with 3 tickets, no midnight reset, 10 Resource Gold per win, no normal-run progression, server-cancellation refund only to the original run (docs/battle_modes.md)
 - server-authoritative 1:1 PvP command handling
 - account-based PvP matchmaking and reconnect groundwork
 - Unity clients sending intended commands only
@@ -82,7 +87,7 @@ Do not implement yet unless explicitly requested:
 
 - ranked matchmaking
 - MMR or seasons
-- paid shop or real-money purchase flows
+- real-money purchase flows beyond the confirmed Resource Gold ticket/card-pack purchases
 - additional social OAuth providers such as Kakao and Naver
 - production anti-cheat beyond server-side rule validation
 - resuming unfinished battles after server restart (user policy: cancel without win/loss; see docs/battle_rules.md)
@@ -164,7 +169,7 @@ Online work must pass through a gateway boundary.
   - mana `0`
   - qi `0`
   - power `0`
-  - gold `3`
+  - gold `3` for the first player / `4` for the second player, assigned before mulligan
 
 ### Mulligan
 
@@ -189,9 +194,9 @@ Each turn follows this order:
 
 1. turn start
 2. gain base resources and active occupant resources
-3. resolve power-upkeep payment
-4. resolve active Robot Factory effects
-5. resolve Firewall and Biochemical Bomb turn-start effects together in cast order
+3. resolve Fallout damage and destruction chains
+4. resolve Firewall and Biochemical Bomb turn-start damage/destruction together in cast order
+5. resolve power-upkeep payment for survivors, then active Robot Factory effects
 6. resolve the base draw
 7. main phase
 8. turn end
@@ -202,12 +207,12 @@ Each turn follows this order:
 - Resource Gold is meta currency and is out of scope for the current slice.
 - Base turn gain:
   - draw `1`
-  - gold `1`
+  - gold `3`
   - mana `0`
   - qi `0`
   - power `0`
-- Exception: on battle turn `1`, the first player does not receive the base `gold +1` and enters the first main phase with the initial `3` gold.
-- The second player receives the normal base `gold +1` on battle turn `2` and enters their first main phase with `4` gold if no other resource changes occurred.
+- Exception: on battle turns `1` and `2`, neither player receives base gold; the initial `3` / `4` gold has already been assigned during battle setup.
+- From battle turn `3` onward, the active player gains the normal base `gold +3`. Card-based resource gains are unchanged, including on opening turns.
 - Units and buildings may grant `mana +n`, `qi +n`, `power +n`, or `gold +n` at turn start.
 - All battle resources have no maximum.
 - Unspent battle resources persist between turns.
@@ -315,10 +320,10 @@ No separate global action-point system exists.
 - Persistent spells have no default duration.
 - Their end condition must be defined by card text.
 
-### Power-Upkeep Payment
+### Power Consumption (전력 소모)
 
-- Any unit with `sciencePowerUpkeep > 0`, plus an explicitly defined building such as Robot Factory, requires power payment at turn start.
-- Power payment happens after turn-start resource gain and before Robot Factory, Firewall/Biochemical Bomb effects, and the base draw.
+- The `전력 소모:n` special effect uses the existing `sciencePowerUpkeep > 0` numeric field on units/buildings. Pay n Power each owner turn start; Power-first and 1:1 Gold substitution remain confirmed rules. Preview tooltip `전력소모: n` always includes the explanatory `방전` side tooltip. Existing saved fields and gateway state are unchanged.
+- Power payment happens after resource gain and turn-start damage/destruction, including Fallout, Firewall/Biochemical Bomb and destruction chains, and before Robot Factory and the base draw. Dead occupants pay neither Power nor substitute Gold.
 - Payment is automatic in this fixed order:
   - `(0,0), (0,1), (1,0), (1,1), (2,0), (2,1), (3,0), (3,1), (4,0), (4,1)`
 - Empty tiles are skipped.
@@ -379,6 +384,7 @@ When affected by Erasure (`망각`), the occupant:
 - A Hiding Unit cannot be targeted by an opponent's normal attack or opponent's single-target spell, but area effects still affect it.
 - A Hiding Unit does not participate in front-row blocking and its Shielder is inactive.
 - A legal normal-attack declaration reveals Hiding before the first hit, LifeSteal, and counterattack resolve. Rejected attacks do not reveal it.
+- Actual HP loss from any damage source (normal attack, counterattack, Piercing, spell, or effect) reveals Hiding; fully prevented damage does not.
 - Entering Drained or Erasure permanently reveals Hiding. Clearing Drained does not restore it.
 - Sealbound takes priority. Erasure cannot reveal a Sealbound Hiding Unit, and it becomes hidden when released unless already revealed.
 - StateView and reconnect snapshots preserve `HasHiding` and `HidingRevealed`.
@@ -390,7 +396,7 @@ When affected by Erasure (`망각`), the occupant:
 - A Flying melee attacker ignores front-row blocking, and an active Flying occupant does not participate in front-row blocking.
 - Normal melee counterattack rules still apply when a Flying melee attacker legally attacks a melee defender.
 - Flying does not prevent spells, effects, healing, buffs, or debuffs and does not change movement rules.
-- A Flying Shielder may redirect a non-Flying melee normal attack. For normal attacks/Piercing, resolve the protected target's defense/state/Flying first, then the Shielder's defense/state; never apply the Shielder's Flying or repeat target mitigation on overflow. Counterattacks and spells do not receive Flying damage reduction.
+- A Flying Shielder may redirect a non-Flying melee normal attack. For normal attacks/Piercing, resolve the protected target's defense/state/Flying first, then the Shielder's defense/state; never apply the Shielder's Flying or repeat target mitigation on overflow. Counterattacks from non-Flying melee occupants also apply Flying reduction per hit after defense. Spells do not receive Flying damage reduction.
 - Drained and Erasure suppress Flying. Clearing Drained restores it; an Erasure occupant remains suppressed and blocks normally.
 - Hiding and Sealbound targeting rules take priority. Robot Fusion never transfers Flying from absorbed materials.
 - StateView and reconnect snapshots preserve `HasFlying` for Units, Buildings, and Master Units.
@@ -495,11 +501,12 @@ All current-slice implementations must preserve these locked scenarios:
 22. multi-hit normal attacks and eligible counterattacks use independent hit counts and apply defense separately per hit
 23. Shielder normal-attack/Piercing overflow does not repeat target mitigation; single-target spells retain their separate transfer order
 24. LifeSteal uses actual HP removed after defense
-25. Robot Factory resolves after upkeep and before Firewall/base draw
+25. Turn-start damage/destruction resolves before upkeep; only survivors pay. Robot Factory resolves after damage/destruction and upkeep, before the base draw
 26. Robot Factory hides the generated card identity from the opponent
 27. Flying normal-attack targeting, front-row bypass, Shielder interaction, and suppression rules
 28. SpellPower on all Magic sources, damage-time recalculation, suppression, persistent triggers, and snapshot projection ignoring legacy captured values
 29. Invincible damage prevention, duration advancement, suppression, Shielder, and snapshot projection
+30. Critical doubles final mitigation once; Hiding normal attacks keep critical for all hits/Piercing, but counters do not; actual HP loss from any damage source reveals Hiding; fully prevented damage preserves it.
 
 If a code change breaks any of the above, it is not valid for the current slice.
 
@@ -526,8 +533,8 @@ The following are intentionally not fixed yet and must not be invented:
 - ranked matchmaking rules
 - MMR, season, and ladder rules
 - OAuth provider integration details for Kakao and Naver; existing Google integration is documented in docs/google_auth_setup.md
-- exact pack contents and probabilities
-- shop rules
+- additional pack products or guarantees beyond the confirmed 33 Resource Gold, 10 independent reward-eligible cards and 40/30/18/9/3% rarity probabilities (shop_card_packs.md)
+- individual-card shop inventory, pricing or refresh rules beyond the confirmed ticket and card-pack products
 - crafting rules
 - paid purchase rules
 - resuming unfinished battles after server restart (user policy: cancel without win/loss; see docs/battle_rules.md)

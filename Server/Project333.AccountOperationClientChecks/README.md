@@ -5,6 +5,8 @@ Run with:
 dotnet run --project Server/Project333.AccountOperationClientChecks/AccountOperationClientChecks.csproj --configuration Release
 ```
 
-Links the production PendingAccountOperation and AccountOperationRecovery implementations. Unity storage, HTTP, JSON, lifecycle and account-refresh boundaries are substitutes; this is not a native device or scene test.
+Links the production `PendingAccountOperation`, `AccountOperationRecovery`, `AccountHttpTransport`, `PendingCardPackPresentation` and `ServerShopClient` implementations. Unity storage, transport, account DTOs, lifecycle and `/me` application boundaries are substitutes; this is not a native device, Unity scene, database or real network test.
 
-Nine groups cover durable pending metadata, account/server/card separation, error classification, matching confirmations, corrupt storage, automatic completed/cancelled resolution for both operations, no purchase resubmission, failed account refresh, switching accounts, worker recreation and skipping a request still in flight. Compile the Unity runtime separately to validate actual Unity API references.
+The original nine purchase/upgrade recovery groups and four HTTP deadline/cancellation groups remain. The card-pack checks cover durable request/unopened markers before HTTP, response loss and storage reload, in-flight duplicate rejection, exact ten-copy order and duplicates, authoritative `/me` collection application, invalid receipts/refreshes, account/token/endpoint/cancellation guards, GET-only unread result restoration, scoped/matching acknowledgement, corrupt storage, completed/cancelled common recovery, original in-flight work, and definitive business rejection. Recovery never resends a purchase POST.
+
+Compile the Unity runtime separately to validate actual Unity APIs and account DTOs. For an isolated run, copy this harness and its linked production files into a throwaway project tree so `bin/obj` stay outside the primary server directories. Set `PROJECT333_CLIENT_CHECK_PROOF` to a writable JSON path for individual card-pack case results and exact boundary limitations.

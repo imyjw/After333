@@ -111,7 +111,106 @@ namespace Project333.Tests.EditMode
             return copy;
         }
 
+        [TestCase(PlayerId.Player, AttackType.Ranged, false, 0.85)]
+        [TestCase(PlayerId.AI, AttackType.Ranged, false, -0.85)]
+        [TestCase(PlayerId.Player, AttackType.Melee, false, 0.55)]
+        [TestCase(PlayerId.Player, AttackType.Ranged, true, 1.0)]
+        public void RangedDamageValue_UsesOriginalHpWeightWithoutChangingOtherRoles(
+            PlayerId owner, AttackType attackType, bool producer, double expectedGain)
+        {
+            var deck = Enumerable.Repeat("unknown", 20).ToArray();
+            var state = new BattleSetupService().CreateInitialState(new BattleSetupRequest(deck, deck, PlayerId.AI));
+            state.SetPhase(PhaseType.Main);
+            var position = new TileCoord(0, 0);
+            var unit = new UnitState("hp-value", "hp-value", owner, position, attackType,
+                10, 20, true, false, 0, producer ? new ResourceSet(1, 0, 0, 0) : null);
+            unit.HasSummoningSickness = false;
+            unit.RemainingAttacksThisTurn = 1;
+            state.GetBoard(owner).Place(position, unit);
+            var before = Evaluate(state);
+            unit.CurrentHp -= 1;
+            Assert.That(Evaluate(state) - before, Is.EqualTo(expectedGain).Within(0.000001));
+        }
+
+        [TestCase(333, 332, 0.8)]
+        [TestCase(250, 249, 0.8)]
+        [TestCase(249, 248, 0.84)]
+        [TestCase(150, 149, 0.84)]
+        [TestCase(149, 148, 1.2)]
+        [TestCase(80, 79, 1.2)]
+        [TestCase(79, 78, 3.0)]
+        [TestCase(250, 240, 8.0)]
+        [TestCase(150, 140, 8.4)]
+        [TestCase(80, 70, 12.0)]
+        [TestCase(79, 69, 30.0)]
+        [TestCase(70, 70, 0.0)]
+        [TestCase(10, -50, 30.0)]
+        [TestCase(70, 80, -30.0)]
+        public void MasterDamageBands_UsePreActionHpAndActualHpChange(int before, int after, double expected)
+        {
+            Assert.That(Invoke("EvaluateEnemyMasterHpChange", before, after), Is.EqualTo(expected).Within(0.000001));
+        }
+
+        [Test]
+        public void MasterDamageBands_DoNotKeepOldEnemyHpBonuses()
+        {
+            var state = State();
+            Unit(state, PlayerId.AI, new TileCoord(0, 0), 10, 20);
+            var before = Invoke("EvaluateForPlanning", state, 333);
+            state.Player.Master.CurrentHp -= 100;
+            Assert.That(Invoke("EvaluateForPlanning", state, 333), Is.EqualTo(before).Within(0.000001), "Enemy HP must be credited only by the pre-action transition score.");
+            state.AI.Master.CurrentHp -= 10;
+            Assert.That(Invoke("EvaluateForPlanning", state, 333), Is.EqualTo(before).Within(0.000001), "Own HP also belongs to the pre-action transition score.");
+            Assert.That(Invoke("EvaluateOwnMasterHpChange", 333, 323), Is.EqualTo(-8).Within(0.000001));
+        }
+
+        [TestCase(317, false)]
+        [TestCase(79, true)]
+        [TestCase(7, true)]
+        public void MasterDamageBands_ChooseArcherAtHighHpAndMasterAtLowHp(int masterHp, bool targetMaster)
+        {
+            var state = State();
+            foreach (var player in new[] { state.Player, state.AI })
+                foreach (var cardId in player.Hand.CardIds.ToArray()) player.Hand.Remove(cardId);
+            state.Player.Master.CurrentHp = masterHp;
+            state.AI.Master.CurrentHp = 327;
+            state.AI.Master.RemainingAttacksThisTurn = 0;
+            var skeleton = Unit(state, PlayerId.AI, new TileCoord(0, 0), 10, 10, id: "Skeleton");
+            skeleton.CurrentHp = 7;
+            // Place the archer in another column so both targets are legal.
+            var archer = new UnitState("archer", "ElfLongbowScout", PlayerId.Player,
+                new TileCoord(1, 0), AttackType.Ranged, 10, 20, true, false, 0);
+            archer.CurrentHp = 17;
+            state.PlayerBoard.Place(archer.Position, archer);
+            var provider = new Project333.Runtime.Infrastructure.Data.InMemoryCardDefinitionProvider(
+                Array.Empty<Project333.Runtime.Infrastructure.Data.CardDefinition>());
+            var planner = new AiDecisionService(provider, new TargetingService(),
+                Project333.Runtime.Application.Services.ZeroCardUpgradeLevelProvider.Instance,
+                new AiSearchOptions { MaxDepth = 1, MaxMilliseconds = 10000, MaxSimulations = 4000 });
+            var command = planner.GetNextCommand(state) as Project333.Runtime.Application.Commands.AttackCommand;
+            Assert.That(command, Is.Not.Null);
+            Assert.That(command.TargetCoord, Is.EqualTo(targetMaster ? state.Player.Master.Position : archer.Position));
+        }
+
         private static double Evaluate(BattleState state) => Invoke("Evaluate", state);
+
+        [TestCase(PlayerId.Player)][TestCase(PlayerId.AI)]
+        public void FalloutForecast_UsesSharedMasterDefeatAndKeepsLegacyExposedBuildingsSafe(PlayerId victim)
+        {
+            var state=State();state.GetBoard(victim).AddFalloutStack();state.GetPlayer(victim).Master.CurrentHp=10;
+            var position=new TileCoord(0,0);
+            var building=new BuildingState("legacy-building","PowerPlant",victim,position,false,0,5);
+            state.GetBoard(victim).Place(position,building);building.RestoreFallout(8,8);
+            var projected=AiBattleStateCopy.Create(state);
+            new EndTurnService(new Random(41)).EndTurn(projected);
+            new TurnStartService().ResolveTurnStart(projected);
+            Assert.That(projected.IsEnded,Is.True);
+            Assert.That(projected.Result.Winner,Is.EqualTo(projected.GetOpponent(victim).Id));
+            Assert.That(projected.GetBoard(victim).GetOccupant(position).CurrentHp,Is.EqualTo(5));
+            Assert.That(Evaluate(projected),Is.EqualTo(victim==PlayerId.AI?-1000000:1000000));
+            Assert.That(state.GetPlayer(victim).Master.CurrentHp,Is.EqualTo(10));
+            Assert.That(state.IsEnded,Is.False,"Forecast simulation cannot mutate real battle state.");
+        }
 
         private static double Before(BattleState state, BattleState projected) =>
             Invoke("EvaluateBeforeTurnStart", state, projected);

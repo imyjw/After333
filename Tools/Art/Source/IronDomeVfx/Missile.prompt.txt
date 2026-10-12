@@ -1,0 +1,8 @@
+Use case: stylized-concept
+Asset type: transparent 2D pixel-art missile projectile sprite for the After333 card-battle game, not a card illustration.
+Primary request: one clearly readable compact interceptor missile flying to the RIGHT, shown perfectly horizontal in a clean side view, to animate from a master unit to an attacking enemy.
+Subject: a single steel and off-white missile with a pointed nose at the right, dark gray small tail fins at the left, a subtle cyan technology accent, and a short bright cyan-and-white rocket exhaust immediately behind the tail on the left.
+Style/medium: crisp handcrafted game pixel art, chunky pixel clusters, limited palette and sharp stepped contours, strong silhouette readable at small size. No painterly airbrush or photorealism.
+Composition/framing: one sprite centered in a square canvas, exact horizontal body axis, all of the missile and exhaust fully inside the image with generous transparent margins on every side; body and exhaust occupy roughly 75% of image width and 25% of height. Nose, body and tail are unobstructed. This image will be rotated procedurally toward the target during gameplay.
+Scene/backdrop: genuine transparent alpha background.
+Constraints: only one missile and its attached exhaust. No explosion, smoke cloud, scenery, master or enemy character, targeting reticle, text, border, card frame, ground, logo or watermark. No cast shadow or decorative background. Whole sprite must be visible; do not crop the missile or exhaust.

@@ -48,6 +48,15 @@ namespace Project333.Runtime.Presentation.Hand
 
         public HandCardView[] HandCardViews => _handCardViews;
 
+        public BattleState PreviewBattleState { get; internal set; }
+
+        public bool IsExpanded { get; private set; }
+
+        private System.Func<bool> _tutorialCanExpand;
+        public void ConfigureTutorialExpansion(System.Func<bool> canExpand) => _tutorialCanExpand = canExpand;
+        public void SetExpanded(bool expanded)
+        { if (!expanded || _tutorialCanExpand == null || _tutorialCanExpand()) IsExpanded = expanded; }
+
         private void Awake()
         {
             RestoreAuthoringLayout();
@@ -349,6 +358,7 @@ namespace Project333.Runtime.Presentation.Hand
                 }
 
                 textView.BindRuntimeHandRoot(_runtimeHandRoot);
+                textView.SetHandInteractionOwner(this);
             }
         }
 
@@ -402,7 +412,7 @@ namespace Project333.Runtime.Presentation.Hand
                     _edgeDrop,
                     _minimumLargeHandScale);
 
-                if (visibleHandCard.View.HighlightState == BattleHighlightState.Selected ||
+                if ((IsExpanded && visibleHandCard.View.HighlightState == BattleHighlightState.Selected) ||
                     visibleHandCard.View.HighlightState == BattleHighlightState.MulliganSelected)
                 {
                     selectedVisibleIndex = i;
@@ -413,7 +423,8 @@ namespace Project333.Runtime.Presentation.Hand
                         layout.NormalizedPosition);
                 }
 
-                layouts[i] = layout;
+                layouts[i] = HandPresenterLayout.ApplyExpansion(layout, IsExpanded ||
+                    visibleHandCard.View.HighlightState == BattleHighlightState.MulliganSelected);
             }
 
             var siblingOrder = HandPresenterLayout.GetSiblingOrderForFan(layouts, selectedVisibleIndex);

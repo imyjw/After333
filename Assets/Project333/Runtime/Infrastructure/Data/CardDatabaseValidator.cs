@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Project333.Runtime.Application.Services;
 using Project333.Runtime.Domain.Cards;
+using Project333.Runtime.Domain.Effects;
 #if UNITY_5_3_OR_NEWER
 using Newtonsoft.Json.Linq;
 #else
@@ -23,6 +25,11 @@ namespace Project333.Runtime.Infrastructure.Data
             BiochemicalBombRules.EffectId,
             TimedBombRules.EffectId,
             NuclearRules.EffectId,
+            EarthquakeRules.EffectId,
+            MeteorRules.EffectId,
+            FireSpearRules.EffectId,
+            PlasmaShieldRules.EffectId,
+            ManaShieldRules.EffectId,
             MagicAmplificationCircleRules.EffectId,
             PowerBankRules.EffectId,
             ManaStoneRules.EffectId,
@@ -337,12 +344,17 @@ namespace Project333.Runtime.Infrastructure.Data
                     ValidateScriptedSpell(card, result, id);
                     break;
 
+                case JsonCardDefinitionKind.TrapSpell:
+                    ValidateTrapSpell(card, result, id);
+                    break;
+
                 default:
                     result.AddError($"Card '{id}' uses unsupported definitionType '{card.DefinitionType}'.");
                     break;
             }
 
             ValidateReplicateText(card, result, id);
+            ValidateTrapText(card, result, id);
 
             if (string.Equals(card.Id, RobotFactoryService.CardId, StringComparison.Ordinal))
             {
@@ -422,6 +434,36 @@ namespace Project333.Runtime.Infrastructure.Data
                 ValidateWerewolf(card, result);
             }
 
+            if (string.Equals(card.Id, "OrcChieftain", StringComparison.Ordinal))
+            {
+                ValidateOrcChieftain(card, result);
+            }
+
+            if (string.Equals(card.Id, ManaCannonRules.CardId, StringComparison.Ordinal))
+            {
+                ValidateManaCannon(card, result);
+            }
+
+            if (string.Equals(card.Id, GaebangChiefRules.CardId, StringComparison.Ordinal))
+            {
+                ValidateGaebangChief(card, result);
+            }
+
+            if (string.Equals(card.Id, "ElfElder", StringComparison.Ordinal) ||
+                string.Equals(card.DisplayName, "엘프 장로", StringComparison.Ordinal))
+            {
+                ValidateElfElder(card, result);
+            }
+            if (string.Equals(card.Id, "SkeletonArcher", StringComparison.Ordinal))
+            {
+                ValidateSkeletonArcher(card, result);
+            }
+
+            if (string.Equals(card.Id, OrcBerserkerRules.CardId, StringComparison.Ordinal))
+            {
+                ValidateOrcBerserker(card, result);
+            }
+
             if (string.Equals(card.Id, DemonKingRules.CardId, StringComparison.Ordinal))
             {
                 ValidateDemonKing(card, result);
@@ -439,14 +481,85 @@ namespace Project333.Runtime.Infrastructure.Data
                     result.AddError("MagicAmplificationCircle must be an unreleased Common Fantasy spell costing 1 mana with its confirmed effect.");
             }
 
+            if (string.Equals(card.Id, ManaShieldRules.CardId, StringComparison.Ordinal))
+            {
+                if (card.DisplayName != "마나쉴드" || card.DefinitionType != JsonCardDefinitionKind.ScriptedSpell ||
+                    card.Rarity != CardRarity.Common || card.Affiliation != CardAffiliation.Fantasy ||
+                    card.ChargeTileFootprint != ChargeTileFootprint.None ||
+                    card.EffectId != ManaShieldRules.EffectId || card.EffectText != ManaShieldRules.EffectDescription ||
+                    !string.IsNullOrWhiteSpace(card.SpecialEffectText) || card.TriggerCount != 0 ||
+                    card.EffectAmount != ManaShieldRules.BaseDefenseBonus || card.Damage != 0 || card.DamageType != DamageType.None ||
+                    card.Cost == null || card.Cost.Mana != ManaShieldRules.ManaCost ||
+                    card.Cost.Gold != 0 || card.Cost.Qi != 0 || card.Cost.Power != 0 ||
+                    !card.IncludeInDraft || card.IncludeInRewards || card.HasReplicate)
+                    result.AddError("ManaShield must be a released Fantasy Common spell costing 1 mana, with a stackable permanent magic-defense bonus of 10 to one Unit or Building, no damage, draft enabled, rewards disabled, and no upgrades.");
+            }
+
+            if (string.Equals(card.Id, PlasmaShieldRules.CardId, StringComparison.Ordinal))
+            {
+                if (card.DisplayName != "플라즈마 쉴드" || card.DefinitionType != JsonCardDefinitionKind.ScriptedSpell ||
+                    card.Rarity != CardRarity.Common || card.Affiliation != CardAffiliation.ScienceCivilization ||
+                    card.ChargeTileFootprint != ChargeTileFootprint.None ||
+                    card.EffectId != PlasmaShieldRules.EffectId || card.EffectText != PlasmaShieldRules.EffectDescription ||
+                    !string.IsNullOrWhiteSpace(card.SpecialEffectText) || card.TriggerCount != 0 ||
+                    card.EffectAmount != PlasmaShieldRules.BaseDefenseBonus || card.Damage != 0 || card.DamageType != DamageType.None ||
+                    card.Cost == null || card.Cost.Power != PlasmaShieldRules.PowerCost ||
+                    card.Cost.Gold != 0 || card.Cost.Qi != 0 || card.Cost.Mana != 0 ||
+                    !card.IncludeInDraft || card.IncludeInRewards || card.HasReplicate)
+                    result.AddError("PlasmaShield must be a released Science Common spell costing 1 power, with a stackable permanent physical-defense bonus of 10 to one Unit or Building, no damage, draft enabled, rewards disabled, and no upgrades.");
+            }
+
+            if (string.Equals(card.Id, FireSpearRules.CardId, StringComparison.Ordinal))
+            {
+                if (card.DisplayName != "파이어스피어" || card.DefinitionType != JsonCardDefinitionKind.ScriptedSpell ||
+                    card.Rarity != CardRarity.Common || card.Affiliation != CardAffiliation.Fantasy ||
+                    card.ChargeTileFootprint != ChargeTileFootprint.None ||
+                    card.EffectId != FireSpearRules.EffectId || card.EffectText != FireSpearRules.EffectDescription ||
+                    !string.IsNullOrWhiteSpace(card.SpecialEffectText) || card.TriggerCount != 0 ||
+                    card.Damage != FireSpearRules.BaseDamage || card.DamageType != DamageType.Magic ||
+                    card.Cost == null || card.Cost.Mana != FireSpearRules.ManaCost ||
+                    card.Cost.Gold != 0 || card.Cost.Qi != 0 || card.Cost.Power != 0 ||
+                    !card.IncludeInDraft || !card.IncludeInRewards)
+                    result.AddError("FireSpear must be a released Fantasy Common spell costing 3 mana with Magic damage 30 to the selected column, enabled in draft and rewards.");
+            }
+
+            if (string.Equals(card.Id, MeteorRules.CardId, StringComparison.Ordinal))
+            {
+                if (card.DisplayName != "메테오" || card.DefinitionType != JsonCardDefinitionKind.ScriptedSpell ||
+                    card.Rarity != CardRarity.Unique || card.Affiliation != CardAffiliation.Fantasy ||
+                    card.ChargeTileFootprint != ChargeTileFootprint.None ||
+                    card.EffectId != MeteorRules.EffectId || card.EffectText != MeteorRules.EffectDescription ||
+                    !string.IsNullOrWhiteSpace(card.SpecialEffectText) ||
+                    card.Damage != MeteorRules.BaseDamage || card.DamageType != DamageType.Magic ||
+                    card.Cost == null || card.Cost.Mana != MeteorRules.ManaCost ||
+                    card.Cost.Gold != 0 || card.Cost.Qi != 0 || card.Cost.Power != 0 ||
+                    !card.IncludeInDraft || !card.IncludeInRewards)
+                    result.AddError("Meteor must be a released Fantasy Unique spell costing 7 mana with Magic damage 40 to the whole enemy board, enabled in draft and rewards.");
+            }
+
+            if (string.Equals(card.Id, EarthquakeRules.CardId, StringComparison.Ordinal))
+            {
+                if (card.DisplayName != "지진" || card.DefinitionType != JsonCardDefinitionKind.ScriptedSpell ||
+                    card.Rarity != CardRarity.Uncommon || card.Affiliation != CardAffiliation.Neutral ||
+                    card.ChargeTileFootprint != ChargeTileFootprint.None ||
+                    card.EffectId != EarthquakeRules.EffectId || card.EffectText != EarthquakeRules.EffectDescription ||
+                    !string.IsNullOrWhiteSpace(card.SpecialEffectText) ||
+                    card.Damage != EarthquakeRules.BaseDamage || card.DamageType != DamageType.Physical ||
+                    card.Cost == null || card.Cost.Gold != EarthquakeRules.GoldCost ||
+                    card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Power != 0 ||
+                    !card.IncludeInDraft || !card.IncludeInRewards)
+                    result.AddError("Earthquake must be a released Neutral Uncommon spell costing 3 gold with Physical damage 10 and triple building damage, enabled in draft and rewards.");
+            }
+
             if (string.Equals(card.Id, NuclearRules.CardId, StringComparison.Ordinal))
             {
                 if (card.DefinitionType != JsonCardDefinitionKind.ScriptedSpell || card.Rarity != CardRarity.Legendary ||
                     card.Affiliation != CardAffiliation.ScienceCivilization || card.ChargeTileFootprint != ChargeTileFootprint.None ||
                     card.EffectId != NuclearRules.EffectId || card.EffectText != NuclearRules.EffectDescription ||
-                    card.Cost == null || card.Cost.Power != 10 || card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Gold != 0 ||
-                    card.IncludeInDraft || card.IncludeInRewards)
-                    result.AddError("Nuclear must be an unreleased Legendary Science spell costing 10 power with its confirmed effect.");
+                    card.Damage != 100 || card.DamageType != DamageType.Fixed ||
+                    card.Cost == null || card.Cost.Power != 13 || card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Gold != 0 ||
+                    !card.IncludeInDraft || !card.IncludeInRewards)
+                    result.AddError("Nuclear must be a released Legendary Science spell costing 13 power with Fixed damage 100 and its confirmed effect, enabled in draft and rewards.");
             }
 
             if (string.Equals(card.Id, HeroRules.CardId, StringComparison.Ordinal))
@@ -548,6 +661,160 @@ namespace Project333.Runtime.Infrastructure.Data
             }
         }
 
+        private static void ValidateManaCannon(JsonCardDefinitionRecord card, CardDatabaseValidationResult result)
+        {
+            if (card.DisplayName != "마나 대포" || card.DefinitionType != JsonCardDefinitionKind.Unit ||
+                card.Rarity != CardRarity.Uncommon || card.Affiliation != CardAffiliation.Fantasy ||
+                card.ChargeTileFootprint != ChargeTileFootprint.OneByOne || !card.IncludeInDraft || !card.IncludeInRewards)
+                result.AddError("ManaCannon must be the released Uncommon 1x1 Fantasy Unit 마나 대포, enabled in draft and rewards.");
+            if (card.Cost == null || card.Cost.Mana != ManaCannonRules.ManaCost || card.Cost.Qi != 0 || card.Cost.Power != 0 || card.Cost.Gold != 0)
+                result.AddError("ManaCannon must cost exactly 2 mana.");
+            if (card.Attack != ManaCannonRules.BaseAttack || card.Health != ManaCannonRules.BaseHealth ||
+                card.AttackType != AttackType.Ranged || card.DamageType != DamageType.Magic ||
+                card.PhysicalDefense != 0 || card.MagicDefense != 0 || !card.CanMove)
+                result.AddError("ManaCannon must use ranged Magic ATK 40, HP 10, DEF 0/0 and be movable.");
+            if (card.Races == null || card.Races.Length != 0)
+                result.AddError("ManaCannon must explicitly have no unit races.");
+            var gain = card.TurnStartResourceGain;
+            if (card.EffectText != ManaCannonRules.EffectDescription || !string.IsNullOrWhiteSpace(card.EffectId) ||
+                !string.IsNullOrWhiteSpace(card.SpecialEffectText) || card.HasBerserker || card.HasEndure || card.HasShielder ||
+                card.HasLifeSteal || card.HasRush || card.CanAttackOnSummon || card.HasReplicate || card.HasHiding ||
+                card.HasFlying || card.HasPiercing || card.IsScience || card.SciencePowerUpkeep != 0 ||
+                card.MaxAttacksPerTurn != 1 || card.HitsPerAttack != 1 || card.SealboundOwnerTurnStarts != 0 || card.SpellPower != 0 ||
+                card.InvincibleDuration != InvincibleDurationType.None || card.InvincibleOwnerTurns != 0 ||
+                gain == null || gain.Mana != 0 || gain.Qi != 0 || gain.Power != 0 || gain.Gold != 0)
+                result.AddError("ManaCannon must have only its one-mana attack cost, one ordinary attack, no innate traits, resource production or upkeep.");
+        }
+
+        private static void ValidateGaebangChief(JsonCardDefinitionRecord card, CardDatabaseValidationResult result)
+        {
+            if (card.DisplayName != "개방 방주" || card.DefinitionType != JsonCardDefinitionKind.Unit ||
+                card.Rarity != CardRarity.Unique || card.Affiliation != CardAffiliation.Murim ||
+                card.ChargeTileFootprint != ChargeTileFootprint.OneByOne || !card.IncludeInDraft || !card.IncludeInRewards)
+                result.AddError("GaebangChief must be the released Unique 1x1 Murim Unit 개방 방주, enabled in draft and rewards.");
+            if (card.Cost == null || card.Cost.Qi != GaebangChiefRules.QiCost || card.Cost.Mana != 0 || card.Cost.Power != 0 || card.Cost.Gold != 0)
+                result.AddError("GaebangChief must cost exactly 7 qi.");
+            if (card.Attack != GaebangChiefRules.BaseAttack || card.Health != GaebangChiefRules.BaseHealth ||
+                card.AttackType != AttackType.Melee || card.DamageType != DamageType.Physical ||
+                card.PhysicalDefense != 0 || card.MagicDefense != 0 || !card.CanMove)
+                result.AddError("GaebangChief must use melee Physical ATK 10, HP 60, DEF 0/0 and be movable.");
+            if (card.Races == null || card.Races.Length != 1 || card.Races[0] != UnitRace.Human)
+                result.AddError("GaebangChief must have exactly the Human race.");
+            var gain = card.TurnStartResourceGain;
+            if (card.EffectText != GaebangChiefRules.EffectDescription || !string.IsNullOrWhiteSpace(card.EffectId) ||
+                !string.IsNullOrWhiteSpace(card.SpecialEffectText) || card.HasBerserker || card.HasEndure || card.HasShielder ||
+                card.HasLifeSteal || card.HasRush || card.CanAttackOnSummon || card.HasReplicate || card.HasHiding ||
+                card.HasFlying || card.HasPiercing || card.IsScience || card.SciencePowerUpkeep != 0 ||
+                card.MaxAttacksPerTurn != 1 || card.HitsPerAttack != 1 || card.SealboundOwnerTurnStarts != 0 || card.SpellPower != 0 ||
+                card.InvincibleDuration != InvincibleDurationType.None || card.InvincibleOwnerTurns != 0 ||
+                gain == null || gain.Mana != 0 || gain.Qi != 0 || gain.Power != 0 || gain.Gold != 0)
+                result.AddError("GaebangChief must have only its current-gold attack effect, one ordinary attack, no innate traits, resource production or upkeep.");
+        }
+
+        private static void ValidateElfElder(JsonCardDefinitionRecord card, CardDatabaseValidationResult result)
+        {
+            if (card.Id != "ElfElder" || card.DisplayName != "엘프 장로" || card.DefinitionType != JsonCardDefinitionKind.Unit ||
+                card.Rarity != CardRarity.Rare || card.Affiliation != CardAffiliation.Fantasy ||
+                card.ChargeTileFootprint != ChargeTileFootprint.OneByOne || !card.IncludeInDraft || !card.IncludeInRewards)
+                result.AddError("ElfElder must use its canonical ID and be the released Rare 1x1 Fantasy Unit 엘프 장로, enabled in draft and rewards.");
+            if (card.Cost == null || card.Cost.Mana != 5 || card.Cost.Qi != 0 || card.Cost.Power != 0 || card.Cost.Gold != 0)
+                result.AddError("ElfElder must cost exactly 5 mana.");
+            if (card.Attack != 30 || card.Health != 25 || card.AttackType != AttackType.Ranged ||
+                card.DamageType != DamageType.Physical || card.PhysicalDefense != 0 || card.MagicDefense != 0 || !card.CanMove)
+                result.AddError("ElfElder must use ranged Physical ATK 30, HP 25, DEF 0/0 and be movable.");
+            if (card.Races == null || card.Races.Length != 1 || card.Races[0] != UnitRace.Elf)
+                result.AddError("ElfElder must have exactly the Elf race.");
+            var gain = card.TurnStartResourceGain;
+            if (!string.IsNullOrWhiteSpace(card.EffectText) || !string.IsNullOrWhiteSpace(card.EffectId) ||
+                card.SpecialEffectText != "관통\n속공" || !card.HasRush || !card.HasPiercing || card.HasBerserker || card.HasEndure ||
+                card.HasShielder || card.HasLifeSteal || card.CanAttackOnSummon || card.HasReplicate ||
+                card.HasHiding || card.HasFlying || card.IsScience || card.SciencePowerUpkeep != 0 ||
+                card.MaxAttacksPerTurn != 1 || card.HitsPerAttack != 1 || card.SealboundOwnerTurnStarts != 0 ||
+                card.SpellPower != 0 || card.InvincibleDuration != InvincibleDurationType.None || card.InvincibleOwnerTurns != 0 ||
+                gain == null || gain.Mana != 0 || gain.Qi != 0 || gain.Power != 0 || gain.Gold != 0)
+                result.AddError("ElfElder must have only Piercing and Rush, one ordinary attack, no card effect, resource production or upkeep.");
+        }
+        private static void ValidateSkeletonArcher(JsonCardDefinitionRecord card, CardDatabaseValidationResult result)
+        {
+            if (card.DisplayName != "스켈레톤아처" || card.DefinitionType != JsonCardDefinitionKind.Unit ||
+                card.Rarity != CardRarity.Common || card.Affiliation != CardAffiliation.Fantasy ||
+                card.ChargeTileFootprint != ChargeTileFootprint.OneByOne || !card.IncludeInDraft || !card.IncludeInRewards)
+                result.AddError("SkeletonArcher must be the released Common 1x1 Fantasy Unit 스켈레톤아처, enabled in draft and rewards.");
+            if (card.Cost == null || card.Cost.Mana != 1 || card.Cost.Qi != 0 || card.Cost.Power != 0 || card.Cost.Gold != 0)
+                result.AddError("SkeletonArcher must cost exactly 1 mana.");
+            if (card.Attack != 10 || card.Health != 3 || card.AttackType != AttackType.Ranged ||
+                card.DamageType != DamageType.Physical || card.PhysicalDefense != 0 || card.MagicDefense != 0 || !card.CanMove)
+                result.AddError("SkeletonArcher must use ranged Physical ATK 10, HP 3, DEF 0/0 and be movable.");
+            if (card.Races == null || card.Races.Length != 1 || card.Races[0] != UnitRace.Undead)
+                result.AddError("SkeletonArcher must have exactly the Undead race.");
+            var gain = card.TurnStartResourceGain;
+            if (!string.IsNullOrWhiteSpace(card.EffectText) || !string.IsNullOrWhiteSpace(card.EffectId) ||
+                !string.IsNullOrWhiteSpace(card.SpecialEffectText) || card.HasBerserker || card.HasEndure ||
+                card.HasShielder || card.HasLifeSteal || card.HasRush || card.CanAttackOnSummon || card.HasReplicate ||
+                card.HasHiding || card.HasFlying || card.HasPiercing || card.IsScience || card.SciencePowerUpkeep != 0 ||
+                card.MaxAttacksPerTurn != 1 || card.HitsPerAttack != 1 || card.SealboundOwnerTurnStarts != 0 ||
+                card.SpellPower != 0 || card.InvincibleDuration != InvincibleDurationType.None || card.InvincibleOwnerTurns != 0 ||
+                gain == null || gain.Mana != 0 || gain.Qi != 0 || gain.Power != 0 || gain.Gold != 0)
+                result.AddError("SkeletonArcher must have one ordinary attack, no card effects or innate traits, and no resource production or upkeep.");
+        }
+
+        private static void ValidateOrcChieftain(JsonCardDefinitionRecord card, CardDatabaseValidationResult result)
+        {
+            if (card.DisplayName != "오크 족장" || card.DefinitionType != JsonCardDefinitionKind.Unit ||
+                card.Rarity != CardRarity.Rare || card.Affiliation != CardAffiliation.Fantasy ||
+                card.ChargeTileFootprint != ChargeTileFootprint.OneByOne || !card.IncludeInDraft || !card.IncludeInRewards)
+                result.AddError("OrcChieftain must be the released Rare 1x1 Fantasy Unit 오크 족장.");
+            if (card.Cost == null || card.Cost.Mana != 7 || card.Cost.Qi != 0 || card.Cost.Power != 0 || card.Cost.Gold != 0)
+                result.AddError("OrcChieftain must cost exactly 7 mana.");
+            if (card.Attack != 50 || card.Health != 70 || card.AttackType != AttackType.Melee ||
+                card.DamageType != DamageType.Physical || card.PhysicalDefense != 0 || card.MagicDefense != 0 || !card.CanMove)
+                result.AddError("OrcChieftain must use melee Physical ATK 50, HP 70, DEF 0/0 and be movable.");
+            if (card.Races == null || card.Races.Length != 1 || card.Races[0] != UnitRace.Orc)
+                result.AddError("OrcChieftain must have exactly the Orc race.");
+            if (card.EffectText != "내 전장의 현재·이후 오크 유닛(자신 포함)에게 공격력 +10, 최대·현재 체력 +10. 이 오크 족장이 전장을 떠나면 해당 버프가 사라집니다. 중첩 가능." || !string.IsNullOrWhiteSpace(card.EffectId) ||
+                !string.IsNullOrWhiteSpace(card.SpecialEffectText))
+                result.AddError("OrcChieftain must describe its confirmed stackable source-bound Orc aura as a card effect and have no innate traits.");
+            var gain = card.TurnStartResourceGain;
+            if (card.HasBerserker || card.HasEndure || card.HasShielder || card.HasLifeSteal || card.HasRush ||
+                card.CanAttackOnSummon || card.HasReplicate || card.HasHiding || card.HasFlying || card.HasPiercing ||
+                card.IsScience || card.SciencePowerUpkeep != 0 || card.MaxAttacksPerTurn != 1 || card.HitsPerAttack != 1 ||
+                card.SealboundOwnerTurnStarts != 0 || card.SpellPower != 0 || card.InvincibleDuration != InvincibleDurationType.None ||
+                card.InvincibleOwnerTurns != 0 || gain == null || gain.Mana != 0 || gain.Qi != 0 || gain.Power != 0 || gain.Gold != 0)
+                result.AddError("OrcChieftain must have one ordinary attack, no innate traits and no resource production or upkeep.");
+        }
+
+        private static void ValidateOrcBerserker(JsonCardDefinitionRecord card, CardDatabaseValidationResult result)
+        {
+            if (card.DisplayName != OrcBerserkerRules.DisplayName ||
+                card.DefinitionType != JsonCardDefinitionKind.Unit || card.Rarity != CardRarity.Uncommon ||
+                card.Affiliation != CardAffiliation.Fantasy || card.ChargeTileFootprint != ChargeTileFootprint.OneByOne ||
+                !card.IncludeInDraft || !card.IncludeInRewards)
+                result.AddError("OrcBerserker must be the released Uncommon 1x1 Fantasy Unit 오크 광전사, enabled in draft and rewards.");
+
+            if (card.Cost == null || card.Cost.Mana != OrcBerserkerRules.ManaCost ||
+                card.Cost.Qi != 0 || card.Cost.Power != 0 || card.Cost.Gold != 0)
+                result.AddError("OrcBerserker must cost exactly 5 mana.");
+
+            if (card.AttackType != AttackType.Melee || card.DamageType != DamageType.Physical ||
+                card.Attack != OrcBerserkerRules.BaseAttack || card.Health != OrcBerserkerRules.BaseHealth ||
+                card.PhysicalDefense != 0 || card.MagicDefense != 0 || !card.CanMove)
+                result.AddError("OrcBerserker must use melee Physical ATK 20, HP 50, DEF 0/0, and be movable.");
+
+            if (card.Races == null || card.Races.Length != 1 || card.Races[0] != UnitRace.Orc)
+                result.AddError("OrcBerserker must have exactly the Orc race.");
+
+            var gain = card.TurnStartResourceGain;
+            if (!card.HasBerserker || card.SpecialEffectText != OrcBerserkerRules.SpecialEffectText ||
+                !string.IsNullOrWhiteSpace(card.EffectText) || !string.IsNullOrWhiteSpace(card.EffectId) ||
+                card.MaxAttacksPerTurn != 1 || card.HitsPerAttack != 1 || card.HasEndure || card.HasShielder ||
+                card.HasLifeSteal || card.CanAttackOnSummon || card.HasRush || card.HasReplicate ||
+                card.HasHiding || card.HasFlying || card.HasPiercing || card.SpellPower != 0 ||
+                card.SealboundOwnerTurnStarts != 0 || card.InvincibleDuration != InvincibleDurationType.None ||
+                card.InvincibleOwnerTurns != 0 || card.IsScience || card.SciencePowerUpkeep != 0 ||
+                gain == null || gain.Mana != 0 || gain.Qi != 0 || gain.Power != 0 || gain.Gold != 0)
+                result.AddError("OrcBerserker must have only Berserker, one ordinary attack, and no additional effects or upkeep.");
+        }
+
         private static void ValidateWerewolf(
             JsonCardDefinitionRecord card,
             CardDatabaseValidationResult result)
@@ -574,7 +841,7 @@ namespace Project333.Runtime.Infrastructure.Data
                 card.PhysicalDefense != 0 || card.MagicDefense != 0 ||
                 !card.CanMove)
             {
-                result.AddError("Werewolf must use melee Physical ATK 20, HP 30, DEF 0/0, and be movable.");
+                result.AddError("Werewolf must use melee Physical ATK 10, HP 30, DEF 0/0, and be movable.");
             }
 
             if (!card.HasReplicate)
@@ -641,9 +908,9 @@ namespace Project333.Runtime.Infrastructure.Data
 
             if (card.Cost == null ||
                 card.Cost.Gold != TenThousandYearSnowGinsengRules.GoldCost ||
-                card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Power != 0)
+                card.Cost.Mana != 0 || card.Cost.Qi != TenThousandYearSnowGinsengRules.QiCost || card.Cost.Power != 0)
             {
-                result.AddError("TenThousandYearSnowGinseng must cost exactly 4 gold.");
+                result.AddError("TenThousandYearSnowGinseng must cost exactly 3 qi and 1 gold.");
             }
 
             if (!string.Equals(
@@ -736,7 +1003,7 @@ namespace Project333.Runtime.Infrastructure.Data
                 card.Cost.Gold != ManaStoneBundleRules.GoldCost ||
                 card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Power != 0)
             {
-                result.AddError("ManaStoneBundle must cost exactly 5 gold.");
+                result.AddError("ManaStoneBundle must cost exactly 6 gold.");
             }
 
             if (!string.Equals(card.EffectId, ManaStoneBundleRules.EffectId, StringComparison.Ordinal) ||
@@ -895,9 +1162,9 @@ namespace Project333.Runtime.Infrastructure.Data
 
             if (card.Cost == null ||
                 card.Cost.Gold != GaebangBranchRules.GoldCost ||
-                card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Power != 0)
+                card.Cost.Mana != 0 || card.Cost.Qi != GaebangBranchRules.QiCost || card.Cost.Power != 0)
             {
-                result.AddError("GaebangBranch must cost exactly 2 gold.");
+                result.AddError("GaebangBranch must cost exactly 2 qi.");
             }
 
             if (card.Attack != 0 ||
@@ -932,9 +1199,9 @@ namespace Project333.Runtime.Infrastructure.Data
 
             if (card.Cost == null ||
                 card.Cost.Gold != MerchantCaravanRules.GoldCost ||
-                card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Power != 0)
+                card.Cost.Mana != 0 || card.Cost.Qi != MerchantCaravanRules.QiCost || card.Cost.Power != 0)
             {
-                result.AddError("MerchantCaravan must cost exactly 4 gold.");
+                result.AddError("MerchantCaravan must cost exactly 5 qi.");
             }
 
             if (card.Attack != 0 ||
@@ -1350,6 +1617,9 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError($"Scripted spell card '{id}' must use None footprint.");
             }
 
+            if (card.EffectAmount < 0)
+                result.AddError($"Scripted spell card '{id}' cannot have a negative effectAmount.");
+
             if (string.IsNullOrWhiteSpace(card.EffectId))
             {
                 result.AddError($"Scripted spell card '{id}' must define effectId.");
@@ -1496,9 +1766,31 @@ namespace Project333.Runtime.Infrastructure.Data
                 RequireTextContains(text, $"{card.HitsPerAttack}연타", result, id, $"hitsPerAttack {card.HitsPerAttack}");
             }
 
-            if (card.SciencePowerUpkeep > 0)
+            var hasPowerConsumptionText = false;
+            foreach (var segment in text.Split(new[] { '\r', '\n', ',' }, StringSplitOptions.RemoveEmptyEntries))
             {
-                RequireTextContains(text, $"전력 -{card.SciencePowerUpkeep}", result, id, "sciencePowerUpkeep");
+                var label = segment.Trim();
+                if (!Regex.IsMatch(label, @"^전력\s*소모\s*:"))
+                {
+                    continue;
+                }
+
+                var match = Regex.Match(label, @"^전력\s*소모\s*:\s*([0-9]+)\s*$");
+                if (!match.Success || !int.TryParse(match.Groups[1].Value, out var amount) ||
+                    amount <= 0 || amount != card.SciencePowerUpkeep)
+                {
+                    result.AddError(
+                        $"Card '{id}' specialEffectText must use '전력 소모:{card.SciencePowerUpkeep}' matching positive sciencePowerUpkeep.");
+                    continue;
+                }
+
+                hasPowerConsumptionText = true;
+            }
+
+            if (card.SciencePowerUpkeep > 0 && !hasPowerConsumptionText)
+            {
+                result.AddError(
+                    $"Card '{id}' has sciencePowerUpkeep but specialEffectText does not contain '전력 소모:{card.SciencePowerUpkeep}'.");
             }
 
             if (ContainsToken(text, "Berserker") && !card.HasBerserker)
@@ -1612,6 +1904,96 @@ namespace Project333.Runtime.Infrastructure.Data
                 result.AddError(
                     $"Card '{id}' specialEffectText contains Sealbound/봉인 but sealboundOwnerTurnStarts is 0.");
             }
+        }
+
+        private static void ValidateTrapText(JsonCardDefinitionRecord card, CardDatabaseValidationResult result, string id)
+        {
+            var containsTrap = (card.SpecialEffectText ?? string.Empty).Contains("트랩") ||
+                ContainsToken(card.SpecialEffectText ?? string.Empty, "Trap");
+            if (card.HasTrap != (card.DefinitionType == JsonCardDefinitionKind.TrapSpell))
+                result.AddError($"Card '{id}' Trap flag and definition kind must match.");
+            if (card.HasTrap != containsTrap)
+                result.AddError($"Card '{id}' Trap flag and special-effect text must match.");
+            if (!card.HasTrap && (card.TrapTrigger != TrapTriggerType.None || card.TrapEffect != TrapEffectType.None ||
+                (card.TrapActivationCost != null && (card.TrapActivationCost.Mana != 0 || card.TrapActivationCost.Qi != 0 || card.TrapActivationCost.Power != 0 || card.TrapActivationCost.Gold != 0))))
+                result.AddError($"Card '{id}' must not carry trap activation metadata without Trap.");
+        }
+
+        private static void ValidateTrapSpell(JsonCardDefinitionRecord card, CardDatabaseValidationResult result, string id)
+        {
+            if (card.ChargeTileFootprint != ChargeTileFootprint.None)
+                result.AddError($"Trap spell '{id}' must use None footprint.");
+            if (card.Cost == null || card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Power != 0 || card.Cost.Gold != 0)
+                result.AddError($"Trap spell '{id}' installation must be free.");
+            if (card.TrapActivationCost == null || card.TrapActivationCost.Mana < 0 || card.TrapActivationCost.Qi < 0 ||
+                card.TrapActivationCost.Power < 0 || card.TrapActivationCost.Gold < 0)
+                result.AddError($"Trap spell '{id}' requires a nonnegative activation cost.");
+            if (!Enum.IsDefined(typeof(TrapTriggerType), card.TrapTrigger) || card.TrapTrigger == TrapTriggerType.None ||
+                !Enum.IsDefined(typeof(TrapEffectType), card.TrapEffect) || card.TrapEffect == TrapEffectType.None)
+                result.AddError($"Trap spell '{id}' requires a supported trigger and effect.");
+            if (card.Id == SummonTrapCardRules.CardId)
+            {
+                if (card.DisplayName != SummonTrapCardRules.DisplayName || card.Rarity != CardRarity.Common ||
+                    card.Affiliation != CardAffiliation.Neutral || !card.IncludeInDraft || !card.IncludeInRewards ||
+                    card.HasReplicate || card.SpecialEffectText != SummonTrapCardRules.SpecialEffectText ||
+                    !string.IsNullOrEmpty(card.EffectText) || card.Damage != SummonTrapCardRules.BaseDamage ||
+                    card.DamageType != DamageType.Physical || card.EffectAmount != 0 || card.TriggerCount != 0 ||
+                    card.TrapTrigger != TrapTriggerType.EnemyUnitSummoned ||
+                    card.TrapEffect != TrapEffectType.DamageSummonedUnitPhysical || card.TrapActivationCost == null ||
+                    card.TrapActivationCost.Gold != SummonTrapCardRules.ActivationGoldCost ||
+                    card.TrapActivationCost.Mana != 0 || card.TrapActivationCost.Qi != 0 || card.TrapActivationCost.Power != 0)
+                    result.AddError("SummonTrap must be the Neutral Common free summon trap with Gold1 activation, Physical20 damage, +1 damage per upgrade level, draft and rewards enabled.");
+                return;
+            }
+            if (card.Id == IronDomeCardRules.CardId)
+            {
+                if (card.DisplayName != IronDomeCardRules.DisplayName || card.Rarity != CardRarity.Rare ||
+                    card.Affiliation != CardAffiliation.ScienceCivilization || !card.IncludeInDraft || card.IncludeInRewards ||
+                    card.HasReplicate || card.SpecialEffectText != IronDomeCardRules.SpecialEffectText ||
+                    !string.IsNullOrEmpty(card.EffectText) || card.Damage != 0 || card.DamageType != DamageType.None ||
+                    card.EffectAmount != 0 || card.TriggerCount != 0 || card.TrapTrigger != TrapTriggerType.EnemyRangedUnitAttacksMaster ||
+                    card.TrapEffect != TrapEffectType.DestroyAttacker || card.TrapActivationCost == null ||
+                    card.TrapActivationCost.Power != IronDomeCardRules.ActivationPowerCost ||
+                    card.TrapActivationCost.Mana != 0 || card.TrapActivationCost.Qi != 0 || card.TrapActivationCost.Gold != 0)
+                    result.AddError("IronDome must be the Science Rare free ranged-at-Master trap with Power4 direct destruction, no damage or upgrades, draft enabled and rewards disabled.");
+                return;
+            }
+            if (card.Id == ExplosiveReactiveArmourCardRules.CardId)
+            {
+                if (card.DisplayName != ExplosiveReactiveArmourCardRules.DisplayName || card.Rarity != CardRarity.Rare ||
+                    card.Affiliation != CardAffiliation.ScienceCivilization || !card.IncludeInDraft || card.IncludeInRewards ||
+                    card.HasReplicate || card.SpecialEffectText != ExplosiveReactiveArmourCardRules.SpecialEffectText ||
+                    !string.IsNullOrEmpty(card.EffectText) || card.Damage != 0 || card.DamageType != DamageType.None ||
+                    card.EffectAmount != 0 || card.TriggerCount != 0 || card.TrapTrigger != TrapTriggerType.EnemyMeleeUnitAttacksMaster ||
+                    card.TrapEffect != TrapEffectType.DestroyAttacker || card.TrapActivationCost == null ||
+                    card.TrapActivationCost.Power != ExplosiveReactiveArmourCardRules.ActivationPowerCost ||
+                    card.TrapActivationCost.Mana != 0 || card.TrapActivationCost.Qi != 0 || card.TrapActivationCost.Gold != 0)
+                    result.AddError("ExplosiveReactiveArmour must be the Science Rare free melee-at-Master trap with Power4 direct destruction, no damage or upgrades, draft enabled and rewards disabled.");
+                return;
+            }
+            if (card.Id == TrapMirrorFieldCardRules.CardId)
+            {
+                if (card.DisplayName != TrapMirrorFieldCardRules.DisplayName || card.Rarity != CardRarity.Rare ||
+                    card.Affiliation != CardAffiliation.Fantasy || !card.IncludeInDraft || card.IncludeInRewards ||
+                    card.HasReplicate || card.SpecialEffectText != TrapMirrorFieldCardRules.SpecialEffectText ||
+                    !string.IsNullOrEmpty(card.EffectText) || card.Damage != 0 || card.DamageType != DamageType.Magic ||
+                    card.EffectAmount != 0 || card.TriggerCount != 0 || card.TrapTrigger != TrapTriggerType.EnemyUnitAttacksUnit ||
+                    card.TrapEffect != TrapEffectType.ReflectAttackerAttackAsMagic || card.TrapActivationCost == null ||
+                    card.TrapActivationCost.Mana != TrapMirrorFieldCardRules.ActivationManaCost ||
+                    card.TrapActivationCost.Qi != 0 || card.TrapActivationCost.Power != 0 || card.TrapActivationCost.Gold != 0)
+                    result.AddError("TrapMirrorField must be the Fantasy Rare free trap with Mana2 reflection, no upgrades, draft enabled and rewards disabled.");
+                return;
+            }
+            if (card.Id != TrapReturnCardRules.CardId) return;
+            if (card.DisplayName != TrapReturnCardRules.DisplayName || card.Rarity != CardRarity.Rare ||
+                card.Affiliation != CardAffiliation.Neutral || !card.IncludeInDraft || !card.IncludeInRewards ||
+                card.HasReplicate || card.SpecialEffectText != TrapReturnCardRules.SpecialEffectText ||
+                !string.IsNullOrEmpty(card.EffectText) || card.Damage != 0 || card.DamageType != DamageType.Magic ||
+                card.EffectAmount != 0 || card.TriggerCount != 0 || card.TrapTrigger != TrapTriggerType.EnemyUnitAttacksMaster ||
+                card.TrapEffect != TrapEffectType.ReturnAttackerToHand || card.TrapActivationCost == null ||
+                card.TrapActivationCost.Mana != 0 || card.TrapActivationCost.Qi != 0 || card.TrapActivationCost.Power != 0 ||
+                card.TrapActivationCost.Gold != TrapReturnCardRules.ActivationGoldCost)
+                result.AddError("TrapReturn must be the released Neutral Rare free spell with Gold4 activation, return-before-damage, and no damage or upgrades.");
         }
 
         private static void ValidateReplicateText(

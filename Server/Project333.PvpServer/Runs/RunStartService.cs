@@ -401,6 +401,18 @@ public sealed class RunStartService
             account.Account.Id,
             runId,
             cancellationToken);
+        if (lockedRun.RewardClaimedAt.HasValue)
+        {
+            // A lost response or repeated chest click reads the committed receipt.
+            // Never reroll rewards or mutate wallet, collection, packs or ledger here.
+            var storedReward = await LoadRunRewardReceiptAsync(
+                connection, transaction, account.Account.Id, lockedRun.Id, cancellationToken);
+            var currentWallet = await LoadRewardWalletAsync(
+                connection, transaction, account.Account.Id, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new ClaimRunRewardsResponse(account.Account, currentWallet, lockedRun, storedReward);
+        }
+
         var rewardSpec = ResolveRunEndReward(lockedRun);
         var reward = await InsertRewardGrantAsync(
             connection,
@@ -725,16 +737,101 @@ public sealed class RunStartService
                 "Run rewards can only be claimed after the run is completed.");
         }
 
-        if (run.RewardClaimedAt.HasValue)
-        {
-            throw new RunServiceException(
-                "reward_already_claimed",
-                "Rewards for this run have already been claimed.");
-        }
 
         return run;
     }
 
+    private static async Task<RewardGrantDto> LoadRunRewardReceiptAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        Guid accountId,
+        Guid runId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            select id, resource_gold_delta, ticket_delta, card_rewards::text, pack_rewards::text, created_at
+            from reward_grants
+            where account_id = @accountId
+              and source_type = 'run_end'
+              and source_id = @runId
+            limit 2;
+            """;
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("accountId", accountId);
+        command.Parameters.AddWithValue("runId", runId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            throw RewardReceiptUnavailable();
+        }
+
+        var id = reader.GetGuid(0);
+        var gold = reader.GetInt64(1);
+        var tickets = reader.GetInt32(2);
+        var cards = ReadStoredRewardMap(reader.GetString(3));
+        var packs = ReadStoredRewardMap(reader.GetString(4));
+        var createdAt = reader.GetFieldValue<DateTimeOffset>(5);
+        if (gold < 0 || tickets < 0 || await reader.ReadAsync(cancellationToken))
+        {
+            // Ambiguous/missing legacy data is an error, never a reason to pay again.
+            throw RewardReceiptUnavailable();
+        }
+
+        return new RewardGrantDto(id, "run_end", runId, gold, tickets, cards, packs,
+            ToRewardItems(cards), ToRewardItems(packs), createdAt);
+    }
+
+    private static IReadOnlyDictionary<string, int> ReadStoredRewardMap(string json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                throw RewardReceiptUnavailable();
+            }
+
+            var rewards = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in document.RootElement.EnumerateObject())
+            {
+                if (string.IsNullOrWhiteSpace(item.Name) ||
+                    item.Value.ValueKind != JsonValueKind.Number ||
+                    !item.Value.TryGetInt32(out var count) || count <= 0 ||
+                    !rewards.TryAdd(item.Name, count))
+                {
+                    throw RewardReceiptUnavailable();
+                }
+            }
+
+            return rewards;
+        }
+        catch (JsonException)
+        {
+            throw RewardReceiptUnavailable();
+        }
+    }
+
+    private static RunServiceException RewardReceiptUnavailable() => new(
+        "reward_receipt_unavailable", "The completed run's stored reward receipt is unavailable.");
+
+    private static async Task<WalletDto> LoadRewardWalletAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        Guid accountId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "select resource_gold, tickets from user_wallets where account_id = @accountId;",
+            connection, transaction);
+        command.Parameters.AddWithValue("accountId", accountId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            throw new RunServiceException("wallet_not_found", "Wallet was not found for this account.");
+        }
+
+        return new WalletDto(reader.GetInt64(0), reader.GetInt32(1));
+    }
     private RunRewardSpec ResolveRunEndReward(RunSummaryDto run)
     {
         var resourceGold = ResolveLong("PROJECT333_RUN_REWARD_RESOURCE_GOLD_BASE", 0) +
@@ -856,25 +953,8 @@ public sealed class RunStartService
         }
     }
 
-    private static bool IsRewardableCard(JsonCardDefinitionRecord? card)
-    {
-        if (card == null ||
-            string.IsNullOrWhiteSpace(card.Id) ||
-            !card.IncludeInRewards ||
-            IsExcludedFromRandomCardRewards(card.Id))
-        {
-            return false;
-        }
-
-        try
-        {
-            return CardUpgradeRules.IsCardUpgradeable(card.ToDefinition());
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-    }
+    private static bool IsRewardableCard(JsonCardDefinitionRecord? card) =>
+        Project333.PvpServer.Cards.RewardCardEligibility.IsRewardableCard(card);
 
     private static void AddRewardMap(
         IDictionary<string, int> target,

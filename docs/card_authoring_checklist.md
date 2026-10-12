@@ -2,7 +2,7 @@
 
 이 문서는 새 카드 1장을 추가하거나 기존 카드를 수정할 때 따르는 표준 작업 순서다.
 
-현재 구현된 전체 카드와 아직 기획에만 남아 있는 카드는 `docs/card_catalog.md`에서 확인한다.
+현재 구현된 전체 카드와 아직 기획에만 남아 있는 카드는 `docs/card_catalog.md`에서 확인한다. 2026-10-03 현재 카드 데이터·네이티브 자산·강화·보상 코드를 대조한 기준으로 JSON/domain 정의 60종, 드래프트 On 54종, Unity 네이티브 카드 53종이다. 강화 가능 44종, includeInRewards 적용값 On 43종과 서버 실제 보상 41종은 별도로 집계한다.
 
 핵심 원칙:
 
@@ -20,7 +20,7 @@
 
 - 단일 대상 피해 마법: `definitionType: "DamageSpell"`, `damage`, `damageType`
 - 턴 시작 자원 생산: `turnStartResourceGain`
-- 전력 유지비: `sciencePowerUpkeep`, `specialEffectText: "전력 -n"`
+- 전력 소모: `sciencePowerUpkeep`, `specialEffectText: "전력 소모:n"`
 - 버서커: `hasBerserker: true`, `specialEffectText`에 `Berserker`
 - 엔듀어: `hasEndure: true`, `specialEffectText`에 `Endure`
 - 쉴더: `hasShielder: true`, `specialEffectText`에 `쉴더` 또는 `Shielder` (`hasGuard`는 구버전 JSON 읽기 전용 호환 필드)
@@ -40,17 +40,32 @@
 - 상단: `Building`, CardId `MerchantCaravan`; 소유자의 턴 시작 자원 획득 단계에 골드 +3
 - 객잔: `Building`, CardId `Inn`; 소유자의 턴 시작 자원 획득 단계에 골드 +1
 - 웨어울프: `Unit`, CardId `Werewolf`; 현재 같은 아군 필드의 다른 살아 있는 웨어울프마다 ATK +10을 실시간 계산하며, 효과를 받는 자신은 방전·망각·봉인 상태가 아니어야 한다. 셀 때는 방전·망각 웨어울프를 포함하고 봉인·사망 웨어울프를 제외한다.
+- 마나 대포: `Unit`, CardId `ManaCannon`, 사용자 확정 판타지 언커먼·종족 없음(`races: []`), 소환 마나 2, 기본 ATK/HP 40/10, 원거리 Magic, 방어 0/0, 이동 가능. `effectText: "공격할 때마다 마나 1 소모. 부족한 마나는 골드로 대신 지불할 수 있습니다."`, `effectId`·고유 특수효과 없음. 유효한 일반 공격 행동마다 현재 소유자 마나 1 우선 지불, 부족하면 골드 1로 대체; 모든 검증을 마친 뒤 한 번만 차감하며 실패 시 미차감. 망각 중 비용 효과 억제, 고독 후 새 소유자 자원 사용. 강화 Lv.3/6/9/13 ATK +1·나머지 HP +1, Lv.13 기본 44/19; 드래프트·보상 On. 원본 카드 PNG와 기존 파일을 보존하고 native 등록·실행 검증을 실제 결과와 구분한다.
+- 개방 방주: `Unit`, CardId `GaebangChief`, 사용자 확정 무림 유니크·인간, 기 7, 기본 ATK/HP 10/60, 근거리 Physical, 방어 0/0, 이동 가능. `effectText: "현재 소유한 골드 1당 공격력 +10. 골드가 변하면 즉시 반영되며 골드를 소모하지 않습니다."`, `effectId`·고유 특수효과 플래그 없음. 현재 소유자의 전투 골드 ×10을 저장 BaseAttack과 분리해 동적 계산하며 사망·방전·망각·봉인 중 보너스 0, 고독 이후 새 소유자 골드 사용. 비용을 골드로 대신 내면 차감 후 잔액을 사용. 강화 Lv.3/6/9/13 ATK +1·나머지 HP +1, Lv.13 기본 14/69; 드래프트·보상 On.
 - 용사: `Unit`, CardId `Hero`; 기본 33/33·속공. 일반공격으로 상대 소환물을 파괴할 때마다 ATK +33 또는 최대/현재 HP +33을 각각 50% 확률로 부여한다. 반격·마스터·아군·파괴 효과 연쇄 사망 제외. 기존 무적·턴 종료 성장 제거.
-- 뉴클리어: Nuclear, 과학문명 레전더리 마법, 전력 10, 강화 불가·드래프트/보상 제외. 봉인·마스터 제외 전체 파괴 및 상대 전장 영구 낙진 중첩. [세부 규칙](nuclear_fallout.md)
+- 엘프 장로: `Unit`, CardId는 사용자 변경(2026-10-09)에 따라 `ElfElder`로 통일한다. 판타지 레어·엘프, 마나5, ATK/HP30/25, 원거리 Physical, 방어0/0, 이동 가능, 카드 효과 없음. `hasPiercing: true`·`hasRush: true`, `specialEffectText: "관통\n속공"`. 강화 가능: Lv.3/6/9/13 ATK+1, 나머지 HP+1; Lv.13 34/34. 드래프트·보상 On. 사용자 지정 기존 ElfLongbowScout 카드 이미지·Idle_0·controller를 재사용하며 이후 전용 ElfElder.png를 우선 사용한다.
+- 스켈레톤아처: `Unit`, CardId `SkeletonArcher`, 사용자 확정 판타지 커먼·언데드, 마나 1, ATK/HP 10/3, 원거리 Physical, 방어 0/0, 이동 가능. 카드 효과·고유 특수효과 없음. 강화 가능: Lv.3/6/9/13 ATK +1, 나머지 Lv.1-13 HP +1; Lv.13 14/12. 드래프트·보상 On. 전용 PNG 우선, 없으면 기존 Skeleton.png alias; 기존 Skeleton.controller/Idle_0 공유.
+- 오크 족장: `Unit`, CardId `OrcChieftain`, 사용자 확정 판타지 레어·오크, 마나 7, 기본 ATK/HP 50/70, 근거리 Physical, 방어 0/0, 이동 가능, 고유 특수효과 플래그 없음. 같은 내 전장의 현재·이후 오크 유닛과 자기 자신에게 족장별 ATK/최대·현재 HP +10, 다중 족장 중첩. 해당 족장 퇴장 때 같은 수치를 제거하며 HP≤0 연쇄 사망 가능. 강화 가능: Lv.3/6/9/13 ATK +1, 나머지 HP +1; Lv.13 기본54/79·자기오라64/89. 현재 보드 Animator는 전용 `Assets/Unit/OrcChieftian/OrcChieftian.controller`이며 실제 경로 철자를 보존한다.
+- 오크 광전사: `Unit`, CardId `OrcBerserker`, 사용자 확정 판타지 언커먼·오크, 마나 5, ATK/HP 20/50, 근거리 Physical, 방어 0/0, 이동 가능. 카드 효과 없음, `hasBerserker: true` 및 `specialEffectText: "Berserker"`. 강화 가능: Lv.3/6/9/13 ATK +1, 나머지 Lv.1-13 HP +1; Lv.13 24/59. 드래프트·보상 On. 사용자 OrcBerserker.png 보존, 기존 OrcWarrior.controller 공유.
+- 플라즈마 쉴드: `PlasmaShield`, 과학문명 커먼 ScriptedSpell, 전력1, `effectId: "plasma_shield"`, `effectAmount: 10`, `damage: 0`, `damageType: "None"`. 내·적 유닛(마스터 제외) 또는 건물 하나의 물리 방어력을 영구 증가, 출처별 중첩. 강화 불가·부여량 +10 고정. 드래프트 On·보상 Off. 보호막은 시전 때 한 번만 재생. EffectAmount는 피해 필드와 구분하며 누락 시0, 새 카드에 사용하려면 해당 Rules/검증/표시/시전 처리를 모두 연결한다. [상세](plasma_shield_presentation.md)
+- 마나쉴드: `ManaShield`, 판타지 커먼 ScriptedSpell, 마나 1(부족하면 골드 1 대체), `effectId: "mana_shield"`, `effectAmount: 10`, `damage: 0`, `damageType: "None"`. 살아 있는 내·적 유닛(마스터 제외) 또는 건물 하나의 마법 방어력을 영구 증가하며 중첩 가능. 물리 방어력은 바꾸지 않고 플라즈마 쉴드와 독립적으로 합산한다. 강화 불가·부여량 +10 고정, 주문력·마법 증폭진 보너스 없음. 드래프트 On·보상 Off. 기존 대상·망각·방전·고독·온라인 복원 규칙을 유지한다. 매끄럽고 투명한 마나 구체는 약 0.817초 동안 한 번만 재생 후 숨기며 피해·피격·효과음이 없다. [상세](mana_shield_presentation.md)
+
+- 파이어스피어: FireSpear, 판타지 커먼 ScriptedSpell, 마나3, effectId fire_spear, Magic15. 살아 있는 아군·적 유닛/건물/마스터를 지정하여 같은 전장의 열 앞·뒤2칸에 즉시 광역 피해. 빈 칸·봉인·적 은신 직접 지정 불가, collateral은 광역 규칙. 매 Lv.1–13 피해+1, Lv.13 28+현재 주문력. 드래프트·보상 On. [규칙·편집 경로](fire_spear_presentation.md)
+- 메테오: Meteor, 사용자 확정 판타지 유니크 ScriptedSpell, 마나 7, effectId meteor, damage 40/Magic, 대상 지정 없음. 즉시 상대 전장의 현재 유닛·마스터·건물에 각 1회 마법 피해. Lv.1-13 매 레벨 기본 피해 +1(Lv.13: 53), 현재 아군 주문력을 대상마다 한 번 더한 뒤 마법 방어·보호 적용; 건물 배수 없음. 모든 직접 피해 후 사망·부활·연쇄 처리. 드래프트·보상 포함. 사용자 CardArtwork/Meteor.png 보존, 네이티브 API로 카드/카탈로그와 새 VFX/음원을 등록한다. [규칙·편집 경로](meteor_presentation.md)
+- 지진: Earthquake, 중립 언커먼 ScriptedSpell, 골드 3, effectId earthquake, damage 10/Physical, 대상 지정 없음. 즉시 상대 전장 전체(유닛·마스터·건물)에 물리 피해; 건물은 강화된 기본 피해를 3배로 만든 뒤 물리 방어 적용. Lv.1-13 매 레벨 피해 +1, Lv.13 유닛/마스터 23·건물 69(방어 전). 드래프트·보상 포함. 사용자 CardArtwork/Earthquake.png와 `.meta`를 보존하고 native API로 카드/카탈로그를 등록한다. [규칙·편집 경로](earthquake_presentation.md)
+- 뉴클리어: Nuclear, 과학문명 레전더리 마법, 전력 10. 즉시 상대 전장 전체(마스터·유닛·건물)에 고정 피해 100, 강화 가능·매 레벨 즉시 피해 +1(Lv.13: 113). 사용 당시 상대 전장에 있는 유닛(마스터 포함)에 영구 낙진 +1중첩, 건물은 낙진 중첩·피해 제외. 양쪽 턴 시작마다 중첩당 고정 피해 10(강화로 변하지 않음). 사용자 이미지와 카드 자산 등록, 드래프트/보상 포함. [세부 규칙](nuclear_fallout.md)
+- 은신: `hasHiding: true`; 은신에서 시작한 일반 공격의 전체 연타·관통은 최종 피해 2배 치명타. 피해 종류와 관계없이 실제 HP가 줄면 은신 해제, 피해가 0이면 유지. 반격 치명타 없음. 확률형 치명타 카드는 아직 없으며 문구만으로 발동하지 않는다.
 - 관통: `hasPiercing: true`, `specialEffectText`에 `관통` 또는 `Piercing`; 일반공격의 각 타격 후 같은 열 반대 행에 별도 피해; 쉴더 이전 적용
 - 더블/트리플 어택: `hitsPerAttack: 2` 또는 `3`, `specialEffectText`에 `Double Attack` 또는 `Triple Attack`
+- 트랩: `definitionType: "TrapSpell"`, `hasTrap: true`, 타입화된 `trapTrigger`·`trapEffect`·별도 `trapActivationCost`. 내 행동 턴에 무료 설치, 조건·발동 비용 충족 시 1회 소모. 같은 소유자의 동일 CardId 중복 설치 불가, 다른 트랩은 설치 순서대로 검사하며 조건/비용 미충족은 건너뛴다. 트랩: 리턴은 중립 Rare·발동 골드4·강화 불가·드래프트/보상 On(사용자 예외). [규칙](battle_rules.md#trap-return)
+- 트랩-미러 필드: `TrapSpell`, CardId `TrapMirrorField`, 판타지 Rare, 설치 무료·발동 마나 2(부족분 골드 1:1 대체). `EnemyUnitAttacksUnit` / `ReflectAttackerAttackAsMagic`: 상대 유닛·마스터가 내 유닛·마스터를 공격하면 공격을 취소하고 공격자의 현재 ATK와 내 현재 주문력으로 본인에게 Magic 피해를 준다. 건물 제외, 마법 방어·피해 보호 적용. 강화 불가·드래프트 On·보상 Off; 상대 비공개, 같은 CardId 동시 설치 불가, 성공 발동 1회 소모. 반사 실제 피해 표시와 온라인 사망·부활 판정을 확인한다. [규칙](battle_rules.md#trapmirrorfield)
 - 스크립트 마법: `definitionType: "ScriptedSpell"`, 지원 중인 `effectId`만 사용
 
 새 효과라면 바로 `cards.json`에만 적지 말고 다음을 먼저 정한다.
 
 - 언제 발동하는가
 - 어떤 대상에게 적용되는가
-- 마스터, 건물, 방전(Drained), 망각(Erasure), Shielder, Endure와 어떻게 상호작용하는가
+- 마스터, 건물, 방전(Drained), 망각(Erasure), 스턴(Stun), 빙결(Freeze), Shielder, Endure와 어떻게 상호작용하는가
 - 서버 PvP에서도 같은 방식으로 처리할 수 있는가
 - 어떤 전투 이벤트와 연출이 필요한가
 
@@ -75,7 +90,7 @@
 권장 규칙:
 
 - 가능하면 영문/숫자/언더스코어/하이픈만 사용한다.
-- 이미 쓰인 `cardId`는 바꾸지 않는다.
+- 이미 쓰인 `cardId`는 기본적으로 바꾸지 않는다. 사용자 요청으로 변경할 때는 저장 데이터·영수증 변환 마이그레이션과 서버·클라이언트 동시 반영 절차를 함께 준비한다. `ElfElder` 통일(2026-10-09)은 마이그레이션 0024를 따른다.
 - 카드 이미지 파일명, 덱 목록, 서버 메시지, 저장 데이터가 모두 이 값을 기준으로 연결된다.
 - 임시 이름인 `starter_firebolt` 같은 별도 ID를 만들지 말고 실제 카드 ID를 그대로 사용한다.
 
@@ -149,14 +164,45 @@ Shielder/Endure/LifeSteal/Drained/Erasure 상호작용:
 - `속성/Attribute`는 더 이상 사용하지 않는다.
 - `데미지 유형`은 `Physical`, `Magic`, `Fixed`, `None` 중 하나로 적는다.
 - 공격력이 있는 유닛/건물은 `None`을 사용할 수 없다.
-- 물리/마법 방어력은 `0` 이상의 정수다. 기본값은 `0/0`이며, 현재 골렘은 `1/0`, 마왕은 `3/3`을 사용한다.
+- 물리/마법 방어력은 `0` 이상의 정수다. 기본값은 `0/0`이며, 현재 골렘은 `3/0`, 마왕은 `3/3`을 사용한다.
 - `강화 가능 여부`는 `강화 가능` 또는 `강화 불가능`으로 적는다.
 - `개발 상태`는 `기획 중`, `효과 개발 중`, `기능 검증 중`, `출시 가능`처럼 현재 단계를 적는다.
 - `덱 빌딩 등장`과 `랜덤 보상 등장`은 각각 `On` 또는 `Off`로 적는다.
 - `includeInDraft`는 덱 빌딩 등장 여부, `includeInRewards`는 랜덤 카드 보상 등장 여부다. 생략하면 둘 다 `true`다.
 - 효과만 먼저 개발하는 카드는 두 값을 모두 `false`로 두고, 이미지와 실전 검증이 끝난 뒤 필요한 값만 `true`로 바꾼다.
 - 강화 가능 여부는 `CardUpgradeRules`에서 결정한다.
-- 강화 불가능 카드는 보유 카드 목록에서 `강화불가`로 표시되고, 카드 보상 풀에서도 제외된다.
+- 강화 불가능 카드는 보유 카드 목록에서 `강화불가`로 표시되고 원칙적으로 카드 보상 풀에서도 제외된다. 사용자 확정 트랩: 리턴만 강화 불가·보상 On이며, 새 비강화 카드에는 이 예외를 자동 적용하지 않는다.
+
+- 트랩 - 반응 장갑: `TrapSpell` / `ExplosiveReactiveArmour`, 과학문명 Rare, 설치 무료·발동 전력 4(부족분 골드 대체), `EnemyMeleeUnitAttacksMaster` / `DestroyAttacker`, `damageType: "None"`. 상대 일반 근거리 유닛의 내 마스터 근접 공격을 취소하고 직접 파괴. `AttackType.Melee` 기준이며 원거리 유닛·마스터·건물 공격자는 제외한다. 강화 불가·드래프트 On·보상 Off. 정상 파괴/부활/연쇄와 비공개·실제 이미지 공개를 확인한다. [규칙](battle_rules.md#explosivereactivearmour)
+
+- 트랩 - 아이언 돔: `TrapSpell` / `IronDome`, 과학문명 Rare, 설치 무료·발동 전력 4(부족분 골드 대체), `EnemyRangedUnitAttacksMaster` / `DestroyAttacker`, `damageType: "None"`. 상대 일반 원거리 유닛(`AttackType.Ranged`)의 내 실제 마스터 공격을 피해 전에 취소하고 직접 파괴한다. 근거리 유닛·마스터·건물 공격자는 제외하고, 환술의 최종 대상 및 승인된 공격 비용 후 판정한다. 강화 불가·드래프트 On·보상 Off. 리턴의 비강화 보상 예외를 적용하지 않는다. [규칙](battle_rules.md#irondome), [그림·등록](iron_dome.md)
+
+- 트랩 - 서먼 트랩: `TrapSpell` / `SummonTrap`, 중립 Common, 설치 무료·발동 전투 골드 1, `EnemyUnitSummoned`(5) / `DamageSummonedUnitPhysical`(4), `damage: 20` / `damageType: "Physical"`. 성공한 상대 일반 유닛 손패 소환의 정상 초기화 후 해당 유닛에 직접 Physical 피해. Lv.1–13 매 레벨 피해 +1, Lv.13 33; 설치 때 ArmedTrapState.EffectAmount에 강화 피해 포착. 마스터·건물·이동·고독·패 반환·부활 제외, 쉴더 이전·주문력 없음. 강화 가능·드래프트/보상 On이며 소환 비용/손패는 돌려주지 않는다. 새 소환 runtimeId의 공개·피해·사망 표시와 비밀 정보/복원을 함께 확인한다. [규칙](battle_rules.md#summontrap).
+
+### 3.1 트랩 카드의 추가 작성 항목
+
+트랩은 마법 공통 항목에 아래 내용을 추가한다. 유닛/건물의 ATK·HP·이동·종족은 트랩의 전장 능력치로 지정하지 않는다.
+
+```text
+유형: TrapSpell / hasTrap: true
+설치 비용: 0 (무료)
+발동 비용: 마나 / 기 / 전력 / 전투 골드 각각의 값
+발동 조건 (trapTrigger):
+발동 효과 (trapEffect):
+판정 순서: 조건 발생·비용 검증·피해/반격 전후·1회 소모 시점
+대상 포함/제외: 일반 유닛 / 마스터 / 건물 / 소유자
+동일 CardId 중복 설치: 불가 (현재 공통 규칙)
+서로 다른 트랩의 처리: 설치 순서, 조건/비용 미충족 건너뜀
+반환 등 비피해 제거: 현재 소유자, 새 일반 손패 카드, 손패 상한 처리
+강화 가능 여부와 레벨별 증가량:
+드래프트 / 보상: 각각 On / Off, 비강화 보상 예외는 별도 사용자 확인
+설치 중 비밀 정보 / 발동 공개 정보:
+중앙 공개 그림 / 숨김 공통 그림 / 마스터 ?·Xn 표시:
+```
+
+현재 확정 트랩은 트랩: 리턴, 트랩-미러 필드, 트랩 - 반응 장갑, 트랩 - 아이언 돔, 트랩 - 서먼 트랩이다. 아래는 리턴의 개별 규칙이다. 무료 설치·골드 4 발동·강화 불가·드래프트/보상 On이며, 보상 On은 사용자 지정 예외다. 일반 상대 유닛의 마스터 공격을 피해·쉴더·반격 전에 취소하고 현재 소유자에게 새 일반 카드로 반환한다. 손패가 가득 차면 반환 카드는 소실되지만 공격 취소는 유지한다. 실제 피해는 없으며 `damageType: "Magic"` 메타데이터를 피해 효과로 해석하지 않는다.
+
+`TrapSpellCardDefinition`의 조건/효과 enum과 발동 비용으로 확장한다. 미지원 조건·효과를 문구나 임의 문자열만 추가해 처리하지 않는다. [확정 전투 규칙](battle_rules.md#trap-return).
 
 ## 4. cards.json에 카드 데이터 추가
 
@@ -222,9 +268,9 @@ Assets/Project333/Resources/Project333/Data/cards.json
 
 봉인(`Sealbound`)은 구현되어 있다. 유닛 또는 건물에 `sealboundOwnerTurnStarts: n`을 사용하며, `0` 또는 필드 생략은 봉인 없음이다. `1` 이상이면 소환 즉시 봉인되고 이후 소유자의 턴 시작 마지막 단계마다 `1` 감소한다. `specialEffectText`에는 `봉인` 또는 `Sealbound`를 반드시 적는다. 봉인 중에는 공격·반격·이동·위치 교환·효과·유지비·대상 지정·피해·회복·버프·디버프·Shielder·로봇 검색·전열차단에 참여하지 않으며 망각도 받지 않는다. 해제 턴에는 속공이 있을 때만 바로 공격할 수 있다.
 
-은신(`Hiding`)은 구현되어 있다. 유닛 전용 `hasHiding: true`를 사용하고 `specialEffectText`에는 `은신` 또는 `Hiding`을 반드시 적는다. 은신 중에는 상대 일반공격과 상대 단일 대상 마법의 지정을 막고 전열차단과 Shielder에 참여하지 않는다. 합법적인 일반공격 선언 또는 Drained/Erasure 진입 시 영구 해제되며, 봉인 중에는 봉인이 우선되어 해제 후 은신 상태로 돌아온다. 건물과 마스터에는 사용할 수 없다.
+은신(`Hiding`)은 구현되어 있다. 유닛 전용 `hasHiding: true`를 사용하고 `specialEffectText`에는 `은신` 또는 `Hiding`을 반드시 적는다. 은신 중에는 상대 일반공격과 상대 단일 대상 마법의 지정을 막고 전열차단과 Shielder에 참여하지 않는다. 합법적인 일반공격 선언, 모든 종류 피해에 의한 실제 HP 감소 또는 Drained/Erasure 진입 시 영구 해제되며, 봉인 중에는 봉인이 우선되어 해제 후 은신 상태로 돌아온다. 건물과 마스터에는 사용할 수 없다.
 
-비행(`Flying`)은 구현되어 있다. 유닛 또는 건물에 `hasFlying: true`를 사용하고 `specialEffectText`에는 `비행` 또는 `Flying`을 반드시 적는다. 지상 근접 공격자도 활성 비행 소환물을 일반공격할 수 있다. 지상 근접의 일반공격·관통 피해는 대상의 방어력·상태 적용 후 절반으로 줄이고 소수점은 버린다. 반격·마법 피해는 이 감소를 적용하지 않는다. 비행 근접 공격자는 전열차단을 무시하며, 활성 비행 소환물은 전열차단을 하지 않는다. Drained와 Erasure는 비행을 억제하고, 봉인과 은신이 활성화되어 있으면 해당 상태의 대상 지정 규칙이 먼저 적용된다. 마스터의 비행은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
+비행(`Flying`)은 구현되어 있다. 유닛 또는 건물에 `hasFlying: true`를 사용하고 `specialEffectText`에는 `비행` 또는 `Flying`을 반드시 적는다. 지상 근접 공격자도 활성 비행 소환물을 일반공격할 수 있다. 지상 근접의 일반공격·관통 피해는 대상의 방어력·상태 적용 후 절반으로 줄이고 소수점은 버린다. 비행이 없는 근접 소환물의 반격 피해도 타격마다 같은 감소를 적용하며, 마법·효과 피해는 적용하지 않는다. 비행 근접 공격자는 전열차단을 무시하며, 활성 비행 소환물은 전열차단을 하지 않는다. Drained와 Erasure는 비행을 억제하고, 봉인과 은신이 활성화되어 있으면 해당 상태의 대상 지정 규칙이 먼저 적용된다. 마스터의 비행은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
 
 관통(`Piercing`)은 구현되어 있다. 유닛 또는 공격 가능한 건물에 `hasPiercing: true`를 사용하고 `specialEffectText`에는 `관통` 또는 `Piercing`을 반드시 적는다. 실제 일반공격 대상이 전열이면 후열에, 후열이면 전열에 각 타격 후 같은 열 반대 행으로 공격자의 동일한 타격 ATK와 데미지 유형의 별도 피해를 준다. 관통은 Shielder가 대신 받을 수 있지만 추가 반격이나 재귀 관통은 발생하지 않는다. 일반공격·관통은 원래 보호 대상의 방어력·상태·비행 감소를 먼저 적용하고 Shielder의 방어력·상태를 적용한다. 초과분에는 원래 대상의 피해 감소를 중복 적용하지 않는다. 단일 대상 마법은 기존 Shielder 우선 처리 순서를 유지한다. Invincible·Endure·Sealbound 판정은 정상 적용한다. 다단히트는 매 타격마다 발동하고 반대 행 피해의 실제 HP 감소량(대신 받은 Shielder와 초과분 포함)도 LifeSteal에 포함한다. HuanShu는 원래 클릭 대상이 아니라 서버가 확정한 실제 대상의 열을 사용한다. Erasure 중에는 관통이 무효화된다. 마스터의 관통은 런타임 전장 설정에서 지원하며 일반 `cards.json` 카드 레코드로 제작하지 않는다.
 
@@ -308,8 +354,9 @@ Assets/Project333/Resources/Project333/Data/cards.json
 
 - 강화 가능 카드라면 `CardUpgradeRules.IsCardUpgradeable(...)`에서 true가 되도록 한다.
 - 강화 불가능 카드라면 `CardUpgradeRules.IsCardUpgradeable(...)`에서 false가 되도록 한다.
-- 강화 불가능 카드는 보상 카드 풀에 들어가면 안 된다.
+- 강화 불가능 카드는 원칙적으로 보상 카드 풀에서 제외한다. 사용자 확정 예외인 TrapReturn만 보상에 포함하고 새 비강화 카드에 이 예외를 확대하지 않는다.
 - 강화 가능 카드는 보유 카드 씬에서 다음 강화 비용과 초록 테두리 표시가 정상적으로 떠야 한다.
+- 목표 Lv.1/2/3/4/5 비용은 동일 카드·계정 골드 각각 3/6/10/20/30, 목표 Lv.6~13은 각각 33이다. 카드 종류·희귀도와 무관한 [공통 비용표](meta_rules.md#card-upgrade-costs)를 사용하며, 이 비용 변경은 기존 카드별 HP/ATK/효과 증가량을 바꾸지 않는다. 실제 계정 차감은 서버 DB의 card_upgrade_costs와 순서대로 적용한 migration0020·0021을 따른다.
 - 사용자가 확정한 Lv.1~13 증가량이 CardLevelStatRules 및 필요한 효과 처리에 반영되고, 카드 표시와 실제 전투 적용값이 일치하는지 확인한다.
 - 마법 카드는 강화 가능 카드와 강화 불가능 카드의 정책을 카드별로 명확히 정한다.
 
@@ -320,34 +367,44 @@ Assets/Project333/Resources/Project333/Data/cards.json
 | A-111 | A-111 | Unit | 강화 가능 | 유닛 |
 | A-212 | A-212 | Unit | 강화 가능 | Lv.1~12 HP +1, Lv.13 ATK +1; Lv.13 ATK/HP 7/34; 드래프트·보상 On |
 | A-301 | A-301 | Unit | 강화 가능 | 3·6·9·13레벨 ATK +1, 나머지 레벨 HP +1, 드래프트·보상 On |
+| TrapReturn | 트랩: 리턴 | TrapSpell | 강화 불가 | 설치 무료·발동 골드4·반환/공격 취소 불변, 드래프트 On·사용자 확정 비강화 보상 On |
+| TrapMirrorField | 트랩-미러 필드 | TrapSpell | 강화 불가 | 설치 무료·발동 마나 2(골드 대체), 공격자 현재 ATK 반사·공격 취소 불변, 드래프트 On·보상 Off |
 | MagicAmplificationCircle | 마법 증폭진 | ScriptedSpell | 강화 불가 | 판타지 커먼, 마나 1, 내 턴 종료까지 주문력 +10, 중첩 가능, 드래프트·보상 Off |
-| Nuclear | 뉴클리어 | ScriptedSpell | 강화 불가 | 전력 10, 전장 파괴·영구 낙진 중첩, 과학문명 레전더리, 드래프트·보상 Off |
+| FireSpear | 파이어스피어 | ScriptedSpell | 강화 가능 | 판타지 커먼·마나3, 매 레벨 Magic15+레벨(Lv.13 28)+현재 주문력. 선택한 대상 전장의 앞·뒤2칸; 드래프트·보상 On |
+| Meteor | 메테오 | ScriptedSpell | 강화 가능 | 사용자 확정 판타지 유니크, 마나 7. 매 레벨 기본 마법 피해 +1(40+레벨), Lv.13 53에 현재 아군 주문력 추가. 비용 고정, 건물 배수 없음, 드래프트·보상 On |
+| Earthquake | 지진 | ScriptedSpell | 강화 가능 | 중립 언커먼, 골드 3. 매 레벨 기본 물리 피해 +1(10+레벨), 건물에는 강화 뒤 3배를 방어 전에 적용. Lv.13 유닛/마스터 23·건물 69. 드래프트·보상 On |
+| Nuclear | 뉴클리어 | ScriptedSpell | 강화 가능 | 전력 10, 즉시 적 전장 전체 고정 피해 100 + 레벨(Lv.13: 113); 사용 당시 상대 전장에 있는 유닛(마스터 포함)에만 영구 낙진 +1중첩, 건물은 낙진 제외. 중첩당 10은 강화 불변. 과학문명 레전더리, 드래프트·보상 On |
+| PlasmaShield | 플라즈마 쉴드 | ScriptedSpell | 강화 불가 | 부여 방어력 +10 고정. 드래프트 On·랜덤 카드 보상/카드팩 Off |
+| ManaShield | 마나쉴드 | ScriptedSpell | 강화 불가 | 부여 방어력 +10 고정. 드래프트 On·랜덤 카드 보상/카드팩 Off |
 | BiochemicalBomb | 생화학폭탄 | ScriptedSpell | 강화 가능 | 카드 레벨당 4회 지속 고정 피해 +1 (기본 25), 방어력·주문력 미적용, 드래프트·보상 On |
 | BlueDragon | 블루 드래곤 | Unit | 강화 가능 | 기본 ATK/HP 40/50, 표준 강화 (Lv.13: 44/59) |
 | Cerberus | 케르베로스 | Unit | 강화 가능 | Lv.1~12 HP +1, Lv.13 ATK +1; Lv.13 ATK/HP 10/78 |
 | ElfLongbowScout | 엘프 장궁수 | Unit | 강화 가능 | 유닛 |
+| ElfElder | 엘프 장로 | Unit | 강화 가능 | 사용자 확정: Lv.3/6/9/13 ATK+1, 나머지 HP+1; Lv.13 34/34. 공백 없는 CardId 사용, 마나5·방어0/0·엘프·관통·속공 불변, 드래프트·보상 On |
 | firebolt | 파이어볼 | DamageSpell | 강화 가능 | 강화 가능한 마법으로 예외 허용 |
 | Firewall | 파이어월 | ScriptedSpell | 강화 가능 | 카드 레벨당 지속 피해 +1 |
 | Goblin | 고블린 | Unit | 강화 가능 | 유닛 |
 | GoldMiner | 금광 채굴꾼 | Unit | 강화 가능 | 유닛 |
 | Golem | 골렘 | Unit | 강화 가능 | 유닛 |
+| GaebangChief | 개방 방주 | Unit | 강화 가능 | 사용자 확정: Lv.3/6/9/13 기본 ATK +1, 나머지 HP +1; Lv.13 14/69. 골드당 +10 동적 보너스·기 7·방어 0/0·인간 종족 불변, 드래프트·보상 On |
 | Gwangma | 광마 | Unit | 강화 가능 | 유닛 |
 | Inn | 객잔 | Building | 강화 가능 | 매 레벨 HP +1, 이미지 준비 전 드래프트·보상 제외 |
-| ManaPond | 마나의 샘 | Building | 강화 가능 | 마나 5, 주문력 +20; Lv.1~13 HP +1, ATK 증가 없음; Lv.13 ATK/HP 0/33, 주문력 20 유지 |
+| ManaCannon | 마나 대포 | Unit | 강화 가능 | 사용자 확정: Lv.3/6/9/13 기본 ATK +1, 나머지 HP +1; Lv.13 44/19. 소환 마나 2·공격 마나 1·골드 1:1 대체·방어 0/0·종족 없음 불변, 드래프트·보상 On |
+| ManaPond | 마나의 샘 | Building | 강화 가능 | 마나 6, 주문력 +20; Lv.1~13 HP +1, ATK 증가 없음; Lv.13 ATK/HP 0/33, 주문력 20 유지 |
 | ManaWeaver | 마나 위버 | Unit | 강화 가능 | 유닛 |
 | RedDragon | 레드 드래곤 | Unit | 강화 가능 | 기본 ATK/HP 40/40, 표준 강화 (Lv.13: 44/49) |
 | Shaolin_1st_Disciple | 소림 1대 제자 | Unit | 강화 가능 | 유닛 |
 | Shieldbearer | 방패병 | Unit | 강화 가능 | 유닛 |
 | Vampire | 뱀파이어 | Unit | 강화 가능 | 유닛 |
-| CheonraJimang | 천라지망 | ScriptedSpell | 강화 불가능 | 강화 불가능 마법 |
-| Daehwandan | 대환단 | ScriptedSpell | 강화 불가능 | 강화 불가능 마법 |
+| CheonraJimang | 천라지망 | ScriptedSpell | 강화 불가능 | 드래프트 On. includeInRewards 생략 기본값 On이나 서버 실제 보상 Off |
+| Daehwandan | 대환단 | ScriptedSpell | 강화 가능, 매 레벨 효과수치 +1 | Lv.0 30 → Lv.13 43만큼 내 마스터 공격력 증가. 기 생산 없음. 드래프트·보상·카드팩 On |
 | TenThousandYearSnowGinseng | 영약: 만년설삼 | PersistentResourceSpell | 강화 불가능 | 다음 3번의 내 턴 시작마다 기 +3, 드래프트 On·보상 Off |
 | Gu | 고독 | ScriptedSpell | 강화 불가능 | 소유권 이전 마법, 드래프트 On·보상 Off |
 | HuanShu | 환술 | ScriptedSpell | 강화 불가능 | 영구적으로 일반 공격 대상 무작위 변경, 드래프트 On·보상 Off |
 | ManaStone | 마정석 | ScriptedSpell | 강화 불가능 | 즉시 자원 획득 마법, 드래프트 On·보상 Off |
 | ManaStoneBundle | 마정석 꾸러미 | ScriptedSpell | 강화 불가능 | 즉시 자원 획득 마법, 드래프트 On·보상 Off |
 | MerchantCaravan | 상단 | Building | 강화 가능 | 매 레벨 HP +1, 드래프트·보상 On |
-| Microreactor | 초소형 발전기 | PersistentResourceSpell | 강화 불가능 | 강화 불가능 마법 |
+| Microreactor | 초소형 발전기 | PersistentResourceSpell | 강화 불가능 | 드래프트 On. includeInRewards 생략 기본값 On이나 서버 실제 보상 Off |
 | PowerBank | 보조배터리 | ScriptedSpell | 강화 불가능 | 즉시 자원 획득 마법, 드래프트 On·보상 Off |
 | PowerPlant | 발전소 | Building | 강화 가능 | 매 레벨 HP +1, 드래프트·보상 On |
 | NuclearPowerPlant | 원자력 발전소 | Building | 강화 가능 | 매 레벨 HP +1, 파괴 시 양쪽 전장 물리 피해 30, 드래프트·보상 On |
@@ -355,11 +412,17 @@ Assets/Project333/Resources/Project333/Data/cards.json
 | RobotFactory | 로봇 공장 | Building | 강화 가능 | 매 레벨 HP +1, 이미지 준비 전 드래프트·보상 제외 |
 | GaebangBranch | 개방 분타 | Building | 강화 가능 | 매 레벨 HP +1, 드래프트·보상 On |
 | Skeleton | 스켈레톤 | Unit | 강화 가능 | 표준 강화, 드래프트·보상 On |
+| SkeletonArcher | 스켈레톤아처 | Unit | 강화 가능 | 사용자 확정: Lv.3/6/9/13 ATK +1, 나머지 HP +1; Lv.13 14/12. 마나1·방어0/0·언데드·특수효과 없음 유지, 드래프트·보상 On |
 | Zombie | 좀비 | Unit | 강화 가능 | 표준 강화, 드래프트·보상 On |
-| OrcWarrior | 오크 전사 | Unit | 강화 가능 | 표준 강화, 드래프트·보상 On |
+| OrcWarrior | 오크 전사 | Unit | 강화 가능 | 기본 ATK/HP 20/40. 표준 강화; Lv.13 24/49, 드래프트·보상 On |
+| OrcBerserker | 오크 광전사 | Unit | 강화 가능 | 사용자 확정: Lv.3/6/9/13 ATK +1, 나머지 HP +1; Lv.13 24/59. 비용·방어·종족·버서커 유지, 드래프트·보상 On |
+| OrcChieftain | 오크 족장 | Unit | 강화 가능 | 사용자 확정: Lv.3/6/9/13 ATK +1, 나머지 HP +1; Lv.13 기본54/79·자기오라1개64/89. 오라각+10은 강화 불변, 드래프트·보상 On |
 | Werewolf | 웨어울프 | Unit | 강화 가능 | 표준 강화, 드래프트·보상 On |
 | DemonKing | 마왕 | Unit | 강화 가능 | Lv.3/6/9 ATK +1, Lv.13 ATK +3, 나머지 HP +1, 드래프트·보상 Off |
 | Hero | 용사 | Unit | 강화 가능 | Lv.3/6/9 ATK +1, Lv.13 ATK +3, 나머지 HP +1, 드래프트·보상 Off |
+| ExplosiveReactiveArmour | 트랩 - 반응 장갑 | TrapSpell | 강화 불가 | 설치 무료·발동 전력4(골드 대체), 상대 일반 근거리 유닛의 내 마스터 근접 공격 취소·공격자 직접 파괴, Lv.1–13 증가 없음, 드래프트 On·보상 Off |
+| IronDome | 트랩 - 아이언 돔 | TrapSpell | 강화 불가 | 설치 무료·발동 전력4(골드 대체), 상대 일반 원거리 유닛의 내 마스터 공격 취소·공격자 직접 파괴, Lv.1–13 증가 없음, 드래프트 On·보상 Off |
+| SummonTrap | 트랩 - 서먼 트랩 | TrapSpell | 강화 가능 | 설치 무료·발동 골드1, 성공한 상대 일반 유닛 손패 소환 후 직접 Physical20+레벨, 매 Lv.1–13 피해 +1·Lv.13 33, 설치 당시 피해 포착, 드래프트·보상 On |
 | TimedBomb | 시한폭탄 | ScriptedSpell | 강화 가능 | 비용 전력 3, 매 레벨 물리 피해 +1 (기본 33), 드래프트·보상 On |
 
 정책 테스트:
@@ -376,7 +439,7 @@ Assets/Project333/Resources/Project333/Data/cards.json
 - 규칙 문서: `docs/battle_rules.md`
 - JSON DTO: `JsonCardDefinitionRecord`
 - 카드 정의 타입: `UnitCardDefinition`, `BuildingCardDefinition`, `SpellCardDefinition` 계열
-- 소환/사용 연결: `PlayCardService`, `SpellService`
+- 소환/사용 연결: `PlayCardService`, `SpellService`; 트랩은 `InstallTrapCommand`·`TrapService`와 승인된 공격의 피해 전 또는 정상 유닛 손패 소환 초기화 완료 후의 타입별 연결점을 사용
 - 전투 해상: `AttackService`, `DamageResolutionRules`, `TurnStartService`, `EndTurnService` 등 해당 효과가 발동되는 서비스
 - 온라인 동기화: `BattleStateViewDto`, `BattleStateViewFactory`, `BattleStateViewProjector`
 - UI/연출: `BattleBootstrapper`, `TileTextView`, `HandPresenter` 등 필요한 표시 계층
@@ -544,14 +607,16 @@ dotnet build C:\Project_333\Server\Project333.PvpServer\Project333.PvpServer.csp
 
 - `cards.json`에는 효과 문장만 쓰고 실제 플래그를 빼먹음
 - 새 카드 요청 양식에는 `강화 가능 여부`를 적었지만 `CardUpgradeRules`를 수정하지 않음
-- 강화 불가능 카드가 보상 풀에 포함됨
+- 사용자 확정 예외(현재 TrapReturn) 없이 강화 불가능 카드를 보상 풀에 포함함
 - `specialEffectText`에는 `LifeSteal`이 있는데 `hasLifeSteal`이 false임
 - `hitsPerAttack`을 3으로 했지만 `specialEffectText`에 `Triple Attack`을 안 씀
-- `sciencePowerUpkeep`은 있는데 `specialEffectText`에 `전력 -n`을 안 씀
+- `sciencePowerUpkeep`은 있는데 `specialEffectText`에 `전력 소모:n`을 안 씀
 - 카드 이미지 파일명이 `cardId`와 다름
 - 서버에는 JSON 카드가 있는데 드래프트 카탈로그에는 카드 에셋이 없음
 - 새 `ScriptedSpell`의 `effectId`를 만들었지만 `CardDatabaseValidator`와 `SpellService` 구현을 안 함
 - 로컬에서는 되는 것처럼 보이지만 온라인 `BattleStateView`에 필요한 상태가 안 내려감
+- 트랩 설치 이벤트나 상대 StateView/AI 복사본에 비밀 CardId·비용·조건·효과를 노출함
+- 반환을 죽음으로 처리하거나 손패 상한에서 전장 제거/공격 취소를 누락함
 
 ## 12. 새 카드 추가 완료 기준
 

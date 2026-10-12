@@ -235,7 +235,7 @@ $verifyScriptLines = @(
     "    BattleWebSocketUrl = `"$battleWebSocketUrl`"",
     "    ExpectedPublicUrl = `"$publicBaseUrl`"",
     "    ExpectedRequiredClientVersion = `"$RequiredClientVersion`"",
-    '    RequireStartupRecovery = $true',
+    # The readiness tool always checks 70 seconds and cancel_without_result.
     '    SkipWebSocket = $SkipWebSocket',
     '    PrintOnly = $PrintOnly',
     '}',
@@ -300,6 +300,8 @@ $readmeLines = @(
     '- Prefer the secure prompt or a host secret manager instead of a command-line password.',
     '- Do not expose port 7333 to the public internet.',
     '- Back up PostgreSQL before schema changes or external tests.',
+    '- Verification requires 70-second reconnect, StartupRecoveryEnabled=false and InterruptedBattlePolicy=cancel_without_result.',
+    '- Restarting the server cancels unfinished battles; wait until no battles are in progress.',
     '- Keep smoke-test commands disabled for staging/public tests.'
 )
 $readmePath = Join-Path $OutputPath "README.md"

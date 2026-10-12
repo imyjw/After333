@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e59e216d7994fd7bfe5103de767c156, type: 3}
+  m_Name: TrapMirrorField
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Infrastructure.Data.TrapSpellCardDefinitionAsset
+  _cardId: TrapMirrorField
+  _displayName: "\uD2B8\uB7A9-\uBBF8\uB7EC \uD544\uB4DC"
+  _rarity: 2
+  _cost:
+    _mana: 0
+    _qi: 0
+    _power: 0
+    _gold: 0
+  _affiliation: 1
+  _chargeTileFootprint: 0
+  _effectText: 
+  _specialEffectText: "\uD2B8\uB7A9: \uB9C8\uB098-2. \uC0C1\uB300\uBC29 \uC720\uB2DB\uC774
+    \uB0B4 \uC720\uB2DB\uC744 \uACF5\uACA9 \uC2DC, \uACF5\uACA9\uC744 \uCDE8\uC18C\uD558\uACE0
+    \uADF8 \uC720\uB2DB\uC5D0\uAC8C \uD574\uB2F9 \uC720\uB2DB\uC758 \uACF5\uACA9\uB825\uB9CC\uD07C
+    \uB9C8\uBC95 \uB370\uBBF8\uC9C0\uB97C \uC785\uD78C\uB2E4."
+  _hasReplicate: 0
+  _boardSprite: {fileID: 0}
+  _boardAnimatorController: {fileID: 0}
+  _activationCost:
+    _mana: 2
+    _qi: 0
+    _power: 0
+    _gold: 0
+  _triggerType: 2
+  _trapEffectType: 2

@@ -1,0 +1,17 @@
+{
+  "asset": "GaebangChief Idle",
+  "created": "2026-10-02",
+  "tool": "image_gen.imagegen",
+  "reference": "C:/Project_333/Assets/Unit/GaebangChief/Idle.png",
+  "generatedSource": "Tools/Art/Source/GaebangChief/Idle-Generated-20261002.png",
+  "packedTarget": "Assets/Unit/GaebangChief/Idle.png",
+  "grid": {
+    "columns": 4,
+    "rows": 4,
+    "cell": 512
+  },
+  "frameCount": 16,
+  "frameRate": 8,
+  "loopSeconds": 2,
+  "prompt": "Use case: identity-preserve.\nAsset type: production pixel-art game animation sprite sheet, GaebangChief calm standing Idle.\nEdit/reference input: C:/Project_333/Assets/Unit/GaebangChief/Idle.png. Preserve exactly this elderly Korean beggar chief's identity, ragged tan wide conical straw hat with muted green patches, long gray hair and long beard, tan patched ragged robe, dark pants, brown sash, bare feet and small brown begging bowl held on the viewer-right. Use the FIRST reference pose as the anchor. Preserve the existing pixel cluster style, proportions, facial expression and palette; do not redesign the character.\nPrimary request: replace the jerky poses with 16 carefully consecutive in-between frames of a VERY QUIET standing idle, one seamless two-second breathing loop. This is in-between animation, not 16 unrelated portraits.\nComposition: exactly 4 columns x 4 rows of equal 512x512 cells in a 2048x2048 transparent sprite sheet. Frames read left to right, top to bottom, 0 through 15. Entire body in every cell; approximate same 340 pixel character height as reference. Feet stay firmly planted, same center/baseline and 16px clear space under soles in EVERY cell. No outlines/grid/text/numbers.\nMotion: tiny slow inhale across frames0-7, tiny exhale across8-15; chest and sleeves subtly rise/fall, beard tips drift at most 2-3 pixel-art pixels and return. Frame15 smoothly joins0. NO bowl lifting, head turns, big hair waving, bouncing, walking, foot sliding, coin eyes or attack motion. Bowl hand remains stable. Character torso/hat shape stable. Only extremely subtle incremental changes from each neighboring frame. All 16 are genuine animation frames with intermediate poses, no holding only two poses.\nBackground: true transparent alpha, no painted checkerboard. Sharp nearest-neighbor pixel art, no blur, no anti-aliased photographic shading, no effects, no shadows outside body. Do not crop any hat, hair, bowl or feet; no spill to neighboring cells."
+}

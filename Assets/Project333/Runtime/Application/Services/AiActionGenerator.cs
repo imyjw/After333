@@ -25,8 +25,13 @@ namespace Project333.Runtime.Application.Services
         };
         private readonly Dictionary<string, CardDefinition> _cards = new Dictionary<string, CardDefinition>(StringComparer.Ordinal);
         private readonly TargetingService _targeting;
+        private readonly AiProducerProtectionPolicy _protectionPolicy;
         public AiActionGenerator(ICardDefinitionProvider provider, TargetingService targeting)
+            : this(provider, targeting, new AiProducerProtectionPolicy(provider)) { }
+        internal AiActionGenerator(ICardDefinitionProvider provider, TargetingService targeting,
+            AiProducerProtectionPolicy protectionPolicy)
         {
+            _protectionPolicy = protectionPolicy;
             _targeting = targeting;
             foreach (var card in provider.GetAll()) _cards[card.CardId] = card;
         }
@@ -47,7 +52,8 @@ namespace Project333.Runtime.Application.Services
                     actions.Add(new AiAction(80, new ActivateEffectCommand(source, state.AIBoard.GetOccupant(source).RuntimeId)));
                 var unit = state.AIBoard.GetOccupant(source);
                 if (unit == null || !unit.IsAlive || unit.CannotAttack || unit.HasSummoningSickness ||
-                    unit.RemainingAttacksThisTurn <= 0 || unit.Attack <= 0) continue;
+                    unit.RemainingAttacksThisTurn <= 0 || unit.Attack <= 0 ||
+                    !ManaCannonRules.CanPayAttackCost(state, unit)) continue;
                 foreach (var target in Coordinates)
                     if (_targeting.CanTarget(state, PlayerId.AI, source, target))
                         actions.Add(new AiAction(100, new AttackCommand(source, target)));
@@ -77,6 +83,15 @@ namespace Project333.Runtime.Application.Services
                             if (state.GetBoard(owner).GetOccupant(coord) is OccupantState o && o.CanBeAffected)
                                 group.Add(new AiAction(90, new CastDamageSpellCommand(hand.CardId, owner, coord, hand.RuntimeId)));
                 }
+                else if (definition is TrapSpellCardDefinition)
+                {
+                    var duplicate = false;
+                    foreach (var trap in state.ArmedTraps)
+                        if (trap != null && trap.OwnerId == PlayerId.AI && trap.CardId == hand.CardId)
+                        { duplicate = true; break; }
+                    if (!duplicate && state.AI.Master.IsAlive)
+                        group.Add(new AiAction(80, new InstallTrapCommand(hand.CardId, hand.RuntimeId)));
+                }
                 else if (definition is PersistentResourceSpellCardDefinition)
                     group.Add(new AiAction(80, new CastPersistentResourceSpellCommand(hand.CardId, hand.RuntimeId)));
                 else if (definition is ScriptedSpellCardDefinition script)
@@ -102,7 +117,7 @@ namespace Project333.Runtime.Application.Services
                     if (occupant != null && (!occupant.CanMove || !occupant.IsAlive || occupant.CannotMoveDueToState)) continue;
                     var move = new MoveOccupantCommand(source, target);
                     var escapesHazard = AiMovementPolicy.IsHazardEscapeCandidate(state, move);
-                    if (AiMovementPolicy.Score(state, move) <= 0 && !escapesHazard) continue;
+                    if (AiMovementPolicy.ScoreUsingCardCosts(state, move, _protectionPolicy) <= 0 && !escapesHazard) continue;
                     // Inspect threatened occupants before ordinary plays exhaust the search budget.
                     actions.Add(new AiAction(escapesHazard ? 96 : state.AI.Master.CurrentHp < 40 ? 95 : 20,
                         move));
@@ -116,6 +131,7 @@ namespace Project333.Runtime.Application.Services
             actions.Clear();
             foreach (var item in indexed) actions.Add(item.Value);
             PrioritizeTacticalTargets(state, actions);
+            _protectionPolicy.OrderProtectionMoves(state, actions);
             return actions;
         }
 
@@ -169,6 +185,34 @@ namespace Project333.Runtime.Application.Services
             if (card.EffectId == RobotFusionRules.EffectId)
             {
                 if (RobotFusionRules.CanBegin(state, PlayerId.AI)) AddFusion(actions, state, card.CardId, runtimeId, true);
+            }
+            else if (card.EffectId == ManaShieldRules.EffectId)
+            {
+                foreach (var owner in new[] { PlayerId.AI, PlayerId.Player })
+                    foreach (var coord in Coordinates)
+                        if (ManaShieldRules.IsLegalTarget(state, PlayerId.AI, owner, coord))
+                            actions.Add(new AiAction(90, new CastScriptedSpellCommand(card.CardId, owner, coord, runtimeId)));
+            }
+            else if (card.EffectId == PlasmaShieldRules.EffectId)
+            {
+                foreach (var owner in new[] { PlayerId.AI, PlayerId.Player })
+                    foreach (var coord in Coordinates)
+                        if (PlasmaShieldRules.IsLegalTarget(state, PlayerId.AI, owner, coord))
+                            actions.Add(new AiAction(90, new CastScriptedSpellCommand(card.CardId, owner, coord, runtimeId)));
+            }
+            else if (card.EffectId == FireSpearRules.EffectId)
+            {
+                foreach (var owner in new[] { PlayerId.Player, PlayerId.AI })
+                {
+                    var columns = new HashSet<int>();
+                    foreach (var coord in Coordinates)
+                    {
+                        if (columns.Contains(coord.Column) ||
+                            !FireSpearRules.IsLegalTarget(state, PlayerId.AI, owner, coord)) continue;
+                        columns.Add(coord.Column);
+                        actions.Add(new AiAction(90, new CastScriptedSpellCommand(card.CardId, owner, coord, runtimeId)));
+                    }
+                }
             }
             else if (card.EffectId == "firewall")
             {

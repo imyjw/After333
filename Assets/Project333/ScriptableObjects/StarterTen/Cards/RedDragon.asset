@@ -16,21 +16,21 @@ MonoBehaviour:
   _displayName: "\uB808\uB4DC \uB4DC\uB798\uACE4"
   _rarity: 4
   _cost:
-    _mana: 9
+    _mana: 10
     _qi: 0
     _power: 0
     _gold: 0
   _affiliation: 1
   _chargeTileFootprint: 1
   _effectText: "\uB0B4 \uD134 \uC885\uB8CC \uC2DC \uC0C1\uB300\uBC29 \uD0C0\uC77C
-    \uC804\uCCB4\uC5D0 33 \uB9C8\uBC95 \uD53C\uD574"
+    \uC804\uCCB4\uC5D0 20 \uB9C8\uBC95 \uD53C\uD574"
   _specialEffectText: "\uBE44\uD589"
   _hasReplicate: 0
   _boardSprite: {fileID: 954118651, guid: 344e1e15725a74e4e8b22f54f47c25cd, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: 96d2d0d396818d24dbc6380f8d565c28, type: 2}
   _attackType: 0
   _damageType: 2
-  _attack: 40
+  _attack: 50
   _health: 40
   _physicalDefense: 0
   _magicDefense: 0

@@ -283,13 +283,13 @@ namespace Project333.Tests.EditMode
                 PlayerId.Player);
             var projected = BattleStateViewProjector.CreateLocalPerspectiveState(view);
             var restored = projected.AIBoard.GetOccupant(targetCoord);
-            var tooltip = OccupantSpecialEffectTooltipCatalog.Build(null, restored)
+            var tooltip = OccupantStatusTooltipCatalog.BuildAttached(null, restored, projected)
                 .Single(entry => entry.Title == "환술");
 
             Assert.That(restored.IsUnderHuanShu, Is.True);
             Assert.That(restored.HuanShuOwnerTurnsRemaining, Is.EqualTo(HuanShuRules.ActiveStateMarker));
             Assert.That(restored.HuanShuEligibleAfterTurnNumber, Is.Zero);
-            Assert.That(tooltip.Description, Is.EqualTo("일반 공격 시 공격 대상이 무작위로 변경됩니다."));
+            Assert.That(tooltip.Description, Is.Empty);
         }
 
         private static SpellService CreateSpellService()

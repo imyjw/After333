@@ -62,18 +62,12 @@ namespace Project333.Runtime.Infrastructure.Data
             get
             {
                 var lines = new List<string>();
-                var explicitText = RawSpecialEffectText?.Trim();
+                var explicitText = NormalizePowerConsumptionSpecialEffectText(RawSpecialEffectText, _sciencePowerUpkeep);
                 if (!string.IsNullOrWhiteSpace(explicitText))
                 {
                     lines.Add(explicitText);
                 }
 
-                var powerUpkeepText = GetSciencePowerUpkeepSpecialEffectText();
-                if (!string.IsNullOrWhiteSpace(powerUpkeepText) &&
-                    !lines.Exists(line => string.Equals(line, powerUpkeepText, StringComparison.Ordinal)))
-                {
-                    lines.Add(powerUpkeepText);
-                }
 
                 if (_canAttackOnSummon && !lines.Exists(ContainsRushSpecialEffectText))
                 {
@@ -208,12 +202,6 @@ namespace Project333.Runtime.Infrastructure.Data
             _hasPiercing = hasPiercing;
         }
 
-        private string GetSciencePowerUpkeepSpecialEffectText()
-        {
-            return _sciencePowerUpkeep > 0
-                ? $"전력 -{_sciencePowerUpkeep}"
-                : string.Empty;
-        }
 
         private static bool ContainsRushSpecialEffectText(string text)
         {

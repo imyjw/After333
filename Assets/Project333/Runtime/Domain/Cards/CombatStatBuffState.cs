@@ -10,7 +10,8 @@ namespace Project333.Runtime.Domain.Cards
             int attackBonus = 0,
             int maxHpBonus = 0,
             int physicalDefenseBonus = 0,
-            int magicDefenseBonus = 0)
+            int magicDefenseBonus = 0,
+            string sourceRuntimeId = "")
         {
             if (string.IsNullOrWhiteSpace(sourceCardId))
                 throw new ArgumentException("A combat stat buff requires its source CardId.", nameof(sourceCardId));
@@ -19,6 +20,7 @@ namespace Project333.Runtime.Domain.Cards
             if (physicalDefenseBonus < 0) throw new ArgumentOutOfRangeException(nameof(physicalDefenseBonus));
             if (magicDefenseBonus < 0) throw new ArgumentOutOfRangeException(nameof(magicDefenseBonus));
             SourceCardId = sourceCardId;
+            SourceRuntimeId = sourceRuntimeId ?? string.Empty;
             AttackBonus = attackBonus;
             MaxHpBonus = maxHpBonus;
             PhysicalDefenseBonus = physicalDefenseBonus;
@@ -26,12 +28,14 @@ namespace Project333.Runtime.Domain.Cards
         }
 
         public string SourceCardId { get; }
+        // Empty for permanent gains; a live source's identity distinguishes stacked auras.
+        public string SourceRuntimeId { get; }
         public int AttackBonus { get; }
         public int MaxHpBonus { get; }
         public int PhysicalDefenseBonus { get; }
         public int MagicDefenseBonus { get; }
 
         public CombatStatBuffState Clone() => new CombatStatBuffState(
-            SourceCardId, AttackBonus, MaxHpBonus, PhysicalDefenseBonus, MagicDefenseBonus);
+            SourceCardId, AttackBonus, MaxHpBonus, PhysicalDefenseBonus, MagicDefenseBonus, SourceRuntimeId);
     }
 }

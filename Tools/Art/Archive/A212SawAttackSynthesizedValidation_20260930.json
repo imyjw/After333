@@ -1,0 +1,16 @@
+{
+    "name":  "SawAttack",
+    "format":  "PCM16 mono",
+    "sampleRate":  44100,
+    "seconds":  0.480,
+    "samples":  21168,
+    "peakDbfs":  -3.8764,
+    "rmsDbfs":  -13.5013,
+    "dcOffset":  -0.00002280,
+    "clippedSamples":  0,
+    "maxAdjacentSampleStep":  0.651306,
+    "firstSample":  0,
+    "lastSample":  0,
+    "suggestedOneShotGain":  0.30,
+    "source":  "Original deterministic synthesis; no recordings or external samples"
+}

@@ -43,6 +43,9 @@ namespace Project333.Runtime.Domain.Battle
 
         public int MaxHandSizeBonus { get; private set; }
 
+        // Presentation/AI projection only; authoritative and visible owned traps stay in BattleState.ArmedTraps.
+        public int HiddenTrapCount { get; private set; }
+
         public int MaxHandSize => Math.Min(AbsoluteMaxHandSize, BaseMaxHandSize + MaxHandSizeBonus);
 
         public void MarkMulliganUsed()
@@ -69,6 +72,11 @@ namespace Project333.Runtime.Domain.Battle
         public void ResetFailedDrawCount()
         {
             FailedDrawCount = 0;
+        }
+
+        public void RestoreHiddenTrapCount(int count)
+        {
+            HiddenTrapCount = Math.Max(0, count);
         }
 
         public void RestoreRuntimeState(

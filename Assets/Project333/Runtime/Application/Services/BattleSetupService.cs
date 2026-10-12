@@ -15,7 +15,8 @@ namespace Project333.Runtime.Application.Services
         private const int StartingMana = 0;
         private const int StartingQi = 0;
         private const int StartingPower = 0;
-        private const int StartingGold = 3;
+        private const int FirstPlayerStartingGold = 3;
+        private const int SecondPlayerStartingGold = 4;
 
         private const int MasterAttack = 3;
         private const int MasterHp = 333;
@@ -62,7 +63,7 @@ namespace Project333.Runtime.Application.Services
 
             var player = new PlayerState(
                 id: PlayerId.Player,
-                resources: CreateStartingResources(),
+                resources: CreateStartingResources(request.FirstPlayerId == PlayerId.Player),
                 deck: playerDeck,
                 hand: new HandState(),
                 discard: new DiscardState(),
@@ -70,7 +71,7 @@ namespace Project333.Runtime.Application.Services
 
             var ai = new PlayerState(
                 id: PlayerId.AI,
-                resources: CreateStartingResources(),
+                resources: CreateStartingResources(request.FirstPlayerId == PlayerId.AI),
                 deck: aiDeck,
                 hand: new HandState(),
                 discard: new DiscardState(),
@@ -95,13 +96,13 @@ namespace Project333.Runtime.Application.Services
             return battleState;
         }
 
-        private static ResourceSet CreateStartingResources()
+        private static ResourceSet CreateStartingResources(bool isFirstPlayer)
         {
             return new ResourceSet(
                 mana: StartingMana,
                 qi: StartingQi,
                 power: StartingPower,
-                gold: StartingGold);
+                gold: isFirstPlayer ? FirstPlayerStartingGold : SecondPlayerStartingGold);
         }
 
         private static void DrawOpeningHands(PlayerState player, PlayerState ai)

@@ -301,6 +301,7 @@ namespace Project333.Runtime.Presentation.Development
                 _buttonText.color = new Color(1f, 0.96f, 0.82f, 1f);
                 _buttonText.text = "확인";
             }
+            NoticeTheme.Dialog(_panelRect);
         }
 
         private void SetSortingOrder(int sortingOrder)

@@ -8,8 +8,8 @@ public sealed record AiChallengeAttemptDto(
 
 public sealed record AiChallengeStartResponse(
     Guid AttemptId, string MatchId, Guid RunId, Guid DeckId, string Status,
-    int RemainingAttempts, DateTimeOffset ResetsAtUtc, bool Replayed);
+    int RemainingAttempts, bool Replayed);
 
 public sealed record AiChallengeStatusResponse(
-    int DailyLimit, int RemainingAttempts, DateTimeOffset ResetsAtUtc,
+    int RunLimit, int RemainingAttempts, Guid? RunId,
     AiChallengeAttemptDto? PendingAttempt);

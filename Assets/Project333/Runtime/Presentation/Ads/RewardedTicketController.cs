@@ -1,4 +1,5 @@
 using System;
+using Project333.Runtime.Presentation.Tutorial;
 using System.Threading;
 using Project333.Runtime.Application.Accounts;
 using Project333.Runtime.Application.Ads;
@@ -63,14 +64,27 @@ namespace Project333.Runtime.Presentation.Ads
         private bool _editorRefreshQueued;
 #endif
 
+        public bool IsRewardInteractionActive => _isRequestingAttempt || (_adService?.IsShowing ?? false);
+
         public bool IsConfigured =>
             !string.IsNullOrWhiteSpace(_levelPlayAppKey) &&
             !string.IsNullOrWhiteSpace(_rewardedAdUnitId);
+
+        private bool _tutorialAdLoaded;
+        private bool IsTutorialAdMode => _tutorialAdLoaded || TutorialRuntimeIsolation.IsActive;
 
         private string AccountServerUrl => Project333ServerEndpointSettings.ResolveHttpUrl(_accountServerUrl);
 
         private void Awake()
         {
+            if (IsTutorialAdMode)
+            {
+                _tutorialAdLoaded = true;
+                _startSceneController = GetComponent<GameStartSceneController>();
+                _shopSceneController = GetComponent<ShopSceneController>();
+                if (IsLegacyStartSceneHost()) { SetEditableUiActive(false); enabled = false; return; }
+                EnsureEditableHierarchy(); return;
+            }
             _startSceneController = GetComponent<GameStartSceneController>();
             _shopSceneController = GetComponent<ShopSceneController>();
             if (IsLegacyStartSceneHost())
@@ -87,6 +101,14 @@ namespace Project333.Runtime.Presentation.Ads
 
         private void OnEnable()
         {
+            if (IsTutorialAdMode)
+            {
+                _tutorialAdLoaded = true;
+                _startSceneController = GetComponent<GameStartSceneController>();
+                _shopSceneController = GetComponent<ShopSceneController>();
+                if (IsLegacyStartSceneHost()) { SetEditableUiActive(false); enabled = false; return; }
+                EnsureEditableHierarchy(); return;
+            }
             _startSceneController = GetComponent<GameStartSceneController>();
             _shopSceneController = GetComponent<ShopSceneController>();
             if (IsLegacyStartSceneHost())
@@ -220,8 +242,14 @@ namespace Project333.Runtime.Presentation.Ads
                 return;
             }
 
+            if (IsTutorialAdMode)
+            {
+                _watchAdButton.interactable = false; _watchAdButtonLabel.text = "광고 보고 티켓 +1";
+                if (_rewardedAdStatusText != null) { _rewardedAdStatusText.text = "튜토리얼에서는 실제 광고를 재생하지 않습니다."; _rewardedAdStatusText.gameObject.SetActive(true); }
+                return;
+            }
             var authenticated = AccountSessionState.IsAuthenticated;
-            var busy = _isRequestingAttempt || PendingRewardedAd.IsBlocking(AccountServerUrl, AccountSessionState.AccountId) || (_adService?.IsShowing ?? false);
+            var busy = IsRewardInteractionActive || PendingRewardedAd.IsBlocking(AccountServerUrl, AccountSessionState.AccountId) || (_shopSceneController?.IsInteractionLocked ?? false);
             _watchAdButton.gameObject.SetActive(true);
             _watchAdButton.interactable = IsConfigured && authenticated && !busy && (_adService?.IsReady ?? false);
             _watchAdButtonLabel.text = BuildButtonLabel(authenticated);
@@ -274,6 +302,7 @@ namespace Project333.Runtime.Presentation.Ads
 
         private void Update()
         {
+            if (IsTutorialAdMode) return;
             if (Time.unscaledTime < _nextUiRefresh) return;
             _nextUiRefresh = Time.unscaledTime + 0.5f;
             if (_displayOwner != AccountSessionState.AccountId)
@@ -286,7 +315,8 @@ namespace Project333.Runtime.Presentation.Ads
 
         public async void WatchRewardedAdFromUi()
         {
-            if (_isRequestingAttempt || (_adService?.IsShowing ?? false) ||
+            if (IsTutorialAdMode) return;
+            if ((_shopSceneController?.IsInteractionLocked ?? false) || _isRequestingAttempt || (_adService?.IsShowing ?? false) ||
                 PendingRewardedAd.IsBlocking(AccountServerUrl, AccountSessionState.AccountId)) return;
             if (!AccountSessionState.IsAuthenticated)
             {

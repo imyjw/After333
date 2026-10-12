@@ -1,5 +1,7 @@
 # Draft Rules
 
+최신 대조 기준: 2026-10-03. 현재 공유 카드 정의 60종 중 드래프트 On 53종이며 Unity 네이티브 카탈로그도 53종이다. includeInRewards 적용값 On 42종과 실제 랜덤 보상 39종은 드래프트 후보와 별도 기준이다.
+
 ## Document Purpose
 
 This document defines the full-game draft system used to create a 33-card deck before a run begins.
@@ -87,6 +89,15 @@ Confirmed:
 - The non-Legendary pool must also provide at least `32` total copies under the three-copy limit.
 - If fewer than `3` eligible non-Legendary card ids remain during draft, offer creation fails instead of presenting an invalid offer.
 
+2026-09-30: Nuclear is enabled in draft after registration of the user's card artwork. As a Legendary card, it participates in the opening offer only; later offers and copy limits retain the existing rules. Random reward eligibility is also enabled under the existing upgradeable-card policy and rarity weights.
+
+2026-10-01 사용자 확정: 트랩: 리턴(`TrapReturn`)은 중립 Rare 마법으로 드래프트에 포함한다. 설치 무료·발동 전투 골드 4이며 Rare 확률과 비레전더리 최대 3장 규칙은 유지한다. 덱에 3장을 넣을 수 있어도 동일 소유자의 같은 CardId는 동시에 하나만 설치할 수 있다. 강화 불가지만 사용자 지정 예외로 랜덤 보상에도 포함한다. 미러 필드에는 이 비강화 보상 예외를 적용하지 않는다.
+
+- 2026-10-01: FireSpear / 파이어스피어 (Fantasy, Common, Mana3) is enabled in shared draft and the Unity card catalog. Existing Common odds and non-Legendary three-copy limits remain unchanged.
+- 2026-10-03 변경: PlasmaShield / 플라즈마 쉴드 (ScienceCivilization, Common, Power1) is registered in shared draft (rewards/card packs excluded; not upgradeable) and the native Unity catalog. Common probabilities and the existing three-copy limit are unchanged.
+- 2026-10-03 변경: ManaShield / 마나쉴드 (Fantasy, Common, Mana 1) is registered in shared draft (rewards/card packs excluded; not upgradeable) and the native Unity catalog. Existing Common probabilities and the non-Legendary three-copy limit are unchanged; permanent Magic Defense buffs do not change its rarity or draft cost.
+- 2026-10-01 트랩-미러 필드(TrapMirrorField): 판타지 Rare, 기존 Rare 제시 확률·최대3장 규칙으로 덱 빌딩에 포함한다. 설치 무료, 발동 마나2·골드 대체, 강화 불가, 랜덤 보상 제외. 동일 CardId는 동시에 하나만 설치할 수 있다.
+
 ## Persistence And Resume
 
 - `POST /runs/start` returns the server-generated Legendary opening offer.
@@ -100,6 +111,7 @@ Confirmed:
 - Cards always resolve through the current deployed card definitions: stats, effects and rarity are not frozen per run. Previously selected IDs and copy counts remain intact after a card update; newly generated offers use current rarity and eligibility.
 - A missing current card definition or corrupt saved offer produces an error instead of silently substituting another card or rerolling. Existing IDs must remain available in the catalog even when excluded from future drafts.
 - Leaving DeckBuilding does not abandon or reroll the current draft.
+- 2026-10-02: 완료 런의 보상 진입은 중앙 단독 버튼 대신 닫힌 상자·개봉 애니메이션·전체 보상 결과 창을 사용한다. 상자를 누르지 않고 종료해도 완료 런은 유지하며, 지급 후 확인 전 종료는 같은 RunId의 원래 영수증으로 표시를 복구한다. 다음 런·기존 드래프트를 자동으로 시작하거나 보상을 재추첨하지 않는다. [보상 상자](run_reward_chest.md).
 - A stale or replayed pick index is rejected instead of adding a duplicate card.
 - Unity cannot submit an arbitrary offer, full pick history, or completed deck as authority.
 - The former client-authoritative `/runs/save-draft-picks` and `/runs/complete-draft` endpoints return `410 Gone`.
@@ -124,12 +136,23 @@ See [pve_ai_decks.md](./pve_ai_decks.md) for all ten lists and maintenance rules
 
 > TBD: Future PvE difficulty tiers or win-count-based encounter selection
 
-> TBD: Any future draft preview or undo feature beyond the current immediate-save flow
+> TBD: Undoing committed draft picks or previewing future offers beyond the current immediate-save and long-press card preview flow
 
 ## Deck List Card Preview
 
 - In both Draft and DeckBuilding, hold a card entry in the player's deck list for 0.4 seconds to show its card artwork at the center of the screen.
-- The preview uses the battle card artwork and the account's current upgrade level for displayed stats.
+- The preview uses the battle card artwork and the account's current upgrade level for displayed stats. Shared card tooltips show the card's actual abilities/effects at the sides; runtime buffs/debuffs below and field influences above are shown only when that preview has the corresponding battle state, so a draft card does not invent battle-only statuses.
 - Releasing the mouse button or touch hides the preview immediately. Leaving the entry, scrolling/dragging, hiding the list, or switching away from the app cancels the hold.
 - A quick tap does not open a preview. Deck summaries, section headings, and empty space are not card entries.
 - Grouped duplicates and wrapped card names resolve to the displayed card ID. Existing list scrolling remains available.
+
+
+### Draft offer hold preview (2026-09-25)
+
+- Each of the three offered cards supports a 0.4-second hold to show its card image in the center. Release closes it immediately.
+- A completed hold does not pick the card; a new short click/tap still picks normally. Leaving, moving beyond the drag threshold, hiding/replacing the offer, or losing app focus cancels the hold.
+- Reuses the deck-list preview overlay and account upgrade stats. Offer identity and server pick/save rules are unchanged.
+
+2026-10-01 트랩 - 반응 장갑(`ExplosiveReactiveArmour`): 과학문명 Rare 마법, 드래프트 포함·랜덤 보상 제외·강화 불가. 설치 무료·발동 전력4(부족분 골드 대체), 상대 일반 근거리 유닛이 내 마스터를 근접 공격할 때만 발동한다. 기존 Rare 확률과 비레전더리 최대3장 규칙을 따르며 동일 CardId는 동시에 하나만 설치할 수 있다. 리턴의 비강화 보상 예외는 적용하지 않는다.
+
+2026-10-01 트랩 - 아이언 돔(`IronDome`): 과학문명 Rare 마법, 드래프트 포함·랜덤 보상 제외·강화 불가. 설치 무료·발동 전력4(부족분 골드 대체), 상대 일반 원거리 유닛이 내 실제 마스터를 공격할 때만 발동한다. 기존 Rare 확률과 비레전더리 최대3장 규칙을 따르며 동일 CardId는 동시에 하나만 설치할 수 있다. 반응 장갑과 별도 CardId이므로 함께 설치할 수 있고, 공통 설치 순서에 따라 해당 공격 방식에 맞는 트랩을 검사한다. 리턴의 비강화 보상 예외는 적용하지 않는다.

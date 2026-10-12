@@ -26,7 +26,10 @@ namespace Project333.Runtime.Application.Online
         InvinciblePrevented = 17,
         HuanShuRedirected = 18,
         AreaSpellEffectTriggered = 19,
-        CardDrawn = 20
+        CardDrawn = 20,
+        TimedBombCountdown = 21,
+        TrapInstalled = 22,
+        TrapTriggered = 23
     }
 
     public sealed class BattleEventDto
@@ -52,6 +55,14 @@ namespace Project333.Runtime.Application.Online
         public string SourceCardId { get; set; } = string.Empty;
 
         public string EffectId { get; set; } = string.Empty;
+
+        public int EffectIndex { get; set; }
+
+        public int TrapCount { get; set; }
+
+        public int RemainingTriggersBefore { get; set; }
+
+        public int RemainingTriggersAfter { get; set; }
 
         public string TargetRuntimeId { get; set; } = string.Empty;
 

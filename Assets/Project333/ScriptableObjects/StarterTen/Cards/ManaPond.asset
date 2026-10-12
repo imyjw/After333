@@ -16,14 +16,14 @@ MonoBehaviour:
   _displayName: "\uB9C8\uB098\uC758 \uC0D8"
   _rarity: 2
   _cost:
-    _mana: 5
+    _mana: 6
     _qi: 0
     _power: 0
     _gold: 0
   _affiliation: 1
   _chargeTileFootprint: 1
-  _effectText: "턴 시작 시 마나 +3"
-  _specialEffectText: "주문력 +20"
+  _effectText: "\uD134 \uC2DC\uC791 \uC2DC \uB9C8\uB098 +3"
+  _specialEffectText: "\uC8FC\uBB38\uB825 +20"
   _hasReplicate: 0
   _boardSprite: {fileID: 980851926, guid: a4215456ac69ce245a08dc891390573e, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: 0bb8a00653f004647ac86d0ff80220fb, type: 2}

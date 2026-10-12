@@ -20,7 +20,9 @@
     <Compile Include="ResultDeliveryChecks.cs" />
     <Compile Include="ConnectionStabilityChecks.cs" />
     <Compile Include="BattleInputChecks.cs" />
+    <Compile Include="TurnInputChecks.cs" />
     <Compile Include="RunStartAtomicityChecks.cs" />
+    <Compile Include="RunRewardReplayChecks.cs" />
     <Compile Include="AccountOperationChecks.cs" />
     <Compile Include="GiftInboxChecks.cs" />
     <Compile Include="BattleConnectionLimitChecks.cs" />

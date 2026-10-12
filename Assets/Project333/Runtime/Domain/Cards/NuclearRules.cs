@@ -4,8 +4,9 @@ namespace Project333.Runtime.Domain.Cards
     {
         public const string CardId = "Nuclear";
         public const string EffectId = "nuclear";
-        public const int PowerCost = 10;
+        public const int PowerCost = 13;
+        public const int BaseDamage = 100;
         public const int FalloutDamage = 10;
-        public const string EffectDescription = "마스터와 봉인 중인 소환물을 제외한 전장의 모든 소환물을 파괴한다. 앞으로 소환할 것을 포함해 상대방의 모든 소환물에 영구적으로 낙진을 부여한다. 낙진은 중첩된다.";
+        public const string EffectDescription = "(사용 즉시) 상대방 전장 전체에 고정 데미지 100을 입힌다. 사용 당시 상대 전장에 있는 유닛(마스터 포함)에 영구 낙진 +1중첩. 양쪽 턴 시작마다 중첩당 고정 피해 10.";
     }
 }

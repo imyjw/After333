@@ -14,7 +14,8 @@ namespace Project333.Runtime.Infrastructure.Data
             int damage = 0,
             DamageType damageType = DamageType.None,
             int triggerCount = 0,
-            bool hasReplicate = false)
+            bool hasReplicate = false,
+            int effectAmount = 0)
             : base(cardId, displayName, cost, hasReplicate)
         {
             if (string.IsNullOrWhiteSpace(effectId))
@@ -22,6 +23,8 @@ namespace Project333.Runtime.Infrastructure.Data
                 throw new ArgumentException("Effect id is required.", nameof(effectId));
             }
 
+            if (effectAmount < 0) throw new ArgumentOutOfRangeException(nameof(effectAmount));
+            EffectAmount = effectAmount;
             EffectId = effectId;
             Damage = damage;
             DamageType = damageType;
@@ -35,5 +38,8 @@ namespace Project333.Runtime.Infrastructure.Data
         public DamageType DamageType { get; }
 
         public int TriggerCount { get; }
+
+        // Non-damage magnitude. Existing spells and assets keep the safe default of zero.
+        public int EffectAmount { get; }
     }
 }

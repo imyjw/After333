@@ -81,12 +81,15 @@ Expected:
 - `Status` is `Ok`
 - `Database.Status` is `Ok`
 - `Cards.Status` is `Ok`
-- `PvP.ReconnectGraceSeconds` is `60`
+- `PvP.ReconnectGraceSeconds` is `70`
+- `PvP.StartupRecoveryEnabled` is `false` and `PvP.InterruptedBattlePolicy` is `cancel_without_result`
 - `Audit.Enabled` is `true`
 
 ### 3. Run Endpoint Preflight
 
-Recommended public PvP smoke preflight:
+Preflight policy updated 2026-10-02: `TestPublicPvpSmokeReadiness.ps1`, `TestDeploymentReadiness.ps1` and newly generated staging verifiers check 70-second reconnect, `StartupRecoveryEnabled=false`, and `InterruptedBattlePolicy=cancel_without_result`. Missing or conflicting policy fields fail even with `-AllowDeploymentWarnings`. The retired `-RequireStartupRecovery` flag is accepted for old callers with a warning and checks the current cancellation policy instead. Regenerate older bundles. A passing preflight checks endpoints and reported configuration; the two-client battle tests below remain necessary.
+
+Public PvP smoke preflight:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File C:\Project_333\Server\Project333.PvpServer\Tools\TestPublicPvpSmokeReadiness.ps1 -BaseUrl 'http://SERVER_HOST:7333' -ExpectedRequiredClientVersion '0.1.0-dev' -AllowDeploymentWarnings
@@ -154,9 +157,9 @@ Pass if both accounts show the expected account/run/deck state.
 
 ### Test B. PvP Matchmaking
 
-1. Client A presses PvP.
+1. Client A presses the normal `전투` button (not Gold Dungeon).
 2. Confirm matchmaking overlay appears.
-3. Client B presses PvP.
+3. Client B presses `전투` on the same server before the default 20-second AI fallback. Confirm the opponent is the other human account.
 4. Confirm both clients enter the same battle.
 
 Pass if both clients leave the matchmaking overlay and enter battle.
@@ -198,12 +201,12 @@ Use two clients already inside the same PvP battle.
 2. Client A should see:
 
 ```text
-PVP 전투 재접속 (60초)
+전투 재접속 (70초)
 ```
 
 or the current reconnect waiting message.
 
-3. Before 60 seconds pass, reopen Client B.
+3. Before the server's 70-second grace expires, reopen Client B.
 4. Log in with the same account.
 5. Press the PvP reconnect button if it appears.
 6. Confirm Client B returns to the same battle.
@@ -213,7 +216,7 @@ Pass if battle state is restored and both clients can continue.
 Server log should include:
 
 ```text
-disconnected during PvP battle. Waiting 60 seconds for reconnect.
+disconnected during PvP battle. Waiting 70 seconds for reconnect.
 reconnect account=...
 ReconnectGraceCancelled
 ```
@@ -224,7 +227,7 @@ Use a separate match or repeat after Test D.
 
 1. Close Client B.
 2. Do not reconnect Client B.
-3. Wait until the 60-second reconnect grace expires.
+3. Wait until the 70-second reconnect grace expires.
 4. Confirm Client A receives a win result.
 5. Confirm the ended-match reconnect button does not remain.
 
@@ -374,7 +377,7 @@ The test passes when:
 - both clients can enter PvP matchmaking
 - both clients enter the same battle
 - at least one unit play, move, attack, spell, and end turn sync correctly
-- reconnect within 60 seconds restores the battle
+- reconnect within the server's 70-second deadline restores the original battle
 - reconnect timeout grants the correct forfeit result
 - normal battle end records the correct win/loss
 - completed run rewards can be claimed once

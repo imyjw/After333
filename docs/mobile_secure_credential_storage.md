@@ -50,7 +50,7 @@ New mobile credentials are never intentionally written back to PlayerPrefs.
 - If needed, Unity rotates the saved refresh token and restores the same account.
 - Android may then attempt automatic Google sign-in when the existing safety rules allow it.
 - If no valid registered account can be restored, a non-dismissible login gate blocks all game features until Game ID or Google login succeeds.
-- The current UI intentionally exposes no logout or account-switch action.
+- The authenticated start scene exposes **로그아웃** in its settings menu. Confirmation invokes `/auth/logout`, then clears saved local credentials and shows the login gate; server account/card/run/wallet data is retained. Local clearing also occurs if the server logout request fails, so this is not a claim of successful remote revocation during an outage. There is no automatic identity linking or account merging.
 
 ## Source Files
 
@@ -78,6 +78,8 @@ The iOS post-build processor adds `Security.framework` automatically. Android us
 The same login, relaunch, refresh, and logout flow must be tested on a signed iOS device build produced on macOS/Xcode. Windows can compile the C# bridge but cannot perform the final Objective-C++ link or device Keychain test.
 
 ## Current Verification
+
+Source behavior reviewed 2026-10-01. The checks below retain their original validation scope; no new device build or credential inspection was performed for this documentation update.
 
 - Unity Editor runtime assembly compilation: passed
 - Windows player runtime assembly compilation: passed

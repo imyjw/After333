@@ -1,0 +1,23 @@
+﻿{
+    "Source":  "Original seeded DSP; no recordings, samples or external libraries",
+    "Format":  "PCM16 mono",
+    "SampleRate":  44100,
+    "Samples":  47628,
+    "Channels":  1,
+    "BitsPerSample":  16,
+    "ClippedSamples":  0,
+    "FirstSample":  0,
+    "LastSample":  0,
+    "DurationSeconds":  1.08,
+    "PeakDbfs":  -17.001131693600119,
+    "RmsDbfs":  -29.78538263694864,
+    "DcOffset":  2.8833690594293274E-08,
+    "MaxAdjacentStep":  0.007904052734375,
+    "HighpassHz":  50,
+    "LowpassHz":  1200,
+    "FadeInMs":  60,
+    "FadeOutMs":  200,
+    "RecommendedOneShotGain":  0.3,
+    "FilterOrder":  4,
+    "OutputSha256":  "AF998BE7C62093531DEBB664220083C78CE4BA4365408CA4A1A8C3231233F45B"
+}

@@ -1,0 +1,24 @@
+{
+    "generator":  "After333Music.cs",
+    "sampleRate":  44100,
+    "channels":  2,
+    "bits":  16,
+    "clips":  [
+                  {
+                      "file":  "After333_Lobby.wav",
+                      "title":  "Sunlit Garden",
+                      "bpm":  72,
+                      "bars":  40,
+                      "notes":  252,
+                      "frames":  5880000
+                  },
+                  {
+                      "file":  "After333_Battle.wav",
+                      "title":  "Convergence of Three",
+                      "bpm":  128,
+                      "bars":  64,
+                      "notes":  2075,
+                      "frames":  5292000
+                  }
+              ]
+}

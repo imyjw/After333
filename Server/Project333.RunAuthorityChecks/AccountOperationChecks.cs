@@ -48,14 +48,14 @@ static class AccountOperationChecks
         var levelRaces = await Task.WhenAll(Enumerable.Range(0,8).Select(_=>Send(http,a.SessionToken,"/cards/upgrade",
             new { requestId=Guid.NewGuid().ToString("D"),cardId="firebolt",expectedUpgradeLevel=1 },ct)));
         Require(levelRaces.Count(r=>r.Status==HttpStatusCode.OK)==1 && levelRaces.Count(r=>r.Status==HttpStatusCode.Conflict && Code(r.Body)=="card_upgrade_conflict")==7,"Different request ids from the same displayed level must not chain upgrades.");
-        await Totals(a.Account.Id,988,11,91,2,3);
+        await Totals(a.Account.Id,989,11,92,2,3);
         pass("eight different request ids for the same displayed upgrade level produce one upgrade and seven stale-level conflicts");
 
         snapshot=await Snapshot(db,a.Account.Id,ct);
         var replay=await Send(http,a.SessionToken,"/cards/upgrade",new {requestId=upgradeId,cardId=" FIREBOLT ",expectedUpgradeLevel=0},ct);
-        Require(replay.Status==HttpStatusCode.OK && replay.Body.Field("replayed").GetBoolean() && replay.Body.Field("wallet").Field("resourceGold").GetInt64()==988 && replay.Body.Field("upgradedCard").Field("upgradeLevel").GetInt32()==2 && replay.Body.Field("upgradeCost").Field("levelTo").GetInt32()==1,"Replay must retain original cost but return current wallet/collection, accepting canonical card spelling.");
+        Require(replay.Status==HttpStatusCode.OK && replay.Body.Field("replayed").GetBoolean() && replay.Body.Field("wallet").Field("resourceGold").GetInt64()==989 && replay.Body.Field("upgradedCard").Field("upgradeLevel").GetInt32()==2 && replay.Body.Field("upgradeCost").Field("levelTo").GetInt32()==1,"Replay must retain original cost but return current wallet/collection, accepting canonical card spelling.");
         var ticketReplay=await Send(http,a.SessionToken,"/wallet/purchase-ticket",ticket,ct);
-        Require(ticketReplay.Body.Field("wallet").Field("resourceGold").GetInt64()==988 && await Snapshot(db,a.Account.Id,ct)==snapshot,"Ticket replay returned stale balance or mutated data.");
+        Require(ticketReplay.Body.Field("wallet").Field("resourceGold").GetInt64()==989 && await Snapshot(db,a.Account.Id,ct)==snapshot,"Ticket replay returned stale balance or mutated data.");
         pass("older committed receipts replay after later spending with current wallet/card state and original cost, without stale-state rollback");
 
         foreach(var value in new object[] { new {ticketCount=1},new {ticketCount=1,requestId=""},new {ticketCount=1,requestId=Guid.Empty.ToString("D")},new {ticketCount=1,requestId="malformed"} })

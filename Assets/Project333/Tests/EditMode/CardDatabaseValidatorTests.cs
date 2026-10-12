@@ -20,7 +20,50 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void CurrentCardsJson_ManaPondHasFiveManaCostAndTwentySpellPower()
+        public void CurrentCardsJson_NuclearKeepsFixedImmediateDamageAndReleasedPools()
+        {
+            var database = JsonCardDefinitionDatabase.FromJson(File.ReadAllText(
+                Path.Combine(Application.dataPath, "Project333/Resources/Project333/Data/cards.json")));
+            var record = database.Cards.Find(card => card.Id == NuclearRules.CardId);
+            var definition = (ScriptedSpellCardDefinition)record.ToDefinition();
+            Assert.That(record.Damage, Is.EqualTo(100));
+            Assert.That(definition.Damage, Is.EqualTo(100));
+            Assert.That(definition.DamageType, Is.EqualTo(DamageType.Fixed));
+            Assert.That(record.IncludeInDraft, Is.True);
+            Assert.That(record.IncludeInRewards, Is.True);
+            Assert.That(record.EffectText, Is.EqualTo(NuclearRules.EffectDescription));
+        }
+
+        [TestCase(0, DamageType.Fixed)]
+        [TestCase(99, DamageType.Fixed)]
+        [TestCase(101, DamageType.Fixed)]
+        [TestCase(100, DamageType.Physical)]
+        [TestCase(100, DamageType.Magic)]
+        [TestCase(100, DamageType.None)]
+        public void Validate_NuclearWithIncorrectImmediateDamageMetadata_Fails(int damage, DamageType type)
+        {
+            var database = JsonCardDefinitionDatabase.FromJson(File.ReadAllText(
+                Path.Combine(Application.dataPath, "Project333/Resources/Project333/Data/cards.json")));
+            var record = database.Cards.Find(card => card.Id == NuclearRules.CardId);
+            record.Damage = damage; record.DamageType = type;
+            var result = CardDatabaseValidator.Validate(database);
+            Assert.That(result.Errors, Has.Some.Contains("Nuclear must be"));
+        }
+
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(false, false)]
+        public void Validate_NuclearWithDisabledReleasePool_Fails(bool draft, bool rewards)
+        {
+            var database = JsonCardDefinitionDatabase.FromJson(File.ReadAllText(
+                Path.Combine(Application.dataPath, "Project333/Resources/Project333/Data/cards.json")));
+            var record = database.Cards.Find(card => card.Id == NuclearRules.CardId);
+            record.IncludeInDraft = draft; record.IncludeInRewards = rewards;
+            Assert.That(CardDatabaseValidator.Validate(database).Errors, Has.Some.Contains("Nuclear must be"));
+        }
+
+        [Test]
+        public void CurrentCardsJson_ManaPondHasSixManaCostAndTwentySpellPower()
         {
             var path = Path.Combine(Application.dataPath, "Project333/Resources/Project333/Data/cards.json");
             var provider = JsonCardDefinitionDatabase.FromJson(File.ReadAllText(path)).CreateProvider();
@@ -28,13 +71,13 @@ namespace Project333.Tests.EditMode
 
             Assert.That(manaPond, Is.Not.Null);
             Assert.That(manaPond.Health, Is.EqualTo(20));
-            Assert.That(manaPond.Cost.Mana, Is.EqualTo(5));
+            Assert.That(manaPond.Cost.Mana, Is.EqualTo(6));
             Assert.That(manaPond.SpellPower, Is.EqualTo(20));
             Assert.That(manaPond.TurnStartResourceGain.Mana, Is.EqualTo(3));
             var asset = UnityEditor.AssetDatabase.LoadAssetAtPath<BuildingCardDefinitionAsset>(
                 "Assets/Project333/ScriptableObjects/StarterTen/Cards/ManaPond.asset");
             var assetDefinition = (BuildingCardDefinition)asset.ToDefinition();
-            Assert.That(assetDefinition.Cost.Mana, Is.EqualTo(5));
+            Assert.That(assetDefinition.Cost.Mana, Is.EqualTo(6));
             Assert.That(assetDefinition.SpellPower, Is.EqualTo(20));
             Assert.That(asset.SpecialEffectText, Does.Contain("주문력 +20"));
         }
@@ -66,7 +109,7 @@ namespace Project333.Tests.EditMode
             AssertUnit(provider, "Cerberus", DamageType.Physical);
             AssertUnit(provider, "ElfLongbowScout", DamageType.Physical);
             AssertUnit(provider, "Goblin", DamageType.Physical);
-            AssertUnit(provider, "Golem", DamageType.Physical, expectedPhysicalDefense: 1);
+            AssertUnit(provider, "Golem", DamageType.Physical, expectedPhysicalDefense: 3);
             AssertUnit(provider, "Skeleton", DamageType.Physical);
             AssertUnit(provider, "Zombie", DamageType.Physical);
             AssertUnit(provider, "OrcWarrior", DamageType.Physical);
@@ -128,13 +171,13 @@ namespace Project333.Tests.EditMode
             Assert.That(a301Record.HasReplicate, Is.True);
             Assert.That(a301Record.SpecialEffectText, Does.Contain("비행"));
             Assert.That(a301Record.SpecialEffectText, Does.Not.Contain("로봇"));
-            Assert.That(a301Record.SpecialEffectText, Does.Contain("전력 -1"));
+            Assert.That(a301Record.SpecialEffectText, Does.Contain("전력 소모:1"));
             Assert.That(a301Record.SpecialEffectText, Does.Contain("복제"));
             Assert.That(a301Record.SpecialEffectText, Does.Not.Contain("속공"));
 
             AssertSimpleFantasyUnit(provider, path, "Skeleton", 10, 10);
-            AssertSimpleFantasyUnit(provider, path, "Zombie", 15, 1);
-            AssertSimpleFantasyUnit(provider, path, "OrcWarrior", 25, 40, expectedManaCost: 3);
+            AssertSimpleFantasyUnit(provider, path, "Zombie", 20, 1);
+            AssertSimpleFantasyUnit(provider, path, "OrcWarrior", 20, 40, expectedManaCost: 3);
 
             var werewolf = provider.GetRequired(WerewolfRules.CardId) as UnitCardDefinition;
             Assert.That(werewolf, Is.Not.Null);
@@ -209,7 +252,7 @@ namespace Project333.Tests.EditMode
 
             var redDragon = provider.GetRequired("RedDragon") as UnitCardDefinition;
             Assert.That(redDragon, Is.Not.Null);
-            Assert.That(redDragon.Attack, Is.EqualTo(40));
+            Assert.That(redDragon.Attack, Is.EqualTo(50));
             Assert.That(redDragon.Health, Is.EqualTo(40));
             Assert.That(redDragon.HasFlying, Is.True);
 
@@ -245,7 +288,8 @@ namespace Project333.Tests.EditMode
             var gaebangBranch = provider.GetRequired("GaebangBranch") as BuildingCardDefinition;
             Assert.That(gaebangBranch, Is.Not.Null);
             Assert.That(gaebangBranch.DisplayName, Is.EqualTo("개방 분타"));
-            Assert.That(gaebangBranch.Cost.Gold, Is.EqualTo(2));
+            Assert.That(gaebangBranch.Cost.Qi, Is.EqualTo(2));
+            Assert.That(gaebangBranch.Cost.Gold, Is.Zero);
             Assert.That(gaebangBranch.Attack, Is.Zero);
             Assert.That(gaebangBranch.Health, Is.EqualTo(20));
             Assert.That(gaebangBranch.CanAttack, Is.False);
@@ -350,15 +394,15 @@ namespace Project333.Tests.EditMode
 
             var firewall = provider.GetRequired("Firewall") as ScriptedSpellCardDefinition;
             Assert.That(firewall, Is.Not.Null);
-            Assert.That(firewall.Damage, Is.EqualTo(33));
+            Assert.That(firewall.Damage, Is.EqualTo(15));
             Assert.That(firewall.DamageType, Is.EqualTo(DamageType.Magic));
             Assert.That(firewall.TriggerCount, Is.EqualTo(2));
 
             var firewallRecord = JsonCardDefinitionDatabase.FromJson(File.ReadAllText(path)).Cards
                 .Find(card => card.Id == "Firewall");
             Assert.That(firewallRecord, Is.Not.Null);
-            Assert.That(firewallRecord.IncludeInDraft, Is.False);
-            Assert.That(firewallRecord.IncludeInRewards, Is.False);
+            Assert.That(firewallRecord.IncludeInDraft, Is.True);
+            Assert.That(firewallRecord.IncludeInRewards, Is.True);
 
             var timedBomb = provider.GetRequired(TimedBombRules.CardId) as ScriptedSpellCardDefinition;
             Assert.That(timedBomb, Is.Not.Null);
@@ -428,7 +472,7 @@ namespace Project333.Tests.EditMode
 
             var manaStoneBundle = provider.GetRequired(ManaStoneBundleRules.CardId) as ScriptedSpellCardDefinition;
             Assert.That(manaStoneBundle, Is.Not.Null);
-            Assert.That(ManaStoneBundleRules.GoldCost, Is.EqualTo(5));
+            Assert.That(ManaStoneBundleRules.GoldCost, Is.EqualTo(6));
             Assert.That(manaStoneBundle.Cost.Gold, Is.EqualTo(ManaStoneBundleRules.GoldCost));
             Assert.That(manaStoneBundle.EffectId, Is.EqualTo(ManaStoneBundleRules.EffectId));
             Assert.That(manaStoneBundle.Damage, Is.Zero);
@@ -679,7 +723,7 @@ namespace Project333.Tests.EditMode
 
             var result = CardDatabaseValidator.Validate(CreateDraftCompatibleDatabase(snowGinseng));
 
-            Assert.That(result.Errors, Has.Some.Contains("cost exactly 4 gold"));
+            Assert.That(result.Errors, Has.Some.Contains("cost exactly 3 qi and 1 gold"));
             Assert.That(result.Errors, Has.Some.Contains("next 3 owner turn starts"));
             Assert.That(result.Errors, Has.None.Contains("disabled in draft"));
             Assert.That(result.Errors, Has.Some.Contains("must not appear in random rewards"));
@@ -1381,6 +1425,63 @@ namespace Project333.Tests.EditMode
             Assert.That(result.Errors, Has.Some.Contains("requires positive invincibleOwnerTurns"));
         }
 
+        [TestCase("A-111", 1)]
+        [TestCase("A-212", 2)]
+        [TestCase("A-301", 1)]
+        [TestCase("RobotFactory", 1)]
+        public void CurrentCardsJson_PowerConsumptionIsNamedAndRetainsTypedAmount(string cardId, int amount)
+        {
+            var database = JsonCardDefinitionDatabase.FromJson(File.ReadAllText(
+                Path.Combine(Application.dataPath, "Project333/Resources/Project333/Data/cards.json")));
+            var record = database.Cards.Find(card => card.Id == cardId);
+            Assert.That(record, Is.Not.Null);
+            Assert.That(record.SciencePowerUpkeep, Is.EqualTo(amount));
+            Assert.That(record.SpecialEffectText, Does.Contain($"전력 소모:{amount}"));
+            Assert.That(record.SpecialEffectText, Does.Not.Contain("전력 -"));
+        }
+
+        [TestCase("전력 소모:2")]
+        [TestCase("전력 소모: 2")]
+        [TestCase("전력소모: 2")]
+        [TestCase("전력 소모 : 2")]
+        [TestCase("전력 소모:2\n속공")]
+        [TestCase("속공, 전력 소모:2")]
+        public void Validate_PowerConsumptionTextWithMatchingAmount_Passes(string text)
+        {
+            var card = CreateUnitRecord("power-consumer");
+            card.SciencePowerUpkeep = 2;
+            card.HasRush = text.Contains("속공");
+            card.SpecialEffectText = text;
+            var result = CardDatabaseValidator.Validate(CreateDraftCompatibleDatabase(card));
+            Assert.That(result.Errors, Is.Empty, string.Join("\n", result.Errors));
+        }
+
+        [TestCase("전력 -2")]
+        [TestCase("전력-2")]
+        [TestCase("전력 소모:1")]
+        [TestCase("전력 소모:20")]
+        [TestCase("전력 소모:0")]
+        [TestCase("전력 소모:-2")]
+        [TestCase("전력 소모:2147483648")]
+        [TestCase("전력 소모:2extra")]
+        [TestCase("")]
+        public void Validate_PowerConsumptionTextWithMissingOrIncorrectAmount_Fails(string text)
+        {
+            var card = CreateUnitRecord("power-consumer");
+            card.SciencePowerUpkeep = 2;
+            card.SpecialEffectText = text;
+            var result = CardDatabaseValidator.Validate(CreateDraftCompatibleDatabase(card));
+            Assert.That(result.Errors, Has.Some.Contains("sciencePowerUpkeep"));
+        }
+
+        [Test]
+        public void Validate_PowerConsumptionTextWithoutTypedEffect_Fails()
+        {
+            var card = CreateUnitRecord("power-consumer");
+            card.SpecialEffectText = "전력 소모:2";
+            var result = CardDatabaseValidator.Validate(CreateDraftCompatibleDatabase(card));
+            Assert.That(result.Errors, Has.Some.Contains("matching positive sciencePowerUpkeep"));
+        }
         private static JsonCardDefinitionDatabase CreateDatabase(params JsonCardDefinitionRecord[] cards)
         {
             var database = new JsonCardDefinitionDatabase();

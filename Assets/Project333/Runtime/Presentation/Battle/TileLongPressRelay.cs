@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -12,6 +13,9 @@ namespace Project333.Runtime.Presentation.Battle
         private bool _previewShown;
         private bool _suppressCurrentPressClick;
         private float _pointerDownStartedAt;
+
+        public TileView TileView => _tileView;
+        public event Action<TileView> PreviewReleased;
 
         public void Initialize(TileTextView owner, TileView tileView)
         {
@@ -55,12 +59,14 @@ namespace Project333.Runtime.Presentation.Battle
 
         public void OnPointerUp(PointerEventData eventData)
         {
+            var completedPreview = _pointerDown && _previewShown;
             if (_previewShown && _owner != null)
             {
                 _owner.HideCurrentCardPreview();
             }
 
             ResetState();
+            if (completedPreview) PreviewReleased?.Invoke(_tileView);
         }
 
         public void OnPointerExit(PointerEventData eventData)

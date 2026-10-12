@@ -1,5 +1,6 @@
 using System;
 using Project333.Runtime.Presentation.Hand;
+using Project333.Runtime.Presentation.Tutorial;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
@@ -27,13 +28,18 @@ using UnityEditor.SceneManagement;
 
 namespace Project333.Runtime.Presentation.Battle
 {
-    public sealed class BattleBootstrapper : MonoBehaviour, IDraftOverlayHost
+    public sealed partial class BattleBootstrapper : MonoBehaviour, IDraftOverlayHost
     {
         [System.Serializable]
         public sealed class CombatLogChangedEvent : UnityEvent<string>
         {
         }
 
+        // Temporary bodies belong only to views, never to the authoritative board.
+        private int _pendingOnlineSummonTrapImpacts;
+        private int _pendingOnlineSummonTrapGroups;
+        public bool IsSummonTrapOnlinePresentationPending => _pendingOnlineSummonTrapImpacts > 0 || _pendingOnlineSummonTrapGroups > 0;
+        private readonly List<TileView> _summonTrapVisualTiles = new List<TileView>();
         private const int MaxCombatLogEntries = 33;
         private const string BusyMessage = "Battle is still resolving animations.";
         private const string MasterCardAssetResourcePath = "Project333/SpecialCards/MasterCard";
@@ -98,8 +104,6 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private string _onlineMatchIdPrefix = "draft-run";
         [SerializeField] private string _onlinePlayerToken = "player-a";
         [SerializeField] private bool _animateOnlineMoveEvents;
-        [SerializeField] private string _onlineErrorToastPrefix = "명령 실패";
-        [SerializeField] private string _onlineStatusToastPrefix = "온라인";
         [Header("Tile Area Spell Effects")]
         [SerializeField] private Sprite[] _firewallTileEffectFrames = Array.Empty<Sprite>();
         [SerializeField] [Min(0.01f)] private float _firewallTileEffectFramesPerSecond = 12f;
@@ -198,6 +202,315 @@ namespace Project333.Runtime.Presentation.Battle
         private AiTurnRunner _aiTurnRunner;
         private DraftSessionService _draftSessionService;
         private Coroutine _presentationSequenceCoroutine;
+        private int _combatPresentationGeneration;
+        private BlueDragonWaterCannon _blueDragonWaterCannon;
+        private GwangmaCrossSlash _gwangmaCrossSlash;
+        private RedDragonFireBreath _redDragonFireBreath;
+        private RedDragonEndTurnFlamesVfx _redDragonEndTurnFlamesVfx;
+        private int _pendingOnlineRedDragonImpacts;
+        private int _pendingOnlineRedDragonGroups;
+        public bool IsRedDragonOnlinePresentationPending => _pendingOnlineRedDragonImpacts > 0 || _pendingOnlineRedDragonGroups > 0;
+        private A212SawAttack _a212SawAttack;
+        private A301LaserAttack _a301LaserAttack;
+        private GaebangChiefCoinPunch _gaebangChiefCoinPunch;
+        private ManaCannonProjectile _manaCannonProjectile;
+        private NuclearExplosionVfx _nuclearExplosionVfx;
+        private TimedBombPresentationVfx _timedBombPresentationVfx;
+        private FirewallVfx _firewallVfx;
+        private EarthquakeVfx _earthquakeVfx;
+        private MeteorVfx _meteorVfx;
+        private FireSpearVfx _fireSpearVfx;
+        private PlasmaShieldVfx _plasmaShieldVfx;
+        private IronDomeMissileVfx _ironDomeMissileVfx;
+        private int _pendingOnlineIronDomeImpacts;
+        private int _pendingOnlineIronDomeGroups;
+        public bool IsIronDomeOnlinePresentationPending => _pendingOnlineIronDomeImpacts > 0 || _pendingOnlineIronDomeGroups > 0;
+        private ReactiveArmourVfx _reactiveArmourVfx;
+        private int _pendingOnlineReactiveArmourImpacts;
+        private int _pendingOnlineReactiveArmourGroups;
+        public bool IsReactiveArmourOnlinePresentationPending => _pendingOnlineReactiveArmourImpacts > 0 || _pendingOnlineReactiveArmourGroups > 0;
+        private int _pendingOnlinePlasmaShieldImpacts;
+        private int _pendingOnlinePlasmaShieldGroups;
+        public bool IsPlasmaShieldOnlinePresentationPending => _pendingOnlinePlasmaShieldImpacts > 0 || _pendingOnlinePlasmaShieldGroups > 0;
+        private ManaShieldVfx _manaShieldVfx;
+        private int _pendingOnlineManaShieldImpacts;
+        private int _pendingOnlineManaShieldGroups;
+        public bool IsManaShieldOnlinePresentationPending => _pendingOnlineManaShieldImpacts > 0 || _pendingOnlineManaShieldGroups > 0;
+        private int _pendingOnlineFireSpearImpacts;
+        private int _pendingOnlineFireSpearGroups;
+        public bool IsFireSpearOnlinePresentationPending => _pendingOnlineFireSpearImpacts > 0 || _pendingOnlineFireSpearGroups > 0;
+        private int _pendingOnlineMeteorImpacts;
+        private int _pendingOnlineMeteorGroups;
+        public bool IsMeteorOnlinePresentationPending => _pendingOnlineMeteorImpacts > 0 || _pendingOnlineMeteorGroups > 0;
+
+        public void CancelCombatPresentation()
+        {
+            _combatPresentationGeneration++;
+            _pendingOnlineIronDomeImpacts = 0;
+            _pendingOnlineIronDomeGroups = 0;
+            _pendingOnlineReactiveArmourImpacts = 0;
+            _pendingOnlineReactiveArmourGroups = 0;
+            _pendingOnlineMeteorImpacts = 0;
+            _pendingOnlineMeteorGroups = 0;
+            _pendingOnlineFireSpearImpacts = 0;
+            _pendingOnlineFireSpearGroups = 0;
+            _pendingOnlinePlasmaShieldImpacts = 0;
+            _pendingOnlinePlasmaShieldGroups = 0;
+            _pendingOnlineManaShieldImpacts = 0;
+            _pendingOnlineManaShieldGroups = 0;
+            if (_blueDragonWaterCannon != null) _blueDragonWaterCannon.Cancel();
+            if (_gwangmaCrossSlash != null) _gwangmaCrossSlash.Cancel();
+            if (_redDragonFireBreath != null) _redDragonFireBreath.Cancel();
+            if (_redDragonEndTurnFlamesVfx != null) _redDragonEndTurnFlamesVfx.Cancel();
+            _pendingOnlineRedDragonImpacts = 0;
+            _pendingOnlineRedDragonGroups = 0;
+            if (_a212SawAttack != null) _a212SawAttack.Cancel();
+            if (_a301LaserAttack != null) _a301LaserAttack.Cancel();
+            if (_gaebangChiefCoinPunch != null) _gaebangChiefCoinPunch.Cancel();
+            if (_manaCannonProjectile != null) _manaCannonProjectile.Cancel();
+            if (_nuclearExplosionVfx != null) _nuclearExplosionVfx.Cancel();
+            if (_timedBombPresentationVfx != null) _timedBombPresentationVfx.Cancel();
+            if (_firewallVfx != null) _firewallVfx.Cancel();
+            if (_earthquakeVfx != null) _earthquakeVfx.Cancel();
+            if (_meteorVfx != null) _meteorVfx.Cancel();
+            if (_fireSpearVfx != null) _fireSpearVfx.Cancel();
+            if (_plasmaShieldVfx != null) _plasmaShieldVfx.Cancel();
+            if (_ironDomeMissileVfx != null) _ironDomeMissileVfx.Cancel();
+            if (_reactiveArmourVfx != null) _reactiveArmourVfx.Cancel();
+            if (_manaShieldVfx != null) _manaShieldVfx.Cancel();
+            _pendingOnlineSummonTrapImpacts = 0;
+            _pendingOnlineSummonTrapGroups = 0;
+            RestoreSummonTrapVisuals();
+            var board = _battleScreenPresenter == null ? null : _battleScreenPresenter.BoardPresenter;
+            if (board != null)
+            {
+                ResetTileCombatPresentation(board.PlayerTileViews);
+                ResetTileCombatPresentation(board.AITileViews);
+            }
+        }
+
+        private static void ResetTileCombatPresentation(TileView[] tiles)
+        {
+            if (tiles == null) return;
+            foreach (var tile in tiles)
+                if (tile != null) tile.GetComponent<TileTextView>()?.ResetCombatPresentation();
+        }
+
+        private void OnDisable() { CancelCombatPresentation(); ClearOpponentPlayedCardReveals(); }
+
+        private BlueDragonWaterCannon GetBlueDragonWaterCannon()
+        {
+            if (_blueDragonWaterCannon == null)
+                _blueDragonWaterCannon = gameObject.AddComponent<BlueDragonWaterCannon>();
+            return _blueDragonWaterCannon;
+        }
+        private GwangmaCrossSlash GetGwangmaCrossSlash()
+        {
+            if (_gwangmaCrossSlash == null)
+                _gwangmaCrossSlash = gameObject.AddComponent<GwangmaCrossSlash>();
+            return _gwangmaCrossSlash;
+        }
+        private RedDragonFireBreath GetRedDragonFireBreath()
+        {
+            if (_redDragonFireBreath == null)
+                _redDragonFireBreath = gameObject.AddComponent<RedDragonFireBreath>();
+            return _redDragonFireBreath;
+        }
+        private A212SawAttack GetA212SawAttack()
+        {
+            if (_a212SawAttack == null)
+                _a212SawAttack = gameObject.AddComponent<A212SawAttack>();
+            return _a212SawAttack;
+        }
+        private A301LaserAttack GetA301LaserAttack()
+        {
+            if (_a301LaserAttack == null) _a301LaserAttack = gameObject.AddComponent<A301LaserAttack>();
+            return _a301LaserAttack;
+        }
+        private ManaCannonProjectile GetManaCannonProjectile()
+        {
+            if (_manaCannonProjectile == null) _manaCannonProjectile = gameObject.AddComponent<ManaCannonProjectile>();
+            return _manaCannonProjectile;
+        }
+        private GaebangChiefCoinPunch GetGaebangChiefCoinPunch()
+        {
+            if (_gaebangChiefCoinPunch == null) _gaebangChiefCoinPunch = gameObject.AddComponent<GaebangChiefCoinPunch>();
+            return _gaebangChiefCoinPunch;
+        }
+        private float PlayIronDome(ImpactAnimationRequest request)
+        {
+            var cue = request.IronDomeCue;
+            if (cue == null) return 0f;
+            var master = FindTileTextView(cue.MasterOwnerId, cue.MasterCoord);
+            var attacker = FindTileTextView(cue.AttackerOwnerId, cue.AttackerCoord);
+            if (_ironDomeMissileVfx == null) _ironDomeMissileVfx = gameObject.AddComponent<IronDomeMissileVfx>();
+            return _ironDomeMissileVfx.Play(master, cue.MasterRuntimeId, attacker, cue.AttackerRuntimeId);
+        }
+
+        private float PlayReactiveArmour(ImpactAnimationRequest request)
+        {
+            var cue = request.ReactiveArmourCue;
+            if (cue == null) return 0f;
+            var master = FindTileTextView(cue.MasterOwnerId, cue.MasterCoord);
+            var attacker = FindTileTextView(cue.AttackerOwnerId, cue.AttackerCoord);
+            if (_reactiveArmourVfx == null) _reactiveArmourVfx = gameObject.AddComponent<ReactiveArmourVfx>();
+            return _reactiveArmourVfx.Play(master, cue.MasterRuntimeId, attacker, cue.AttackerRuntimeId);
+        }
+
+        private float PlayMeteor(PlayerId casterOwnerId)
+        {
+            if (_meteorVfx == null) _meteorVfx = gameObject.AddComponent<MeteorVfx>();
+            return _meteorVfx.Play(_battleScreenPresenter?.BoardPresenter, casterOwnerId);
+        }
+        private float PlayEarthquake(PlayerId casterOwnerId)
+        {
+            if (_earthquakeVfx == null) _earthquakeVfx = gameObject.AddComponent<EarthquakeVfx>();
+            return _earthquakeVfx.Play(_battleScreenPresenter?.BoardPresenter, casterOwnerId);
+        }
+        private float PlayNuclearExplosion(PlayerId casterOwnerId)
+        {
+            if (_nuclearExplosionVfx == null)
+                _nuclearExplosionVfx = gameObject.AddComponent<NuclearExplosionVfx>();
+            return _nuclearExplosionVfx.Play(_battleScreenPresenter?.BoardPresenter, casterOwnerId);
+        }
+        private float PlayTimedBombCountdown(TimedBombCountdownCue cue)
+        {
+            if (_timedBombPresentationVfx == null)
+                _timedBombPresentationVfx = gameObject.AddComponent<TimedBombPresentationVfx>();
+            return _timedBombPresentationVfx.Play(_battleScreenPresenter?.BoardPresenter,
+                cue.Caster, cue.Before, cue.After);
+        }
+        private float PlayRedDragonEndTurnFlames(ImpactAnimationRequest request)
+        {
+            if (request.SpellEffectTargets.Count != BoardState.ColumnCount * BoardState.RowCount) return 0f;
+            var owner = request.SpellEffectTargets[0].OwnerId;
+            var seen = new bool[BoardState.ColumnCount * BoardState.RowCount];
+            foreach (var target in request.SpellEffectTargets)
+            {
+                if (target.OwnerId != owner || target.Coord.Column < 0 || target.Coord.Column >= BoardState.ColumnCount ||
+                    target.Coord.Row < 0 || target.Coord.Row >= BoardState.RowCount) return 0f;
+                var index = target.Coord.Row * BoardState.ColumnCount + target.Coord.Column;
+                if (seen[index]) return 0f;
+                seen[index] = true;
+            }
+            if (_redDragonEndTurnFlamesVfx == null)
+                _redDragonEndTurnFlamesVfx = gameObject.AddComponent<RedDragonEndTurnFlamesVfx>();
+            return _redDragonEndTurnFlamesVfx.Play(_battleScreenPresenter?.BoardPresenter, owner);
+        }
+
+        private float PlayFirewall(ImpactAnimationRequest request)
+        {
+            if (request.SpellEffectTargets.Count != BoardState.ColumnCount) return 0f;
+            var target = request.SpellEffectTargets[0];
+            var columns = new bool[BoardState.ColumnCount];
+            foreach (var tile in request.SpellEffectTargets)
+            {
+                if (tile.OwnerId != target.OwnerId || tile.Coord.Row != target.Coord.Row ||
+                    tile.Coord.Column < 0 || tile.Coord.Column >= columns.Length || columns[tile.Coord.Column]) return 0f;
+                columns[tile.Coord.Column] = true;
+            }
+            if (_firewallVfx == null) _firewallVfx = gameObject.AddComponent<FirewallVfx>();
+            return _firewallVfx.Play(_battleScreenPresenter?.BoardPresenter, target.OwnerId, target.Coord.Row);
+        }
+        private static void ConfigureFirewallCast(ImpactAnimationRequest request, PlayerId targetOwnerId, TileCoord target)
+        {
+            request.SpellEffectId = FirewallSpellEffectId;
+            request.SpellEffectTargets.Clear();
+            for (var column = 0; column < BoardState.ColumnCount; column++)
+                request.SpellEffectTargets.Add(new SpellEffectTarget(targetOwnerId, new TileCoord(column, target.Row)));
+        }
+        private bool IsFirewallCard(string cardId)
+        {
+            if (cardId == "Firewall") return true;
+            if (string.IsNullOrEmpty(cardId) || _cardDefinitionProvider == null) return false;
+            try { return _cardDefinitionProvider.GetRequired(cardId) is ScriptedSpellCardDefinition spell && spell.EffectId == FirewallSpellEffectId; }
+            catch (InvalidOperationException) { return false; }
+        }
+        private float PlayFireSpear(ImpactAnimationRequest request)
+        {
+            if (request == null || !request.SpellCasterOwnerId.HasValue || request.SpellEffectTargets.Count != BoardState.RowCount)
+                return 0f;
+            var target = request.SpellEffectTargets[0];
+            var rows = new bool[BoardState.RowCount];
+            foreach (var tile in request.SpellEffectTargets)
+            {
+                if (tile.OwnerId != target.OwnerId || tile.Coord.Column != target.Coord.Column ||
+                    tile.Coord.Row < 0 || tile.Coord.Row >= rows.Length || rows[tile.Coord.Row]) return 0f;
+                rows[tile.Coord.Row] = true;
+            }
+            if (_fireSpearVfx == null) _fireSpearVfx = gameObject.AddComponent<FireSpearVfx>();
+            return _fireSpearVfx.Play(_battleScreenPresenter?.BoardPresenter,
+                request.SpellCasterOwnerId.Value, target.OwnerId, target.Coord.Column);
+        }
+        private static void ConfigureFireSpearCast(ImpactAnimationRequest request, PlayerId owner, TileCoord target)
+        {
+            request.SpellEffectId = FireSpearRules.EffectId;
+            request.GuardAreaRuntimeIds = true;
+            request.SpellEffectTargets.Clear();
+            for (var row = 0; row < BoardState.RowCount; row++)
+                request.SpellEffectTargets.Add(new SpellEffectTarget(owner, new TileCoord(target.Column, row)));
+        }
+        private float PlayPlasmaShield(ImpactAnimationRequest request)
+        {
+            if (request.SpellEffectTargets.Count != 1) return 0f;
+            var target = request.SpellEffectTargets[0];
+            var view = FindTileTextView(target.OwnerId, target.Coord);
+            if (view == null) return 0f;
+            if (_plasmaShieldVfx == null) _plasmaShieldVfx = gameObject.AddComponent<PlasmaShieldVfx>();
+            return _plasmaShieldVfx.Play(view, request.SpellTargetRuntimeId);
+        }
+
+        private static void ConfigurePlasmaShieldCast(ImpactAnimationRequest request, PlayerId owner,
+            TileCoord coord, string runtimeId)
+        {
+            request.SpellEffectId = PlasmaShieldRules.EffectId;
+            request.SpellTargetRuntimeId = runtimeId;
+            request.SpellEffectTargets.Clear();
+            request.SpellEffectTargets.Add(new SpellEffectTarget(owner, coord));
+        }
+
+        private float PlayManaShield(ImpactAnimationRequest request)
+        {
+            if (request.SpellEffectTargets.Count != 1) return 0f;
+            var target = request.SpellEffectTargets[0];
+            var view = FindTileTextView(target.OwnerId, target.Coord);
+            if (view == null) return 0f;
+            if (_manaShieldVfx == null) _manaShieldVfx = gameObject.AddComponent<ManaShieldVfx>();
+            return _manaShieldVfx.Play(view, request.SpellTargetRuntimeId);
+        }
+
+        private static void ConfigureManaShieldCast(ImpactAnimationRequest request, PlayerId owner,
+            TileCoord coord, string runtimeId)
+        {
+            request.SpellEffectId = ManaShieldRules.EffectId;
+            request.SpellTargetRuntimeId = runtimeId;
+            request.SpellEffectTargets.Clear();
+            request.SpellEffectTargets.Add(new SpellEffectTarget(owner, coord));
+        }
+
+        private bool IsFireSpearCard(string cardId)
+        {
+            if (cardId == FireSpearRules.CardId) return true;
+            if (string.IsNullOrEmpty(cardId) || _cardDefinitionProvider == null) return false;
+            try { return _cardDefinitionProvider.GetRequired(cardId) is ScriptedSpellCardDefinition spell && spell.EffectId == FireSpearRules.EffectId; }
+            catch (InvalidOperationException) { return false; }
+        }
+        private float GetMeleeApproachDuration(string cardId)
+        {
+            if (cardId == GwangmaPresentationAssets.CardId) return Mathf.Max(_attackRunDuration, GwangmaPresentationAssets.ApproachDuration);
+            if (cardId == RedDragonPresentationAssets.CardId) return Mathf.Max(_attackRunDuration, RedDragonPresentationAssets.ApproachDuration);
+            if (cardId == A212PresentationAssets.CardId) return Mathf.Max(_attackRunDuration, A212PresentationAssets.ApproachDuration);
+            if (cardId == GaebangChiefPresentationAssets.CardId) return Mathf.Max(_attackRunDuration, GaebangChiefPresentationAssets.ApproachDuration);
+            return _attackRunDuration;
+        }
+        private float GetMeleeReturnDuration(string cardId)
+        {
+            if (cardId == GwangmaPresentationAssets.CardId) return Mathf.Max(_attackReturnDuration, GwangmaPresentationAssets.ReturnDuration);
+            if (cardId == RedDragonPresentationAssets.CardId) return Mathf.Max(_attackReturnDuration, RedDragonPresentationAssets.ReturnDuration);
+            if (cardId == A212PresentationAssets.CardId) return Mathf.Max(_attackReturnDuration, A212PresentationAssets.ReturnDuration);
+            if (cardId == GaebangChiefPresentationAssets.CardId) return Mathf.Max(_attackReturnDuration, GaebangChiefPresentationAssets.ReturnDuration);
+            return _attackReturnDuration;
+        }
         private Coroutine _onlineErrorToastCoroutine;
         private Coroutine _onlineReconnectCountdownCoroutine;
         private Coroutine _onlineTurnTimerCoroutine;
@@ -245,14 +558,18 @@ namespace Project333.Runtime.Presentation.Battle
         private bool _hasQueuedEditorBattleUiMaterialization;
 #endif
         private static Font s_runtimeKoreanToastFont;
+        private bool _tutorialBattleEntry;
         private readonly RandomFirstPlayerSelector _firstPlayerSelector = new RandomFirstPlayerSelector();
         private readonly List<string> _combatLogEntries = new List<string>();
+        private Text _opponentPlayedCardTrapTitleText;
         private readonly Queue<OpponentPlayedCardRevealRequest> _opponentPlayedCardRevealQueue =
             new Queue<OpponentPlayedCardRevealRequest>();
         private Coroutine _opponentPlayedCardRevealCoroutine;
         private IReadOnlyList<string> _runtimePlayerDeckCardIdsOverride = Array.Empty<string>();
         private IReadOnlyList<string> _runtimeAIDeckCardIdsOverride = Array.Empty<string>();
         private bool _isBusy;
+        private BattleState _endTurnSubmittedBattle;
+        private int _endTurnSubmittedNumber = -1;
         private bool _hasQueuedDraftSceneReturn;
         private bool _isPvpMatchmakingOverlayVisible;
         private bool _isCancellingPvpMatchmaking;
@@ -263,7 +580,24 @@ namespace Project333.Runtime.Presentation.Battle
 
         public string LastInteractionStatus => _lastInteractionStatus;
 
-        public bool IsBusy => _isBusy;
+        public bool IsBusy => _tutorialResolving || _isBusy || IsEndTurnInputLocked || IsRedDragonOnlinePresentationPending || IsMeteorOnlinePresentationPending || IsFireSpearOnlinePresentationPending || IsPlasmaShieldOnlinePresentationPending || IsManaShieldOnlinePresentationPending || IsReactiveArmourOnlinePresentationPending || IsIronDomeOnlinePresentationPending || IsSummonTrapOnlinePresentationPending;
+
+        public bool CanPlayerEndTurn => TutorialAllowsEndTurn && !IsBusy && CurrentBattleState != null &&
+            !CurrentBattleState.IsEnded && CurrentBattleState.Phase == PhaseType.Main &&
+            CurrentBattleState.ActivePlayerId == PlayerId.Player && CurrentBattleState.PendingRobotFusion == null;
+
+        private bool IsEndTurnInputLocked
+        {
+            get
+            {
+                if (_sendPlayerActionsToOnlineGateway)
+                    return _onlineConnectionTester != null && _onlineConnectionTester.IsAwaitingNextTurn;
+                var state = CurrentBattleState;
+                if (state == null || state != _endTurnSubmittedBattle || state.IsEnded) return false;
+                return !(state.TurnNumber > _endTurnSubmittedNumber && state.ActivePlayerId == PlayerId.Player &&
+                    state.Phase == PhaseType.Main);
+            }
+        }
 
         public bool IsPvpMatchmakingOverlayVisible => _isPvpMatchmakingOverlayVisible;
 
@@ -299,12 +633,12 @@ namespace Project333.Runtime.Presentation.Battle
 
         public void ShowOnlineErrorToast(string message)
         {
-            ShowOnlineToast(message, "온라인 오류", _onlineErrorToastPanelColor);
+            ShowOnlineToast(message, _onlineErrorToastPanelColor);
         }
 
         public void ShowOnlineStatusToast(string message)
         {
-            ShowOnlineToast(message, _onlineStatusToastPrefix, _onlineStatusToastPanelColor);
+            ShowOnlineToast(message, _onlineStatusToastPanelColor);
         }
 
         public void ShowLocalConnectionRecoveryStatus(string message)
@@ -332,10 +666,11 @@ namespace Project333.Runtime.Presentation.Battle
             ApplyOnlineErrorToastSettings();
             if (_onlineErrorToastPanelImage != null)
             {
-                _onlineErrorToastPanelImage.color = _onlineStatusToastPanelColor;
+                _onlineErrorToastPanelImage.color = NoticeTheme.PanelColor;
             }
 
             _onlineErrorToastText.text = message;
+            NoticeTheme.Toast(_onlineErrorToastPanelRect, _onlineErrorToastText);
             _onlineErrorToastCanvasGroup.gameObject.SetActive(true);
             _onlineErrorToastCanvasGroup.alpha = 1f;
             _onlineErrorToastCanvasGroup.interactable = false;
@@ -366,17 +701,17 @@ namespace Project333.Runtime.Presentation.Battle
 
         public void ShowOnlineSuccessToast(string message)
         {
-            ShowOnlineToast(message, _onlineStatusToastPrefix, _onlineSuccessToastPanelColor);
+            ShowOnlineToast(message, _onlineSuccessToastPanelColor);
         }
 
         public void ShowBattleResultToast(string message)
         {
-            ShowOnlineToast(message, string.Empty, _onlineSuccessToastPanelColor);
+            ShowOnlineToast(message, _onlineSuccessToastPanelColor);
         }
 
         public void ShowCommandErrorToast(string message)
         {
-            ShowOnlineToast(message, _onlineErrorToastPrefix, _onlineErrorToastPanelColor);
+            ShowOnlineToast(message, _onlineErrorToastPanelColor);
         }
 
         public void ShowOpponentReconnectCountdown(int durationSeconds)
@@ -402,7 +737,7 @@ namespace Project333.Runtime.Presentation.Battle
             ApplyOnlineErrorToastSettings();
             if (_onlineErrorToastPanelImage != null)
             {
-                _onlineErrorToastPanelImage.color = _onlineStatusToastPanelColor;
+                _onlineErrorToastPanelImage.color = NoticeTheme.PanelColor;
             }
 
             _onlineErrorToastCanvasGroup.alpha = 1f;
@@ -613,7 +948,7 @@ namespace Project333.Runtime.Presentation.Battle
             }
         }
 
-        private void ShowOnlineToast(string message, string prefix, Color panelColor)
+        private void ShowOnlineToast(string message, Color panelColor)
         {
             if (string.IsNullOrWhiteSpace(message))
             {
@@ -623,9 +958,7 @@ namespace Project333.Runtime.Presentation.Battle
             var shouldResumeReconnectCountdown = HasActiveOpponentReconnectCountdown();
             _isLocalConnectionRecoveryStatusVisible = false;
             StopOnlineReconnectCountdown();
-            var displayMessage = string.IsNullOrWhiteSpace(prefix)
-                ? message
-                : $"{prefix}: {message}";
+            var displayMessage = message;
 
             _lastInteractionStatus = displayMessage;
             EnsureOnlineErrorToast();
@@ -637,10 +970,14 @@ namespace Project333.Runtime.Presentation.Battle
             ApplyOnlineErrorToastSettings();
             if (_onlineErrorToastPanelImage != null)
             {
-                _onlineErrorToastPanelImage.color = panelColor;
+                _onlineErrorToastPanelImage.color = NoticeTheme.PanelColor;
             }
 
+            // The borrowed scene's toast must remain above the tutorial dialogue canvas.
+            if (_tutorialBattleEntry && _onlineErrorToastCanvasGroup != null)
+                _onlineErrorToastCanvasGroup.GetComponent<Canvas>().sortingOrder = short.MaxValue - 1;
             _onlineErrorToastText.text = displayMessage;
+            NoticeTheme.Toast(_onlineErrorToastPanelRect, _onlineErrorToastText);
             if (_onlineErrorToastCoroutine != null)
             {
                 StopCoroutine(_onlineErrorToastCoroutine);
@@ -683,7 +1020,7 @@ namespace Project333.Runtime.Presentation.Battle
             ApplyOnlineErrorToastSettings();
             if (_onlineErrorToastPanelImage != null)
             {
-                _onlineErrorToastPanelImage.color = _onlineStatusToastPanelColor;
+                _onlineErrorToastPanelImage.color = NoticeTheme.PanelColor;
             }
 
             _onlineErrorToastCanvasGroup.gameObject.SetActive(true);
@@ -703,6 +1040,7 @@ namespace Project333.Runtime.Presentation.Battle
                 if (_onlineErrorToastText != null)
                 {
                     _onlineErrorToastText.text = message;
+            NoticeTheme.Toast(_onlineErrorToastPanelRect, _onlineErrorToastText);
                 }
 
                 if (remainingSeconds <= 0)
@@ -805,6 +1143,15 @@ namespace Project333.Runtime.Presentation.Battle
                 }
                 _onlineTurnTimerText.color = isDanger ? _onlineTurnTimerDangerTextColor : _onlineTurnTimerTextColor;
             }
+            NoticeTheme.Inline(_onlineTurnTimerPanelRect, _onlineTurnTimerText);
+        }
+
+        private IEnumerator ShowYourTurnBannerAfterCountdowns(float delay)
+        {
+            var generation = _combatPresentationGeneration;
+            if (delay > 0) yield return new WaitForSecondsRealtime(delay);
+            if (generation == _combatPresentationGeneration && isActiveAndEnabled && CurrentBattleState?.IsEnded != true)
+                ShowYourTurnBanner();
         }
 
         private void ShowYourTurnBanner()
@@ -941,41 +1288,53 @@ namespace Project333.Runtime.Presentation.Battle
 
         public void QueueOpponentPlayedCardReveals(IReadOnlyList<BattleEventDto> battleEvents)
         {
-            if (battleEvents == null)
+            if (battleEvents == null) return;
+            foreach (var battleEvent in battleEvents)
             {
-                return;
+                if (!OpponentPlayedCardRevealRules.ShouldReveal(battleEvent)) continue;
+                // Even a malformed installation payload cannot reach artwork/name/stat lookup.
+                var hidden = battleEvent.EventType == BattleEventType.TrapInstalled;
+                _opponentPlayedCardRevealQueue.Enqueue(hidden
+                    ? new OpponentPlayedCardRevealRequest(string.Empty, 0, 0, null, isHiddenTrap: true)
+                    : new OpponentPlayedCardRevealRequest(battleEvent.CardId, battleEvent.CardAttack,
+                        battleEvent.CardMaxHp, battleEvent.CardSpellDamage));
             }
+            StartOpponentPlayedCardRevealQueue();
+        }
 
-            for (var eventIndex = 0; eventIndex < battleEvents.Count; eventIndex++)
+        private void QueueLocalTrapReveals()
+        {
+            // Projected online states restore counts only; their history is delivered by the online event queue.
+            if (_sendPlayerActionsToOnlineGateway) return;
+            var battle = _battleGateway?.CurrentBattleState;
+            if (battle == null || battle.TrapEvents.Count == 0) return;
+            var events = new List<BattleTrapEvent>(battle.TrapEvents);
+            battle.ClearTrapEvents();
+            foreach (var trapEvent in events)
             {
-                var battleEvent = battleEvents[eventIndex];
-                if (!OpponentPlayedCardRevealRules.ShouldReveal(battleEvent))
+                if (trapEvent.Kind == BattleTrapEventKind.Installed)
                 {
-                    continue;
+                    if (trapEvent.OwnerId == PlayerId.AI)
+                        _opponentPlayedCardRevealQueue.Enqueue(new OpponentPlayedCardRevealRequest(string.Empty, 0, 0, null, isHiddenTrap: true));
                 }
-
-                _opponentPlayedCardRevealQueue.Enqueue(new OpponentPlayedCardRevealRequest(
-                    battleEvent.CardId,
-                    battleEvent.CardAttack,
-                    battleEvent.CardMaxHp,
-                    battleEvent.CardSpellDamage));
+                else if (trapEvent.Kind == BattleTrapEventKind.Triggered && !string.IsNullOrWhiteSpace(trapEvent.CardId))
+                    _opponentPlayedCardRevealQueue.Enqueue(new OpponentPlayedCardRevealRequest(trapEvent.CardId, 0, 0,
+                        trapEvent.CardId == SummonTrapCardRules.CardId ? (int?)trapEvent.EffectAmount : null));
             }
+            StartOpponentPlayedCardRevealQueue();
+        }
 
-            if (_opponentPlayedCardRevealQueue.Count <= 0 || _opponentPlayedCardRevealCoroutine != null)
-            {
-                return;
-            }
-
+        private void StartOpponentPlayedCardRevealQueue()
+        {
+            if (_opponentPlayedCardRevealQueue.Count <= 0 || _opponentPlayedCardRevealCoroutine != null) return;
             EnsureOpponentPlayedCardReveal();
             if (_opponentPlayedCardRevealCanvasGroup == null)
             {
                 _opponentPlayedCardRevealQueue.Clear();
                 return;
             }
-
             _opponentPlayedCardRevealCoroutine = StartCoroutine(OpponentPlayedCardRevealSequence());
         }
-
         public void ClearOpponentPlayedCardReveals()
         {
             _opponentPlayedCardRevealQueue.Clear();
@@ -1067,7 +1426,11 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
-            var hasArtwork = CardArtworkLibrary.TryGetArtwork(request.CardId, out var artwork) && artwork != null;
+            Sprite artwork;
+            var hasArtwork = request.IsHiddenTrap
+                ? (artwork = TrapPresentationAssets.HiddenArtwork) != null
+                : CardArtworkLibrary.TryGetArtwork(request.CardId, out artwork) && artwork != null;
+            SetTrapRevealTitle(request.IsHiddenTrap);
             _opponentPlayedCardRevealImage.sprite = hasArtwork ? artwork : null;
             _opponentPlayedCardRevealImage.color = hasArtwork
                 ? Color.white
@@ -1076,12 +1439,12 @@ namespace Project333.Runtime.Presentation.Battle
 
             if (_opponentPlayedCardFallbackText != null)
             {
-                _opponentPlayedCardFallbackText.text = request.CardId;
+                _opponentPlayedCardFallbackText.text = request.IsHiddenTrap ? "?" : request.CardId;
                 _opponentPlayedCardFallbackText.gameObject.SetActive(!hasArtwork);
             }
 
-            var showHp = _showOpponentPlayedCardStats && request.CardMaxHp > 0;
-            var showAttack = showHp || (_showOpponentPlayedCardStats && request.CardSpellDamage.HasValue);
+            var showHp = !request.IsHiddenTrap && _showOpponentPlayedCardStats && request.CardMaxHp > 0;
+            var showAttack = !request.IsHiddenTrap && (showHp || (_showOpponentPlayedCardStats && request.CardSpellDamage.HasValue));
             if (_opponentPlayedCardAttackText != null)
             {
                 _opponentPlayedCardAttackText.text = (request.CardSpellDamage ?? request.CardAttack).ToString();
@@ -1100,6 +1463,29 @@ namespace Project333.Runtime.Presentation.Battle
             _opponentPlayedCardRevealCanvasGroup.gameObject.SetActive(true);
             Canvas.ForceUpdateCanvases();
             RefreshOpponentPlayedCardStatLayout();
+        }
+
+        private void SetTrapRevealTitle(bool visible)
+        {
+            if (!visible) { if (_opponentPlayedCardTrapTitleText != null) _opponentPlayedCardTrapTitleText.gameObject.SetActive(false); return; }
+            if (_opponentPlayedCardTrapTitleText == null)
+            {
+                _opponentPlayedCardTrapTitleText = CreateOpponentPlayedCardStatText(_opponentPlayedCardRevealRect, "TrapTitleText");
+                var rect = _opponentPlayedCardTrapTitleText.rectTransform;
+                rect.anchorMin = new Vector2(0f, 1f);
+                rect.anchorMax = new Vector2(1f, 1f);
+                rect.pivot = new Vector2(.5f, 1f);
+                rect.offsetMin = new Vector2(12f, -70f);
+                rect.offsetMax = new Vector2(-12f, -10f);
+                _opponentPlayedCardTrapTitleText.font = ResolveOnlineErrorToastFont();
+                _opponentPlayedCardTrapTitleText.fontSize = 30;
+                _opponentPlayedCardTrapTitleText.color = new Color(1f, .83f, .34f, 1f);
+                var outline = _opponentPlayedCardTrapTitleText.GetComponent<Outline>();
+                outline.effectColor = Color.black;
+                outline.effectDistance = new Vector2(1f, -1f);
+            }
+            _opponentPlayedCardTrapTitleText.text = "트랩";
+            _opponentPlayedCardTrapTitleText.gameObject.SetActive(true);
         }
 
         private void RefreshOpponentPlayedCardStatLayout()
@@ -1171,7 +1557,9 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             _battleScreenPresenter?.QueueCardDrawSounds(cardDrawCount);
-            if (startsLocalPlayerTurn)
+            var hasTimedBombCountdown = FindFirstBattleEvent(battleEvents, BattleEventType.TimedBombCountdown) != null;
+            var endsBattle = FindFirstBattleEvent(battleEvents, BattleEventType.BattleEnded) != null;
+            if (startsLocalPlayerTurn && !hasTimedBombCountdown && !endsBattle)
             {
                 ShowYourTurnBanner();
             }
@@ -1179,6 +1567,8 @@ namespace Project333.Runtime.Presentation.Battle
             QueueOpponentPlayedCardReveals(battleEvents);
 
             var animationGroups = BuildOnlineAnimationGroups(battleEvents);
+            if (startsLocalPlayerTurn && hasTimedBombCountdown && !endsBattle)
+                StartCoroutine(ShowYourTurnBannerAfterCountdowns(EstimateOnlineBattleEventAnimationGroupsDuration(animationGroups)));
             if (animationGroups.Count == 0)
             {
                 return 0f;
@@ -1189,12 +1579,50 @@ namespace Project333.Runtime.Presentation.Battle
                 return PlayOnlineBattleEventAnimationGroup(animationGroups[0]);
             }
 
-            StartCoroutine(PlayOnlineBattleEventAnimationGroups(animationGroups));
+            var groups = PlayOnlineBattleEventAnimationGroups(animationGroups);
+            var containsRedDragon = false;
+            var containsMeteor = false;
+            var containsFireSpear = false;
+            var containsPlasmaShield = false;
+            var containsManaShield = false;
+            var containsIronDome = false;
+            var containsReactiveArmour = false;
+            var containsSummonTrap = false;
+            foreach (var group in animationGroups)
+                foreach (var battleEvent in group)
+                    if (battleEvent?.EventType == BattleEventType.AreaSpellEffectTriggered &&
+                        battleEvent.EffectId == EndTurnService.RedDragonFlamesEffectId)
+                        containsRedDragon = true;
+                    else if (battleEvent?.EventType == BattleEventType.SpellCast)
+                    {
+                        if (battleEvent.CardId == MeteorRules.CardId) containsMeteor = true;
+                        if (battleEvent.CardId == FireSpearRules.CardId) containsFireSpear = true;
+                        if (battleEvent.CardId == PlasmaShieldRules.CardId) containsPlasmaShield = true;
+                        if (battleEvent.CardId == ManaShieldRules.CardId) containsManaShield = true;
+                    }
+                    else if (battleEvent?.EventType == BattleEventType.TrapTriggered &&
+                             battleEvent.CardId == ExplosiveReactiveArmourCardRules.CardId)
+                        containsReactiveArmour = true;
+                    else if (battleEvent?.EventType == BattleEventType.TrapTriggered &&
+                             battleEvent.CardId == IronDomeCardRules.CardId)
+                        containsIronDome = true;
+                    else if (battleEvent?.EventType == BattleEventType.TrapTriggered && battleEvent.CardId == SummonTrapCardRules.CardId)
+                        containsSummonTrap = true;
+            StartCoroutine(containsRedDragon ? TrackOnlineRedDragonSequence(groups, isGroup: true) :
+                containsMeteor ? TrackOnlineMeteorSequence(groups, isGroup: true) :
+                containsFireSpear ? TrackOnlineFireSpearSequence(groups, isGroup: true) :
+                containsPlasmaShield ? TrackOnlinePlasmaShieldSequence(groups, isGroup: true) :
+                containsManaShield ? TrackOnlineManaShieldSequence(groups, isGroup: true) :
+                containsReactiveArmour ? TrackOnlineReactiveArmourSequence(groups, isGroup: true) :
+                containsIronDome ? TrackOnlineIronDomeSequence(groups, isGroup: true) :
+                containsSummonTrap ? TrackOnlineSummonTrapSequence(groups, isGroup: true) : groups);
             return EstimateOnlineBattleEventAnimationGroupsDuration(animationGroups);
         }
 
         private float PlayOnlineBattleEventAnimationGroup(IReadOnlyList<BattleEventDto> battleEvents)
         {
+            var countdown = FindFirstBattleEvent(battleEvents, BattleEventType.TimedBombCountdown);
+            if (countdown != null) return PlayOnlineImpactAnimation(countdown.SourceCardId, countdown, battleEvents);
             var areaSpellEffectEvent = FindFirstBattleEvent(
                 battleEvents,
                 BattleEventType.AreaSpellEffectTriggered);
@@ -1218,10 +1646,9 @@ namespace Project333.Runtime.Presentation.Battle
                 return PlayOnlineImpactAnimation(spellEvent.CardId, spellEvent, battleEvents);
             }
 
-            if (HasOnlineImpactEvents(battleEvents))
-            {
-                return PlayOnlineImpactAnimation(null, null, battleEvents);
-            }
+            var trapEvent = FindFirstBattleEvent(battleEvents, BattleEventType.TrapTriggered);
+            if (trapEvent != null || HasOnlineImpactEvents(battleEvents))
+                return PlayOnlineImpactAnimation(trapEvent?.CardId, trapEvent, battleEvents);
 
             return _animateOnlineMoveEvents
                 ? PlayOnlineMoveAnimations(battleEvents)
@@ -1235,13 +1662,17 @@ namespace Project333.Runtime.Presentation.Battle
                 yield break;
             }
 
+            var generation = _combatPresentationGeneration;
             foreach (var animationGroup in animationGroups)
             {
+                if (generation != _combatPresentationGeneration) yield break;
                 var duration = PlayOnlineBattleEventAnimationGroup(animationGroup);
                 if (duration > 0f)
                 {
                     yield return new WaitForSecondsRealtime(duration);
                 }
+                while (generation == _combatPresentationGeneration && (_pendingOnlineRedDragonImpacts > 0 || _pendingOnlineMeteorImpacts > 0 || _pendingOnlineFireSpearImpacts > 0 || _pendingOnlinePlasmaShieldImpacts > 0 || _pendingOnlineManaShieldImpacts > 0 || _pendingOnlineReactiveArmourImpacts > 0 || _pendingOnlineIronDomeImpacts > 0 || _pendingOnlineSummonTrapImpacts > 0))
+                    yield return null;
             }
         }
 
@@ -1267,6 +1698,10 @@ namespace Project333.Runtime.Presentation.Battle
             {
                 return 0f;
             }
+
+            var countdown = FindFirstBattleEvent(battleEvents, BattleEventType.TimedBombCountdown);
+            if (countdown != null)
+                return EstimateImpactAnimationDuration(BuildOnlineImpactAnimationRequest(countdown.SourceCardId, countdown, battleEvents));
 
             var areaSpellEffectEvent = FindFirstBattleEvent(
                 battleEvents,
@@ -1298,9 +1733,10 @@ namespace Project333.Runtime.Presentation.Battle
                     : EstimateImpactAnimationDuration(request);
             }
 
-            if (HasOnlineImpactEvents(battleEvents))
+            var trapEvent = FindFirstBattleEvent(battleEvents, BattleEventType.TrapTriggered);
+            if (trapEvent != null || HasOnlineImpactEvents(battleEvents))
             {
-                var request = BuildOnlineImpactAnimationRequest(null, null, battleEvents);
+                var request = BuildOnlineImpactAnimationRequest(trapEvent?.CardId, trapEvent, battleEvents);
                 return request == null || !HasPresentationImpact(request)
                     ? 0f
                     : EstimateImpactAnimationDuration(request);
@@ -1315,6 +1751,7 @@ namespace Project333.Runtime.Presentation.Battle
         {
             var groups = new List<IReadOnlyList<BattleEventDto>>();
             List<BattleEventDto> currentGroup = null;
+            BattleEventDto lastBoardCardPlay = null;
 
             void FlushCurrentGroup()
             {
@@ -1340,10 +1777,43 @@ namespace Project333.Runtime.Presentation.Battle
                     continue;
                 }
 
+                // Older servers report Dragon damage without an activation cue. Use only
+                // those accepted packets, never board state, and avoid duplicating new cues.
+                if ((battleEvent.EventType == BattleEventType.DamageApplied || battleEvent.EventType == BattleEventType.InvinciblePrevented) &&
+                    battleEvent.ValueCause == BattleValueChangeCause.RedDragon)
+                {
+                    var cue = FindFirstBattleEvent(currentGroup, BattleEventType.AreaSpellEffectTriggered);
+                    var firstDragonPacket = currentGroup?.Find(candidate =>
+                        (candidate.EventType == BattleEventType.DamageApplied || candidate.EventType == BattleEventType.InvinciblePrevented) &&
+                        candidate.ValueCause == BattleValueChangeCause.RedDragon);
+                    if (cue?.EffectId != EndTurnService.RedDragonFlamesEffectId ||
+                        (firstDragonPacket != null && firstDragonPacket.SourceRuntimeId != battleEvent.SourceRuntimeId))
+                    {
+                        FlushCurrentGroup();
+                        var targets = new List<TileCoordDto>(BoardState.ColumnCount * BoardState.RowCount);
+                        for (var row = 0; row < BoardState.RowCount; row++)
+                        for (var column = 0; column < BoardState.ColumnCount; column++)
+                            targets.Add(new TileCoordDto { Column = column, Row = row });
+                        currentGroup = new List<BattleEventDto> { new BattleEventDto
+                        {
+                            EventType = BattleEventType.AreaSpellEffectTriggered,
+                            EffectId = EndTurnService.RedDragonFlamesEffectId,
+                            CardId = RedDragonPresentationAssets.CardId, SourceCardId = RedDragonPresentationAssets.CardId,
+                            SourceOwnerId = battleEvent.SourceOwnerId, SourceRuntimeId = battleEvent.SourceRuntimeId,
+                            TargetOwnerId = battleEvent.TargetOwnerId, TargetCoord = targets[0], TargetCoords = targets
+                        } };
+                    }
+                }
+                if (battleEvent.EventType == BattleEventType.CardPlayed) lastBoardCardPlay = battleEvent;
                 if (StartsOnlineAnimationGroup(battleEvent.EventType))
                 {
                     FlushCurrentGroup();
                     currentGroup = new List<BattleEventDto> { battleEvent };
+                    if (battleEvent.EventType == BattleEventType.TrapTriggered &&
+                        battleEvent.CardId == SummonTrapCardRules.CardId && lastBoardCardPlay != null &&
+                        lastBoardCardPlay.SourceOwnerId == battleEvent.TargetOwnerId &&
+                        lastBoardCardPlay.RuntimeId == battleEvent.TargetRuntimeId)
+                        currentGroup.Add(lastBoardCardPlay);
                     continue;
                 }
 
@@ -1358,15 +1828,46 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             FlushCurrentGroup();
+            AssignTimedBombDeathsToLethalGroup(groups);
             return groups;
+        }
+
+        private static void AssignTimedBombDeathsToLethalGroup(List<IReadOnlyList<BattleEventDto>> groups)
+        {
+            // The server appends final removals after all effects. Keep a confirmed death
+            // with the earlier bomb or area effect that reduced this exact occupant to zero HP.
+            for (var groupIndex = 0; groupIndex < groups.Count; groupIndex++)
+            {
+                var group = (List<BattleEventDto>)groups[groupIndex];
+                for (var eventIndex = group.Count - 1; eventIndex >= 0; eventIndex--)
+                {
+                    var removed = group[eventIndex];
+                    if (removed.EventType != BattleEventType.OccupantRemoved) continue;
+                    var runtimeId = string.IsNullOrWhiteSpace(removed.TargetRuntimeId) ? removed.RuntimeId : removed.TargetRuntimeId;
+                    if (string.IsNullOrWhiteSpace(runtimeId)) continue;
+                    for (var earlierIndex = 0; earlierIndex < groupIndex; earlierIndex++)
+                    {
+                        var earlier = (List<BattleEventDto>)groups[earlierIndex];
+                        if (FindFirstBattleEvent(earlier, BattleEventType.TimedBombCountdown) == null &&
+                            FindFirstBattleEvent(earlier, BattleEventType.AreaSpellEffectTriggered) == null) continue;
+                        var lethal = earlier.Find(candidate => candidate.EventType == BattleEventType.DamageApplied &&
+                            candidate.TargetOwnerId == removed.TargetOwnerId && candidate.HpBefore > 0 && candidate.HpAfter <= 0 &&
+                            string.Equals(string.IsNullOrWhiteSpace(candidate.TargetRuntimeId) ? candidate.RuntimeId : candidate.TargetRuntimeId,
+                                runtimeId, StringComparison.Ordinal));
+                        if (lethal == null) continue;
+                        earlier.Add(removed); group.RemoveAt(eventIndex); break;
+                    }
+                }
+            }
         }
 
         private static bool StartsOnlineAnimationGroup(BattleEventType eventType)
         {
-            return eventType == BattleEventType.AttackStarted ||
+            return eventType == BattleEventType.TimedBombCountdown || eventType == BattleEventType.AttackStarted ||
                    eventType == BattleEventType.SpellCast ||
                    eventType == BattleEventType.AreaSpellEffectTriggered ||
-                   eventType == BattleEventType.OccupantMoved;
+                   eventType == BattleEventType.OccupantMoved ||
+                   eventType == BattleEventType.TrapTriggered;
         }
 
         private static bool IsOnlineImpactEvent(BattleEventType eventType)
@@ -1446,6 +1947,45 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             return false;
+        }
+
+        // Chapter three previews local entry; battle practices belong to later chapters.
+        public void ConfigureTutorialBattleEntry(IReadOnlyList<string> localDeckCardIds)
+        {
+            if (!TutorialRuntimeIsolation.IsActive)
+                throw new InvalidOperationException("A tutorial host must be active before borrowing the battle scene.");
+            if (_tutorialBattleEntry && !_tutorialChapterFour) return;
+            ResetTutorialCombatPractice();
+            CancelPresentationSequence();
+            if (_tutorialMulliganRoutine != null) StopCoroutine(_tutorialMulliganRoutine);
+            _tutorialMulliganRoutine = null; _tutorialResolving = false; _tutorialChapterFour = false;
+            _tutorialSession = null;
+            _battleScreenPresenter?.ResetTutorialPractice();
+            _battleScreenPresenter?.TutorialHand?.ConfigureTutorialExpansion(null);
+            if (localDeckCardIds == null || localDeckCardIds.Count != 33 || _cardCatalogAsset == null)
+                throw new InvalidOperationException("Tutorial battle entry requires its local 33-card deck and native catalog.");
+            _tutorialBattleEntry = true;
+            _autoRunAiTurns = false;
+            _returnToDraftSceneWhenRunSessionActive = false;
+            ConfigureLocalInput();
+            _cardDefinitionProvider = _cardCatalogAsset.CreateProvider();
+            var processor = new BattleCommandProcessor(new PlayCardService(_cardDefinitionProvider),
+                new SpellService(_cardDefinitionProvider), new MoveService(), new AttackService(), new EndTurnService());
+            _battleFlowController = new BattleFlowController(new BattleSetupService(new TutorialEntryDeckShuffler()),
+                new MulliganService(), new TurnStartService(_cardDefinitionProvider), processor);
+            _battleGateway = new LocalBattleGateway(_battleFlowController);
+            _battleGateway.StartBattle(new BattleSetupRequest(localDeckCardIds, localDeckCardIds, PlayerId.Player));
+            _battleGateway.PassMulligan(PlayerId.Player);
+            _battleScreenPresenter?.Bind(this);
+            _battleScreenPresenter?.SetBattleUiVisible(true);
+            ClearCombatLog();
+            InitializeTutorialCombatLog();
+            RefreshPresenter();
+        }
+
+        private sealed class TutorialEntryDeckShuffler : IDeckShuffler
+        {
+            public void Shuffle(DeckState deckState) { } // Preserve the authored order on every entry.
         }
 
         public void StartBattleWithDeckCardIds(IReadOnlyList<string> playerDeckCardIds, IReadOnlyList<string> aiDeckCardIds = null)
@@ -1653,6 +2193,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void Awake()
         {
+            if (TutorialRuntimeIsolation.IsActive) return;
             if (UnityEngine.Application.isPlaying && !AccountSessionState.IsAuthenticated)
             {
                 SceneManager.LoadScene("GameStart_VSlice");
@@ -2171,7 +2712,7 @@ namespace Project333.Runtime.Presentation.Battle
 
             if (_onlineErrorToastPanelImage != null)
             {
-                _onlineErrorToastPanelImage.color = _onlineErrorToastPanelColor;
+                _onlineErrorToastPanelImage.color = NoticeTheme.PanelColor;
                 _onlineErrorToastPanelImage.raycastTarget = false;
             }
 
@@ -2196,6 +2737,7 @@ namespace Project333.Runtime.Presentation.Battle
                 _onlineErrorToastText.color = _onlineErrorToastTextColor;
                 _onlineErrorToastText.fontSize = Mathf.Max(1, Mathf.RoundToInt(_onlineErrorToastFontSize));
             }
+            NoticeTheme.Toast(_onlineErrorToastPanelRect, _onlineErrorToastText);
         }
 
         private Font ResolveOnlineErrorToastFont()
@@ -2266,6 +2808,7 @@ namespace Project333.Runtime.Presentation.Battle
 
                 _onlineTurnTimerText.fontSize = Mathf.Max(1, Mathf.RoundToInt(_onlineTurnTimerFontSize));
             }
+            NoticeTheme.Inline(_onlineTurnTimerPanelRect, _onlineTurnTimerText);
         }
 
         private void ApplyYourTurnBannerSettings()
@@ -2289,10 +2832,24 @@ namespace Project333.Runtime.Presentation.Battle
 
             if (_yourTurnBannerImage != null)
             {
+                _yourTurnBannerImage.overrideSprite = null;
                 _yourTurnBannerImage.sprite = _yourTurnBannerSprite;
+                _yourTurnBannerImage.type = UnityEngine.UI.Image.Type.Simple;
+                var outline = _yourTurnBannerImage.GetComponent<UnityEngine.UI.Outline>();
+                if (outline != null) outline.enabled = false;
                 _yourTurnBannerImage.color = Color.white;
                 _yourTurnBannerImage.preserveAspect = true;
                 _yourTurnBannerImage.raycastTarget = false;
+            }
+
+            // A banner saved while the common notice theme was active may retain its label.
+            var noticeLabel = _yourTurnBannerRect != null ? _yourTurnBannerRect.Find("NoticeLabel") : null;
+            if (noticeLabel != null)
+            {
+                noticeLabel.gameObject.SetActive(false);
+                _yourTurnBannerRect.sizeDelta = new Vector2(
+                    Mathf.Max(1f, _yourTurnBannerSize.x),
+                    Mathf.Max(1f, _yourTurnBannerSize.y));
             }
 
             if (_yourTurnBannerRect == null || _yourTurnBannerUsesSceneLayout)
@@ -2500,6 +3057,7 @@ namespace Project333.Runtime.Presentation.Battle
                 _pvpMatchmakingCancelButtonText.color = _pvpMatchmakingTextColor;
                 _pvpMatchmakingCancelButtonText.fontSize = Mathf.Max(1, Mathf.RoundToInt(_pvpMatchmakingCancelFontSize));
             }
+            NoticeTheme.Dialog(_pvpMatchmakingPanelRect);
         }
 
         private IEnumerator OnlineErrorToastSequence(bool resumeReconnectCountdownAfter)
@@ -2619,6 +3177,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         public bool SubmitPlayerMulligan(IReadOnlyList<string> selectedCardIds)
         {
+            if (_tutorialBattleEntry) return SubmitTutorialMulligan(selectedCardIds);
             if (!TryBeginImmediateInteraction())
             {
                 return false;
@@ -2693,7 +3252,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         public void EndTurn()
         {
-            if (!TryBeginImmediateInteraction())
+            if (!CanPlayerEndTurn)
             {
                 return;
             }
@@ -2712,7 +3271,15 @@ namespace Project333.Runtime.Presentation.Battle
 
             var beforeSnapshot = CaptureBattleSnapshot(CurrentBattleState);
             AddCombatLogEntry(CombatLogFormatter.FormatEndTurn(CurrentBattleState.ActivePlayerId));
-            _battleGateway.EndTurn();
+            _endTurnSubmittedBattle = CurrentBattleState;
+            _endTurnSubmittedNumber = CurrentBattleState.TurnNumber;
+            try { _battleGateway.EndTurn(); }
+            catch
+            {
+                _endTurnSubmittedBattle = null;
+                _endTurnSubmittedNumber = -1;
+                throw;
+            }
             var afterSnapshot = CaptureBattleSnapshot(CurrentBattleState);
             var impactRequest = BuildImpactAnimationRequest(beforeSnapshot, afterSnapshot, CloneValuePopupEvents(CurrentBattleState));
             if (ShouldAnimateAttackSequences() && HasPresentationImpact(impactRequest))
@@ -2722,11 +3289,13 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             RefreshPresenter();
-            MaybeRunAiTurn();
+            if (_tutorialChapterFour) StartPresentationSequence(TutorialOpponentTurnSequence());
+            else MaybeRunAiTurn();
         }
 
         public bool TrySurrenderPlayer(out string message)
         {
+            if (_tutorialBattleEntry) { message = "연습 전투에서는 튜토리얼 스킵을 이용하세요."; return false; }
             var battleState = CurrentBattleState;
             if (battleState == null)
             {
@@ -2764,6 +3333,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         public bool TryActivatePlayerEffect(TileCoord coord, string runtimeId, out string message)
         {
+            if (_tutorialBattleEntry) { message = "이번 실습에서는 액티브를 사용하지 않습니다."; return false; }
             EnsureBattleStarted();
             if (IsBusy) { message = BusyMessage; return false; }
             if (ActiveEffectService.CanOfferActivation(CurrentBattleState, PlayerId.Player, coord))
@@ -2777,8 +3347,10 @@ namespace Project333.Runtime.Presentation.Battle
                 return TrySendOnlinePlayerCommand(command, "액티브 사용 요청", out message);
             try
             {
+                var activeLog = CombatLogFormatter.FormatCommand(PlayerId.Player, command,
+                    CurrentBattleState, ResolveCombatLogCardDisplayName);
                 _battleGateway.ExecuteCommand(PlayerId.Player, command);
-                message = "액티브: 골드 -1, 전력 +2";
+                message = activeLog;
                 _lastInteractionStatus = message;
                 AddCombatLogEntry(message);
                 RefreshPresenter();
@@ -2790,6 +3362,7 @@ namespace Project333.Runtime.Presentation.Battle
         public bool TryMovePlayerOccupant(TileCoord fromCoord, TileCoord toCoord, out string message)
         {
             EnsureBattleStarted();
+            if (!TutorialAllowsMove(fromCoord, toCoord)) { message = "초록색으로 표시한 실습 대상을 이용하세요."; return false; }
 
             if (IsBusy)
             {
@@ -2816,11 +3389,13 @@ namespace Project333.Runtime.Presentation.Battle
                 _lastInteractionStatus = message;
                 AddCombatLogEntry(message);
                 RefreshPresenter();
+                TutorialMoveAccepted();
                 MaybeRunAiTurn();
                 return true;
             }
             catch (Exception ex)
             {
+                TutorialMoveRejected(fromCoord, toCoord);
                 message = ex.Message;
                 _lastInteractionStatus = message;
                 Debug.LogWarning($"Move interaction failed from {fromCoord} to {toCoord}: {ex.Message}");
@@ -2831,6 +3406,7 @@ namespace Project333.Runtime.Presentation.Battle
         public bool TryAttackWithPlayerOccupant(TileCoord attackerCoord, TileCoord targetCoord, out string message)
         {
             EnsureBattleStarted();
+            if (!TutorialAllowsAttack(attackerCoord, targetCoord)) { message = "초록색으로 표시한 실습 대상을 이용하세요."; return false; }
 
             if (IsBusy)
             {
@@ -2853,11 +3429,13 @@ namespace Project333.Runtime.Presentation.Battle
                 if (!ShouldAnimateAttackSequences())
                 {
                     _battleGateway.ExecuteCommand(PlayerId.Player, attackCommand);
-                    message = $"Attacked from {attackerCoord} to {targetCoord}.";
+                    message = CurrentBattleState.LastAttackResolution?.WasCancelledByTrap == true
+                        ? "트랩이 발동해 공격이 취소되었습니다." : $"Attacked from {attackerCoord} to {targetCoord}.";
                     _lastInteractionStatus = message;
                     AddCombatLogEntry(message);
                     RefreshPresenter();
                     MaybeRunAiTurn();
+                    TutorialAttackAccepted();
                     return true;
                 }
 
@@ -2875,6 +3453,24 @@ namespace Project333.Runtime.Presentation.Battle
                     PlayerId.AI,
                     shielderInfo);
                 _battleGateway.ExecuteCommand(PlayerId.Player, attackCommand);
+                if (CurrentBattleState.LastAttackResolution?.WasCancelledByTrap == true)
+                {
+                    message = "트랩이 발동해 공격이 취소되었습니다.";
+                    _lastInteractionStatus = message;
+                    AddCombatLogEntry(message);
+                    var trapImpact = BuildCancelledTrapImpact(beforeSnapshot);
+                    if (HasPresentationImpact(trapImpact))
+                    {
+                        QueueLocalTrapReveals();
+                        StartPresentationSequence(PlayerSpellImpactSequence(trapImpact));
+                    }
+                    else
+                    {
+                        RefreshPresenter();
+                        MaybeRunAiTurn();
+                    }
+                    return true;
+                }
                 var afterSnapshot = CaptureBattleSnapshot(CurrentBattleState);
                 var valuePopupEvents = CloneValuePopupEvents(CurrentBattleState);
                 var animationRequest = BuildAttackAnimationRequest(beforeSnapshot, afterSnapshot, PlayerId.Player, attackerCoord, PlayerId.AI, targetCoord, shielderInfo, attackerIsRanged, defenderCounterattacks, valuePopupEvents);
@@ -2883,10 +3479,13 @@ namespace Project333.Runtime.Presentation.Battle
                 _lastInteractionStatus = message;
                 AddCombatLogEntry(message);
                 StartPresentationSequence(PlayerAttackSequence(animationRequest));
+                TutorialAttackAccepted();
                 return true;
             }
             catch (Exception ex)
             {
+                if (_tutorialBattleEntry) ShowCommandErrorToast(ex.Message);
+                TutorialAttackRejected(attackerCoord, targetCoord);
                 message = ex.Message;
                 _lastInteractionStatus = message;
                 Debug.LogWarning($"Attack interaction failed from {attackerCoord} to {targetCoord}: {ex.Message}");
@@ -2894,6 +3493,26 @@ namespace Project333.Runtime.Presentation.Battle
             }
         }
 
+        private ImpactAnimationRequest BuildCancelledTrapImpact(BattlePresentationSnapshot beforeSnapshot)
+        {
+            // Return has no combat reaction. Reflection and destruction retain their real
+            // damage/removal chains while skipping the canceled attack motion.
+            foreach (var trapEvent in CurrentBattleState.TrapEvents)
+            {
+                if (trapEvent.Kind == BattleTrapEventKind.Triggered &&
+                    (trapEvent.CardId == TrapMirrorFieldCardRules.CardId ||
+                     IsDirectDestructionTrapCard(trapEvent.CardId)))
+                {
+                    var request = BuildImpactAnimationRequest(beforeSnapshot, CaptureBattleSnapshot(CurrentBattleState),
+                        CloneValuePopupEvents(CurrentBattleState), trapEvent.CardId, trapEvent.OwnerId);
+                    if (trapEvent.TargetCoord.HasValue)
+                        ConfigureDestructionTrapCue(request, beforeSnapshot, trapEvent.CardId, trapEvent.OwnerId,
+                            trapEvent.TargetOwnerId, trapEvent.TargetCoord.Value, trapEvent.TargetRuntimeId);
+                    return request;
+                }
+            }
+            return null;
+        }
         public bool TryUsePlayerCardOnTile(string cardId, PlayerId targetOwnerId, TileCoord targetCoord, out string message)
         {
             return TryUsePlayerCardOnTile(
@@ -2912,6 +3531,8 @@ namespace Project333.Runtime.Presentation.Battle
             out string message)
         {
             EnsureBattleStarted();
+            if (!TutorialAllowsCardUse(cardId, targetOwnerId, targetCoord))
+                return FailPlayerCardUseSilently("초록색으로 표시한 실습 대상을 이용하세요.", out message);
 
             if (IsBusy)
             {
@@ -2920,12 +3541,14 @@ namespace Project333.Runtime.Presentation.Battle
 
             if (string.IsNullOrWhiteSpace(cardId))
             {
-                return FailPlayerCardUse("No card is selected.", out message);
+                return FailPlayerCardUse("카드가 선택되지 않았습니다.", out message);
             }
 
             try
             {
                 var definition = _cardDefinitionProvider.GetRequired(cardId);
+                ImpactAnimationRequest summonTrapImpact = null;
+                string scriptedSpellLog = null;
 
                 switch (definition.CardType)
                 {
@@ -2947,7 +3570,9 @@ namespace Project333.Runtime.Presentation.Battle
                                 out message);
                         }
 
+                        var beforeSummon = CaptureBattleSnapshot(CurrentBattleState);
                         _battleGateway.ExecuteCommand(PlayerId.Player, playUnitCommand);
+                        summonTrapImpact = BuildLocalSummonTrapImpact(beforeSummon);
                         break;
 
                     case CardType.Building:
@@ -2972,6 +3597,18 @@ namespace Project333.Runtime.Presentation.Battle
                         break;
 
                     case CardType.Spell:
+                        if (definition.HasTrap)
+                        {
+                            if (targetOwnerId != PlayerId.Player || CurrentBattleState.GetBoard(PlayerId.Player).GetOccupant(targetCoord)?.Kind != OccupantKind.Master)
+                                return FailPlayerCardUseSilently("내 마스터에 트랩을 설치하세요.", out message);
+                            if (HasPlayerArmedTrap(cardId))
+                                return FailPlayerCardUseSilently("이미 설치된 트랩입니다.", out message);
+                            var installCommand = new InstallTrapCommand(cardId, handCardRuntimeId);
+                            if (ShouldRoutePlayerActionsOnline())
+                                return TrySendOnlinePlayerCommand(installCommand, "트랩을 설치했습니다.", out message);
+                            _battleGateway.ExecuteCommand(PlayerId.Player, installCommand);
+                            break;
+                        }
                         if (definition is DamageSpellCardDefinition)
                         {
                             var castDamageCommand = new CastDamageSpellCommand(
@@ -3002,13 +3639,25 @@ namespace Project333.Runtime.Presentation.Battle
                             _lastInteractionStatus = message;
                             AddCombatLogEntry(message);
                             StartPresentationSequence(PlayerSpellImpactSequence(impactRequest));
+                            TutorialCardUsed(cardId);
                             return true;
                         }
 
                         if (definition is ScriptedSpellCardDefinition scriptedSpellDefinition)
                         {
+                            if (scriptedSpellDefinition.EffectId == EarthquakeRules.EffectId ||
+                                scriptedSpellDefinition.EffectId == MeteorRules.EffectId)
+                            {
+                                if (targetOwnerId != PlayerId.AI || targetCoord.Column < 0 || targetCoord.Column >= BoardState.ColumnCount ||
+                                    targetCoord.Row < 0 || targetCoord.Row >= BoardState.RowCount)
+                                    return FailPlayerCardUseSilently("해당 위치에 카드를 사용할 수 없습니다.", out message);
+                                return TryCastPlayerPersistentSpell(cardId, handCardRuntimeId, out message);
+                            }
                             if (string.Equals(scriptedSpellDefinition.EffectId, "cheonra_jimang", StringComparison.Ordinal) ||
                                 string.Equals(scriptedSpellDefinition.EffectId, "firewall", StringComparison.Ordinal) ||
+                                string.Equals(scriptedSpellDefinition.EffectId, FireSpearRules.EffectId, StringComparison.Ordinal) ||
+                                string.Equals(scriptedSpellDefinition.EffectId, PlasmaShieldRules.EffectId, StringComparison.Ordinal) ||
+                                string.Equals(scriptedSpellDefinition.EffectId, ManaShieldRules.EffectId, StringComparison.Ordinal) ||
                                 string.Equals(scriptedSpellDefinition.EffectId, BiochemicalBombRules.EffectId, StringComparison.Ordinal) ||
                                 string.Equals(scriptedSpellDefinition.EffectId, GuRules.EffectId, StringComparison.Ordinal) ||
                                 string.Equals(scriptedSpellDefinition.EffectId, HuanShuRules.EffectId, StringComparison.Ordinal))
@@ -3026,7 +3675,35 @@ namespace Project333.Runtime.Presentation.Battle
                                         out message);
                                 }
 
+                                var beforeTargetedCast = (scriptedSpellDefinition.EffectId == FirewallSpellEffectId ||
+                                    scriptedSpellDefinition.EffectId == FireSpearRules.EffectId ||
+                                    scriptedSpellDefinition.EffectId == PlasmaShieldRules.EffectId ||
+                                    scriptedSpellDefinition.EffectId == ManaShieldRules.EffectId) && ShouldAnimateAttackSequences()
+                                    ? CaptureBattleSnapshot(CurrentBattleState) : null;
+                                // Resolve the recipient before execution; append only after a successful cast.
+                                scriptedSpellLog = CombatLogFormatter.FormatCommand(PlayerId.Player,
+                                    castScriptedTargetCommand, CurrentBattleState, ResolveCombatLogCardDisplayName);
                                 _battleGateway.ExecuteCommand(PlayerId.Player, castScriptedTargetCommand);
+                                if (beforeTargetedCast != null)
+                                {
+                                    IReadOnlyList<BattleValuePopupEvent> popups = scriptedSpellDefinition.EffectId == FireSpearRules.EffectId
+                                        ? CloneValuePopupEvents(CurrentBattleState) : Array.Empty<BattleValuePopupEvent>();
+                                    var impactRequest = BuildImpactAnimationRequest(beforeTargetedCast, CaptureBattleSnapshot(CurrentBattleState),
+                                        popups, cardId, PlayerId.Player);
+                                    if (scriptedSpellDefinition.EffectId == FireSpearRules.EffectId)
+                                        ConfigureFireSpearCast(impactRequest, targetOwnerId, targetCoord);
+                                    else if (scriptedSpellDefinition.EffectId == PlasmaShieldRules.EffectId)
+                                        ConfigurePlasmaShieldCast(impactRequest, targetOwnerId, targetCoord,
+                                            CurrentBattleState.GetBoard(targetOwnerId).GetOccupant(targetCoord)?.RuntimeId);
+                                    else if (scriptedSpellDefinition.EffectId == ManaShieldRules.EffectId)
+                                        ConfigureManaShieldCast(impactRequest, targetOwnerId, targetCoord,
+                                            CurrentBattleState.GetBoard(targetOwnerId).GetOccupant(targetCoord)?.RuntimeId);
+                                    else ConfigureFirewallCast(impactRequest, targetOwnerId, targetCoord);
+                                    message = scriptedSpellLog;
+                                    _lastInteractionStatus = message; AddCombatLogEntry(message);
+                                    StartPresentationSequence(PlayerSpellImpactSequence(impactRequest));
+                                    return true;
+                                }
                                 break;
                             }
 
@@ -3044,12 +3721,19 @@ namespace Project333.Runtime.Presentation.Battle
                         return FailPlayerCardUse($"Card '{cardId}' cannot be used on a board tile in the current slice.", out message);
                 }
 
-                message = definition.CardType == CardType.Spell
+                message = scriptedSpellLog ?? (definition.HasTrap ? "트랩을 설치했습니다." : definition.CardType == CardType.Spell
                     ? $"Cast '{cardId}' on {targetOwnerId} {targetCoord}."
-                    : $"Played '{cardId}' to {targetCoord}.";
+                    : $"Played '{cardId}' to {targetCoord}.");
                 _lastInteractionStatus = message;
                 AddCombatLogEntry(message);
+                if (summonTrapImpact != null)
+                {
+                    QueueLocalTrapReveals();
+                    StartPresentationSequence(PlayerSpellImpactSequence(summonTrapImpact));
+                    return true;
+                }
                 RefreshPresenter();
+                TutorialCardUsed(cardId);
                 MaybeRunAiTurn();
                 return true;
             }
@@ -3059,6 +3743,94 @@ namespace Project333.Runtime.Presentation.Battle
                 Debug.LogWarning($"Play card interaction failed for '{cardId}' at {targetCoord}: {ex.Message}");
                 return false;
             }
+        }
+
+        private ImpactAnimationRequest BuildLocalSummonTrapImpact(BattlePresentationSnapshot before)
+        {
+            var battle = CurrentBattleState;
+            var summoned = battle?.LastSummonedOccupant;
+            if (before == null || summoned == null) return null;
+            foreach (var entry in battle.TrapEvents)
+            {
+                if (entry.Kind != BattleTrapEventKind.Triggered || entry.CardId != SummonTrapCardRules.CardId ||
+                    entry.TargetRuntimeId != summoned.RuntimeId) continue;
+                before.Occupants.Add(new OccupantPresentationSnapshot(summoned.RuntimeId, summoned.OwnerId,
+                    summoned.Position, summoned.CurrentHp, summoned.CardId, false, summoned.Kind));
+                var request = BuildImpactAnimationRequest(before, CaptureBattleSnapshot(battle),
+                    CloneValuePopupEvents(battle), SummonTrapCardRules.CardId);
+                var visual = summoned.CloneDetached();
+                // The view is detached from the board; preserve resource/pack attack bonuses captured at summon.
+                visual.IncreaseBaseAttack(Math.Max(0, battle.LastSummonedAttack - visual.Attack));
+                request.SummonedVisual = visual;
+                return request;
+            }
+            return null;
+        }
+
+        private OccupantState CreateOnlineSummonTrapVisual(BattleEventDto trigger, IReadOnlyList<BattleEventDto> events)
+        {
+            foreach (var entry in events)
+            {
+                if (entry.EventType != BattleEventType.CardPlayed || entry.SourceOwnerId != trigger.TargetOwnerId ||
+                    entry.RuntimeId != trigger.TargetRuntimeId || entry.CardMaxHp <= 0 ||
+                    !(_cardDefinitionProvider?.GetRequired(entry.CardId) is UnitCardDefinition definition)) continue;
+                var hp = entry.CardMaxHp;
+                foreach (var damage in events)
+                    if ((damage.EventType == BattleEventType.DamageApplied || damage.EventType == BattleEventType.InvinciblePrevented) &&
+                        damage.TargetRuntimeId == trigger.TargetRuntimeId && damage.HpBefore > 0) { hp = damage.HpBefore; break; }
+                var visual = new UnitState(entry.RuntimeId, entry.CardId, entry.SourceOwnerId,
+                    trigger.TargetCoord.ToDomain(), definition.AttackType, entry.CardAttack, entry.CardMaxHp,
+                    definition.CanMove, definition.IsScience, definition.SciencePowerUpkeep,
+                    turnStartResourceGain: definition.TurnStartResourceGain,
+                    maxAttacksPerTurn: definition.MaxAttacksPerTurn, hitsPerAttack: definition.HitsPerAttack,
+                    hasBerserker: definition.HasBerserker, hasEndure: definition.HasEndure,
+                    hasShielder: definition.HasShielder, hasLifeSteal: definition.HasLifeSteal,
+                    damageType: definition.DamageType, physicalDefense: definition.PhysicalDefense,
+                    magicDefense: definition.MagicDefense, races: definition.Races, hasRush: definition.HasRush,
+                    hasHiding: definition.HasHiding, hasFlying: definition.HasFlying,
+                    spellPower: definition.SpellPower, hasPiercing: definition.HasPiercing);
+                visual.WasSummonedThisTurn = true;
+                visual.HasSummoningSickness = !definition.HasRush;
+                if (definition.SealboundOwnerTurnStarts > 0) visual.EnterSealbound(definition.SealboundOwnerTurnStarts);
+                visual.AddInvincibleEffect(definition.InvincibleDuration, definition.InvincibleOwnerTurns,
+                    CurrentBattleState?.TurnNumber ?? 0, CurrentBattleState?.ActivePlayerId);
+                visual.CurrentHp = hp;
+                return visual;
+            }
+            return null;
+        }
+
+        private bool PresentSummonTrapVisual(OccupantState summoned)
+        {
+            var text = FindTileTextView(summoned.OwnerId, summoned.Position);
+            var tile = text == null ? null : text.GetComponent<TileView>();
+            if (tile == null) return false;
+            // A newer state may already have replaced this exact occupant.
+            if (tile.CurrentOccupant != null && tile.CurrentOccupant.RuntimeId != summoned.RuntimeId) return false;
+            tile.Present(summoned);
+            text.SetTile(tile.Title, tile.Content, true);
+            if (!_summonTrapVisualTiles.Contains(tile)) _summonTrapVisualTiles.Add(tile);
+            return true;
+        }
+
+        private void RestoreSummonTrapVisuals()
+        {
+            foreach (var tile in _summonTrapVisualTiles)
+                if (tile != null)
+                {
+                    tile.Present(CurrentBattleState?.GetBoard(tile.OwnerId).GetOccupant(tile.Coord));
+                    tile.GetComponent<TileTextView>()?.SetTile(tile.Title, tile.Content, tile.IsOccupied);
+                }
+            _summonTrapVisualTiles.Clear();
+        }
+
+        private bool HasPlayerArmedTrap(string cardId)
+        {
+            var battle = CurrentBattleState;
+            if (battle == null) return false;
+            foreach (var trap in battle.ArmedTraps)
+                if (trap.OwnerId == PlayerId.Player && string.Equals(trap.CardId, cardId, StringComparison.Ordinal)) return true;
+            return false;
         }
 
         public bool TryCastPlayerPersistentSpell(string cardId, out string message)
@@ -3080,7 +3852,7 @@ namespace Project333.Runtime.Presentation.Battle
 
             if (string.IsNullOrWhiteSpace(cardId))
             {
-                return FailPlayerCardUse("No card is selected.", out message);
+                return FailPlayerCardUse("카드가 선택되지 않았습니다.", out message);
             }
 
             try
@@ -3106,6 +3878,8 @@ namespace Project333.Runtime.Presentation.Battle
                          (string.Equals(scriptedSpellDefinition.EffectId, "daehwandan", StringComparison.Ordinal) ||
                           string.Equals(scriptedSpellDefinition.EffectId, TimedBombRules.EffectId, StringComparison.Ordinal) ||
                           string.Equals(scriptedSpellDefinition.EffectId, NuclearRules.EffectId, StringComparison.Ordinal) ||
+                          string.Equals(scriptedSpellDefinition.EffectId, EarthquakeRules.EffectId, StringComparison.Ordinal) ||
+                          string.Equals(scriptedSpellDefinition.EffectId, MeteorRules.EffectId, StringComparison.Ordinal) ||
                           string.Equals(scriptedSpellDefinition.EffectId, MagicAmplificationCircleRules.EffectId, StringComparison.Ordinal) ||
                           string.Equals(scriptedSpellDefinition.EffectId, PowerBankRules.EffectId, StringComparison.Ordinal) ||
                           string.Equals(scriptedSpellDefinition.EffectId, ManaStoneRules.EffectId, StringComparison.Ordinal) ||
@@ -3122,12 +3896,25 @@ namespace Project333.Runtime.Presentation.Battle
                             out message);
                     }
 
+                    var beforeAreaCast = (scriptedSpellDefinition.EffectId == NuclearRules.EffectId || scriptedSpellDefinition.EffectId == EarthquakeRules.EffectId ||
+                                          scriptedSpellDefinition.EffectId == MeteorRules.EffectId) && ShouldAnimateAttackSequences()
+                        ? CaptureBattleSnapshot(CurrentBattleState) : null;
                     _battleGateway.ExecuteCommand(PlayerId.Player, castScriptedCommand);
-                    message = $"Cast spell '{cardId}'.";
+                    message = CombatLogFormatter.FormatCommand(PlayerId.Player, castScriptedCommand,
+                        CurrentBattleState, ResolveCombatLogCardDisplayName);
+                    if (beforeAreaCast != null)
+                    {
+                        var impactRequest = BuildImpactAnimationRequest(beforeAreaCast,
+                            CaptureBattleSnapshot(CurrentBattleState), CloneValuePopupEvents(CurrentBattleState), cardId, PlayerId.Player);
+                        _lastInteractionStatus = message;
+                        AddCombatLogEntry(message);
+                        StartPresentationSequence(PlayerSpellImpactSequence(impactRequest));
+                        return true;
+                    }
                 }
                 else
                 {
-                    return FailPlayerCardUse($"Card '{cardId}' is not a self-cast spell.", out message);
+                    return FailPlayerCardUse("사용 가능한 대상이 아닙니다.", out message);
                 }
 
                 _lastInteractionStatus = message;
@@ -3163,7 +3950,7 @@ namespace Project333.Runtime.Presentation.Battle
 
             if (string.IsNullOrWhiteSpace(cardId))
             {
-                return FailPlayerCardUse("No card is selected.", out message);
+                return FailPlayerCardUse("카드가 선택되지 않았습니다.", out message);
             }
 
             try
@@ -3244,6 +4031,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void RefreshPresenter()
         {
+            QueueLocalTrapReveals();
             _battleScreenPresenter?.Present(CurrentBattleState);
 
             if (ShouldQueueDraftSceneReturn())
@@ -3299,7 +4087,7 @@ namespace Project333.Runtime.Presentation.Battle
         private bool FailPlayerCardUse(string failureMessage, out string message)
         {
             message = string.IsNullOrWhiteSpace(failureMessage)
-                ? "Card use failed."
+                ? "카드 사용이 실패했습니다."
                 : failureMessage;
             ShowCommandErrorToast(message);
             return false;
@@ -3308,7 +4096,7 @@ namespace Project333.Runtime.Presentation.Battle
         private static bool FailPlayerCardUseSilently(string failureMessage, out string message)
         {
             message = string.IsNullOrWhiteSpace(failureMessage)
-                ? "Card use failed."
+                ? "카드 사용이 실패했습니다."
                 : failureMessage;
             return false;
         }
@@ -3425,7 +4213,7 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
-            _aiTurnRunner.RunAiTurn(_battleGateway, AddCombatLogEntry);
+            _aiTurnRunner.RunAiTurn(_battleGateway, AddCombatLogEntry, ResolveCombatLogCardDisplayName);
 
             if (_autoResolvePlayerTurnStartAfterAi &&
                 CurrentBattleState != null &&
@@ -3500,6 +4288,11 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void AddCombatLogEntry(string entry)
         {
+            if (_tutorialBattleEntry) { RecordTutorialCombatLog(); return; }
+            AppendCombatLogText(entry);
+        }
+        private void AppendCombatLogText(string entry)
+        {
             // Online PVE/PVP logs come from the authoritative server StateView.
             if (_sendPlayerActionsToOnlineGateway)
             {
@@ -3523,6 +4316,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         private bool TryBeginImmediateInteraction()
         {
+            if (_tutorialBattleEntry) return false;
             if (!IsBusy)
             {
                 return true;
@@ -3882,6 +4676,18 @@ namespace Project333.Runtime.Presentation.Battle
                         shielderInfo);
                     _battleGateway.ExecuteCommand(PlayerId.AI, attackCommand);
                     AddCombatLogEntry(CombatLogFormatter.FormatCommand(PlayerId.AI, attackCommand));
+                    if (CurrentBattleState.LastAttackResolution?.WasCancelledByTrap == true)
+                    {
+                        var trapImpact = BuildCancelledTrapImpact(beforeSnapshot);
+                        if (HasPresentationImpact(trapImpact))
+                        {
+                            QueueLocalTrapReveals();
+                            yield return PlayImpactAnimationSequence(trapImpact);
+                        }
+                        RefreshPresenter();
+                        yield return PauseAfterLocalAiAction(command, actionPresentationStarted);
+                        continue;
+                    }
                     var afterSnapshot = CaptureBattleSnapshot(CurrentBattleState);
                     var valuePopupEvents = CloneValuePopupEvents(CurrentBattleState);
                     var animationRequest = BuildAttackAnimationRequest(beforeSnapshot, afterSnapshot, PlayerId.AI, attackCommand.AttackerCoord, PlayerId.Player, attackCommand.TargetCoord, shielderInfo, attackerIsRanged, defenderCounterattacks, valuePopupEvents);
@@ -3904,8 +4710,47 @@ namespace Project333.Runtime.Presentation.Battle
                     continue;
                 }
 
+                if (command is CastScriptedSpellCommand scriptedCommand &&
+                    (scriptedCommand.CardId == NuclearRules.CardId || scriptedCommand.CardId == EarthquakeRules.CardId ||
+                     scriptedCommand.CardId == MeteorRules.CardId || (scriptedCommand.HasTarget && (IsFirewallCard(scriptedCommand.CardId) || IsFireSpearCard(scriptedCommand.CardId) || scriptedCommand.CardId == PlasmaShieldRules.CardId || scriptedCommand.CardId == ManaShieldRules.CardId))))
+                {
+                    var beforeSnapshot = CaptureBattleSnapshot(CurrentBattleState);
+                    var scriptedSpellLog = CombatLogFormatter.FormatCommand(PlayerId.AI, scriptedCommand,
+                        CurrentBattleState, ResolveCombatLogCardDisplayName);
+                    _battleGateway.ExecuteCommand(PlayerId.AI, scriptedCommand);
+                    AddCombatLogEntry(scriptedSpellLog);
+                    var impactRequest = BuildImpactAnimationRequest(beforeSnapshot, CaptureBattleSnapshot(CurrentBattleState),
+                        CloneValuePopupEvents(CurrentBattleState), scriptedCommand.CardId, PlayerId.AI);
+                    if (IsFirewallCard(scriptedCommand.CardId))
+                    {
+                        impactRequest.ValuePopupEvents.Clear();
+                        ConfigureFirewallCast(impactRequest, scriptedCommand.TargetOwnerId, scriptedCommand.TargetCoord);
+                    }
+                    if (IsFireSpearCard(scriptedCommand.CardId))
+                        ConfigureFireSpearCast(impactRequest, scriptedCommand.TargetOwnerId, scriptedCommand.TargetCoord);
+                    if (scriptedCommand.CardId == PlasmaShieldRules.CardId)
+                        ConfigurePlasmaShieldCast(impactRequest, scriptedCommand.TargetOwnerId, scriptedCommand.TargetCoord,
+                            CurrentBattleState.GetBoard(scriptedCommand.TargetOwnerId).GetOccupant(scriptedCommand.TargetCoord)?.RuntimeId);
+                    if (scriptedCommand.CardId == ManaShieldRules.CardId)
+                        ConfigureManaShieldCast(impactRequest, scriptedCommand.TargetOwnerId, scriptedCommand.TargetCoord,
+                            CurrentBattleState.GetBoard(scriptedCommand.TargetOwnerId).GetOccupant(scriptedCommand.TargetCoord)?.RuntimeId);
+                    yield return PlayImpactAnimationSequence(impactRequest);
+                    RefreshPresenter();
+                    yield return PauseAfterLocalAiAction(command, actionPresentationStarted);
+                    continue;
+                }
+
+                var beforeSummon = command is PlayUnitCardCommand ? CaptureBattleSnapshot(CurrentBattleState) : null;
+                var commandLog = CombatLogFormatter.FormatCommand(PlayerId.AI, command,
+                    CurrentBattleState, ResolveCombatLogCardDisplayName);
                 _battleGateway.ExecuteCommand(PlayerId.AI, command);
-                AddCombatLogEntry(CombatLogFormatter.FormatCommand(PlayerId.AI, command));
+                var summonTrapImpact = BuildLocalSummonTrapImpact(beforeSummon);
+                if (summonTrapImpact != null)
+                {
+                    QueueLocalTrapReveals();
+                    yield return PlayImpactAnimationSequence(summonTrapImpact);
+                }
+                AddCombatLogEntry(commandLog);
                 RefreshPresenter();
                 yield return PauseAfterLocalAiAction(command, actionPresentationStarted);
             }
@@ -3976,7 +4821,11 @@ namespace Project333.Runtime.Presentation.Battle
                 defenderOwnerId,
                 declaredTargetCoord,
                 FindOnlineTravelTargetCoord(defenderOwnerId, declaredTargetCoord, battleEvents),
-                attacker.AttackType == AttackType.Ranged);
+                attacker.AttackType == AttackType.Ranged)
+            {
+                AttackerCardId = attacker.CardId
+            };
+            request.DefenderCardId = CurrentBattleState?.GetBoard(defenderOwnerId)?.GetOccupant(request.TravelTargetCoord)?.CardId;
 
             request.ValuePopupEvents.AddRange(BuildOnlineValuePopupEvents(battleEvents));
             foreach (var battleEvent in battleEvents)
@@ -4037,8 +4886,137 @@ namespace Project333.Runtime.Presentation.Battle
                 return 0f;
             }
 
-            StartCoroutine(PlayImpactAnimationSequence(request));
+            var sequence = PlayImpactAnimationSequence(request);
+            StartCoroutine(request.SpellEffectId == EndTurnService.RedDragonFlamesEffectId
+                ? TrackOnlineRedDragonSequence(sequence, isGroup: false) :
+                request.SpellEffectId == MeteorRules.EffectId
+                ? TrackOnlineMeteorSequence(sequence, isGroup: false) :
+                request.SpellEffectId == FireSpearRules.EffectId ? TrackOnlineFireSpearSequence(sequence, isGroup: false) :
+                request.SpellEffectId == PlasmaShieldRules.EffectId ? TrackOnlinePlasmaShieldSequence(sequence, isGroup: false) :
+                request.SpellEffectId == ManaShieldRules.EffectId ? TrackOnlineManaShieldSequence(sequence, isGroup: false) :
+                request.ReactiveArmourCue != null ? TrackOnlineReactiveArmourSequence(sequence, isGroup: false) :
+                request.IronDomeCue != null ? TrackOnlineIronDomeSequence(sequence, isGroup: false) :
+                sourceCardId == SummonTrapCardRules.CardId ? TrackOnlineSummonTrapSequence(sequence, isGroup: false) : sequence);
             return EstimateImpactAnimationDuration(request);
+        }
+
+        private IEnumerator TrackOnlineRedDragonSequence(IEnumerator sequence, bool isGroup)
+        {
+            var generation = _combatPresentationGeneration;
+            if (isGroup) _pendingOnlineRedDragonGroups++; else _pendingOnlineRedDragonImpacts++;
+            try { yield return sequence; }
+            finally
+            {
+                if (generation == _combatPresentationGeneration)
+                {
+                    if (isGroup) _pendingOnlineRedDragonGroups = Mathf.Max(0, _pendingOnlineRedDragonGroups - 1);
+                    else _pendingOnlineRedDragonImpacts = Mathf.Max(0, _pendingOnlineRedDragonImpacts - 1);
+                }
+            }
+        }
+
+        private IEnumerator TrackOnlineMeteorSequence(IEnumerator sequence, bool isGroup)
+        {
+            var generation = _combatPresentationGeneration;
+            if (isGroup) _pendingOnlineMeteorGroups++; else _pendingOnlineMeteorImpacts++;
+            try { yield return sequence; }
+            finally
+            {
+                if (generation == _combatPresentationGeneration)
+                {
+                    if (isGroup) _pendingOnlineMeteorGroups = Mathf.Max(0, _pendingOnlineMeteorGroups - 1);
+                    else _pendingOnlineMeteorImpacts = Mathf.Max(0, _pendingOnlineMeteorImpacts - 1);
+                }
+            }
+        }
+
+        private IEnumerator TrackOnlineFireSpearSequence(IEnumerator sequence, bool isGroup)
+        {
+            var generation = _combatPresentationGeneration;
+            if (isGroup) _pendingOnlineFireSpearGroups++; else _pendingOnlineFireSpearImpacts++;
+            try { yield return sequence; }
+            finally
+            {
+                if (generation == _combatPresentationGeneration)
+                {
+                    if (isGroup) _pendingOnlineFireSpearGroups = Mathf.Max(0, _pendingOnlineFireSpearGroups - 1);
+                    else _pendingOnlineFireSpearImpacts = Mathf.Max(0, _pendingOnlineFireSpearImpacts - 1);
+                }
+            }
+        }
+        private IEnumerator TrackOnlinePlasmaShieldSequence(IEnumerator sequence, bool isGroup)
+        {
+            var generation = _combatPresentationGeneration;
+            if (isGroup) _pendingOnlinePlasmaShieldGroups++; else _pendingOnlinePlasmaShieldImpacts++;
+            try { yield return sequence; }
+            finally
+            {
+                if (generation == _combatPresentationGeneration)
+                {
+                    if (isGroup) _pendingOnlinePlasmaShieldGroups = Mathf.Max(0, _pendingOnlinePlasmaShieldGroups - 1);
+                    else _pendingOnlinePlasmaShieldImpacts = Mathf.Max(0, _pendingOnlinePlasmaShieldImpacts - 1);
+                }
+            }
+        }
+
+        private IEnumerator TrackOnlineManaShieldSequence(IEnumerator sequence, bool isGroup)
+        {
+            var generation = _combatPresentationGeneration;
+            if (isGroup) _pendingOnlineManaShieldGroups++; else _pendingOnlineManaShieldImpacts++;
+            try { yield return sequence; }
+            finally
+            {
+                if (generation == _combatPresentationGeneration)
+                {
+                    if (isGroup) _pendingOnlineManaShieldGroups = Mathf.Max(0, _pendingOnlineManaShieldGroups - 1);
+                    else _pendingOnlineManaShieldImpacts = Mathf.Max(0, _pendingOnlineManaShieldImpacts - 1);
+                }
+            }
+        }
+
+        private IEnumerator TrackOnlineSummonTrapSequence(IEnumerator sequence, bool isGroup)
+        {
+            var generation = _combatPresentationGeneration;
+            if (isGroup) _pendingOnlineSummonTrapGroups++; else _pendingOnlineSummonTrapImpacts++;
+            try { yield return sequence; }
+            finally
+            {
+                if (generation == _combatPresentationGeneration)
+                {
+                    if (isGroup) _pendingOnlineSummonTrapGroups = Mathf.Max(0, _pendingOnlineSummonTrapGroups - 1);
+                    else _pendingOnlineSummonTrapImpacts = Mathf.Max(0, _pendingOnlineSummonTrapImpacts - 1);
+                }
+            }
+        }
+
+        private IEnumerator TrackOnlineIronDomeSequence(IEnumerator sequence, bool isGroup)
+        {
+            var generation = _combatPresentationGeneration;
+            if (isGroup) _pendingOnlineIronDomeGroups++; else _pendingOnlineIronDomeImpacts++;
+            try { yield return sequence; }
+            finally
+            {
+                if (generation == _combatPresentationGeneration)
+                {
+                    if (isGroup) _pendingOnlineIronDomeGroups = Mathf.Max(0, _pendingOnlineIronDomeGroups - 1);
+                    else _pendingOnlineIronDomeImpacts = Mathf.Max(0, _pendingOnlineIronDomeImpacts - 1);
+                }
+            }
+        }
+
+        private IEnumerator TrackOnlineReactiveArmourSequence(IEnumerator sequence, bool isGroup)
+        {
+            var generation = _combatPresentationGeneration;
+            if (isGroup) _pendingOnlineReactiveArmourGroups++; else _pendingOnlineReactiveArmourImpacts++;
+            try { yield return sequence; }
+            finally
+            {
+                if (generation == _combatPresentationGeneration)
+                {
+                    if (isGroup) _pendingOnlineReactiveArmourGroups = Mathf.Max(0, _pendingOnlineReactiveArmourGroups - 1);
+                    else _pendingOnlineReactiveArmourImpacts = Mathf.Max(0, _pendingOnlineReactiveArmourImpacts - 1);
+                }
+            }
         }
 
         private ImpactAnimationRequest BuildOnlineImpactAnimationRequest(
@@ -4051,8 +5029,41 @@ namespace Project333.Runtime.Presentation.Battle
                 SpellEffectId = sourceEvent?.EventType == BattleEventType.AreaSpellEffectTriggered
                     ? ResolveAreaSpellEffectId(sourceEvent.EffectId)
                     : ResolveDamageSpellEffectId(sourceCardId),
+                SpellCasterOwnerId = sourceEvent?.EventType == BattleEventType.SpellCast
+                    ? sourceEvent.SourceOwnerId : (PlayerId?)null,
+                GuardAreaRuntimeIds = sourceEvent?.EventType == BattleEventType.AreaSpellEffectTriggered ||
+                    sourceCardId == EarthquakeRules.CardId || sourceCardId == MeteorRules.CardId || sourceCardId == FireSpearRules.CardId || sourceCardId == TrapMirrorFieldCardRules.CardId || sourceCardId == SummonTrapCardRules.CardId || IsDirectDestructionTrapCard(sourceCardId),
             };
             request.ValuePopupEvents.AddRange(BuildOnlineValuePopupEvents(battleEvents));
+            if (sourceCardId == SummonTrapCardRules.CardId && sourceEvent?.TargetCoord != null)
+                request.SummonedVisual = CreateOnlineSummonTrapVisual(sourceEvent, battleEvents);
+            if (sourceEvent?.EventType == BattleEventType.TrapTriggered &&
+                IsDirectDestructionTrapCard(sourceCardId) && sourceEvent.TargetCoord != null)
+                ConfigureDestructionTrapCue(request, CaptureBattleSnapshot(CurrentBattleState), sourceCardId,
+                    sourceEvent.SourceOwnerId, sourceEvent.TargetOwnerId, sourceEvent.TargetCoord.ToDomain(), sourceEvent.TargetRuntimeId);
+            if (sourceEvent?.EventType == BattleEventType.SpellCast && sourceEvent.TargetCoord != null && IsFirewallCard(sourceCardId))
+                ConfigureFirewallCast(request, sourceEvent.TargetOwnerId, sourceEvent.TargetCoord.ToDomain());
+            if (sourceEvent?.EventType == BattleEventType.SpellCast && sourceEvent.TargetCoord != null && IsFireSpearCard(sourceCardId))
+                ConfigureFireSpearCast(request, sourceEvent.TargetOwnerId, sourceEvent.TargetCoord.ToDomain());
+            if (sourceEvent?.EventType == BattleEventType.SpellCast && sourceEvent.TargetCoord != null &&
+                sourceCardId == PlasmaShieldRules.CardId)
+            {
+                var coord = sourceEvent.TargetCoord.ToDomain();
+                var runtimeId = sourceEvent.TargetRuntimeId;
+                if (string.IsNullOrEmpty(runtimeId)) runtimeId = FindTileTextView(sourceEvent.TargetOwnerId, coord)?.VisualRuntimeId;
+                ConfigurePlasmaShieldCast(request, sourceEvent.TargetOwnerId, coord, runtimeId);
+            }
+            if (sourceEvent?.EventType == BattleEventType.SpellCast && sourceEvent.TargetCoord != null &&
+                sourceCardId == ManaShieldRules.CardId)
+            {
+                var coord = sourceEvent.TargetCoord.ToDomain();
+                var runtimeId = sourceEvent.TargetRuntimeId;
+                if (string.IsNullOrEmpty(runtimeId)) runtimeId = FindTileTextView(sourceEvent.TargetOwnerId, coord)?.VisualRuntimeId;
+                ConfigureManaShieldCast(request, sourceEvent.TargetOwnerId, coord, runtimeId);
+            }
+            if (sourceEvent?.EventType == BattleEventType.TimedBombCountdown)
+                request.TimedBombCountdown = new TimedBombCountdownCue(sourceEvent.SourceOwnerId,
+                    sourceEvent.EffectIndex, sourceEvent.RemainingTriggersBefore, sourceEvent.RemainingTriggersAfter);
 
             if (sourceEvent?.EventType == BattleEventType.AreaSpellEffectTriggered)
             {
@@ -4096,12 +5107,20 @@ namespace Project333.Runtime.Presentation.Battle
                         AddOrMergeImpact(request.Impacts, ownerId, coord, tookDamage: false, died: true);
                         break;
                 }
+                if (request.GuardAreaRuntimeIds &&
+                    (battleEvent.EventType == BattleEventType.DamageApplied || battleEvent.EventType == BattleEventType.OccupantRemoved))
+                {
+                    var runtimeId = string.IsNullOrWhiteSpace(battleEvent.TargetRuntimeId) ? battleEvent.RuntimeId : battleEvent.TargetRuntimeId;
+                    foreach (var impact in request.Impacts)
+                        if (impact.OwnerId == ownerId && impact.Coord == coord && !string.IsNullOrWhiteSpace(runtimeId))
+                            request.AreaImpactRuntimeIds[impact] = runtimeId;
+                }
             }
 
             if (request.Impacts.Count == 0 &&
                 sourceEvent != null &&
                 sourceEvent.TargetCoord != null &&
-                !string.IsNullOrWhiteSpace(request.SpellEffectId))
+                !string.IsNullOrWhiteSpace(request.SpellEffectId) && request.SpellEffectId != FirewallSpellEffectId && request.SpellEffectId != FireSpearRules.EffectId && request.SpellEffectId != PlasmaShieldRules.EffectId && request.SpellEffectId != ManaShieldRules.EffectId && request.SpellEffectId != EndTurnService.RedDragonFlamesEffectId)
             {
                 AddOrMergeImpact(
                     request.Impacts,
@@ -4315,9 +5334,12 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             var attackerView = FindTileTextView(request.AttackerOwnerId, request.AttackerCoord);
-            var travelDuration = request.IsRangedAttacker
+            var isCrossSlash = request.AttackerCardId == GwangmaPresentationAssets.CardId;
+            var isFireBreath = request.AttackerCardId == RedDragonPresentationAssets.CardId;
+            var isFireCounter = request.DefenderCounterattacked && request.DefenderCardId == RedDragonPresentationAssets.CardId;
+            var travelDuration = (request.AttackerCardId == A301PresentationAssets.CardId || request.AttackerCardId == ManaCannonPresentationAssets.CardId) ? 0f : request.IsRangedAttacker
                 ? _rangedAttackNudgeDuration * 2f
-                : _attackRunDuration + _attackReturnDuration;
+                : GetMeleeApproachDuration(request.AttackerCardId) + GetMeleeReturnDuration(request.AttackerCardId);
             var attackDuration = attackerView == null
                 ? _attackImpactDelay
                 : attackerView.GetAttackAnimationDurationSeconds();
@@ -4328,7 +5350,56 @@ namespace Project333.Runtime.Presentation.Battle
                 ? Mathf.Max(0f, _deathHoldDuration)
                 : 0f;
 
-            return travelDuration + attackDuration + popupDuration + Mathf.Max(0f, _attackReactionDuration) + deathDuration + 0.1f;
+            var reactionDuration = Mathf.Max(0f, _attackReactionDuration);
+            foreach (var impact in request.DefenderImpacts)
+            {
+                var view = FindTileTextView(impact.OwnerId, impact.Coord);
+                if (view == null) continue;
+                if (impact.TookDamage) reactionDuration = Mathf.Max(reactionDuration, view.GetBeAttackedAnimationDurationSeconds());
+                if (impact.Died) deathDuration = Mathf.Max(deathDuration, view.GetDeathAnimationDurationSeconds());
+            }
+            if (attackerView != null)
+            {
+                if (request.AttackerDied) deathDuration = Mathf.Max(deathDuration, attackerView.GetDeathAnimationDurationSeconds());
+            }
+            if (request.AttackerCardId == BlueDragonPresentationAssets.CardId)
+            {
+                attackDuration = BlueDragonPresentationAssets.WindupDuration + BlueDragonPresentationAssets.FlightDuration;
+                reactionDuration = Mathf.Max(reactionDuration, BlueDragonPresentationAssets.ImpactDuration);
+            }
+            if (request.AttackerCardId == A301PresentationAssets.CardId)
+                attackDuration = Mathf.Max(attackDuration, A301PresentationAssets.WindupDuration + A301PresentationAssets.ImpactDuration);
+            if (request.AttackerCardId == ManaCannonPresentationAssets.CardId)
+                attackDuration = Mathf.Max(attackDuration, ManaCannonPresentationAssets.TotalDuration);
+            if (isFireBreath) attackDuration = Mathf.Max(attackDuration, RedDragonPresentationAssets.WindupDuration + RedDragonPresentationAssets.BreathDuration);
+            if (isCrossSlash || isFireBreath || isFireCounter || (request.DefenderCounterattacked && request.DefenderCardId == GwangmaPresentationAssets.CardId))
+            {
+                var impactDelay = isCrossSlash ? GwangmaPresentationAssets.WindupDuration :
+                    isFireBreath ? RedDragonPresentationAssets.WindupDuration :
+                    attackDuration > 0f ? Mathf.Min(_attackImpactDelay, attackDuration) : _attackImpactDelay;
+                if (request.DefenderCounterattacked)
+                {
+                    var defenderView = FindTileTextView(request.DefenderOwnerId, request.TravelTargetCoord);
+                    if (defenderView != null) attackDuration = Mathf.Max(attackDuration,
+                        impactDelay + Mathf.Max(defenderView.GetAttackAnimationDurationSeconds(),
+                            isFireCounter ? RedDragonPresentationAssets.WindupDuration + RedDragonPresentationAssets.BreathDuration : 0f));
+                }
+                reactionDuration = Mathf.Max(reactionDuration, GwangmaPresentationAssets.ImpactDuration);
+            }
+            if (request.AttackerCardId == GaebangChiefPresentationAssets.CardId ||
+                (request.DefenderCounterattacked && request.DefenderCardId == GaebangChiefPresentationAssets.CardId) ||
+                request.AttackerCardId == A212PresentationAssets.CardId ||
+                (request.DefenderCounterattacked && request.DefenderCardId == A212PresentationAssets.CardId))
+            {
+                var defenderView = FindTileTextView(request.DefenderOwnerId, request.TravelTargetCoord);
+                var attackerHits = attackerView == null ? 1 : attackerView.PresentedHitsPerAttack;
+                attackDuration = Mathf.Max(attackDuration, A212PresentationAssets.WindupDuration +
+                    GetContactEffectDuration(request.AttackerCardId, attackerHits));
+                if (request.DefenderCounterattacked && defenderView != null)
+                    attackDuration = Mathf.Max(attackDuration, Mathf.Max(defenderView.GetAttackAnimationDurationSeconds(),
+                        A212PresentationAssets.WindupDuration + GetContactEffectDuration(request.DefenderCardId, defenderView.PresentedHitsPerAttack)));
+            }
+            return travelDuration + attackDuration + popupDuration + reactionDuration + deathDuration + 0.1f;
         }
 
         private float EstimateImpactAnimationDuration(ImpactAnimationRequest request)
@@ -4339,6 +5410,12 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             var spellDuration = GetSpellEffectDuration(request.SpellEffectId);
+            if (request.ReactiveArmourCue != null) spellDuration += ReactiveArmourVfx.DurationSeconds;
+            if (request.IronDomeCue != null) spellDuration += IronDomeMissileVfx.DurationSeconds;
+            if (request.TimedBombCountdown != null)
+                spellDuration += TimedBombPresentationVfx.DurationFor(request.TimedBombCountdown.Before, request.TimedBombCountdown.After);
+            foreach (var step in request.TimedBombSteps) spellDuration += EstimateImpactAnimationDuration(step);
+            foreach (var step in request.AreaSpellSteps) spellDuration += EstimateImpactAnimationDuration(step);
             var popupDuration = request.ValuePopupEvents.Count > 0
                 ? (request.ValuePopupEvents.Count * Mathf.Max(0f, _valuePopupCascadeDelay)) + Mathf.Max(0f, _valuePopupCascadeDelay)
                 : 0f;
@@ -4348,6 +5425,13 @@ namespace Project333.Runtime.Presentation.Battle
             var reactionDuration = HasAnyDamageImpact(request.Impacts)
                 ? Mathf.Max(0f, _attackReactionDuration)
                 : 0f;
+            foreach (var impact in request.Impacts)
+            {
+                var view = FindTileTextView(impact.OwnerId, impact.Coord);
+                if (view == null) continue;
+                if (impact.TookDamage) reactionDuration = Mathf.Max(reactionDuration, view.GetBeAttackedAnimationDurationSeconds());
+                if (impact.Died) deathDuration = Mathf.Max(deathDuration, view.GetDeathAnimationDurationSeconds());
+            }
             var completionPadding = spellDuration > 0f || popupDuration > 0f ||
                                     reactionDuration > 0f || deathDuration > 0f
                 ? 0.1f
@@ -4399,6 +5483,13 @@ namespace Project333.Runtime.Presentation.Battle
                 yield break;
             }
 
+            var presentationGeneration = _combatPresentationGeneration;
+            var isWaterCannon = request.AttackerCardId == BlueDragonPresentationAssets.CardId;
+            var isLaser = request.AttackerCardId == A301PresentationAssets.CardId;
+            var isManaCannon = request.AttackerCardId == ManaCannonPresentationAssets.CardId;
+            var isCrossSlash = request.AttackerCardId == GwangmaPresentationAssets.CardId;
+            var isFireBreath = request.AttackerCardId == RedDragonPresentationAssets.CardId;
+            var isFireCounter = request.DefenderCounterattacked && request.DefenderCardId == RedDragonPresentationAssets.CardId;
             var attackerView = FindTileTextView(request.AttackerOwnerId, request.AttackerCoord);
             if (attackerView == null)
             {
@@ -4408,6 +5499,9 @@ namespace Project333.Runtime.Presentation.Battle
             var destinationView = FindTileTextView(request.DefenderOwnerId, request.TravelTargetCoord) ??
                                   FindTileTextView(request.DefenderOwnerId, request.DeclaredTargetCoord);
 
+            var attackerRuntimeId = attackerView.VisualRuntimeId;
+            var targetRuntimeId = destinationView == null ? null : destinationView.VisualRuntimeId;
+            var laserImpactIdentities = (isLaser || isManaCannon) ? CaptureLaserImpactIdentities(request) : null;
             attackerView.RestoreVisualLayout();
             destinationView?.RestoreVisualLayout();
             var attackerStartPosition = attackerView.GetVisualWorldPosition();
@@ -4419,6 +5513,16 @@ namespace Project333.Runtime.Presentation.Battle
             var meleeContactTarget = shouldTravelForAttack
                 ? GetMeleeAttackContactTarget(destinationView, request.DefenderOwnerId, attackDestination, _meleeAttackContactOffset, _meleeAttackSideOffset)
                 : attackerStartPosition;
+            if (isCrossSlash && shouldTravelForAttack)
+            {
+                // The legacy contact offset is authored for full-size sprites. Keep the
+                // compact atlas grounded at that same contact point instead of rising.
+                var visualHeight = attackerView.GetVisualNormalizedWorldPosition(new Vector2(0.5f, 1f)) -
+                                   attackerView.GetVisualNormalizedWorldPosition(new Vector2(0.5f, 0f));
+                meleeContactTarget -= visualHeight * (1f / GwangmaPresentationAssets.BoardScale - 1f) * 0.5f;
+            }
+            if ((isFireBreath || isFireCounter) && shouldTravelForAttack)
+                meleeContactTarget = RedDragonFireBreath.GetMeleeContactPosition(attackerView, destinationView, meleeContactTarget);
             var rangedNudgeTarget = shouldTravelForAttack
                 ? attackerStartPosition
                 : GetRangedAttackNudgeTarget(
@@ -4429,73 +5533,142 @@ namespace Project333.Runtime.Presentation.Battle
             if (shouldTravelForAttack)
             {
                 attackerView.PlayRunAnimation();
-                yield return AnimateVisualTravel(attackerView, attackerStartPosition, meleeContactTarget, _attackRunDuration);
+                if (isCrossSlash) GetGwangmaCrossSlash().PlayDash();
+                yield return AnimateVisualTravel(attackerView, attackerStartPosition, meleeContactTarget,
+                    GetMeleeApproachDuration(request.AttackerCardId));
+                if (!IsAttackPresentationCurrent(presentationGeneration, attackerView, attackerRuntimeId, destinationView, targetRuntimeId)) yield break;
             }
             else
             {
                 attackerView.SetVisualWorldPosition(attackerStartPosition);
-                yield return AnimateVisualTravel(attackerView, attackerStartPosition, rangedNudgeTarget, _rangedAttackNudgeDuration);
+                if (!isLaser && !isManaCannon) yield return AnimateVisualTravel(attackerView, attackerStartPosition, rangedNudgeTarget, _rangedAttackNudgeDuration);
+                if (!IsAttackPresentationCurrent(presentationGeneration, attackerView, attackerRuntimeId, destinationView, targetRuntimeId)) yield break;
             }
 
-            attackerView.PlayAttackAnimation();
-            var attackImpactDelay = attackAnimationDuration > 0f
-                ? Mathf.Min(_attackImpactDelay, attackAnimationDuration)
-                : _attackImpactDelay;
-            if (attackImpactDelay > 0f)
+            if (request.AttackerCardId == GaebangChiefPresentationAssets.CardId ||
+                (request.DefenderCounterattacked && request.DefenderCardId == GaebangChiefPresentationAssets.CardId) ||
+                request.AttackerCardId == A212PresentationAssets.CardId ||
+                (request.DefenderCounterattacked && request.DefenderCardId == A212PresentationAssets.CardId))
             {
-                yield return new WaitForSecondsRealtime(attackImpactDelay);
+                yield return PlayContactAttackExchange(request, attackerView, destinationView, presentationGeneration,
+                    attackerRuntimeId, targetRuntimeId);
+                if (!IsAttackPresentationCurrent(presentationGeneration, attackerView, attackerRuntimeId, destinationView, targetRuntimeId)) yield break;
             }
-
-            var defenderCounterattacked = request.DefenderCounterattacked && destinationView != null;
-            var defenderCounterattackDuration = 0f;
-            if (defenderCounterattacked)
+            else if (isManaCannon)
             {
-                destinationView.PlayAttackAnimation();
-                defenderCounterattackDuration = destinationView.GetAttackAnimationDurationSeconds();
+                yield return PlayManaCannonAttackExchange(request, attackerView, destinationView, presentationGeneration, attackerRuntimeId, targetRuntimeId, laserImpactIdentities);
+                if (!IsAttackPresentationCurrent(presentationGeneration, attackerView, attackerRuntimeId, destinationView, targetRuntimeId)) yield break;
             }
-
-            var remainingAttackDuration = Mathf.Max(0f, attackAnimationDuration - attackImpactDelay);
-            var attackPhaseWaitDuration = Mathf.Max(remainingAttackDuration, defenderCounterattackDuration);
-            if (attackPhaseWaitDuration > 0f)
+            else if (isLaser)
             {
-                yield return new WaitForSecondsRealtime(attackPhaseWaitDuration);
+                yield return PlayLaserAttackExchange(request, attackerView, destinationView, presentationGeneration, attackerRuntimeId, targetRuntimeId, laserImpactIdentities);
+                if (!IsAttackPresentationCurrent(presentationGeneration, attackerView, attackerRuntimeId, destinationView, targetRuntimeId)) yield break;
             }
-
-            var valuePopupCascadeDuration = QueueValuePopupAnimations(request.ValuePopupEvents);
-            if (valuePopupCascadeDuration > 0f)
+            else
             {
-                yield return new WaitForSecondsRealtime(valuePopupCascadeDuration);
-            }
-
-            var reactionDuration = 0f;
-            foreach (var impact in request.DefenderImpacts)
-            {
-                if (!impact.TookDamage)
+                attackerView.PlayAttackAnimation();
+                if (isWaterCannon) GetBlueDragonWaterCannon().PlayCharge();
+                if (isCrossSlash && destinationView != null) GetGwangmaCrossSlash().PlayStrike(attackerView, destinationView);
+                if (isFireBreath && destinationView != null) GetRedDragonFireBreath().PlayStrike(attackerView, destinationView);
+                if (isFireBreath) attackAnimationDuration = Mathf.Max(attackAnimationDuration, RedDragonPresentationAssets.WindupDuration + RedDragonPresentationAssets.BreathDuration);
+                var attackImpactDelay = isWaterCannon
+                    ? BlueDragonPresentationAssets.WindupDuration
+                    : isCrossSlash ? GwangmaPresentationAssets.WindupDuration
+                    : isFireBreath ? RedDragonPresentationAssets.WindupDuration
+                    : attackAnimationDuration > 0f
+                    ? Mathf.Min(_attackImpactDelay, attackAnimationDuration)
+                    : _attackImpactDelay;
+                if (attackImpactDelay > 0f)
                 {
-                    continue;
+                    yield return new WaitForSecondsRealtime(attackImpactDelay);
+                    if (!IsAttackPresentationCurrent(presentationGeneration, attackerView, attackerRuntimeId, destinationView, targetRuntimeId)) yield break;
                 }
 
-                var impactView = FindTileTextView(impact.OwnerId, impact.Coord);
-                impactView?.PlayBeAttackedAnimation();
-
-                if (impactView != null)
+                if (isWaterCannon && destinationView != null)
                 {
-                    reactionDuration = Mathf.Max(reactionDuration, impactView.GetBeAttackedAnimationDurationSeconds());
+                    yield return GetBlueDragonWaterCannon().PlayFlight(attackerView, destinationView);
+                    if (!IsAttackPresentationCurrent(presentationGeneration, attackerView, attackerRuntimeId, destinationView, targetRuntimeId)) yield break;
                 }
+
+                var defenderCounterattacked = request.DefenderCounterattacked && destinationView != null;
+                var defenderCounterattackDuration = 0f;
+                if (defenderCounterattacked)
+                {
+                    destinationView.PlayAttackAnimation();
+                    if (request.DefenderCardId == GwangmaPresentationAssets.CardId)
+                        GetGwangmaCrossSlash().PlayStrike(destinationView, attackerView, counterattack: true);
+                    defenderCounterattackDuration = destinationView.GetAttackAnimationDurationSeconds();
+                    if (isFireCounter)
+                    {
+                        GetRedDragonFireBreath().PlayStrike(destinationView, attackerView, counterattack: true);
+                        defenderCounterattackDuration = Mathf.Max(defenderCounterattackDuration, RedDragonPresentationAssets.WindupDuration + RedDragonPresentationAssets.BreathDuration);
+                    }
+                }
+
+                var remainingAttackDuration = Mathf.Max(0f, attackAnimationDuration - attackImpactDelay -
+                    (isWaterCannon ? BlueDragonPresentationAssets.FlightDuration : 0f));
+                var attackPhaseWaitDuration = Mathf.Max(remainingAttackDuration, defenderCounterattackDuration);
+                if (attackPhaseWaitDuration > 0f)
+                {
+                    yield return new WaitForSecondsRealtime(attackPhaseWaitDuration);
+                    if (!IsAttackPresentationCurrent(presentationGeneration, attackerView, attackerRuntimeId, destinationView, targetRuntimeId)) yield break;
+                }
+
+                var valuePopupCascadeDuration = QueueValuePopupAnimations(request.ValuePopupEvents);
+                if (!isWaterCannon && !isFireBreath && !isFireCounter && valuePopupCascadeDuration > 0f)
+                {
+                    yield return new WaitForSecondsRealtime(valuePopupCascadeDuration);
+                    if (!IsAttackPresentationCurrent(presentationGeneration, attackerView, attackerRuntimeId, destinationView, targetRuntimeId)) yield break;
+                }
+
+                var reactionDuration = 0f;
+                foreach (var impact in request.DefenderImpacts)
+                {
+                    if (!impact.TookDamage)
+                    {
+                        continue;
+                    }
+
+                    var impactView = FindTileTextView(impact.OwnerId, impact.Coord);
+                    impactView?.PlayBeAttackedAnimation();
+
+                    if (impactView != null)
+                    {
+                        reactionDuration = Mathf.Max(reactionDuration, impactView.GetBeAttackedAnimationDurationSeconds());
+                    }
+                }
+
+                if (request.AttackerTookDamage)
+                {
+                    // The initiating attacker keeps its attack pose through counterattack damage.
+                    attackerView.PlayDamageSound();
+                }
+
+                var reactionWaitDuration = Mathf.Max(_attackReactionDuration, reactionDuration);
+                if (isCrossSlash || (defenderCounterattacked && request.DefenderCardId == GwangmaPresentationAssets.CardId))
+                    reactionWaitDuration = Mathf.Max(reactionWaitDuration, GwangmaPresentationAssets.ImpactDuration);
+                if (isWaterCannon) reactionWaitDuration = Mathf.Max(reactionWaitDuration,
+                    Mathf.Max(valuePopupCascadeDuration, BlueDragonPresentationAssets.ImpactDuration));
+                if (isFireBreath || isFireCounter) reactionWaitDuration = Mathf.Max(reactionWaitDuration, valuePopupCascadeDuration);
+                if (reactionWaitDuration > 0f)
+                {
+                    yield return new WaitForSecondsRealtime(reactionWaitDuration);
+                    if (!IsAttackPresentationCurrent(presentationGeneration, attackerView, attackerRuntimeId, destinationView, targetRuntimeId)) yield break;
+                }
+
             }
 
-            if (request.AttackerTookDamage)
+            if ((isLaser || isManaCannon) && !AreLaserImpactIdentitiesCurrent(laserImpactIdentities))
             {
-                attackerView.PlayBeAttackedAnimation();
-                reactionDuration = Mathf.Max(reactionDuration, attackerView.GetBeAttackedAnimationDurationSeconds());
+                if (_a301LaserAttack != null) _a301LaserAttack.Cancel();
+            if (_gaebangChiefCoinPunch != null) _gaebangChiefCoinPunch.Cancel();
+            if (_manaCannonProjectile != null) _manaCannonProjectile.Cancel();
+                attackerView.ResetCombatPresentation();
+                foreach (var entry in laserImpactIdentities)
+                    if (entry.Key != null && entry.Key.isActiveAndEnabled && entry.Key.VisualRuntimeId == entry.Value)
+                        entry.Key.ResetCombatPresentation();
+                yield break;
             }
-
-            var reactionWaitDuration = Mathf.Max(_attackReactionDuration, reactionDuration);
-            if (reactionWaitDuration > 0f)
-            {
-                yield return new WaitForSecondsRealtime(reactionWaitDuration);
-            }
-
             var hasAnyDeath = false;
             var deathDuration = 0f;
             foreach (var impact in request.DefenderImpacts)
@@ -4528,6 +5701,7 @@ namespace Project333.Runtime.Presentation.Battle
                 if (hasAnyDeath && deathWaitDuration > 0f)
                 {
                     yield return new WaitForSecondsRealtime(deathWaitDuration);
+                    if (!IsAttackPresentationCurrent(presentationGeneration, attackerView, attackerRuntimeId, destinationView, targetRuntimeId)) yield break;
                 }
 
                 yield break;
@@ -4536,11 +5710,14 @@ namespace Project333.Runtime.Presentation.Battle
             if (shouldTravelForAttack)
             {
                 attackerView.PlayRunAnimation();
-                yield return AnimateVisualTravel(attackerView, meleeContactTarget, attackerStartPosition, _attackReturnDuration);
+                yield return AnimateVisualTravel(attackerView, meleeContactTarget, attackerStartPosition,
+                    GetMeleeReturnDuration(request.AttackerCardId));
+                if (!IsAttackPresentationCurrent(presentationGeneration, attackerView, attackerRuntimeId, destinationView, targetRuntimeId)) yield break;
             }
             else
             {
-                yield return AnimateVisualTravel(attackerView, rangedNudgeTarget, attackerStartPosition, _rangedAttackNudgeDuration);
+                if (!isLaser && !isManaCannon) yield return AnimateVisualTravel(attackerView, rangedNudgeTarget, attackerStartPosition, _rangedAttackNudgeDuration);
+                if (!IsAttackPresentationCurrent(presentationGeneration, attackerView, attackerRuntimeId, destinationView, targetRuntimeId)) yield break;
             }
 
             attackerView.RestoreVisualLayout();
@@ -4550,7 +5727,277 @@ namespace Project333.Runtime.Presentation.Battle
             if (hasAnyDeath && finalDeathWaitDuration > 0f)
             {
                 yield return new WaitForSecondsRealtime(finalDeathWaitDuration);
+                if (!IsAttackPresentationCurrent(presentationGeneration, attackerView, attackerRuntimeId, destinationView, targetRuntimeId)) yield break;
             }
+        }
+
+        private Dictionary<TileTextView, string> CaptureLaserImpactIdentities(AttackAnimationRequest request)
+        {
+            var identities = new Dictionary<TileTextView, string>();
+            foreach (var impact in request.DefenderImpacts)
+            {
+                if (!impact.TookDamage && !impact.Died) continue;
+                var view = FindTileTextView(impact.OwnerId, impact.Coord);
+                if (view != null) identities[view] = view.VisualRuntimeId;
+            }
+            return identities;
+        }
+
+        private static bool AreLaserImpactIdentitiesCurrent(Dictionary<TileTextView, string> identities)
+        {
+            foreach (var entry in identities)
+                if (entry.Key == null || !entry.Key.isActiveAndEnabled || entry.Key.VisualRuntimeId != entry.Value) return false;
+            return true;
+        }
+
+
+        private IEnumerator PlayManaCannonAttackExchange(AttackAnimationRequest request, TileTextView attacker,
+            TileTextView target, int generation, string attackerId, string targetId,
+            Dictionary<TileTextView, string> impactIdentities)
+        {
+            var effect = GetManaCannonProjectile();
+            // Warm native resources before starting either animation clock.
+            var frames = ManaCannonPresentationAssets.ProjectileFrames;
+            var impactFrames = ManaCannonPresentationAssets.ImpactFrames;
+            var shotSound = ManaCannonPresentationAssets.AttackSound;
+            var impactSound = ManaCannonPresentationAssets.ImpactSound;
+            attacker.PlayAttackAnimation();
+            if (target != null) effect.PlayShot(attacker, target);
+            var startedAt = Time.unscaledTime;
+            var completed = false;
+            try
+            {
+                while (Time.unscaledTime - startedAt < ManaCannonPresentationAssets.ContactAt)
+                {
+                    if (!IsAttackPresentationCurrent(generation, attacker, attackerId, target, targetId) ||
+                        !AreLaserImpactIdentitiesCurrent(impactIdentities)) yield break;
+                    yield return null;
+                }
+                if (!IsAttackPresentationCurrent(generation, attacker, attackerId, target, targetId) ||
+                    !AreLaserImpactIdentitiesCurrent(impactIdentities)) yield break;
+                // Only display gateway-recorded packets when the projectile reaches its target.
+                var perTargetSteps = new Dictionary<string, int>(StringComparer.Ordinal);
+                var soundedTargets = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var cue in request.ValuePopupEvents)
+                {
+                    if (cue == null || (cue.Amount <= 0 && !cue.IsInvinciblePrevented)) continue;
+                    var view = FindTileTextView(cue.OwnerId, cue.Coord);
+                    if (view == null || !view.isActiveAndEnabled ||
+                        (!string.IsNullOrWhiteSpace(cue.RuntimeId) && view.VisualRuntimeId != cue.RuntimeId)) continue;
+                    var key = string.IsNullOrWhiteSpace(cue.RuntimeId) ? $"{cue.OwnerId}:{cue.Coord}" : cue.RuntimeId;
+                    perTargetSteps.TryGetValue(key, out var step);
+                    perTargetSteps[key] = step + 1;
+                    if (cue.IsInvinciblePrevented) view.QueueInvinciblePopup(0f, step);
+                    else
+                    {
+                        view.QueueFloatingValuePopup(cue.Amount, cue.IsHealing, 0f, step);
+                        if (!cue.IsHealing) { view.PlayDamageSound(); soundedTargets.Add(view.VisualRuntimeId); }
+                    }
+                }
+                var reactionDuration = Mathf.Max(0f, _attackReactionDuration);
+                foreach (var impact in request.DefenderImpacts)
+                {
+                    if (!impact.TookDamage) continue;
+                    var view = FindTileTextView(impact.OwnerId, impact.Coord);
+                    if (view == null || !view.isActiveAndEnabled) continue;
+                    view.PlayDamageReactionAnimation();
+                    if (!soundedTargets.Contains(view.VisualRuntimeId)) view.PlayDamageSound();
+                    reactionDuration = Mathf.Max(reactionDuration, view.GetBeAttackedAnimationDurationSeconds());
+                }
+                var finishAt = Mathf.Max(attacker.GetAttackAnimationDurationSeconds(),
+                    Mathf.Max(ManaCannonPresentationAssets.TotalDuration,
+                        Time.unscaledTime - startedAt + Mathf.Max(reactionDuration, impactSound == null ? 0f : impactSound.length)));
+                while (Time.unscaledTime - startedAt < finishAt)
+                {
+                    if (!IsAttackPresentationCurrent(generation, attacker, attackerId, target, targetId) ||
+                        !AreLaserImpactIdentitiesCurrent(impactIdentities)) yield break;
+                    yield return null;
+                }
+                completed = true;
+            }
+            finally
+            {
+                if (!completed && generation == _combatPresentationGeneration)
+                {
+                    effect.Cancel();
+                    if (attacker != null && attacker.isActiveAndEnabled && attacker.VisualRuntimeId == attackerId)
+                        attacker.ResetCombatPresentation();
+                    foreach (var entry in impactIdentities)
+                        if (entry.Key != null && entry.Key.isActiveAndEnabled && entry.Key.VisualRuntimeId == entry.Value)
+                            entry.Key.ResetCombatPresentation();
+                }
+            }
+        }
+
+        private IEnumerator PlayLaserAttackExchange(AttackAnimationRequest request, TileTextView attacker,
+            TileTextView target, int generation, string attackerId, string targetId,
+            Dictionary<TileTextView, string> impactIdentities)
+        {
+            attacker.PlayAttackAnimation();
+            var attackDuration = Mathf.Max(attacker.GetAttackAnimationDurationSeconds(),
+                A301PresentationAssets.WindupDuration + A301PresentationAssets.BeamDuration);
+            yield return new WaitForSecondsRealtime(A301PresentationAssets.WindupDuration);
+            if (!IsAttackPresentationCurrent(generation, attacker, attackerId, target, targetId) ||
+                !AreLaserImpactIdentitiesCurrent(impactIdentities)) yield break;
+
+            if (target != null) GetA301LaserAttack().PlayShot(attacker, target);
+            // Present recorded packets at beam emission; never apply damage or resolve counters here.
+            var perTargetSteps = new Dictionary<string, int>(StringComparer.Ordinal);
+            var soundedTargets = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var cue in request.ValuePopupEvents)
+            {
+                if (cue == null || (cue.Amount <= 0 && !cue.IsInvinciblePrevented)) continue;
+                var view = FindTileTextView(cue.OwnerId, cue.Coord);
+                if (view == null || !view.isActiveAndEnabled ||
+                    (!string.IsNullOrWhiteSpace(cue.RuntimeId) && view.VisualRuntimeId != cue.RuntimeId)) continue;
+                var key = string.IsNullOrWhiteSpace(cue.RuntimeId) ? $"{cue.OwnerId}:{cue.Coord}" : cue.RuntimeId;
+                perTargetSteps.TryGetValue(key, out var step);
+                perTargetSteps[key] = step + 1;
+                if (cue.IsInvinciblePrevented) view.QueueInvinciblePopup(0f, step);
+                else
+                {
+                    view.QueueFloatingValuePopup(cue.Amount, cue.IsHealing, 0f, step);
+                    if (!cue.IsHealing) { view.PlayDamageSound(); soundedTargets.Add(view.VisualRuntimeId); }
+                }
+            }
+            var reactionDuration = Mathf.Max(0f, _attackReactionDuration);
+            foreach (var impact in request.DefenderImpacts)
+            {
+                if (!impact.TookDamage) continue;
+                var view = FindTileTextView(impact.OwnerId, impact.Coord);
+                if (view == null || !view.isActiveAndEnabled) continue;
+                view.PlayDamageReactionAnimation();
+                if (!soundedTargets.Contains(view.VisualRuntimeId)) view.PlayDamageSound();
+                reactionDuration = Mathf.Max(reactionDuration, view.GetBeAttackedAnimationDurationSeconds());
+            }
+            var sound = A301PresentationAssets.AttackSound;
+            var remaining = Mathf.Max(attackDuration - A301PresentationAssets.WindupDuration,
+                Mathf.Max(reactionDuration, Mathf.Max(A301PresentationAssets.ImpactDuration, sound == null ? 0f : sound.length)));
+            if (remaining > 0f) yield return new WaitForSecondsRealtime(remaining);
+        }
+
+
+        private static float GetContactEffectDuration(string cardId, int hits)
+        {
+            return cardId == GaebangChiefPresentationAssets.CardId
+                ? GaebangChiefPresentationAssets.ImpactDuration
+                : A212PresentationAssets.GetGrindDuration(hits, A212PresentationAssets.HitInterval);
+        }
+
+        private IEnumerator PlayContactAttackExchange(AttackAnimationRequest request, TileTextView attacker,
+            TileTextView target, int generation, string attackerId, string targetId)
+        {
+            var counterattacked = request.DefenderCounterattacked && target != null;
+            var hitInterval = A212PresentationAssets.HitInterval;
+            var windup = A212PresentationAssets.WindupDuration;
+            var attackerHits = attacker.PresentedHitsPerAttack;
+            var counterHits = counterattacked ? target.PresentedHitsPerAttack : 0;
+            attacker.PlayAttackAnimation();
+            StartContactExchangeEffect(attacker, target, request.AttackerCardId, attackerHits, false);
+            if (counterattacked)
+            {
+                target.PlayAttackAnimation();
+                StartContactExchangeEffect(target, attacker, request.DefenderCardId, counterHits, true);
+            }
+
+            var duration = Mathf.Max(attacker.GetAttackAnimationDurationSeconds(),
+                windup + GetContactEffectDuration(request.AttackerCardId, attackerHits));
+            if (counterattacked) duration = Mathf.Max(duration,
+                Mathf.Max(target.GetAttackAnimationDurationSeconds(),
+                    windup + GetContactEffectDuration(request.DefenderCardId, counterHits)));
+            // Keep each existing target's popup order, including prevention and LifeSteal.
+            // Emit when due instead of queuing delayed work that could survive a cancelled exchange.
+            var cueTimes = new float[request.ValuePopupEvents.Count];
+            var cueShown = new bool[cueTimes.Length];
+            var cueSteps = new int[cueTimes.Length];
+            var perTargetSteps = new Dictionary<string, int>(StringComparer.Ordinal);
+            var hasDamageCue = false;
+            for (var i = 0; i < cueTimes.Length; i++)
+            {
+                var cue = request.ValuePopupEvents[i];
+                if (cue == null || (cue.Amount <= 0 && !cue.IsInvinciblePrevented)) continue;
+                var key = string.IsNullOrWhiteSpace(cue.RuntimeId) ? $"{cue.OwnerId}:{cue.Coord}" : cue.RuntimeId;
+                perTargetSteps.TryGetValue(key, out var step);
+                cueTimes[i] = windup + step * hitInterval;
+                cueSteps[i] = step;
+                perTargetSteps[key] = step + 1;
+                duration = Mathf.Max(duration, cueTimes[i] + hitInterval);
+                hasDamageCue |= !cue.IsHealing && !cue.IsInvinciblePrevented && cue.Amount > 0;
+            }
+
+            var startedAt = Time.unscaledTime;
+            var fallbackHitPlayed = false;
+            while (Time.unscaledTime - startedAt < duration)
+            {
+                if (!IsAttackPresentationCurrent(generation, attacker, attackerId, target, targetId)) yield break;
+                var elapsed = Time.unscaledTime - startedAt;
+                for (var i = 0; i < cueTimes.Length; i++)
+                {
+                    var cue = request.ValuePopupEvents[i];
+                    if (cueShown[i] || cue == null || (cue.Amount <= 0 && !cue.IsInvinciblePrevented) ||
+                        elapsed < cueTimes[i]) continue;
+                    cueShown[i] = true;
+                    var view = FindTileTextView(cue.OwnerId, cue.Coord);
+                    if (view == null || !view.isActiveAndEnabled ||
+                        (!string.IsNullOrWhiteSpace(cue.RuntimeId) && view.VisualRuntimeId != cue.RuntimeId)) continue;
+                    if (cue.IsInvinciblePrevented) view.QueueInvinciblePopup(0f, cueSteps[i]);
+                    else
+                    {
+                        view.QueueFloatingValuePopup(cue.Amount, cue.IsHealing, 0f, cueSteps[i]);
+                        if (!cue.IsHealing) view.PlayDamageSound();
+                    }
+                }
+                if (!fallbackHitPlayed && !hasDamageCue && elapsed >= windup)
+                {
+                    // Compatibility for summary-only presentation requests; never invent damage.
+                    foreach (var impact in request.DefenderImpacts)
+                        if (impact.TookDamage) FindTileTextView(impact.OwnerId, impact.Coord)?.PlayDamageSound();
+                    if (request.AttackerTookDamage) attacker.PlayDamageSound();
+                    fallbackHitPlayed = true;
+                }
+                yield return null;
+            }
+
+            if (!IsAttackPresentationCurrent(generation, attacker, attackerId, target, targetId)) yield break;
+
+            var reactionDuration = Mathf.Max(0f, _attackReactionDuration);
+            foreach (var impact in request.DefenderImpacts)
+            {
+                if (!impact.TookDamage) continue;
+                var view = FindTileTextView(impact.OwnerId, impact.Coord);
+                if (view == null) continue;
+                view.PlayDamageReactionAnimation();
+                reactionDuration = Mathf.Max(reactionDuration, view.GetBeAttackedAnimationDurationSeconds());
+            }
+            // The initiating attacker keeps its Attack pose through counterattack damage.
+            if (reactionDuration > 0f) yield return new WaitForSecondsRealtime(reactionDuration);
+            if (counterattacked && IsAttackPresentationCurrent(generation, attacker, attackerId, target, targetId))
+                target.PlayIdleAnimation();
+        }
+
+        private void StartContactExchangeEffect(TileTextView attacker, TileTextView target, string cardId,
+            int hits, bool counterattack)
+        {
+            if (attacker == null || target == null) return;
+            if (cardId == A212PresentationAssets.CardId)
+                GetA212SawAttack().PlayStrike(attacker, target, hits, A212PresentationAssets.HitInterval,
+                    A212PresentationAssets.WindupDuration, counterattack);
+            else if (cardId == GaebangChiefPresentationAssets.CardId)
+                GetGaebangChiefCoinPunch().PlayStrike(attacker, target, hits, A212PresentationAssets.HitInterval,
+                    GaebangChiefPresentationAssets.WindupDuration, counterattack);
+            else if (cardId == GwangmaPresentationAssets.CardId)
+                GetGwangmaCrossSlash().PlayStrike(attacker, target, counterattack);
+            else if (cardId == RedDragonPresentationAssets.CardId)
+                GetRedDragonFireBreath().PlayStrike(attacker, target, counterattack);
+        }
+
+
+        private bool IsAttackPresentationCurrent(int generation, TileTextView attacker, string attackerId,
+            TileTextView target, string targetId)
+        {
+            return generation == _combatPresentationGeneration && attacker != null &&
+                attacker.isActiveAndEnabled && attacker.VisualRuntimeId == attackerId &&
+                (targetId == null || (target != null && target.isActiveAndEnabled && target.VisualRuntimeId == targetId));
         }
 
         private IEnumerator PlayImpactAnimationSequence(ImpactAnimationRequest request)
@@ -4560,12 +6007,59 @@ namespace Project333.Runtime.Presentation.Battle
                 yield break;
             }
 
+            var presentationGeneration = _combatPresentationGeneration;
+            if (request.SummonedVisual != null && !PresentSummonTrapVisual(request.SummonedVisual)) yield break;
+            foreach (var step in request.TimedBombSteps)
+            {
+                if (presentationGeneration != _combatPresentationGeneration) yield break;
+                yield return PlayImpactAnimationSequence(step);
+            }
+            foreach (var step in request.AreaSpellSteps)
+            {
+                if (presentationGeneration != _combatPresentationGeneration) yield break;
+                yield return PlayImpactAnimationSequence(step);
+            }
+            if (presentationGeneration != _combatPresentationGeneration) yield break;
+            if (request.TimedBombCountdown != null)
+            {
+                var countdownDuration = PlayTimedBombCountdown(request.TimedBombCountdown);
+                if (countdownDuration > 0) yield return new WaitForSecondsRealtime(countdownDuration);
+                if (presentationGeneration != _combatPresentationGeneration) yield break;
+            }
+            if (request.IronDomeCue != null)
+            {
+                var duration = PlayIronDome(request);
+                if (duration > 0f) yield return new WaitForSecondsRealtime(IronDomeMissileVfx.ImpactDelaySeconds);
+                if (presentationGeneration != _combatPresentationGeneration) yield break;
+                // A replacement occupant or a disabled source cancels the missile. Do not
+                // start the confirmed Death clip on a different body at that coordinate.
+                var impactReady = duration <= 0f || (_ironDomeMissileVfx != null && _ironDomeMissileVfx.TryBeginExplosion());
+                if (impactReady) PlayIronDomeAttackerDeath(request);
+            }
+            if (request.ReactiveArmourCue != null)
+            {
+                var duration = PlayReactiveArmour(request);
+                if (duration > 0f) yield return new WaitForSecondsRealtime(ReactiveArmourVfx.EngulfDelaySeconds);
+                if (presentationGeneration != _combatPresentationGeneration) yield break;
+                if (duration > 0f) _reactiveArmourVfx?.TryBeginEngulf();
+                PlayReactiveArmourAttackerDeath(request);
+            }
+            ProjectDeferredSpellHp(request, afterImpact: false);
             yield return PlaySpellEffectAnimationSequence(request);
+            if (presentationGeneration != _combatPresentationGeneration) yield break;
+            ProjectDeferredSpellHp(request, afterImpact: true);
 
-            var valuePopupCascadeDuration = QueueValuePopupAnimations(request.ValuePopupEvents);
-            if (valuePopupCascadeDuration > 0f)
+            var popups = request.GuardAreaRuntimeIds ? request.ValuePopupEvents.FindAll(popup =>
+            {
+                var view = FindTileTextView(popup.OwnerId, popup.Coord);
+                return view != null && view.isActiveAndEnabled && view.VisualRuntimeId == popup.RuntimeId;
+            }) : request.ValuePopupEvents;
+            var valuePopupCascadeDuration = QueueValuePopupAnimations(popups);
+            // Meteor popups and Hurt begin together at impact while the explosion continues.
+            if (valuePopupCascadeDuration > 0f && request.SpellEffectId != MeteorRules.EffectId && request.SpellEffectId != FireSpearRules.EffectId && request.SpellEffectId != EndTurnService.RedDragonFlamesEffectId)
             {
                 yield return new WaitForSecondsRealtime(valuePopupCascadeDuration);
+                if (presentationGeneration != _combatPresentationGeneration) yield break;
             }
 
             var reactionDuration = 0f;
@@ -4577,6 +6071,7 @@ namespace Project333.Runtime.Presentation.Battle
                 }
 
                 var impactView = FindTileTextView(impact.OwnerId, impact.Coord);
+                if (!MatchesAreaImpactIdentity(request, impact, impactView)) continue;
                 impactView?.PlayBeAttackedAnimation();
                 if (impactView != null)
                 {
@@ -4590,20 +6085,26 @@ namespace Project333.Runtime.Presentation.Battle
             if (reactionWaitDuration > 0f)
             {
                 yield return new WaitForSecondsRealtime(reactionWaitDuration);
+                if (presentationGeneration != _combatPresentationGeneration) yield break;
             }
 
-            var hasAnyDeath = false;
-            var deathDuration = 0f;
+            var hasAnyDeath = request.ReactiveArmourCue?.DeathStarted == true || request.IronDomeCue?.DeathStarted == true;
+            var deathDuration = Mathf.Max(
+                request.ReactiveArmourCue?.DeathStarted == true ? Mathf.Max(0f, request.ReactiveArmourCue.DeathEndsAt - Time.unscaledTime) : 0f,
+                request.IronDomeCue?.DeathStarted == true ? Mathf.Max(0f, request.IronDomeCue.DeathEndsAt - Time.unscaledTime) : 0f);
             foreach (var impact in request.Impacts)
             {
                 var impactView = FindTileTextView(impact.OwnerId, impact.Coord);
-                if (impactView == null)
+                if (impactView == null || !MatchesAreaImpactIdentity(request, impact, impactView))
                 {
                     continue;
                 }
 
                 if (impact.Died)
                 {
+                    if ((IsReactiveArmourAttackerDeath(request, impact) && request.ReactiveArmourCue.DeathStarted) ||
+                        IsIronDomeAttackerDeath(request, impact))
+                        continue;
                     impactView.PlayDeathAnimation();
                     hasAnyDeath = true;
                     deathDuration = Mathf.Max(deathDuration, impactView.GetDeathAnimationDurationSeconds());
@@ -4618,12 +6119,107 @@ namespace Project333.Runtime.Presentation.Battle
             if (hasAnyDeath && deathWaitDuration > 0f)
             {
                 yield return new WaitForSecondsRealtime(deathWaitDuration);
+                if (presentationGeneration != _combatPresentationGeneration) yield break;
+            }
+            if (request.IronDomeCue != null && _ironDomeMissileVfx != null)
+            {
+                var remaining = _ironDomeMissileVfx.RemainingDurationSeconds;
+                if (remaining > 0f) yield return new WaitForSecondsRealtime(remaining);
+                if (presentationGeneration != _combatPresentationGeneration) yield break;
+            }
+            if (request.ReactiveArmourCue != null && _reactiveArmourVfx != null)
+            {
+                var remaining = _reactiveArmourVfx.RemainingDurationSeconds;
+                if (remaining > 0f) yield return new WaitForSecondsRealtime(remaining);
+                if (presentationGeneration != _combatPresentationGeneration) yield break;
+            }
+            if (request.SpellEffectId == EndTurnService.RedDragonFlamesEffectId && _redDragonEndTurnFlamesVfx != null)
+            {
+                var remaining = _redDragonEndTurnFlamesVfx.RemainingDurationSeconds;
+                if (remaining > 0f) yield return new WaitForSecondsRealtime(remaining);
+                if (presentationGeneration != _combatPresentationGeneration) yield break;
+            }
+            if ((request.SpellEffectId == MeteorRules.EffectId && _meteorVfx != null) ||
+                (request.SpellEffectId == FireSpearRules.EffectId && _fireSpearVfx != null))
+            {
+                var remaining = request.SpellEffectId == FireSpearRules.EffectId
+                    ? _fireSpearVfx.RemainingDurationSeconds : _meteorVfx.RemainingDurationSeconds;
+                if (remaining > 0f) yield return new WaitForSecondsRealtime(remaining);
+                if (presentationGeneration != _combatPresentationGeneration) yield break;
+            }
+        }
+
+        private static bool IsIronDomeAttackerDeath(ImpactAnimationRequest request, AttackAnimationImpact impact)
+        {
+            var cue = request.IronDomeCue;
+            return cue != null && impact.Died && impact.OwnerId == cue.AttackerOwnerId &&
+                   impact.Coord == cue.AttackerCoord && request.AreaImpactRuntimeIds.TryGetValue(impact, out var runtimeId) &&
+                   runtimeId == cue.AttackerRuntimeId;
+        }
+
+        private void PlayIronDomeAttackerDeath(ImpactAnimationRequest request)
+        {
+            var cue = request.IronDomeCue;
+            var master = FindTileTextView(cue.MasterOwnerId, cue.MasterCoord);
+            if (master == null || !master.isActiveAndEnabled || master.VisualRuntimeId != cue.MasterRuntimeId ||
+                master.GetComponent<TileView>()?.CurrentOccupantRuntimeId != cue.MasterRuntimeId) return;
+            foreach (var impact in request.Impacts)
+            {
+                if (!IsIronDomeAttackerDeath(request, impact)) continue;
+                var view = FindTileTextView(impact.OwnerId, impact.Coord);
+                if (view == null || !MatchesAreaImpactIdentity(request, impact, view) ||
+                    view.GetComponent<TileView>()?.CurrentOccupantRuntimeId != cue.AttackerRuntimeId) return;
+                view.PlayDeathAnimation();
+                request.IronDomeCue.DeathStarted = true;
+                request.IronDomeCue.DeathEndsAt = Time.unscaledTime +
+                    Mathf.Max(_deathHoldDuration, view.GetDeathAnimationDurationSeconds());
+                return;
+            }
+        }
+
+        private static bool IsReactiveArmourAttackerDeath(ImpactAnimationRequest request, AttackAnimationImpact impact)
+        {
+            var cue = request.ReactiveArmourCue;
+            return cue != null && impact.Died && impact.OwnerId == cue.AttackerOwnerId &&
+                   impact.Coord == cue.AttackerCoord && request.AreaImpactRuntimeIds.TryGetValue(impact, out var runtimeId) &&
+                   runtimeId == cue.AttackerRuntimeId;
+        }
+
+        private void PlayReactiveArmourAttackerDeath(ImpactAnimationRequest request)
+        {
+            foreach (var impact in request.Impacts)
+            {
+                if (!IsReactiveArmourAttackerDeath(request, impact)) continue;
+                var view = FindTileTextView(impact.OwnerId, impact.Coord);
+                if (view == null || !MatchesAreaImpactIdentity(request, impact, view)) return;
+                view.PlayDeathAnimation();
+                request.ReactiveArmourCue.DeathStarted = true;
+                request.ReactiveArmourCue.DeathEndsAt = Time.unscaledTime +
+                    Mathf.Max(_deathHoldDuration, view.GetDeathAnimationDurationSeconds());
+                return;
+            }
+        }
+
+        private void ProjectDeferredSpellHp(ImpactAnimationRequest request, bool afterImpact)
+        {
+            if (request.SpellEffectId != MeteorRules.EffectId && request.SpellEffectId != FireSpearRules.EffectId && request.SpellEffectId != EndTurnService.RedDragonFlamesEffectId) return;
+            var values = new Dictionary<string, BattleValuePopupEvent>(StringComparer.Ordinal);
+            foreach (var popup in request.ValuePopupEvents)
+            {
+                if (popup == null || string.IsNullOrWhiteSpace(popup.RuntimeId)) continue;
+                if (afterImpact || !values.ContainsKey(popup.RuntimeId)) values[popup.RuntimeId] = popup;
+            }
+            foreach (var pair in values)
+            {
+                var popup = pair.Value;
+                FindTileTextView(popup.OwnerId, popup.Coord)?.SetPresentedHp(
+                    popup.RuntimeId, afterImpact ? popup.HpAfter : popup.HpBefore);
             }
         }
 
         private IEnumerator AnimateVisualTravel(TileTextView tileTextView, Vector3 fromWorldPosition, Vector3 toWorldPosition, float duration)
         {
-            if (tileTextView == null)
+            if (tileTextView == null || !tileTextView.isActiveAndEnabled)
             {
                 yield break;
             }
@@ -4635,17 +6231,23 @@ namespace Project333.Runtime.Presentation.Battle
                 yield break;
             }
 
-            var elapsed = 0f;
-            while (elapsed < duration)
+            var generation = _combatPresentationGeneration;
+            var runtimeId = tileTextView.VisualRuntimeId;
+            var startedAt = Time.unscaledTime;
+            while (Time.unscaledTime - startedAt < duration)
             {
-                elapsed += Time.unscaledDeltaTime;
-                var progress = Mathf.Clamp01(elapsed / duration);
+                if (generation != _combatPresentationGeneration || tileTextView == null ||
+                    !tileTextView.isActiveAndEnabled || tileTextView.VisualRuntimeId != runtimeId) yield break;
+                // deltaTime also includes work before this travel began in the current frame.
+                var progress = Mathf.Clamp01((Time.unscaledTime - startedAt) / duration);
                 var easedProgress = Mathf.SmoothStep(0f, 1f, progress);
                 tileTextView.SetVisualWorldPosition(Vector3.LerpUnclamped(fromWorldPosition, toWorldPosition, easedProgress));
                 yield return null;
             }
 
-            tileTextView.SetVisualWorldPosition(toWorldPosition);
+            if (generation == _combatPresentationGeneration && tileTextView != null &&
+                tileTextView.isActiveAndEnabled && tileTextView.VisualRuntimeId == runtimeId)
+                tileTextView.SetVisualWorldPosition(toWorldPosition);
         }
 
         private static Vector3 GetRangedAttackNudgeTarget(Vector3 attackerStartPosition, Vector3 attackDestination, float nudgeDistance)
@@ -4725,6 +6327,10 @@ namespace Project333.Runtime.Presentation.Battle
 
             CaptureBoardSnapshots(snapshot, battleState.PlayerBoard);
             CaptureBoardSnapshots(snapshot, battleState.AIBoard);
+            snapshot.Phase = battleState.Phase;
+            snapshot.TimedBombEvents.AddRange(battleState.TimedBombCountdownEvents);
+            snapshot.AreaSpellEvents.AddRange(battleState.AreaSpellEffectEvents);
+            snapshot.RawValuePopupEvents.AddRange(battleState.ValuePopupEvents);
             return snapshot;
         }
 
@@ -4781,7 +6387,7 @@ namespace Project333.Runtime.Presentation.Battle
                     occupant.RuntimeId,
                     occupant.OwnerId,
                     occupant.Position,
-                    occupant.CurrentHp));
+                    occupant.CurrentHp, occupant.CardId, occupant.IsDemonKingRevivalPending, occupant.Kind));
             }
         }
 
@@ -4869,6 +6475,10 @@ namespace Project333.Runtime.Presentation.Battle
                     : declaredTargetCoord,
                 attackerIsRanged)
             {
+                AttackerCardId = attackerBefore.CardId,
+                DefenderCardId = beforeSnapshot.FindByCoord(defenderOwnerId,
+                    shielderInfo.IsProtected && shielderInfo.ShielderCoord.HasValue
+                        ? shielderInfo.ShielderCoord.Value : declaredTargetCoord)?.CardId,
                 DefenderCounterattacked = defenderCounterattacks,
                 AttackerTookDamage = DidLoseHp(attackerBefore, attackerAfter),
                 AttackerDied = DidDie(attackerBefore, attackerAfter),
@@ -4918,7 +6528,8 @@ namespace Project333.Runtime.Presentation.Battle
             BattlePresentationSnapshot beforeSnapshot,
             BattlePresentationSnapshot afterSnapshot,
             IReadOnlyList<BattleValuePopupEvent> valuePopupEvents,
-            string sourceCardId = null)
+            string sourceCardId = null,
+            PlayerId? spellCasterOwnerId = null)
         {
             if (beforeSnapshot == null)
             {
@@ -4928,6 +6539,8 @@ namespace Project333.Runtime.Presentation.Battle
             var request = new ImpactAnimationRequest
             {
                 SpellEffectId = ResolveDamageSpellEffectId(sourceCardId),
+                SpellCasterOwnerId = spellCasterOwnerId,
+                GuardAreaRuntimeIds = sourceCardId == EarthquakeRules.CardId || sourceCardId == MeteorRules.CardId || sourceCardId == FireSpearRules.CardId || sourceCardId == TrapMirrorFieldCardRules.CardId || sourceCardId == SummonTrapCardRules.CardId || IsDirectDestructionTrapCard(sourceCardId),
             };
             request.ValuePopupEvents.AddRange(valuePopupEvents ?? Array.Empty<BattleValuePopupEvent>());
             foreach (var before in beforeSnapshot.Occupants)
@@ -4938,17 +6551,210 @@ namespace Project333.Runtime.Presentation.Battle
                 }
 
                 var after = afterSnapshot == null ? null : afterSnapshot.FindByRuntimeId(before.RuntimeId);
-                var tookDamage = DidLoseHp(before, after);
+                // A directly destroyed occupant can disappear with positive HP. Only real
+                // damage packets should produce Hurt/UnitHit during this trap's resolution.
+                var tookDamage = IsDirectDestructionTrapCard(sourceCardId)
+                    ? HasRecordedDamage(valuePopupEvents, before.RuntimeId)
+                    : DidLoseHp(before, after);
                 var died = DidDie(before, after);
+                if ((sourceCardId == EarthquakeRules.CardId || sourceCardId == MeteorRules.CardId || sourceCardId == FireSpearRules.CardId || sourceCardId == TrapMirrorFieldCardRules.CardId || sourceCardId == SummonTrapCardRules.CardId || IsDirectDestructionTrapCard(sourceCardId)) &&
+                    after != null && after.IsRevivalPending) died = false;
                 if (!tookDamage && !died)
                 {
                     continue;
                 }
 
-                request.Impacts.Add(new AttackAnimationImpact(before.OwnerId, before.Coord, tookDamage, died));
+                var impact = new AttackAnimationImpact(before.OwnerId, before.Coord, tookDamage, died);
+                request.Impacts.Add(impact);
+                if (request.GuardAreaRuntimeIds) request.AreaImpactRuntimeIds[impact] = before.RuntimeId;
             }
 
+            if (beforeSnapshot.Phase == PhaseType.TurnStart && afterSnapshot != null && afterSnapshot.TimedBombEvents.Count > 0)
+                BuildTimedBombSteps(request, beforeSnapshot, afterSnapshot);
+            if (afterSnapshot != null && afterSnapshot.AreaSpellEvents.Exists(e =>
+                !beforeSnapshot.AreaSpellEvents.Contains(e) &&
+                (e.EffectId == EndTurnService.RedDragonFlamesEffectId ||
+                    (beforeSnapshot.Phase == PhaseType.TurnStart && e.EffectId == FirewallSpellEffectId))))
+                BuildAreaSpellSteps(request, beforeSnapshot, afterSnapshot);
+            else if (beforeSnapshot.Phase == PhaseType.TurnStart && afterSnapshot != null && request.TimedBombSteps.Count == 0 &&
+                (beforeSnapshot.AreaSpellEvents.Exists(e => e.EffectId == FirewallSpellEffectId || e.EffectId == EndTurnService.RedDragonFlamesEffectId) || afterSnapshot.AreaSpellEvents.Exists(e => e.EffectId == FirewallSpellEffectId || e.EffectId == EndTurnService.RedDragonFlamesEffectId)))
+            {
+                request.ValuePopupEvents.Clear();
+                for (var index = Math.Min(beforeSnapshot.RawValuePopupEvents.Count, afterSnapshot.RawValuePopupEvents.Count); index < afterSnapshot.RawValuePopupEvents.Count; index++)
+                {
+                    var popup = afterSnapshot.RawValuePopupEvents[index];
+                    if (popup != null && (popup.Amount > 0 || popup.IsInvinciblePrevented)) request.ValuePopupEvents.Add(popup);
+                }
+            }
             return request;
+        }
+
+        private static void ConfigureDestructionTrapCue(ImpactAnimationRequest request,
+            BattlePresentationSnapshot beforeSnapshot, string cardId, PlayerId masterOwnerId,
+            PlayerId attackerOwnerId, TileCoord attackerCoord, string attackerRuntimeId)
+        {
+            if (request == null || beforeSnapshot == null || masterOwnerId == attackerOwnerId ||
+                string.IsNullOrWhiteSpace(attackerRuntimeId)) return;
+            var attacker = beforeSnapshot.FindByRuntimeId(attackerRuntimeId);
+            if (attacker == null || attacker.OwnerId != attackerOwnerId || attacker.Coord != attackerCoord ||
+                attacker.Kind != OccupantKind.Unit) return;
+            foreach (var master in beforeSnapshot.Occupants)
+                if (master.OwnerId == masterOwnerId && master.Kind == OccupantKind.Master)
+                {
+                    var cue = new DestructionTrapActivationCue(masterOwnerId, master.Coord,
+                        master.RuntimeId, attackerOwnerId, attackerCoord, attackerRuntimeId);
+                    if (cardId == ExplosiveReactiveArmourCardRules.CardId) request.ReactiveArmourCue = cue;
+                    else if (cardId == IronDomeCardRules.CardId) request.IronDomeCue = cue;
+                    return;
+                }
+        }
+
+        private static bool IsDirectDestructionTrapCard(string cardId) =>
+            cardId == ExplosiveReactiveArmourCardRules.CardId || cardId == IronDomeCardRules.CardId;
+
+        private static bool HasRecordedDamage(IReadOnlyList<BattleValuePopupEvent> popups, string runtimeId)
+        {
+            if (popups == null || string.IsNullOrEmpty(runtimeId)) return false;
+            foreach (var popup in popups)
+                if (popup != null && popup.RuntimeId == runtimeId && !popup.IsHealing &&
+                    !popup.IsInvinciblePrevented && popup.Amount > 0) return true;
+            return false;
+        }
+
+        private static void BuildTimedBombSteps(ImpactAnimationRequest request, BattlePresentationSnapshot before, BattlePresentationSnapshot after)
+        {
+            var bombPopupIndices = new bool[after.RawValuePopupEvents.Count];
+            request.ValuePopupEvents.Clear();
+            var freshStart = Math.Min(before.RawValuePopupEvents.Count, after.RawValuePopupEvents.Count);
+            var prefixEnd = Math.Min(after.TimedBombEvents[0].ValuePopupEventIndex, after.RawValuePopupEvents.Count);
+            var prefix = new ImpactAnimationRequest();
+            for (var index = freshStart; index < prefixEnd; index++)
+            {
+                bombPopupIndices[index] = true;
+                var popup = after.RawValuePopupEvents[index];
+                if (popup == null || (popup.Amount <= 0 && !popup.IsInvinciblePrevented)) continue;
+                prefix.ValuePopupEvents.Add(popup);
+                if (popup.IsHealing || popup.IsInvinciblePrevented) continue;
+                AddOrMergeImpact(prefix.Impacts, popup.OwnerId, popup.Coord, tookDamage: true,
+                    died: popup.HpAfter <= 0 && DidDie(before.FindByRuntimeId(popup.RuntimeId), after.FindByRuntimeId(popup.RuntimeId)));
+                request.Impacts.RemoveAll(impact => impact.OwnerId == popup.OwnerId && impact.Coord == popup.Coord);
+                var source = before.FindByRuntimeId(popup.SourceRuntimeId);
+                if (popup.Cause == BattleValueChangeCause.NuclearPowerPlant && source != null &&
+                    DidDie(source, after.FindByRuntimeId(popup.SourceRuntimeId)))
+                {
+                    AddOrMergeImpact(prefix.Impacts, source.OwnerId, source.Coord, tookDamage: false, died: true);
+                    request.Impacts.RemoveAll(impact => impact.OwnerId == source.OwnerId && impact.Coord == source.Coord);
+                }
+            }
+            if (HasPresentationImpact(prefix)) request.TimedBombSteps.Add(prefix);
+            for (var i = 0; i < after.TimedBombEvents.Count; i++)
+            {
+                var cue = after.TimedBombEvents[i];
+                var step = new ImpactAnimationRequest
+                {
+                    TimedBombCountdown = new TimedBombCountdownCue(cue.SourceOwnerId, cue.EffectIndex,
+                        cue.RemainingTriggersBefore, cue.RemainingTriggersAfter)
+                };
+                var end = cue.ValuePopupEventEndIndex;
+                for (var index = Math.Max(0, cue.ValuePopupEventIndex); index < end && index < after.RawValuePopupEvents.Count; index++)
+                {
+                    bombPopupIndices[index] = true;
+                    var popup = after.RawValuePopupEvents[index];
+                    if (popup == null || (popup.Amount <= 0 && !popup.IsInvinciblePrevented)) continue;
+                    step.ValuePopupEvents.Add(popup);
+                    if (popup.IsHealing || popup.IsInvinciblePrevented) continue;
+                    var previous = before.FindByRuntimeId(popup.RuntimeId);
+                    var current = after.FindByRuntimeId(popup.RuntimeId);
+                    AddOrMergeImpact(step.Impacts, popup.OwnerId, popup.Coord, tookDamage: true,
+                        died: popup.HpAfter <= 0 && DidDie(previous, current));
+                    request.Impacts.RemoveAll(impact => impact.OwnerId == popup.OwnerId && impact.Coord == popup.Coord);
+                }
+                request.TimedBombSteps.Add(step);
+            }
+            // Callers pass clones. Raw boundaries preserve fresh effects before a bomb,
+            // exclude old cached popups, and keep subsequent effects out of its reaction.
+            for (var index = freshStart; index < after.RawValuePopupEvents.Count; index++)
+            {
+                var popup = after.RawValuePopupEvents[index];
+                if (!bombPopupIndices[index] && popup != null && (popup.Amount > 0 || popup.IsInvinciblePrevented))
+                    request.ValuePopupEvents.Add(popup);
+            }
+            foreach (var popup in request.ValuePopupEvents)
+            {
+                if (popup == null || popup.Amount <= 0 || popup.IsHealing || popup.IsInvinciblePrevented) continue;
+                AddOrMergeImpact(request.Impacts, popup.OwnerId, popup.Coord, tookDamage: true,
+                    died: popup.HpAfter <= 0 && DidDie(before.FindByRuntimeId(popup.RuntimeId), after.FindByRuntimeId(popup.RuntimeId)));
+            }
+        }
+
+        private static void BuildAreaSpellSteps(ImpactAnimationRequest request, BattlePresentationSnapshot before, BattlePresentationSnapshot after)
+        {
+            var cues = after.AreaSpellEvents.FindAll(e => !before.AreaSpellEvents.Contains(e));
+            if (cues.Count == 0) return;
+            var consumed = new bool[after.RawValuePopupEvents.Count];
+            // Main-phase commands reset their raw popup list; TurnStart appends to it.
+            var freshStart = before.Phase == PhaseType.Main ? 0 : Math.Min(before.RawValuePopupEvents.Count, consumed.Length);
+            if (request.TimedBombSteps.Count > 0)
+            {
+                var firstBomb = Math.Min(after.TimedBombEvents[0].ValuePopupEventIndex, consumed.Length);
+                for (var index = freshStart; index < firstBomb; index++) consumed[index] = true;
+                foreach (var bomb in after.TimedBombEvents)
+                    for (var index = Math.Max(0, bomb.ValuePopupEventIndex); index < bomb.ValuePopupEventEndIndex && index < consumed.Length; index++)
+                        consumed[index] = true;
+            }
+            var prefix = new ImpactAnimationRequest { GuardAreaRuntimeIds = true };
+            AppendAreaPopupRange(prefix, request, before, after, consumed, freshStart, cues[0].ValuePopupEventIndex);
+            if (HasPresentationImpact(prefix)) request.AreaSpellSteps.Add(prefix);
+            for (var cueIndex = 0; cueIndex < cues.Count; cueIndex++)
+            {
+                var cue = cues[cueIndex];
+                var step = new ImpactAnimationRequest { SpellEffectId = ResolveAreaSpellEffectId(cue.EffectId), GuardAreaRuntimeIds = true };
+                foreach (var coord in cue.TargetCoords) step.SpellEffectTargets.Add(new SpellEffectTarget(cue.TargetOwnerId, coord));
+                var end = cueIndex + 1 < cues.Count ? cues[cueIndex + 1].ValuePopupEventIndex : consumed.Length;
+                AppendAreaPopupRange(step, request, before, after, consumed, Math.Max(freshStart, cue.ValuePopupEventIndex), end);
+                request.AreaSpellSteps.Add(step);
+            }
+            // These are raw offsets, not clone identities. Old cached packets and packets
+            // already owned by a bomb or an area cue never reach the parent's reaction.
+            request.ValuePopupEvents.Clear();
+            for (var index = freshStart; index < consumed.Length; index++)
+            {
+                var popup = after.RawValuePopupEvents[index];
+                if (!consumed[index] && popup != null && (popup.Amount > 0 || popup.IsInvinciblePrevented)) request.ValuePopupEvents.Add(popup);
+            }
+        }
+        private static void AppendAreaPopupRange(ImpactAnimationRequest step, ImpactAnimationRequest parent,
+            BattlePresentationSnapshot before, BattlePresentationSnapshot after, bool[] consumed, int start, int end)
+        {
+            for (var index = Math.Max(0, start); index < Math.Min(end, consumed.Length); index++)
+            {
+                if (consumed[index]) continue;
+                consumed[index] = true;
+                var popup = after.RawValuePopupEvents[index];
+                if (popup == null || (popup.Amount <= 0 && !popup.IsInvinciblePrevented)) continue;
+                step.ValuePopupEvents.Add(popup);
+                if (popup.IsHealing || popup.IsInvinciblePrevented) continue;
+                var current = after.FindByRuntimeId(popup.RuntimeId);
+                var died = popup.HpBefore > 0 && popup.HpAfter <= 0 &&
+                    (current == null || (current.CurrentHp <= 0 && !current.IsRevivalPending));
+                AddOrMergeImpact(step.Impacts, popup.OwnerId, popup.Coord, tookDamage: true, died: died);
+                foreach (var impact in step.Impacts)
+                    if (impact.OwnerId == popup.OwnerId && impact.Coord == popup.Coord) step.AreaImpactRuntimeIds[impact] = popup.RuntimeId;
+                parent.Impacts.RemoveAll(impact => impact.OwnerId == popup.OwnerId && impact.Coord == popup.Coord);
+                var source = before.FindByRuntimeId(popup.SourceRuntimeId);
+                if (popup.Cause == BattleValueChangeCause.NuclearPowerPlant && source != null && DidDie(source, after.FindByRuntimeId(source.RuntimeId)))
+                {
+                    AddOrMergeImpact(step.Impacts, source.OwnerId, source.Coord, tookDamage: false, died: true);
+                    foreach (var impact in step.Impacts)
+                        if (impact.OwnerId == source.OwnerId && impact.Coord == source.Coord) step.AreaImpactRuntimeIds[impact] = source.RuntimeId;
+                    parent.Impacts.RemoveAll(impact => impact.OwnerId == source.OwnerId && impact.Coord == source.Coord);
+                }
+            }
+        }
+        private static bool MatchesAreaImpactIdentity(ImpactAnimationRequest request, AttackAnimationImpact impact, TileTextView view)
+        {
+            return !request.AreaImpactRuntimeIds.TryGetValue(impact, out var runtimeId) ||
+                (view != null && view.isActiveAndEnabled && view.VisualRuntimeId == runtimeId);
         }
 
         private static bool HasPresentationImpact(ImpactAnimationRequest request)
@@ -4960,6 +6766,7 @@ namespace Project333.Runtime.Presentation.Battle
 
             return request.Impacts.Count > 0 ||
                    request.ValuePopupEvents.Count > 0 ||
+                   request.ReactiveArmourCue != null || request.IronDomeCue != null || request.TimedBombCountdown != null || request.TimedBombSteps.Count > 0 || request.AreaSpellSteps.Count > 0 ||
                    !string.IsNullOrWhiteSpace(request.SpellEffectId);
         }
 
@@ -4967,6 +6774,76 @@ namespace Project333.Runtime.Presentation.Battle
         {
             if (request == null || string.IsNullOrWhiteSpace(request.SpellEffectId))
             {
+                yield break;
+            }
+
+            if (request.SpellEffectId == EndTurnService.RedDragonFlamesEffectId)
+            {
+                var duration = PlayRedDragonEndTurnFlames(request);
+                if (duration > 0f) yield return new WaitForSecondsRealtime(RedDragonEndTurnFlamesVfx.ImpactDelaySeconds);
+                yield break;
+            }
+            if (request.SpellEffectId == MeteorRules.EffectId)
+            {
+                if (!request.SpellCasterOwnerId.HasValue) yield break;
+                var generation = _combatPresentationGeneration;
+                var duration = PlayMeteor(request.SpellCasterOwnerId.Value);
+                if (duration > 0f)
+                {
+                    yield return new WaitForSecondsRealtime(MeteorVfx.ImpactDelaySeconds);
+                    if (generation != _combatPresentationGeneration) yield break;
+                    _meteorVfx?.TryBeginImpact();
+                }
+                yield break;
+            }
+            if (request.SpellEffectId == FireSpearRules.EffectId)
+            {
+                var generation = _combatPresentationGeneration;
+                var duration = PlayFireSpear(request);
+                if (duration > 0f)
+                {
+                    yield return new WaitForSecondsRealtime(FireSpearVfx.ImpactDelaySeconds);
+                    if (generation != _combatPresentationGeneration) yield break;
+                    _fireSpearVfx?.TryBeginImpact();
+                }
+                yield break;
+            }
+            if (request.SpellEffectId == PlasmaShieldRules.EffectId)
+            {
+                var generation = _combatPresentationGeneration;
+                var duration = PlayPlasmaShield(request);
+                if (duration > 0f)
+                    while (generation == _combatPresentationGeneration && _plasmaShieldVfx != null && _plasmaShieldVfx.IsPlaying)
+                        yield return null;
+                yield break;
+            }
+            if (request.SpellEffectId == ManaShieldRules.EffectId)
+            {
+                var generation = _combatPresentationGeneration;
+                var duration = PlayManaShield(request);
+                if (duration > 0f)
+                    while (generation == _combatPresentationGeneration && _manaShieldVfx != null && _manaShieldVfx.IsPlaying)
+                        yield return null;
+                yield break;
+            }
+            if (request.SpellEffectId == EarthquakeRules.EffectId)
+            {
+                if (!request.SpellCasterOwnerId.HasValue) yield break;
+                var duration = PlayEarthquake(request.SpellCasterOwnerId.Value);
+                if (duration > 0f) yield return new WaitForSecondsRealtime(duration);
+                yield break;
+            }
+            if (request.SpellEffectId == NuclearRules.EffectId)
+            {
+                if (!request.SpellCasterOwnerId.HasValue) yield break;
+                var duration = PlayNuclearExplosion(request.SpellCasterOwnerId.Value);
+                if (duration > 0f) yield return new WaitForSecondsRealtime(duration);
+                yield break;
+            }
+            if (request.SpellEffectId == FirewallSpellEffectId)
+            {
+                var duration = PlayFirewall(request);
+                if (duration > 0f) yield return new WaitForSecondsRealtime(duration);
                 yield break;
             }
 
@@ -5029,6 +6906,13 @@ namespace Project333.Runtime.Presentation.Battle
                 return null;
             }
 
+            if (sourceCardId == NuclearRules.CardId) return NuclearRules.EffectId;
+            if (sourceCardId == EarthquakeRules.CardId) return EarthquakeRules.EffectId;
+            if (sourceCardId == MeteorRules.CardId) return MeteorRules.EffectId;
+            if (sourceCardId == FireSpearRules.CardId) return FireSpearRules.EffectId;
+            if (sourceCardId == PlasmaShieldRules.CardId) return PlasmaShieldRules.EffectId;
+            if (sourceCardId == ManaShieldRules.CardId) return ManaShieldRules.EffectId;
+
             return sourceCardId.IndexOf("firebolt", StringComparison.OrdinalIgnoreCase) >= 0
                 ? FireboltSpellEffectId
                 : null;
@@ -5036,6 +6920,8 @@ namespace Project333.Runtime.Presentation.Battle
 
         private static string ResolveAreaSpellEffectId(string effectId)
         {
+            if (string.Equals(effectId, EndTurnService.RedDragonFlamesEffectId, StringComparison.OrdinalIgnoreCase))
+                return EndTurnService.RedDragonFlamesEffectId;
             if (string.Equals(effectId, FirewallSpellEffectId, StringComparison.OrdinalIgnoreCase))
             {
                 return FirewallSpellEffectId;
@@ -5110,6 +6996,14 @@ namespace Project333.Runtime.Presentation.Battle
 
         private float GetSpellEffectDuration(string spellEffectId)
         {
+            if (spellEffectId == EndTurnService.RedDragonFlamesEffectId) return RedDragonEndTurnFlamesVfx.DurationSeconds;
+            if (spellEffectId == NuclearRules.EffectId) return NuclearExplosionVfx.DurationSeconds;
+            if (spellEffectId == EarthquakeRules.EffectId) return EarthquakeVfx.DurationSeconds;
+            if (spellEffectId == MeteorRules.EffectId) return MeteorVfx.DurationSeconds;
+            if (spellEffectId == FireSpearRules.EffectId) return FireSpearVfx.DurationSeconds;
+            if (spellEffectId == PlasmaShieldRules.EffectId) return PlasmaShieldVfx.DurationSeconds;
+            if (spellEffectId == ManaShieldRules.EffectId) return ManaShieldVfx.DurationSeconds;
+            if (spellEffectId == FirewallSpellEffectId) return FirewallVfx.DurationSeconds;
             if (string.IsNullOrWhiteSpace(spellEffectId))
             {
                 return 0f;
@@ -5267,6 +7161,10 @@ namespace Project333.Runtime.Presentation.Battle
 
         private sealed class BattlePresentationSnapshot
         {
+            public PhaseType Phase { get; set; }
+            public List<BattleTimedBombCountdownEvent> TimedBombEvents { get; } = new List<BattleTimedBombCountdownEvent>();
+            public List<BattleAreaSpellEffectEvent> AreaSpellEvents { get; } = new List<BattleAreaSpellEffectEvent>();
+            public List<BattleValuePopupEvent> RawValuePopupEvents { get; } = new List<BattleValuePopupEvent>();
             public List<OccupantPresentationSnapshot> Occupants { get; } = new List<OccupantPresentationSnapshot>();
 
             public OccupantPresentationSnapshot FindByRuntimeId(string runtimeId)
@@ -5303,18 +7201,24 @@ namespace Project333.Runtime.Presentation.Battle
 
         private sealed class OccupantPresentationSnapshot
         {
-            public OccupantPresentationSnapshot(string runtimeId, PlayerId ownerId, TileCoord coord, int currentHp)
+            public OccupantPresentationSnapshot(string runtimeId, PlayerId ownerId, TileCoord coord, int currentHp, string cardId = null, bool isRevivalPending = false, OccupantKind kind = OccupantKind.Unit)
             {
                 RuntimeId = runtimeId;
                 OwnerId = ownerId;
                 Coord = coord;
                 CurrentHp = currentHp;
+                CardId = cardId;
+                IsRevivalPending = isRevivalPending;
+                Kind = kind;
             }
 
+            public OccupantKind Kind { get; }
+            public string CardId { get; }
             public string RuntimeId { get; }
             public PlayerId OwnerId { get; }
             public TileCoord Coord { get; }
             public int CurrentHp { get; }
+            public bool IsRevivalPending { get; }
         }
 
         private sealed class AttackAnimationRequest
@@ -5342,6 +7246,8 @@ namespace Project333.Runtime.Presentation.Battle
             public PlayerId DefenderOwnerId { get; }
             public TileCoord DeclaredTargetCoord { get; }
             public TileCoord TravelTargetCoord { get; }
+            public string AttackerCardId { get; set; }
+            public string DefenderCardId { get; set; }
             public bool IsRangedAttacker { get; }
             public bool DefenderCounterattacked { get; set; }
             public bool AttackerTookDamage { get; set; }
@@ -5350,13 +7256,51 @@ namespace Project333.Runtime.Presentation.Battle
             public List<BattleValuePopupEvent> ValuePopupEvents { get; }
         }
 
+        private sealed class DestructionTrapActivationCue
+        {
+            public DestructionTrapActivationCue(PlayerId masterOwnerId, TileCoord masterCoord, string masterRuntimeId,
+                PlayerId attackerOwnerId, TileCoord attackerCoord, string attackerRuntimeId)
+            {
+                MasterOwnerId = masterOwnerId; MasterCoord = masterCoord; MasterRuntimeId = masterRuntimeId;
+                AttackerOwnerId = attackerOwnerId; AttackerCoord = attackerCoord; AttackerRuntimeId = attackerRuntimeId;
+            }
+            public PlayerId MasterOwnerId { get; }
+            public TileCoord MasterCoord { get; }
+            public string MasterRuntimeId { get; }
+            public PlayerId AttackerOwnerId { get; }
+            public TileCoord AttackerCoord { get; }
+            public string AttackerRuntimeId { get; }
+            public bool DeathStarted { get; set; }
+            public float DeathEndsAt { get; set; }
+        }
+
         private sealed class ImpactAnimationRequest
         {
+            public OccupantState SummonedVisual { get; set; }
+            public DestructionTrapActivationCue ReactiveArmourCue { get; set; }
+            public DestructionTrapActivationCue IronDomeCue { get; set; }
+            public TimedBombCountdownCue TimedBombCountdown { get; set; }
+            public List<ImpactAnimationRequest> TimedBombSteps { get; } = new List<ImpactAnimationRequest>();
+            public List<ImpactAnimationRequest> AreaSpellSteps { get; } = new List<ImpactAnimationRequest>();
+            public Dictionary<AttackAnimationImpact, string> AreaImpactRuntimeIds { get; } = new Dictionary<AttackAnimationImpact, string>();
+            public bool GuardAreaRuntimeIds { get; set; }
             public List<AttackAnimationImpact> Impacts { get; } = new List<AttackAnimationImpact>();
             public List<BattleValuePopupEvent> ValuePopupEvents { get; } = new List<BattleValuePopupEvent>();
             public List<SpellEffectTarget> SpellEffectTargets { get; } = new List<SpellEffectTarget>();
 
+            public string SpellTargetRuntimeId { get; set; }
             public string SpellEffectId { get; set; }
+            public PlayerId? SpellCasterOwnerId { get; set; }
+        }
+
+        private sealed class TimedBombCountdownCue
+        {
+            public TimedBombCountdownCue(PlayerId caster, int effectIndex, int before, int after)
+            { Caster = caster; EffectIndex = effectIndex; Before = before; After = after; }
+            public PlayerId Caster { get; }
+            public int EffectIndex { get; }
+            public int Before { get; }
+            public int After { get; }
         }
 
         private sealed class SpellEffectTarget
@@ -5390,9 +7334,10 @@ namespace Project333.Runtime.Presentation.Battle
 
         private sealed class OpponentPlayedCardRevealRequest
         {
-            public OpponentPlayedCardRevealRequest(string cardId, int cardAttack, int cardMaxHp, int? cardSpellDamage)
+            public OpponentPlayedCardRevealRequest(string cardId, int cardAttack, int cardMaxHp, int? cardSpellDamage, bool isHiddenTrap = false)
             {
-                CardId = cardId ?? string.Empty;
+                IsHiddenTrap = isHiddenTrap;
+                CardId = isHiddenTrap ? string.Empty : cardId ?? string.Empty;
                 CardAttack = Mathf.Max(0, cardAttack);
                 CardMaxHp = Mathf.Max(0, cardMaxHp);
                 CardSpellDamage = cardSpellDamage;
@@ -5402,6 +7347,7 @@ namespace Project333.Runtime.Presentation.Battle
             public int CardAttack { get; }
             public int CardMaxHp { get; }
             public int? CardSpellDamage { get; }
+            public bool IsHiddenTrap { get; }
         }
     }
 }

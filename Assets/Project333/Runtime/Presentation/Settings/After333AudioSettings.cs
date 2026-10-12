@@ -60,6 +60,7 @@ namespace Project333.Runtime.Presentation.Settings
     {
         [SerializeField] private AudioSource _audioSource;
         [SerializeField, Range(0f, 1f)] private float _volumeAtFullMusicSetting = 1f;
+        private float _fadeGain = 1f;
 
         private void Awake()
         {
@@ -85,6 +86,19 @@ namespace Project333.Runtime.Presentation.Settings
             ApplyMusicVolume(After333AudioSettings.MusicVolume);
         }
 
+        public void SetVolumeAtFullMusicSetting(float volume)
+        {
+            _volumeAtFullMusicSetting = Mathf.Clamp01(volume);
+            ResolveAudioSource();
+            ApplyMusicVolume(After333AudioSettings.MusicVolume);
+        }
+
+        public void SetFadeGain(float gain)
+        {
+            _fadeGain = Mathf.Clamp01(gain);
+            ApplyMusicVolume(After333AudioSettings.MusicVolume);
+        }
+
         private void ResolveAudioSource()
         {
             if (_audioSource == null)
@@ -97,7 +111,7 @@ namespace Project333.Runtime.Presentation.Settings
         {
             if (_audioSource != null)
             {
-                _audioSource.volume = _volumeAtFullMusicSetting * Mathf.Clamp01(musicVolume);
+                _audioSource.volume = _volumeAtFullMusicSetting * Mathf.Clamp01(musicVolume) * _fadeGain;
             }
         }
     }

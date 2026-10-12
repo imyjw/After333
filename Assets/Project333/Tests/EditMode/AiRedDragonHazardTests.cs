@@ -19,8 +19,9 @@ namespace Project333.Tests.EditMode
         private static readonly TileCoord SummonTile = new TileCoord(0, 1);
         private static readonly TileCoord DragonTile = new TileCoord(4, 0);
 
-        [TestCase(33, false)]
-        [TestCase(34, true)]
+        [TestCase(20, false)]
+        [TestCase(21, true)]
+        [TestCase(33, true)]
         public void EnemyRedDragon_SummonMustSurviveEnemyTurnEndBeforeItsFirstOrdinaryAttack(int hp, bool shouldSummon)
         {
             var state = State();
@@ -33,7 +34,7 @@ namespace Project333.Tests.EditMode
             AssertSummonDecisionAndResolve(state, provider, card, command, shouldSummon);
             if (shouldSummon)
             {
-                Assert.That(state.AIBoard.GetOccupant(SummonTile).CurrentHp, Is.EqualTo(1));
+                Assert.That(state.AIBoard.GetOccupant(SummonTile).CurrentHp, Is.EqualTo(hp - 20));
                 Assert.That(state.AIBoard.GetOccupant(SummonTile).HasSummoningSickness, Is.False);
             }
             else
@@ -67,7 +68,7 @@ namespace Project333.Tests.EditMode
         {
             var state = State();
             AddDragon(state, spellPower: 10);
-            var card = Card("armored-attacker", 33, physicalDefense: physicalDefense, magicDefense: magicDefense);
+            var card = Card("armored-attacker", 20, physicalDefense: physicalDefense, magicDefense: magicDefense);
             var provider = GiveCard(state, card);
 
             var command = Planner(provider).GetNextCommand(state);
@@ -85,14 +86,14 @@ namespace Project333.Tests.EditMode
             var state = State();
             AddDragon(state);
             AddDragon(state, coord: new TileCoord(0, 0));
-            var card = Card("two-dragon-target", 50);
+            var card = Card("two-dragon-target", 30);
             var provider = GiveCard(state, card);
 
             var command = Planner(provider).GetNextCommand(state);
 
             AssertSummonDecisionAndResolve(state, provider, card, command, shouldSummon: false);
             Assert.That(state.AIBoard.GetOccupant(SummonTile), Is.Null);
-            Assert.That(state.AI.Master.CurrentHp, Is.EqualTo(333 - 66));
+            Assert.That(state.AI.Master.CurrentHp, Is.EqualTo(333 - 40));
         }
 
         [Test]
@@ -117,7 +118,7 @@ namespace Project333.Tests.EditMode
             var dragon = AddDragon(state, sciencePowerUpkeep: 1);
             dragon.IsDrained = true;
             state.Player.Resources.Add(new ResourceSet(0, 0, 1, 0));
-            var card = Card("reactivated-source", 33);
+            var card = Card("reactivated-source", 20);
             var provider = GiveCard(state, card);
 
             var command = Planner(provider).GetNextCommand(state);
@@ -240,7 +241,7 @@ namespace Project333.Tests.EditMode
             Execute(state, provider, command);
             ResolveUntilNextAiMain(state);
             Assert.That(state.AIBoard.GetOccupant(SummonTile), Is.Null);
-            Assert.That(army.Select(unit => unit.CurrentHp), Is.All.EqualTo(100));
+            Assert.That(army.Select(unit => unit.CurrentHp), Is.All.EqualTo(113));
         }
 
         [Test]

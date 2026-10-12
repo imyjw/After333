@@ -14,6 +14,39 @@ namespace Project333.Tests.EditMode
 {
     public sealed class BattleModeClientTests
     {
+#if UNITY_EDITOR
+        [TestCase("StartBattleFromUi")]
+        [TestCase("StartPveBattleFromUi")]
+        [TestCase("StartPvpBattleFromUi")]
+        public void BattleButtonBinding_DisablesSerializedLaunchAndInvokesExactlyOnce(string oldMethod)
+        {
+            var go = new GameObject("ChallengeButtonTest");
+            go.SetActive(false);
+            try
+            {
+                var controller = go.AddComponent<DraftSceneController>();
+                var button = go.AddComponent<UnityEngine.UI.Button>();
+                var oldAction = (UnityEngine.Events.UnityAction)Delegate.CreateDelegate(
+                    typeof(UnityEngine.Events.UnityAction), controller, oldMethod);
+                UnityEditor.Events.UnityEventTools.AddPersistentListener(button.onClick, oldAction);
+                button.onClick.AddListener(oldAction);
+                var calls = 0;
+                var unrelatedCalls = 0;
+                UnityEngine.Events.UnityAction action = () => calls++;
+                button.onClick.AddListener(() => unrelatedCalls++);
+                var bind = typeof(DraftSceneController).GetMethod("BindBattleModeButtonClick", PrivateInstance);
+                bind.Invoke(controller, new object[] { button, action });
+                bind.Invoke(controller, new object[] { button, action });
+                Assert.That(button.onClick.GetPersistentListenerState(0),
+                    Is.EqualTo(UnityEngine.Events.UnityEventCallState.Off));
+                button.onClick.Invoke();
+                Assert.That(calls, Is.EqualTo(1));
+                Assert.That(unrelatedCalls, Is.EqualTo(1));
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+#endif
+
         private const BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
         [SetUp] public void SetUp() => DraftRunSessionState.ResetSessionState();
         [TearDown] public void TearDown() => DraftRunSessionState.ResetSessionState();

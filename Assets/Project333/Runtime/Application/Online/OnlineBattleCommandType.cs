@@ -16,6 +16,7 @@ namespace Project333.Runtime.Application.Online
         Attack = 11,
         EndTurn = 12,
         Surrender = 13,
-        ActivateEffect = 14
+        ActivateEffect = 14,
+        InstallTrap = 15
     }
 }

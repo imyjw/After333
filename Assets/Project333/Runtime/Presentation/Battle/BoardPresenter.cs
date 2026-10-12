@@ -32,6 +32,7 @@ namespace Project333.Runtime.Presentation.Battle
         [Tooltip("All summoned occupant ATK/HP labels use this TMP font. Leave empty to use each tile's existing font.")]
         [SerializeField] private TMP_FontAsset _occupantStatFont;
 
+        private BiochemicalGasVfx _biochemicalGasVfx;
         private int _lastScreenWidth = -1;
         private int _lastScreenHeight = -1;
         private Rect _lastSafeArea;
@@ -95,6 +96,10 @@ namespace Project333.Runtime.Presentation.Battle
             PresentBoard(
                 battleState == null ? null : battleState.AIBoard,
                 _aiTileViews);
+
+            if (_biochemicalGasVfx == null && battleState != null && battleState.PersistentEffects.Count > 0)
+                _biochemicalGasVfx = gameObject.GetComponent<BiochemicalGasVfx>() ?? gameObject.AddComponent<BiochemicalGasVfx>();
+            _biochemicalGasVfx?.Present(battleState, _playerTileViews, _aiTileViews);
         }
 
         private void EnsureTileRegistry()

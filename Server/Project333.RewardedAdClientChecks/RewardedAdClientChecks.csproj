@@ -9,5 +9,7 @@
     <Compile Include="../../Assets/Project333/Runtime/Application/Accounts/RewardedTicketClient.cs" Link="RewardedTicketClient.cs" />
     <Compile Include="../../Assets/Project333/Runtime/Application/Accounts/AccountHttpTransport.cs" Link="AccountHttpTransport.cs" />
     <Compile Include="../../Assets/Project333/Runtime/Application/Ads/IRewardedAdService.cs" Link="IRewardedAdService.cs" />
+    <Compile Include="../../Assets/Project333/Runtime/Presentation/Tutorial/TutorialRuntimeIsolation.cs" Link="TutorialRuntimeIsolation.cs" />
+    <Compile Include="../Project333.AccountOperationClientChecks/TutorialSceneBoundaries.cs" Link="TutorialSceneBoundaries.cs" />
   </ItemGroup>
 </Project>

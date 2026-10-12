@@ -68,6 +68,11 @@ namespace Project333.Runtime.Presentation.Battle
         public string DebugSummary => _debugSummary;
 
         public BoardPresenter BoardPresenter => _boardPresenter;
+        public HandPresenter TutorialHand => _handPresenter;
+        public BattleMulliganOverlayPresenter TutorialMulligan => _mulliganOverlayPresenter;
+        public RectTransform TutorialEndTurnRect => _endTurnButton != null ? _endTurnButton.transform as RectTransform : null;
+        public void ResetTutorialPractice()
+        { _mulliganOverlayPresenter?.ResetTutorialSession(); }
 
         public bool IsMulliganPresentationActive =>
             _mulliganOverlayPresenter != null && _mulliganOverlayPresenter.IsSessionActive;
@@ -100,7 +105,9 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void ApplyEndTurnButtonVisual()
         {
-            if (_endTurnButtonVisualVersion >= 1 || _endTurnButton == null) return;
+            if (_endTurnButton == null) return;
+            PreserveExpandedHand.Attach(_endTurnButton.gameObject);
+            if (_endTurnButtonVisualVersion >= 1) return;
             var sprite = Resources.Load<Sprite>("Project333/UI/PixelEndTurnButtonFinal");
             var image = _endTurnButton.GetComponent<Image>();
             if (sprite == null || image == null) return;
@@ -201,6 +208,7 @@ namespace Project333.Runtime.Presentation.Battle
         {
             _debugSummary = BattleStateSummaryFormatter.Format(battleState);
             _boardPresenter?.Present(battleState);
+            if (_handPresenter != null) _handPresenter.PreviewBattleState = battleState;
             _handPresenter?.Present(battleState?.Player.Hand,
                 battleState == null ? 0 : Project333.Runtime.Application.Services.SpellPowerRules.GetTotal(battleState, PlayerId.Player));
             _opponentHandPresenter?.Present(battleState?.AI.Hand);
@@ -208,6 +216,7 @@ namespace Project333.Runtime.Presentation.Battle
             _playerDeckPresenter?.Present(battleState?.Player.Deck);
             _resourceBarPresenter?.Present(battleState);
             PresentMulliganControls(battleState);
+            _mulliganOverlayPresenter?.ConfigureDrawSource(_playerDeckPresenter?.DrawSourceRect, _playerDeckPresenter?.DrawCardBackSprite);
             _mulliganOverlayPresenter?.Present(battleState);
             _onSummaryChanged.Invoke(_debugSummary);
         }
@@ -314,9 +323,21 @@ namespace Project333.Runtime.Presentation.Battle
             _battleBootstrapper?.ResolveTurnStart();
         }
 
+        private void Update()
+        {
+            RefreshEndTurnInteractable();
+        }
+
+        private void RefreshEndTurnInteractable()
+        {
+            if (_endTurnButton != null)
+                _endTurnButton.interactable = _battleBootstrapper != null && _battleBootstrapper.CanPlayerEndTurn;
+        }
+
         public void EndTurnFromUi()
         {
             _battleBootstrapper?.EndTurn();
+            RefreshEndTurnInteractable();
         }
 
         private void EnsureManagedBattleUiObjects()

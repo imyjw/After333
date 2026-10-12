@@ -298,7 +298,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 32
     m_FontStyle: 0
     m_BestFit: 1
@@ -2773,7 +2773,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 26
     m_FontStyle: 0
     m_BestFit: 0
@@ -3234,6 +3234,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Presentation.SafeAreaFitter
   _fullBleedElements: []
+  _screenCenteredElements: []
 --- !u!21 &659900658
 Material:
   serializedVersion: 8
@@ -4061,6 +4062,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Presentation.SafeAreaFitter
   _fullBleedElements: []
+  _screenCenteredElements: []
 --- !u!21 &854560566
 Material:
   serializedVersion: 8
@@ -4611,7 +4613,6 @@ RectTransform:
   m_Children:
   - {fileID: 1989683826}
   - {fileID: 1579976404}
-  - {fileID: 1385327861}
   - {fileID: 286829827}
   m_Father: {fileID: 1667726319}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -4913,7 +4914,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 20
     m_FontStyle: 0
     m_BestFit: 1
@@ -6356,7 +6357,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 32
     m_FontStyle: 0
     m_BestFit: 1
@@ -6694,85 +6695,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1374575773}
   m_CullTransparentMesh: 1
---- !u!1 &1385327860
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1385327861}
-  - component: {fileID: 1385327863}
-  - component: {fileID: 1385327862}
-  m_Layer: 0
-  m_Name: DraftHeaderCaption
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!224 &1385327861
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1385327860}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 958230149}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.043, y: 0.055}
-  m_AnchorMax: {x: 0.45, y: 0.27}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
-  m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1385327862
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1385327860}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
-  m_Material: {fileID: 0}
-  m_Color: {r: 0.63, g: 0.77, b: 0.76, a: 1}
-  m_RaycastTarget: 0
-  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
-  m_Maskable: 1
-  m_OnCullStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
-    m_FontSize: 16
-    m_FontStyle: 0
-    m_BestFit: 1
-    m_MinSize: 14
-    m_MaxSize: 16
-    m_Alignment: 3
-    m_AlignByGeometry: 0
-    m_RichText: 1
-    m_HorizontalOverflow: 0
-    m_VerticalOverflow: 0
-    m_LineSpacing: 1
-  m_Text: DRAFT / AFTER333
---- !u!222 &1385327863
-CanvasRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1385327860}
-  m_CullTransparentMesh: 1
 --- !u!1 &1387234002
 GameObject:
   m_ObjectHideFlags: 0
@@ -6947,7 +6869,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 25
     m_FontStyle: 0
     m_BestFit: 1
@@ -7273,7 +7195,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 38
     m_FontStyle: 0
     m_BestFit: 1
@@ -8123,7 +8045,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 17
     m_FontStyle: 0
     m_BestFit: 1
@@ -8369,7 +8291,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 23
     m_FontStyle: 0
     m_BestFit: 1
@@ -8691,7 +8613,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 23
     m_FontStyle: 0
     m_BestFit: 1
@@ -9316,10 +9238,6 @@ MonoBehaviour:
   _battleModeButtonFontSize: 24
   _pveBattleButtonColor: {r: 0.26, g: 0.24, b: 0.13, a: 1}
   _pvpBattleButtonColor: {r: 0.1, g: 0.22, b: 0.46, a: 1}
-  _pveBattleButtonReadyLabel: "PVE \uC2DC\uC791"
-  _pvpBattleButtonReadyLabel: "PVP \uB9E4\uCE6D"
-  _pveBattleButtonLockedLabelFormat: "PVE \uC7A0\uAE40 ({0}/33)"
-  _pvpBattleButtonLockedLabelFormat: "PVP \uC7A0\uAE40 ({0}/33)"
   _returnToStartButtonPosition: {x: 0, y: -204}
   _returnToStartButtonSize: {x: 340, y: 72}
   _returnToStartButtonLabelPadding: {x: 12, y: 12}
@@ -9336,7 +9254,6 @@ MonoBehaviour:
   _claimRewardsScreenOffset: {x: 0, y: 0}
   _claimRewardsCanvasSortingOrder: 3350
   _claimRewardsButtonReadyLabel: "\uBCF4\uC0C1 \uBC1B\uAE30"
-  _claimRewardsButtonSyncingLabel: "\uBCF4\uC0C1 \uBC1B\uAE30"
   _claimRewardsButtonClaimingLabel: "\uBCF4\uC0C1 \uBC1B\uAE30"
   _claimRewardsButtonClaimedLabel: "\uC218\uB839 \uC644\uB8CC"
   _rewardClaimToastAnchor: {x: 0.5, y: 0.5}
@@ -9413,6 +9330,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Presentation.SafeAreaFitter
   _fullBleedElements:
   - {fileID: 1052500045}
+  _screenCenteredElements: []
 --- !u!1 &1678162341
 GameObject:
   m_ObjectHideFlags: 0
@@ -9666,7 +9584,7 @@ MonoBehaviour:
           m_FloatArgument: 0
           m_StringArgument: 
           m_BoolArgument: 0
-        m_CallState: 2
+        m_CallState: 0
 --- !u!114 &1693364913
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11040,7 +10958,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 30
     m_FontStyle: 0
     m_BestFit: 1
@@ -11465,7 +11383,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: b9e596cc164a7e74e87dacaeab2abf29, type: 3}
+    m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
     m_FontSize: 42
     m_FontStyle: 0
     m_BestFit: 1

@@ -22,6 +22,7 @@ using Project333.PvpServer.Observability;
 using Project333.PvpServer.Persistence;
 using Project333.PvpServer.Persistence.Db;
 using Project333.PvpServer.Runs;
+using Project333.PvpServer.Shop;
 using Project333.PvpServer.Security;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,7 +30,7 @@ var listenUrl = builder.Configuration["PROJECT333_PVP_SERVER_URL"] ?? "http://12
 var publicServerUrl = ResolvePublicServerUrl(
     builder.Configuration["PROJECT333_PUBLIC_SERVER_URL"],
     listenUrl);
-var disconnectReconnectGracePeriod = TimeSpan.FromSeconds(60);
+var disconnectReconnectGracePeriod = TimeSpan.FromSeconds(70);
 var clientHeartbeatTimeout = TimeSpan.FromSeconds(12);
 var matchmakingAiWait = TimeSpan.FromSeconds(int.TryParse(
     builder.Configuration["PROJECT333_MATCHMAKING_AI_WAIT_SECONDS"], out var configuredAiWait)
@@ -49,6 +50,7 @@ builder.Services.AddSingleton<GuestAuthService>();
 builder.Services.AddSingleton<RewardedAdService>();
 builder.Services.AddSingleton<RunStartService>();
 builder.Services.AddSingleton<CardUpgradeService>();
+builder.Services.AddSingleton<CardPackService>();
 builder.Services.AddSingleton<GiftInboxService>();
 builder.Services.AddSingleton<AiChallengeService>();
 builder.Services.AddSingleton<BattleCardUpgradeLevelService>();
@@ -194,9 +196,9 @@ app.MapGet("/server/status", async (
         BattleModes = new
         {
             MatchmakingAiWaitSeconds = (int)matchmakingAiWait.TotalSeconds,
-            AiChallengeDailyLimit = AiChallengeService.DailyLimit,
+            AiChallengeRunLimit = AiChallengeService.RunLimit,
             AiChallengeWinResourceGold = AiChallengeService.WinResourceGold,
-            AiChallengeResetTimeZone = "KST (UTC+09:00)",
+            AiChallengeAttemptScope = "run",
             AiChallengeRefundOnServerCancellation = true
         },
         ClientCompatibility = new
@@ -822,6 +824,44 @@ app.MapPost("/account/operations/resolve", async (HttpContext context, GuestAuth
     catch (AccountOperationException ex) { return AuthErrorResult(ex.Code, ex.Message, StatusCodes.Status400BadRequest); }
 });
 
+app.MapPost("/shop/purchase-card-pack", async (HttpContext context, GuestAuthService auth, CardPackService packs) =>
+{
+    if (!packs.IsDatabaseConfigured)
+        return AuthErrorResult("db_not_configured", "Account APIs require PostgreSQL.", StatusCodes.Status503ServiceUnavailable);
+    try
+    {
+        var account = await auth.GetCurrentAccountAsync(context.Request.Headers.Authorization.ToString(), context.RequestAborted);
+        var request = await JsonSerializer.DeserializeAsync<PurchaseCardPackRequest>(context.Request.Body, jsonOptions, context.RequestAborted);
+        return Results.Json(await packs.PurchaseAsync(account, request, context.RequestAborted), jsonOptions);
+    }
+    catch (JsonException) { return AuthErrorResult("invalid_json", "Invalid JSON.", StatusCodes.Status400BadRequest); }
+    catch (AuthServiceException ex) { return AuthErrorResult(ex.Code, ex.Message, AuthStatusCode(ex)); }
+    catch (CardPackServiceException ex) { return AuthErrorResult(ex.Code, ex.Message, ex.StatusCode); }
+    catch (AccountOperationException ex)
+    {
+        return AuthErrorResult(ex.Code, ex.Message, ex.Code == "request_id_conflict" ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
+    }
+    catch (Npgsql.NpgsqlException) { return AuthErrorResult("card_pack_service_unavailable", "카드팩을 잠시 구매할 수 없습니다.", StatusCodes.Status503ServiceUnavailable); }
+});
+
+app.MapGet("/shop/card-pack-purchases/{requestId}", async (HttpContext context, string requestId, GuestAuthService auth, CardPackService packs) =>
+{
+    if (!packs.IsDatabaseConfigured)
+        return AuthErrorResult("db_not_configured", "Account APIs require PostgreSQL.", StatusCodes.Status503ServiceUnavailable);
+    try
+    {
+        var account = await auth.GetCurrentAccountAsync(context.Request.Headers.Authorization.ToString(), context.RequestAborted);
+        return Results.Json(await packs.GetPurchaseAsync(account, requestId, context.RequestAborted), jsonOptions);
+    }
+    catch (AuthServiceException ex) { return AuthErrorResult(ex.Code, ex.Message, AuthStatusCode(ex)); }
+    catch (CardPackServiceException ex) { return AuthErrorResult(ex.Code, ex.Message, ex.StatusCode); }
+    catch (AccountOperationException ex)
+    {
+        return AuthErrorResult(ex.Code, ex.Message, ex.Code == "request_id_conflict" ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
+    }
+    catch (Npgsql.NpgsqlException) { return AuthErrorResult("card_pack_service_unavailable", "카드팩 구매 내역을 잠시 확인할 수 없습니다.", StatusCodes.Status503ServiceUnavailable); }
+});
+
 // Only account-owned listing and claiming are public. Dispatch is a local administrator CLI.
 app.MapGet("/gifts", async (HttpContext context, GuestAuthService auth, GiftInboxService gifts, DbConnectionFactory db) =>
 {
@@ -1382,7 +1422,7 @@ app.MapPost("/runs/claim-rewards", async (
     }
     catch (RunServiceException ex)
     {
-        var statusCode = ex.Code == "reward_already_claimed"
+        var statusCode = ex.Code is "reward_already_claimed" or "reward_receipt_unavailable"
             ? StatusCodes.Status409Conflict
             : StatusCodes.Status400BadRequest;
         await auditLogService.LogAsync(
@@ -1679,7 +1719,7 @@ app.Map("/battle", async (
                         envelope.IsReconnectAttempt ? "battle_reconnect_expired" : "ai_challenge_required",
                         envelope.IsReconnectAttempt
                             ? "The previous battle has ended or was canceled. Return to the run screen."
-                            : "Start an AI challenge from the run screen, or join normal matchmaking.",
+                            : "Start a Gold Dungeon from the run screen, or join normal matchmaking.",
                         jsonOptions, connectionLifetime.Token);
                     continue;
                 }
@@ -1699,7 +1739,7 @@ app.Map("/battle", async (
                     if (challengeStatus.PendingAttempt != null)
                     {
                         await SendErrorAsync(connection, "ai_challenge_pending",
-                            "Finish the reserved AI challenge before starting normal matchmaking.",
+                            "Finish the reserved Gold Dungeon before starting normal matchmaking.",
                             jsonOptions, connectionLifetime.Token);
                         continue;
                     }
@@ -2108,7 +2148,7 @@ app.Map("/battle", async (
                     pvpBattlePersistenceService,
                     jsonOptions,
                     connectionLifetime.Token);
-                await SendErrorAsync(connection, "command_rejected", ex.Message, jsonOptions, connectionLifetime.Token);
+                await SendErrorAsync(connection, "command_rejected", ex.Message, jsonOptions, connectionLifetime.Token, command.Sequence);
                 continue;
             }
 
@@ -2647,7 +2687,7 @@ static Task SendErrorAsync(
     string code,
     string message,
     JsonSerializerOptions jsonOptions,
-    CancellationToken cancellationToken)
+    CancellationToken cancellationToken, long? commandSequence = null)
 {
     return SendEnvelopeAsync(connection, new OnlineBattleEnvelope
     {
@@ -2655,6 +2695,7 @@ static Task SendErrorAsync(
         Error = new OnlineBattleErrorDto
         {
             Code = code,
+            CommandSequence = commandSequence,
             Message = message
         }
     }, jsonOptions, cancellationToken);

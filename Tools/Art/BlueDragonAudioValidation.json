@@ -1,0 +1,52 @@
+{
+    "format":  "PCM16 mono",
+    "sampleRate":  44100,
+    "source":  "Original deterministic synthesis; no recordings",
+    "clips":  [
+                  {
+                      "name":  "WaterCannonCharge",
+                      "seconds":  0.380,
+                      "samples":  16758,
+                      "peakDbfs":  -4.01,
+                      "rmsDbfs":  -17.19,
+                      "clippedSamples":  0,
+                      "suggestedOneShotGain":  0.26
+                  },
+                  {
+                      "name":  "WaterCannonLaunch",
+                      "seconds":  0.580,
+                      "samples":  25578,
+                      "peakDbfs":  -2.16,
+                      "rmsDbfs":  -18.37,
+                      "clippedSamples":  0,
+                      "suggestedOneShotGain":  0.55
+                  },
+                  {
+                      "name":  "WaterCannonImpact",
+                      "seconds":  0.820,
+                      "samples":  36162,
+                      "peakDbfs":  -1.72,
+                      "rmsDbfs":  -17.44,
+                      "clippedSamples":  0,
+                      "suggestedOneShotGain":  0.65
+                  },
+                  {
+                      "name":  "DragonHurt",
+                      "seconds":  0.340,
+                      "samples":  14994,
+                      "peakDbfs":  -3.10,
+                      "rmsDbfs":  -17.29,
+                      "clippedSamples":  0,
+                      "suggestedOneShotGain":  0.45
+                  },
+                  {
+                      "name":  "DragonDeath",
+                      "seconds":  1.120,
+                      "samples":  49392,
+                      "peakDbfs":  -2.85,
+                      "rmsDbfs":  -16.97,
+                      "clippedSamples":  0,
+                      "suggestedOneShotGain":  0.50
+                  }
+              ]
+}

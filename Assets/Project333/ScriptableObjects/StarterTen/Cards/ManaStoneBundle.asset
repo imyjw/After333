@@ -19,7 +19,7 @@ MonoBehaviour:
     _mana: 0
     _qi: 0
     _power: 0
-    _gold: 5
+    _gold: 6
   _affiliation: 1
   _chargeTileFootprint: 0
   _effectText: "\uB9C8\uB098\uB97C 9 \uC5BB\uB294\uB2E4."
@@ -31,3 +31,4 @@ MonoBehaviour:
   _damage: 0
   _damageType: 0
   _triggerCount: 0
+  _effectAmount: 0

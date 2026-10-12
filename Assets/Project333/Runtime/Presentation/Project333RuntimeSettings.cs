@@ -48,6 +48,7 @@ namespace Project333.Runtime.Presentation
             }
 
             GlobalSettingsMenuController.EnsureForScene(scene);
+            After333BackgroundMusic.EnsureForScene(scene);
         }
 
         private static void ConfigureNamedRoot(Scene scene, string rootName)
@@ -65,6 +66,12 @@ namespace Project333.Runtime.Presentation
             }
 
             fitter.Configure(background);
+            if (rootName == "GameStartSceneController")
+            {
+                // The baked-in logo uses the full screen; keep the menu beneath its center.
+                // Account information and corner controls retain their normal safe-area anchors.
+                fitter.ConfigureScreenCenteredElements(FindDirectChild(contentRoot, "CenterPanel"));
+            }
         }
 
         private static void ConfigureBattleCanvas(Scene scene)

@@ -1,0 +1,151 @@
+﻿{
+    "SourceWidth":  1774,
+    "SourceHeight":  887,
+    "FinalWidth":  2048,
+    "FinalHeight":  1024,
+    "Columns":  4,
+    "Rows":  2,
+    "FrameWidth":  512,
+    "FrameHeight":  512,
+    "Packing":  "Uniform nearest-neighbour 480×480 content+16pxborder per512pxcell; exact sourcequarter/halfrectangles",
+    "Frames":  [
+                   {
+                       "Frame":  0,
+                       "Alpha16Bounds":  [
+                                             57,
+                                             54,
+                                             265,
+                                             455
+                                         ],
+                       "BrightBounds":  [
+                                            61,
+                                            63,
+                                            263,
+                                            446
+                                        ],
+                       "TransparentPixels":  185840,
+                       "SemitransparentPixels":  76287
+                   },
+                   {
+                       "Frame":  1,
+                       "Alpha16Bounds":  [
+                                             56,
+                                             54,
+                                             378,
+                                             455
+                                         ],
+                       "BrightBounds":  [
+                                            62,
+                                            61,
+                                            371,
+                                            446
+                                        ],
+                       "TransparentPixels":  168306,
+                       "SemitransparentPixels":  93836
+                   },
+                   {
+                       "Frame":  2,
+                       "Alpha16Bounds":  [
+                                             55,
+                                             54,
+                                             452,
+                                             455
+                                         ],
+                       "BrightBounds":  [
+                                            60,
+                                            63,
+                                            430,
+                                            447
+                                        ],
+                       "TransparentPixels":  142402,
+                       "SemitransparentPixels":  119737
+                   },
+                   {
+                       "Frame":  3,
+                       "Alpha16Bounds":  [
+                                             47,
+                                             54,
+                                             480,
+                                             461
+                                         ],
+                       "BrightBounds":  [
+                                            53,
+                                            61,
+                                            472,
+                                            452
+                                        ],
+                       "TransparentPixels":  109895,
+                       "SemitransparentPixels":  152246
+                   },
+                   {
+                       "Frame":  4,
+                       "Alpha16Bounds":  [
+                                             52,
+                                             47,
+                                             488,
+                                             459
+                                         ],
+                       "BrightBounds":  [
+                                            57,
+                                            52,
+                                            480,
+                                            453
+                                        ],
+                       "TransparentPixels":  95312,
+                       "SemitransparentPixels":  166830
+                   },
+                   {
+                       "Frame":  5,
+                       "Alpha16Bounds":  [
+                                             56,
+                                             51,
+                                             482,
+                                             454
+                                         ],
+                       "BrightBounds":  [
+                                            62,
+                                            59,
+                                            476,
+                                            448
+                                        ],
+                       "TransparentPixels":  98243,
+                       "SemitransparentPixels":  163901
+                   },
+                   {
+                       "Frame":  6,
+                       "Alpha16Bounds":  [
+                                             52,
+                                             52,
+                                             464,
+                                             454
+                                         ],
+                       "BrightBounds":  [
+                                            58,
+                                            61,
+                                            445,
+                                            444
+                                        ],
+                       "TransparentPixels":  110602,
+                       "SemitransparentPixels":  151542
+                   },
+                   {
+                       "Frame":  7,
+                       "Alpha16Bounds":  [
+                                             48,
+                                             52,
+                                             427,
+                                             454
+                                         ],
+                       "BrightBounds":  [
+                                            227,
+                                            262,
+                                            372,
+                                            427
+                                        ],
+                       "TransparentPixels":  126918,
+                       "SemitransparentPixels":  135226
+                   }
+               ],
+    "SourceSha256":  "FF50EA24236D1379869F2625EF0669D1C1C7CDACC722AFC97E5511F1760C975F",
+    "FinalSha256":  "D2EC27BC5D1EECDFCFE1B9E3869D9F0398CAD4E45684EFB18EF591C2BCF74EAA"
+}

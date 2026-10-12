@@ -10,5 +10,8 @@
     <Compile Include="../../Assets/Project333/Runtime/Application/Accounts/AccountHttpTransport.cs" Link="AccountHttpTransport.cs" />
     <Compile Include="../../Assets/Project333/Runtime/Application/Accounts/PendingAccountOperation.cs" Link="PendingAccountOperation.cs" />
     <Compile Include="../../Assets/Project333/Runtime/Application/Accounts/AccountOperationRecovery.cs" Link="AccountOperationRecovery.cs" />
+    <Compile Include="../../Assets/Project333/Runtime/Application/Accounts/PendingCardPackPresentation.cs" Link="PendingCardPackPresentation.cs" />
+    <Compile Include="../../Assets/Project333/Runtime/Application/Accounts/ServerShopClient.cs" Link="ServerShopClient.cs" />
+    <Compile Include="../../Assets/Project333/Runtime/Presentation/Tutorial/TutorialRuntimeIsolation.cs" Link="TutorialRuntimeIsolation.cs" />
   </ItemGroup>
 </Project>

@@ -1,8 +1,8 @@
-# Online PvP Prototype
+# After333 온라인 전투와 연결 설정
 
 ## Target Direction
 
-The online PvP target is moving from a local custom-room smoke test toward account-based matchmaking and reconnectable 1:1 battles.
+Current online battles use account-based matchmaking, independent Gold Dungeon attempts limited to three per paid run and authenticated running-server reconnect. The older custom-room smoke-test procedures below are preserved as development history.
 
 For the short verified LAN demo flow, see `docs/lan_pvp_demo_checklist.md`.
 For production-like server setup and public-test readiness checks, see `docs/deployment_readiness_checklist.md`.
@@ -40,13 +40,13 @@ Current persistence progress:
 - When a disconnected player reconnects successfully and no players remain disconnected, the persisted match status returns from `reconnect_grace` to `active`.
 - `PvpBattlePersistenceService` records battle snapshots after battle start, accepted client commands, server AI actions, turn-timeout actions, reconnect joins, and disconnect forfeit resolution.
 - `PvpBattlePersistenceService` records accepted and rejected client commands into `pvp_battle_command_log`, including the command payload, sender identity, and produced battle events when available.
-- Battle snapshots now include a restorable domain-state payload, not only player-facing `StateView` data.
+- Persisted snapshots include domain state for diagnostics and isolated restore checks, not only player-facing `StateView` data. Their existence does not enable unfinished-battle revival after server restart under the current cancellation policy.
 - Battle snapshots retain the latest 33 structured combat-log records. A new or reconnecting connection receives the retained history; later `StateView` messages carry sequence-numbered increments.
 - User policy (2026-09-13): server interruption cancels unfinished PvP/PvE battles without recording wins, losses or draws. The existing run/deck, tickets and account resources remain unchanged.
 - Before opening HTTP/WebSocket endpoints, startup replays durable completed-result journals, then cancels unfinished DB matches and clears old connections, queues and reservations. Unreadable or undeliverable result journals block startup rather than silently discarding already-finalized outcomes.
 - Startup cancellation is mandatory. `PROJECT333_ENABLE_PVP_STARTUP_RECOVERY` no longer enables snapshot restoration; old launcher recovery switches are accepted for command compatibility only. `/server/status` reports `StartupRecoveryEnabled=false` and `InterruptedBattlePolicy=cancel_without_result`.
 - Missing sessions are not restored from snapshots. A PvP reconnect with no current session returns `battle_cancelled` without fresh matchmaking. PvE uses `battle_reconnect_expired` when its session no longer exists. Updated clients return to the draft/run screen without synthesizing a local result; server run data remains authoritative.
-- Normal client disconnect in PvP and PvE reserves the authenticated participant for 60 seconds within the running server. Existing turn deadlines and AI progression continue. On server shutdown, unfinished sessions suppress actions, AI, turn timers and pending forfeits; already-finalized results remain valid.
+- Normal client disconnect in PvP and PvE reserves the authenticated participant for 70 seconds within the running server. Existing turn deadlines and AI progression continue. On server shutdown, unfinished sessions suppress actions, AI, turn timers and pending forfeits; already-finalized results remain valid.
 - Snapshot serialization remains available for diagnostic tools and format checks; its existence does not enable user battle continuation across server restarts.
 - The laptop-hosted development server can now run behind Cloudflare Tunnel at `https://api.after333.com`, while ASP.NET remains bound to `http://127.0.0.1:7333`.
 - `PROJECT333_PUBLIC_SERVER_URL` separates the public client endpoint from the internal listen address, and `/server/status` reports both values plus `Deployment.Mode=ReverseProxy` for this setup.
@@ -54,33 +54,30 @@ Current persistence progress:
 
 ## Battle Modes and Common Reconnect (2026-09-13)
 
-- [battle_modes.md](./battle_modes.md) defines normal human-first matchmaking with server AI after 20 seconds and the independent daily AI challenge.
-- GameMode (run/ai_challenge) and opponent type are distinct. AI fallback advances the regular run; AI challenge results only settle that attempt and its separate gold reward.
+- [battle_modes.md](./battle_modes.md) defines normal human-first matchmaking with server AI after 20 seconds and the independent Gold Dungeon, limited to three attempts per active run started with 3 tickets.
+- GameMode (run/ai_challenge) and opponent type are distinct. AI fallback advances the regular run; Gold Dungeon results only settle that attempt and its separate gold reward.
 - Start and draft screens use one mode-neutral reconnect label and the server's original match/admission.
 
 ## PvE/PvP Reconnect Discovery (2026-09-13)
 
 - `GET /battle/reconnect-status` requires account authentication and returns the existing match ID, runtime/online seat, server remaining seconds, deadline, and `BattleMode` (`pve` or `pvp`). PvE discovery uses the live server session and account-bound reservation. PvP discovery still requires matching live and persisted reservations.
 - The legacy `GET /pvp/reconnect-status` remains PvP-only. Old apps cannot receive a PvE match and accidentally launch its reconnect as PvP. A legacy response with no mode is interpreted as PvP by the updated DTO.
-- After app restart, both start and draft/run screens query the shared endpoint and display a common reconnect action with the server's remaining time. The response also supplies GameMode and AiChallengeAttemptId. PvE reuses the returned `MatchId` and reconnect intent; it does not generate a fresh room ID or restart a local 60-second allowance.
+- After app restart, both start and draft/run screens query the shared endpoint and display a common reconnect action with the server's remaining time. The response also supplies GameMode and AiChallengeAttemptId. PvE reuses the returned `MatchId` and reconnect intent; it does not generate a fresh room ID or restart a local 70-second allowance.
 - Join restores the original account/seat/run/deck/upgrades and rejects another account or an expired reservation. An ended or missing PvE session returns `battle_reconnect_expired`; the client does not synthesize a loss.
 - Authenticated joins are serialized per account through session lookup and registration. Same-account simultaneous PvE starts cannot create two playable rooms, and active/reconnectable PvE and PvP cannot overlap for one account. Other accounts can join independently.
 - A reconnect can request continuation of server AI, but each session permits only one AI orchestration loop at a time. Its lifetime belongs to the server, not the old client socket. A reconnect cannot duplicate AI planning/broadcast loops or stop AI merely by canceling the previous connection.
 - Grace expiry uses the authoritative deadline and verifies the exact current reservation before applying one forfeit. A stale timeout from a replaced/reconnected socket cannot end the new connection's battle.
 - Source and isolated regression verification are complete; deployment status and client installation are tracked separately in [pve_reconnect_2026-09-13.md](./pve_reconnect_2026-09-13.md). The user builds the updated app. This work adds no turn-clock pause and no battle restoration after server restart.
 
-## Current Milestone
+## 현재 구현 범위 (2026-10-01 소스 대조)
 
-The current milestone verifies that the Unity client can connect to the local PvP WebSocket server, join a test match, receive a server-authored battle state view, and send basic battle commands that the server resolves.
+일반 전투는 계정의 현재 33장 런 덱으로 사람과 먼저 매칭하고 기본 20초 뒤 서버 AI로 전환한다. 골드 던전은 티켓 3개로 시작한 현재 런의 완성된 덱으로, 런당 최대 3회의 별도 입장 예약을 받아 바로 AI와 전투한다. 자정이나 재로그인은 횟수를 늘리지 않는다. 양쪽 모두 서버의 `BattleState`와 공통 규칙을 사용하며, 런 결과·런별 횟수·보상은 서버가 확정한다.
 
-The server now owns an in-memory `BattleState` for each full two-player test match.
-The currently supported server-resolved commands are:
+서버는 멀리건 선택·확정, 유닛/건물 소환, 피해/지속/특수 마법, 트랩 설치, 이동, 일반 공격, 액티브, 턴 종료와 항복을 처리한다. 로봇 합체는 기존 액티브 처리 경로를 사용한다. 새 카드·스턴/빙결·오라·방어력 버프·낙진·비밀 트랩도 공통 규칙에 포함한다. 카드 목록과 실제 규칙은 [카드 목록](card_catalog.md), [전투 규칙](battle_rules.md)을 따른다.
 
-- `PlayUnitCard`
-- `PlayBuildingCard`
-- `MoveOccupant`
-- `Attack`
-- `EndTurn`
+손패·덱 순서·상대 트랩 정체는 관전 주체별로 가린다. 트랩 설치는 상대에게 공통 트랩 이미지와 개수만 공개하고, 발동 성공 때 실제 카드를 공개한다. 자신의 알려진 트랩은 AI의 독립 모의 상태에서만 평가한다.
+
+일반 접속 끊김은 실행 중인 서버에서 70초 동안 원래 좌석으로 복귀한다. 서버 재시작은 미완료 전투를 취소하고 확정된 결과 저널만 재처리한다. 소스에 반영된 새 규칙과 연출은 사용자 클라이언트 빌드 및 필요한 서버 업데이트와 별개로 추적한다.
 
 ## Start The Local Server
 
@@ -190,6 +187,10 @@ powershell -ExecutionPolicy Bypass -File C:\Project_333\Server\Project333.PvpSer
 
 If the endpoint test fails from another PC but works on the server PC, allow inbound TCP port `7333` in Windows Defender Firewall on the server PC.
 
+## 과거 개발용 연결 테스터 절차
+
+아래 수동 `matchId`·player token·두 테스터 예시는 초기 연결 검사 구조를 설명한다. 현재 일반 전투의 입장은 인증 계정·서버 매칭/골드 던전 예약과 완성된 런 덱을 사용한다. 이 예시만으로 현재 공개 서버에 인증 없이 입장할 수 있다고 해석하지 않는다. 최신 두 계정 경기 절차는 [공개 점검 목록](public_pvp_smoke_test_checklist.md)을 따른다.
+
 ## Create The Unity Test Object
 
 In Unity:
@@ -285,5 +286,11 @@ StateView viewer=AI turn=2 active=AI phase=Main hand=4 opponentHand=4 occupants=
 
 ## Current UI Integration
 
-The real battle scene can now send player UI actions to the local WebSocket test server.
+The real battle scene routes player actions to the authenticated online server through `IBattleGateway`; its endpoint may be local, LAN or HTTPS/WSS.
 When online input routing is enabled, the client does not mutate the local battle state directly; it waits for the server-authored `StateView` and presents that view.
+
+### Turn-end double-click protection (2026-09-28)
+
+OnlineBattleGateway closes gameplay submission synchronously before enqueueing EndTurn. Both EndTurn entry points use the same gate. BattleBootstrapper exposes it through IsBusy, and BattleScreenPresenter immediately disables the turn button, refreshing it as the authoritative turn changes. Local battle input also locks through the opponent turn; AI execution uses the underlying gateway and continues normally.
+
+ClientBattleCommandMessage.ExpectedTurnNumber is nullable and stamped from the current server view; BattleSession rejects mismatches under its existing command lock before changing battle state. Legacy messages without the field are accepted for compatibility. OnlineBattleErrorDto.CommandSequence optionally identifies the rejected command, allowing only the matching pending EndTurn to unlock on command_rejected. No retry timer or buffered EndTurn is introduced. Full rollout requires the updated client and server; no database migration.

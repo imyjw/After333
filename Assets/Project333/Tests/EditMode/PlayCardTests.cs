@@ -204,7 +204,7 @@ namespace Project333.Tests.EditMode
             var exception = Assert.Throws<System.InvalidOperationException>(
                 () => service.PlayUnitCard(battleState, PlayerId.Player, "expensive-unit", new TileCoord(0, 0)));
 
-            Assert.That(exception!.Message, Is.EqualTo("The player cannot afford this card."));
+            Assert.That(exception!.Message, Is.EqualTo("자원이 부족합니다."));
             Assert.That(battleState.Player.Hand.Contains("expensive-unit"), Is.True);
             Assert.That(battleState.PlayerBoard.IsEmpty(new TileCoord(0, 0)), Is.True);
         }

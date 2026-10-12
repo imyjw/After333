@@ -45,12 +45,12 @@ namespace Project333.Runtime.Application.Services
 
             if (battleState.Phase != PhaseType.Main)
             {
-                throw new InvalidOperationException("Attacks can only be declared during the main phase.");
+                throw new InvalidOperationException("자신의 행동 턴에만 행동할 수 있습니다.");
             }
 
             if (battleState.ActivePlayerId != attackerOwnerId)
             {
-                throw new InvalidOperationException("Only the active player can attack.");
+                throw new InvalidOperationException("자신의 턴에만 행동할 수 있습니다.");
             }
 
             var attackerBoard = battleState.GetBoard(attackerOwnerId);
@@ -60,21 +60,26 @@ namespace Project333.Runtime.Application.Services
             var attacker = attackerBoard.GetOccupant(attackerCoord);
             if (attacker == null)
             {
-                throw new InvalidOperationException("Attacker tile is empty.");
+                throw new InvalidOperationException("공격자 타일이 비어있습니다.");
             }
 
             var declaredDefender = declaredDefenderBoard.GetOccupant(targetCoord);
             if (declaredDefender == null)
             {
-                throw new InvalidOperationException("Defender tile is empty.");
+                throw new InvalidOperationException("공격 대상 타일이 비어있습니다.");
             }
 
             ValidateAttacker(attacker, attackerOwnerId);
 
-            if (!_targetingService.CanTarget(battleState, attackerOwnerId, attackerCoord, targetCoord))
+            var targetRejection = _targetingService.GetTargetRejectionMessage(battleState, attackerOwnerId, attackerCoord, targetCoord);
+            if (!string.IsNullOrEmpty(targetRejection))
             {
-                throw new InvalidOperationException("Target is not legal for this attacker.");
+                throw new InvalidOperationException(targetRejection);
             }
+
+            // Reject an unaffordable action before any HuanShu random choice is made.
+            if (!ManaCannonRules.CanPayAttackCost(battleState, attacker))
+                throw new InvalidOperationException("자원이 부족합니다.");
 
             var resolvedTarget = ResolveAttackTarget(
                 battleState,
@@ -84,6 +89,11 @@ namespace Project333.Runtime.Application.Services
                 declaredDefender);
             var defenderBoard = battleState.GetBoard(resolvedTarget.OwnerId);
             var defender = resolvedTarget.Occupant;
+            // Pay once for the declared action only after every target validation succeeds.
+            // ResourceSet preserves the common Mana-first, 1:1 Gold substitution rules.
+            ManaCannonRules.PayAttackCost(battleState, attacker);
+            var wasCancelledByTrap = TrapService.TryResolveAcceptedAttack(
+                battleState, attacker, resolvedTarget.OwnerId, resolvedTarget.Coord, defender);
             battleState.RecordAttackResolution(new BattleAttackResolution(
                 attackerOwnerId,
                 attackerCoord,
@@ -95,16 +105,29 @@ namespace Project333.Runtime.Application.Services
                 resolvedTarget.Coord,
                 defender.RuntimeId,
                 defender.CardId,
-                resolvedTarget.WasHuanShuRedirected));
+                resolvedTarget.WasHuanShuRedirected,
+                wasCancelledByTrap));
 
-            // A legal attack declaration reveals Hiding before any hit or counterattack resolves.
+            if (wasCancelledByTrap)
+            {
+                // Direct trap destruction may already have reset a revived Demon King's
+                // action count to zero. The accepted action still consumes one available use.
+                attacker.RemainingAttacksThisTurn = Math.Max(0, attacker.RemainingAttacksThisTurn - 1);
+                // Settle reflection deaths/revival and any aura loss after the canceled action.
+                OccupantDestructionService.ResolveDefeatedOccupants(battleState);
+                return;
+            }
+
+            // Capture Hiding once for this entire attack, then reveal before resolving combat.
+            var isCritical = attacker.IsHiding;
             attacker.RevealHiding();
             var combatResult = ResolveCombat(
                 battleState,
                 defenderBoard,
                 resolvedTarget.Coord,
                 attacker,
-                defender);
+                defender,
+                isCritical);
 
             ResolveHeroAttackKillBonus(attacker, combatResult.AffectedDefenders);
             attacker.RemainingAttacksThisTurn -= 1;
@@ -159,7 +182,7 @@ namespace Project333.Runtime.Application.Services
 
             if (candidates.Count == 0)
             {
-                throw new InvalidOperationException("HuanShu attack has no legal random target.");
+                throw new InvalidOperationException("공격 가능한 대상이 없습니다.");
             }
 
             var selectedIndex = _randomIndexSelector(candidates.Count);
@@ -221,32 +244,32 @@ namespace Project333.Runtime.Application.Services
         {
             if (attacker.OwnerId != attackerOwnerId)
             {
-                throw new InvalidOperationException("Cannot attack with an enemy occupant.");
+                throw new InvalidOperationException("상대 소환물로 공격할 수 없습니다.");
             }
 
             if (attacker.CannotAttack)
             {
-                throw new InvalidOperationException("This occupant cannot attack while drained.");
+                throw new InvalidOperationException("이 유닛을 공격 불가능한 상태입니다.");
             }
 
             if (attacker.HasSummoningSickness)
             {
-                throw new InvalidOperationException("This occupant cannot attack on the turn it was summoned.");
+                throw new InvalidOperationException("소환한 턴에는 공격할 수 없습니다.");
             }
 
             if (attacker.RemainingAttacksThisTurn <= 0)
             {
-                throw new InvalidOperationException("This occupant has no attacks remaining this turn.");
+                throw new InvalidOperationException("이 유닛은 이미 공격했습니다.");
             }
 
             if (attacker.Attack <= 0)
             {
-                throw new InvalidOperationException("Occupants with 0 attack cannot attack.");
+                throw new InvalidOperationException("공격력이 0이하인 유닛은 공격할 수 없습니다.");
             }
 
             if (attacker is BuildingState buildingState && !buildingState.CanAttackAsBuilding)
             {
-                throw new InvalidOperationException("This building cannot attack.");
+                throw new InvalidOperationException("이 유닛은 공격할 수 없습니다.");
             }
         }
 
@@ -255,7 +278,8 @@ namespace Project333.Runtime.Application.Services
             BoardState defenderBoard,
             TileCoord declaredTargetCoord,
             OccupantState attacker,
-            OccupantState declaredDefender)
+            OccupantState declaredDefender,
+            bool isCritical)
         {
             var affectedDefenders = new HashSet<OccupantState>();
             var hitsPerAttack = attacker.EffectiveHitsPerAttack;
@@ -288,7 +312,8 @@ namespace Project333.Runtime.Application.Services
                         attacker,
                         attackerDamagePerHit,
                         attackerDamageType,
-                        affectedDefenders);
+                        affectedDefenders,
+                        isCritical);
                 }
 
                 ApplyFinalMeleeHitWithCounterattack(
@@ -302,7 +327,8 @@ namespace Project333.Runtime.Application.Services
                     defenderCounterDamage,
                     defenderCounterDamageType,
                     defenderCounterHits,
-                    affectedDefenders);
+                    affectedDefenders,
+                    isCritical);
                 return new CombatResolutionResult(affectedDefenders);
             }
 
@@ -315,7 +341,8 @@ namespace Project333.Runtime.Application.Services
                     attacker,
                     attackerDamagePerHit,
                     attackerDamageType,
-                    affectedDefenders);
+                    affectedDefenders,
+                    isCritical);
             }
 
             return new CombatResolutionResult(affectedDefenders);
@@ -328,7 +355,8 @@ namespace Project333.Runtime.Application.Services
             OccupantState attacker,
             int attackerDamagePerHit,
             DamageType attackerDamageType,
-            ISet<OccupantState> affectedDefenders)
+            ISet<OccupantState> affectedDefenders,
+            bool isCritical)
         {
             attackerDamagePerHit = SpellPowerRules.ApplyCurrent(
                 battleState, attacker.OwnerId, attackerDamagePerHit, attackerDamageType);
@@ -345,11 +373,11 @@ namespace Project333.Runtime.Application.Services
                 var resolvedShielderDamage = DamageResolutionRules.ResolveIncomingDamage(
                     shielderInfo.Shielder,
                     shielderDamage,
-                    attackerDamageType);
+                    attackerDamageType, isCritical: isCritical);
                 var absorbedDamage = DamageResolutionRules.ApplyAttackDamage(
                     shielderInfo.Shielder,
                     shielderDamage,
-                    attackerDamageType);
+                    attackerDamageType, isCritical: isCritical);
                 BattleValuePopupRecorder.RecordDamage(
                     battleState,
                     shielderInfo.Shielder,
@@ -386,7 +414,8 @@ namespace Project333.Runtime.Application.Services
                     attacker,
                     attackerDamagePerHit,
                     attackerDamageType,
-                    affectedDefenders);
+                    affectedDefenders,
+                    isCritical);
                 ApplyAttackHitEffects(battleState, attacker, piercingDamage);
 
                 return;
@@ -398,7 +427,8 @@ namespace Project333.Runtime.Application.Services
                 shielderInfo.OriginalTarget,
                 attacker,
                 attackerDamagePerHit,
-                attackerDamageType);
+                attackerDamageType,
+                isCritical);
             var directPiercingDamage = ApplyPiercingDamageWithoutHitEffects(
                 battleState,
                 defenderBoard,
@@ -406,7 +436,8 @@ namespace Project333.Runtime.Application.Services
                 attacker,
                 attackerDamagePerHit,
                 attackerDamageType,
-                affectedDefenders);
+                affectedDefenders,
+                isCritical);
             ApplyAttackHitEffects(battleState, attacker, directPiercingDamage);
         }
 
@@ -415,13 +446,14 @@ namespace Project333.Runtime.Application.Services
             OccupantState defender,
             OccupantState attacker,
             int attackerDamagePerHit,
-            DamageType attackerDamageType)
+            DamageType attackerDamageType,
+            bool isCritical)
         {
             var actualDamage = DamageResolutionRules.ApplyAttackDamage(
                 defender,
                 attackerDamagePerHit,
                 attackerDamageType,
-                DamageResolutionRules.ShouldHalveForFlying(attacker, defender));
+                DamageResolutionRules.ShouldHalveForFlying(attacker, defender), isCritical);
             BattleValuePopupRecorder.RecordDamage(
                 battleState,
                 defender,
@@ -445,7 +477,8 @@ namespace Project333.Runtime.Application.Services
             int defenderCounterDamage,
             DamageType defenderCounterDamageType,
             int defenderCounterHits,
-            ISet<OccupantState> affectedDefenders)
+            ISet<OccupantState> affectedDefenders,
+            bool isCritical)
         {
             // The final melee hit and counterattack are simultaneous: read both sides before HP changes.
             attackerDamagePerHit = SpellPowerRules.ApplyCurrent(
@@ -459,7 +492,8 @@ namespace Project333.Runtime.Application.Services
                 attacker,
                 attackerDamagePerHit,
                 attackerDamageType,
-                affectedDefenders);
+                affectedDefenders,
+                isCritical);
             damageDealtByAttacker += ApplyPiercingDamageWithoutHitEffects(
                 battleState,
                 defenderBoard,
@@ -467,7 +501,8 @@ namespace Project333.Runtime.Application.Services
                 attacker,
                 attackerDamagePerHit,
                 attackerDamageType,
-                affectedDefenders);
+                affectedDefenders,
+                isCritical);
             var counterattackDamage = 0;
             // The counterattacker's own hit count applies once per exchange, independently
             // of the attacker's hit count. Keep separate packets for defense and Endure.
@@ -477,7 +512,8 @@ namespace Project333.Runtime.Application.Services
                 var hitDamage = DamageResolutionRules.ApplyAttackDamage(
                     attacker,
                     defenderCounterDamage,
-                    defenderCounterDamageType);
+                    defenderCounterDamageType,
+                    DamageResolutionRules.ShouldHalveForFlying(counterattacker, attacker));
                 counterattackDamage += hitDamage;
                 BattleValuePopupRecorder.RecordDamage(
                     battleState,
@@ -501,7 +537,8 @@ namespace Project333.Runtime.Application.Services
             OccupantState attacker,
             int attackerDamagePerHit,
             DamageType attackerDamageType,
-            ISet<OccupantState> affectedDefenders)
+            ISet<OccupantState> affectedDefenders,
+            bool isCritical)
         {
             if (attacker == null ||
                 !attacker.HasActivePiercing ||
@@ -529,6 +566,7 @@ namespace Project333.Runtime.Application.Services
                 attackerDamagePerHit,
                 attackerDamageType,
                 affectedDefenders,
+                isCritical,
                 BattleValueChangeCause.Piercing);
         }
 
@@ -540,6 +578,7 @@ namespace Project333.Runtime.Application.Services
             int attackerDamagePerHit,
             DamageType attackerDamageType,
             ISet<OccupantState> affectedDefenders,
+            bool isCritical,
             BattleValueChangeCause damageCause = BattleValueChangeCause.NormalAttack)
         {
             var shielderInfo = ShielderService.ResolveForNormalAttack(
@@ -553,7 +592,7 @@ namespace Project333.Runtime.Application.Services
                     shielderInfo.OriginalTarget,
                     attackerDamagePerHit,
                     attackerDamageType,
-                    DamageResolutionRules.ShouldHalveForFlying(attacker, shielderInfo.OriginalTarget));
+                    DamageResolutionRules.ShouldHalveForFlying(attacker, shielderInfo.OriginalTarget), isCritical);
                 BattleValuePopupRecorder.RecordDamage(
                     battleState,
                     shielderInfo.OriginalTarget,
@@ -573,11 +612,11 @@ namespace Project333.Runtime.Application.Services
             var resolvedShielderDamage = DamageResolutionRules.ResolveIncomingDamage(
                 shielderInfo.Shielder,
                 shielderDamage,
-                attackerDamageType);
+                attackerDamageType, isCritical: isCritical);
             var absorbedDamage = DamageResolutionRules.ApplyAttackDamage(
                 shielderInfo.Shielder,
                 shielderDamage,
-                attackerDamageType);
+                attackerDamageType, isCritical: isCritical);
             BattleValuePopupRecorder.RecordDamage(
                 battleState,
                 shielderInfo.Shielder,

@@ -114,7 +114,8 @@ namespace Project333.Tests.EditMode
 
             Assert.That(front.CurrentHp, Is.EqualTo(20));
             Assert.That(back.CurrentHp, Is.EqualTo(20));
-            Assert.That(attacker.CurrentHp, Is.EqualTo(26));
+            Assert.That(attacker.CurrentHp, Is.EqualTo(28),
+                "The ground melee counterattack of 4 is halved against the Flying recipient.");
         }
 
         [Test]
@@ -155,8 +156,8 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.AIBoard.GetOccupant(shielder.Position), Is.Null);
             Assert.That(back.CurrentHp, Is.EqualTo(26),
                 "Only damage beyond the Shielder's pre-hit HP reaches the protected target.");
-            Assert.That(attacker.CurrentHp, Is.EqualTo(26),
-                "The melee Shielder is the actual counterattacker.");
+            Assert.That(attacker.CurrentHp, Is.EqualTo(28),
+                "The ground melee Shielder counters for 2 after Flying reduction.");
         }
 
         [Test]
