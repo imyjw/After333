@@ -28,7 +28,7 @@ namespace Project333.Tests.EditMode
                 var battle = TutorialCombatBattle.Create(Provider()).CurrentBattleState;
                 Assert.That(battle.TurnNumber, Is.EqualTo(3)); Assert.That(battle.Phase, Is.EqualTo(PhaseType.Main));
                 Assert.That(battle.Player.Resources.Gold, Is.EqualTo(6)); Assert.That(battle.Player.Resources.Mana, Is.EqualTo(3));
-                Assert.That(battle.Player.Hand.CardIds, Is.EqualTo(new[]{"SkeletonArcher","PowerPlant","firebolt"}));
+                Assert.That(battle.Player.Hand.CardIds, Is.EqualTo(new[]{"ManaShield","PlasmaShield","SkeletonArcher","PowerPlant","firebolt"}));
                 Assert.That(battle.PlayerBoard.GetOccupant(TutorialResourceBattle.GoblinTile).HasSummoningSickness, Is.False);
                 Assert.That(battle.PlayerBoard.GetOccupant(TutorialResourceBattle.MasterTile).CurrentHp, Is.EqualTo(333));
             }

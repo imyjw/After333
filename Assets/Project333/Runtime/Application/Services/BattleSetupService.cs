@@ -21,7 +21,7 @@ namespace Project333.Runtime.Application.Services
         private const int MasterAttack = 3;
         private const int MasterHp = 333;
 
-        private const int OpeningHandSize = 3;
+        private const int OpeningHandSize = 5;
 
         public BattleSetupService()
             : this(new SystemDeckShuffler())

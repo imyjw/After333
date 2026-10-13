@@ -45,10 +45,10 @@ namespace Project333.Tests.EditMode
                 Assert.That(state.AI.Resources.Gold, Is.EqualTo(4));
                 Assert.That(state.AIBoard.EnumerateOccupants().Count(), Is.EqualTo(1));
                 Assert.That(state.AIBoard.GetOccupant(TutorialResourceBattle.OpponentArcherTile), Is.Null);
-                Assert.That(state.Player.Hand.CardIds, Is.EqualTo(new[]{"Goblin","ManaPond","firebolt"}));
+                Assert.That(state.Player.Hand.CardIds, Is.EqualTo(new[]{"Goblin","ManaPond","firebolt","ManaShield","PlasmaShield"}));
                 gateway.ApplyMulligan(PlayerId.Player,new[]{"firebolt"},new TutorialResourceBattle.MulliganDeck());
                 Assert.That(state.Phase, Is.EqualTo(PhaseType.TurnStart));
-                Assert.That(state.Player.Hand.CardIds, Is.EqualTo(new[]{"Goblin","ManaPond","SkeletonArcher"}));
+                Assert.That(state.Player.Hand.CardIds, Is.EqualTo(new[]{"Goblin","ManaPond","ManaShield","PlasmaShield","SkeletonArcher"}));
                 gateway.ResolveTurnStart();
                 Assert.That(state.Phase, Is.EqualTo(PhaseType.Main)); Assert.That(state.Player.Resources.Gold, Is.EqualTo(3));
                 Assert.That(state.Player.Hand.CardIds.Last(), Is.EqualTo("PowerPlant"));

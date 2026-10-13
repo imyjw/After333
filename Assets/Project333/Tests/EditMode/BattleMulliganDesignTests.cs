@@ -30,7 +30,7 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void AuthoredOverlayUsesRequestedLabelsAndThreeLargeOpeningCards()
+        public void AuthoredOverlayUsesRequestedLabelsAndFiveLargeOpeningCards()
         {
             var fixture = BattleMulliganDesignTestScene.Load();
             var state = BattleMulliganDesignTestScene.State();
@@ -42,7 +42,7 @@ namespace Project333.Tests.EditMode
             Assert.That(fixture.Text("InstructionText").text, Is.EqualTo("교환할 카드 선택"));
             Assert.That(fixture.Confirm.GetComponentInChildren<Text>(true).text, Is.EqualTo("확인"));
             Assert.That(fixture.Text("TurnOrderBadge").text, Does.Contain("선공"));
-            Assert.That(fixture.ActiveCards.Length, Is.EqualTo(3));
+            Assert.That(fixture.ActiveCards.Length, Is.EqualTo(5));
             foreach (var unused in fixture.Buttons.Where(c => !c.gameObject.activeSelf))
                 AssertCardVisual(unused, keep: false, replace: false);
             foreach (var card in fixture.ActiveCards)
@@ -59,7 +59,7 @@ namespace Project333.Tests.EditMode
         public void TogglingOneDuplicateSelectsOnlyThatSlotAndCanBeUndone()
         {
             var fixture = BattleMulliganDesignTestScene.Load();
-            var state = BattleMulliganDesignTestScene.State("Goblin", "Goblin", "SkeletonArcher");
+            var state = BattleMulliganDesignTestScene.State("Goblin", "Goblin", "SkeletonArcher", "ManaPond", "Goblin");
             var before = BattleMulliganDesignTestScene.TruthSnapshot(state);
             fixture.Presenter.Present(state);
 
@@ -80,12 +80,50 @@ namespace Project333.Tests.EditMode
             var fixture = BattleMulliganDesignTestScene.Load();
             fixture.Presenter.Present(BattleMulliganDesignTestScene.State());
             Assert.That(fixture.Confirm.interactable, Is.True);
-            for (var i = 0; i < 3; i++) fixture.Presenter.ToggleCardFromUi(i);
-            Assert.That(fixture.Presenter.SelectedCardCount, Is.EqualTo(3));
+            for (var i = 0; i < 5; i++) fixture.Presenter.ToggleCardFromUi(i);
+            Assert.That(fixture.Presenter.SelectedCardCount, Is.EqualTo(5));
             foreach (var card in fixture.ActiveCards) AssertCardVisual(card, keep: false, replace: true);
-            for (var i = 0; i < 3; i++) fixture.Presenter.ToggleCardFromUi(i);
+            for (var i = 0; i < 5; i++) fixture.Presenter.ToggleCardFromUi(i);
             Assert.That(fixture.Confirm.interactable, Is.True);
             Assert.That(fixture.Presenter.SelectedCardCount, Is.Zero);
+        }
+
+        [Test]
+        public void FiveCardHandExpandsAuthoredCapacityAndBindsFifthRealButtonOnlyOnce()
+        {
+            var fixture = BattleMulliganDesignTestScene.Load();
+            var authored = fixture.Buttons.ToArray();
+            var state = BattleMulliganDesignTestScene.State();
+            var before = BattleMulliganDesignTestScene.TruthSnapshot(state);
+            fixture.Presenter.Present(state);
+            Assert.That(fixture.ActiveCards.Length, Is.EqualTo(5));
+            Assert.That(fixture.Buttons.Take(authored.Length), Is.EqualTo(authored),
+                "Expanding the opening hand must retain the authored slots and their references.");
+            var fifth = fixture.Buttons[4];
+            var artwork = fifth.transform.Find("CardArtwork").GetComponent<Image>();
+            Assert.That(artwork, Is.Not.Null);
+            Assert.That(artwork.sprite, Is.Not.Null, "The fifth card must render its own artwork.");
+            Assert.That(artwork, Is.Not.SameAs(fixture.Buttons[0].transform.Find("CardArtwork").GetComponent<Image>()));
+            foreach (var name in new[] { "AttackValueText", "HpValueText" })
+            {
+                var text = fifth.GetComponentsInChildren<Text>(true).Single(t => t.name == name);
+                Assert.That(text.font, Is.Not.Null, "Expanded slots must retain their authored stat fonts.");
+            }
+            var allButtons = fixture.Buttons.ToArray();
+            var childCount = fixture.Presenter.GetComponentsInChildren<Transform>(true).Length;
+            for (var repeat = 0; repeat < 5; repeat++) fixture.Presenter.Present(state);
+            Assert.That(fixture.Buttons, Is.EqualTo(allButtons));
+            Assert.That(fixture.Presenter.GetComponentsInChildren<Transform>(true).Length, Is.EqualTo(childCount));
+
+            fifth.onClick.Invoke();
+            Assert.That(fixture.Presenter.SelectedCardCount, Is.EqualTo(1),
+                "The fifth native button must have one listener bound to the fifth slot.");
+            for (var index = 0; index < 5; index++)
+                AssertCardVisual(fixture.Buttons[index], keep: index != 4, replace: index == 4);
+            fixture.Presenter.Present(state);
+            fifth.onClick.Invoke();
+            Assert.That(fixture.Presenter.SelectedCardCount, Is.Zero, "A second click must undo selection exactly once.");
+            Assert.That(BattleMulliganDesignTestScene.TruthSnapshot(state), Is.EqualTo(before));
         }
 
         [Test]
@@ -170,7 +208,7 @@ namespace Project333.Tests.EditMode
             fixture.Presenter.ConfirmSelectionFromUi();
             Assert.That(fixture.Presenter.SelectedCardCount, Is.Zero);
             var ghosts = BattleMulliganDesignTestScene.Ghosts(fixture.Presenter);
-            Assert.That(ghosts.Length, Is.EqualTo(3));
+            Assert.That(ghosts.Length, Is.EqualTo(5));
             var firstGhost = ghosts.OrderBy(g => g.name).First();
             var sourceCanvas = source.GetComponentInParent<Canvas>().rootCanvas;
             var targetCanvas = firstGhost.GetComponentInParent<Canvas>().rootCanvas;
@@ -183,7 +221,7 @@ namespace Project333.Tests.EditMode
             Assert.That(Vector2.Distance(sourceScreen, ghostScreen), Is.LessThan(2f),
                 "The first frame must originate near the authored bottom-right deck.");
             for (var i = 0; i < 5; i++) fixture.Presenter.Present(state);
-            Assert.That(BattleMulliganDesignTestScene.Ghosts(fixture.Presenter).Length, Is.EqualTo(3));
+            Assert.That(BattleMulliganDesignTestScene.Ghosts(fixture.Presenter).Length, Is.EqualTo(5));
             yield return new WaitForSecondsRealtime(1.2f);
             Assert.That(fixture.Presenter.IsDealingOpeningHand, Is.False, "Server countdown must not be paused by game timeScale.");
             Assert.That(BattleMulliganDesignTestScene.Ghosts(fixture.Presenter).Length, Is.Zero);
@@ -346,7 +384,7 @@ namespace Project333.Tests.EditMode
         private const BindingFlags Hidden = BindingFlags.Instance | BindingFlags.NonPublic;
         public BattleMulliganOverlayPresenter Presenter;
         public PlayerDeckPresenter Deck;
-        public Button[] Buttons;
+        public Button[] Buttons => (Button[])Get(Presenter, "_cardButtons");
         public Button Confirm;
         public Button[] ActiveCards => Buttons.Where(c => c != null && c.gameObject.activeSelf).ToArray();
 
@@ -386,7 +424,6 @@ namespace Project333.Tests.EditMode
             {
                 Presenter = presenter,
                 Deck = deck,
-                Buttons = (Button[])Get(presenter, "_cardButtons"),
                 Confirm = (Button)Get(presenter, "_confirmButton")
             };
         }
@@ -400,7 +437,7 @@ namespace Project333.Tests.EditMode
 
         public static BattleState State(params string[] opening)
         {
-            var cards = opening.Length == 0 ? new[] { "Goblin", "SkeletonArcher", "ManaPond" } : opening;
+            var cards = opening.Length == 0 ? new[] { "Goblin", "SkeletonArcher", "ManaPond", "Goblin", "ManaPond" } : opening;
             // Deck.Draw removes from the end, so reverse makes the desired opening order explicit.
             var deck = new[] { "Goblin", "ManaPond", "SkeletonArcher", "Goblin", "ManaPond", "SkeletonArcher" }
                 .Concat(cards.Reverse()).ToArray();

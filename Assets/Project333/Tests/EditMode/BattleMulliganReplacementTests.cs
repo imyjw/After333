@@ -32,10 +32,12 @@ namespace Project333.Tests.EditMode
         [TestCase(1)]
         [TestCase(2)]
         [TestCase(3)]
+        [TestCase(4)]
+        [TestCase(5)]
         public void ConfirmHidesOnlySelectedSlotsBeforeSendingAndDoesNotDrawCards(int count)
         {
             var fixture = BattleMulliganDesignTestScene.Load();
-            var state = BattleMulliganDesignTestScene.State("Goblin", "Goblin", "ManaPond");
+            var state = BattleMulliganDesignTestScene.State("Goblin", "Goblin", "ManaPond", "SkeletonArcher", "ManaPond");
             var driver = BattleMulliganReplacementTestDriver.Bind(fixture, state);
             fixture.Presenter.Present(state);
             var slots = Slots(count);
@@ -44,7 +46,7 @@ namespace Project333.Tests.EditMode
             fixture.Presenter.ConfirmSelectionFromUi();
             Assert.That(driver.Gateway.ConfirmCount, Is.EqualTo(1));
             Assert.That(driver.Gateway.SubmittedCardIds, Is.EqualTo(slots.Select(i => state.Player.Hand.CardIds[i])));
-            for (var slot = 0; slot < 3; slot++)
+            for (var slot = 0; slot < 5; slot++)
             {
                 Assert.That(driver.Gateway.AlphasAtSubmit[slot], Is.EqualTo(slots.Contains(slot) ? 0f : 1f), "Hide before submission: slot " + slot);
                 Assert.That(Alpha(fixture, slot), Is.EqualTo(slots.Contains(slot) ? 0f : 1f));
@@ -86,35 +88,35 @@ namespace Project333.Tests.EditMode
             BattleMulliganDesignTestScene.Set(driver.Bootstrapper, "_isBusy", false);
             fixture.Presenter.ConfirmSelectionFromUi();
             Assert.That(driver.Gateway.ConfirmCount, Is.EqualTo(1), "A rejected submit must allow retry.");
-            Assert.That(driver.Gateway.AlphasAtSubmit, Is.EqualTo(new[] { 0f, 1f, 0f }));
+            Assert.That(driver.Gateway.AlphasAtSubmit, Is.EqualTo(new[] { 0f, 1f, 0f, 1f, 1f }));
             Assert.That(BattleMulliganDesignTestScene.TruthSnapshot(state), Is.EqualTo(before));
         }
 
         [UnityTest]
-        public IEnumerator ZeroOneTwoThreeReplacementsFlyOnlyToSelectedSlotsAndKeepDuplicateInPlace()
+        public IEnumerator ZeroThroughFiveReplacementsFlyOnlyToSelectedSlotsAndKeepDuplicateInPlace()
         {
             BattleMulliganDesignTestScene.Load();
             yield return new EnterPlayMode();
             var fixture = BattleMulliganDesignTestScene.Current();
             Time.timeScale = 0f;
-            for (var count = 0; count <= 3; count++)
+            for (var count = 0; count <= 5; count++)
             {
                 fixture.Presenter.Present(null);
                 yield return null;
-                var state = BattleMulliganDesignTestScene.State("Goblin", "Goblin", "ManaPond");
+                var state = BattleMulliganDesignTestScene.State("Goblin", "Goblin", "ManaPond", "SkeletonArcher", "ManaPond");
                 var driver = BattleMulliganReplacementTestDriver.Bind(fixture, state);
                 BattleMulliganDesignTestScene.Set(fixture.Presenter, "_dealOpeningHand", false);
                 fixture.Presenter.Present(state);
                 var slots = Slots(count);
                 var opening = state.Player.Hand.CardIds.ToArray();
-                var positions = fixture.Buttons.Take(3).Select(c => ((RectTransform)c.transform).anchoredPosition).ToArray();
+                var positions = fixture.Buttons.Take(5).Select(c => ((RectTransform)c.transform).anchoredPosition).ToArray();
                 foreach (var slot in slots) fixture.Buttons[slot].onClick.Invoke();
                 fixture.Confirm.onClick.Invoke();
                 Assert.That(driver.Gateway.ConfirmCount, Is.EqualTo(1), "Real confirm button listener must submit once.");
                 var before = BattleMulliganDesignTestScene.TruthSnapshot(state);
                 fixture.Presenter.Present(state);
                 Assert.That(BattleMulliganDesignTestScene.TruthSnapshot(state), Is.EqualTo(before));
-                for (var slot = 0; slot < 3; slot++) Assert.That(Alpha(fixture, slot), Is.EqualTo(slots.Contains(slot) ? 0f : 1f));
+                for (var slot = 0; slot < 5; slot++) Assert.That(Alpha(fixture, slot), Is.EqualTo(slots.Contains(slot) ? 0f : 1f));
                 BattleMulliganReplacementTestDriver.ApplyAuthoritativeReplacement(state, slots);
                 var expected = BattleMulliganOverlayPresenter.BuildConfirmedCardLayout(opening, slots, state.Player.Hand.CardIds);
                 before = BattleMulliganDesignTestScene.TruthSnapshot(state);
@@ -132,7 +134,7 @@ namespace Project333.Tests.EditMode
                     var first = ghosts.OrderBy(g => g.name).First();
                     Assert.That(Vector2.Distance(ScreenPoint(source.rectTransform), ScreenPoint((RectTransform)first)), Is.LessThan(2f));
                 }
-                for (var slot = 0; slot < 3; slot++)
+                for (var slot = 0; slot < 5; slot++)
                 {
                     Assert.That(((RectTransform)fixture.Buttons[slot].transform).anchoredPosition, Is.EqualTo(positions[slot]), "Kept slots must not reflow.");
                     if (!slots.Contains(slot)) Assert.That(Alpha(fixture, slot), Is.EqualTo(1f));
@@ -340,7 +342,7 @@ namespace Project333.Tests.EditMode
                 };
                 fixture.Confirm.onClick.Invoke(); // Real SubmitPlayerMulligan -> RefreshPresenter -> BattleScreenPresenter.Present.
                 Assert.That(driver.Gateway.ConfirmCount, Is.EqualTo(1));
-                Assert.That(driver.Gateway.AlphasAtSubmit, Is.EqualTo(new[] { 0f, 1f, 0f }));
+                Assert.That(driver.Gateway.AlphasAtSubmit, Is.EqualTo(new[] { 0f, 1f, 0f, 1f, 1f }));
                 Assert.That(fixture.Presenter.IsDealingReplacementHand, Is.True);
             Assert.That(fixture.Text("StatusText").text, Is.Empty, "Replacement animation must not show a progress notice.");
                 Assert.That((int[])BattleMulliganDesignTestScene.Get(fixture.Presenter, "_dealSlotIndices"), Is.EqualTo(new[] { 0, 2 }));
@@ -367,18 +369,21 @@ namespace Project333.Tests.EditMode
             var before = BattleMulliganDesignTestScene.TruthSnapshot(state);
             fixture.Confirm.onClick.Invoke();
             fixture.Presenter.ApplyPresentationDesign();
-            Assert.That(new[] { Alpha(fixture, 0), Alpha(fixture, 1), Alpha(fixture, 2) }, Is.EqualTo(new[] { 0f, 1f, 0f }));
+            Assert.That(SnapshotAlphas(fixture), Is.EqualTo(new[] { 0f, 1f, 0f, 1f, 1f }));
             fixture.Presenter.gameObject.SetActive(false);
             yield return null;
             fixture.Presenter.Present(state);
-            Assert.That(new[] { Alpha(fixture, 0), Alpha(fixture, 1), Alpha(fixture, 2) }, Is.EqualTo(new[] { 0f, 1f, 0f }));
+            Assert.That(SnapshotAlphas(fixture), Is.EqualTo(new[] { 0f, 1f, 0f, 1f, 1f }));
             Assert.That(fixture.Presenter.IsDealingReplacementHand, Is.False);
             Assert.That(BattleMulliganDesignTestScene.Ghosts(fixture.Presenter), Is.Empty);
             Assert.That(fixture.Confirm.interactable, Is.False);
             Assert.That(BattleMulliganDesignTestScene.TruthSnapshot(state), Is.EqualTo(before));
         }
-        private static int[] Slots(int count) => count == 0 ? Array.Empty<int>() : count == 1 ? new[] { 1 } : count == 2 ? new[] { 0, 2 } : new[] { 0, 1, 2 };
+        private static int[] Slots(int count) => count == 0 ? Array.Empty<int>() : count == 1 ? new[] { 1 } : count == 2 ? new[] { 0, 2 } : Enumerable.Range(0, count).ToArray();
         private static float Alpha(BattleMulliganDesignTestScene fixture, int slot) => fixture.Buttons[slot].GetComponent<CanvasGroup>().alpha;
+        // Create this closure after entering PlayMode; iterator locals must survive domain reload.
+        private static float[] SnapshotAlphas(BattleMulliganDesignTestScene fixture) =>
+            Enumerable.Range(0, 5).Select(slot => Alpha(fixture, slot)).ToArray();
         private static IEnumerable<string> Display(BattleMulliganDesignTestScene fixture) => (IEnumerable<string>)BattleMulliganDesignTestScene.Get(fixture.Presenter, "_displayCardIds");
         private static Vector2 ScreenPoint(RectTransform rect)
         {
@@ -425,13 +430,13 @@ namespace Project333.Tests.EditMode
         {
             var opening = state.Player.Hand.Cards.ToArray();
             foreach (var slot in slots) state.Player.Hand.Remove(opening[slot].CardId, opening[slot].RuntimeId);
-            var replacements = new[] { "SkeletonArcher", "ManaPond", "Goblin" };
+            var replacements = new[] { "SkeletonArcher", "ManaPond", "Goblin", "ManaPond", "SkeletonArcher" };
             for (var index = 0; index < slots.Count; index++) state.Player.Hand.Add(replacements[index]);
             state.Player.MarkMulliganUsed();
             if (main)
             {
                 state.AI.MarkMulliganUsed();
-                state.Player.Hand.Add("Cerberus"); // An unrelated normal turn-start draw must never become a fourth mulligan slot.
+                state.Player.Hand.Add("Cerberus"); // An unrelated normal turn-start draw must never become a sixth mulligan slot.
                 state.SetPhase(PhaseType.Main);
             }
         }
@@ -449,7 +454,7 @@ namespace Project333.Tests.EditMode
             {
                 ConfirmCount++;
                 SubmittedCardIds = cards.ToArray();
-                AlphasAtSubmit = _fixture.Buttons.Take(3).Select(c => c.GetComponent<CanvasGroup>().alpha).ToArray();
+                AlphasAtSubmit = _fixture.Buttons.Take(5).Select(c => c.GetComponent<CanvasGroup>().alpha).ToArray();
                 AuthoritativeResponseAtSubmit?.Invoke();
             }
             public void ApplyMulligan(PlayerId playerId, IEnumerable<string> cards, IDeckShuffler shuffler) => Record(cards);

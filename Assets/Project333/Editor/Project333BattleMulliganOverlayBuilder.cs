@@ -14,7 +14,7 @@ namespace Project333.Editor
         private const string BattleScenePath = "Assets/Battle_VSlice.unity";
         private const string OverlayName = "MulliganOverlayCanvas";
         private const string LegacyButtonName = "PassMulliganButton";
-        private const int CardSlotCount = 3;
+        private const int CardSlotCount = 5;
 
         private static readonly Color DimColor = new Color(0.015f, 0.025f, 0.045f, 0.92f);
         private static readonly Color PanelColor = new Color(0.055f, 0.075f, 0.11f, 0.96f);
@@ -36,6 +36,7 @@ namespace Project333.Editor
             var existingOverlay = FindSceneComponent<BattleMulliganOverlayPresenter>(scene);
             if (existingOverlay != null)
             {
+                existingOverlay.EnsureCardCapacity(CardSlotCount);
                 existingOverlay.ApplyPresentationDesign();
                 EditorUtility.SetDirty(existingOverlay);
                 EditorSceneManager.MarkSceneDirty(scene);

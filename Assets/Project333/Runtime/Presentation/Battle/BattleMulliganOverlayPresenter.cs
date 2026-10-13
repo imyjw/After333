@@ -53,8 +53,8 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private Color _statOutlineColor = new Color(0f, 0f, 0f, 0.95f);
         [SerializeField] private Vector2 _statOutlineDistance = new Vector2(2f, -2f);
 
-        private readonly List<string> _openingHandCardIds = new List<string>(4);
-        private readonly List<string> _displayCardIds = new List<string>(4);
+        private readonly List<string> _openingHandCardIds = new List<string>(5);
+        private readonly List<string> _displayCardIds = new List<string>(5);
         private readonly HashSet<int> _selectedSlotIndices = new HashSet<int>();
 
         private BattleBootstrapper _battleBootstrapper;
@@ -377,6 +377,58 @@ namespace Project333.Runtime.Presentation.Battle
             return $"{(isLocalFirstPlayer ? "선공" : "후공")}\n{title ?? string.Empty}";
         }
 
+        // Keep existing scene slots and extend them when the actual opening hand needs more.
+        // Cloning remaps the serialized artwork/stat references without requiring a scene rebuild.
+        public void EnsureCardCapacity(int count)
+        {
+            if (count <= _cardButtons.Length) return;
+            var templateIndex = Array.FindIndex(_cardButtons, button => button != null);
+            if (templateIndex < 0) return;
+            var template = _cardButtons[templateIndex];
+            var oldCount = _cardButtons.Length;
+            UnbindButtons();
+            Array.Resize(ref _cardButtons, count);
+            Array.Resize(ref _cardArtworkImages, count);
+            Array.Resize(ref _selectionOverlays, count);
+            Array.Resize(ref _fallbackCardIdTexts, count);
+            Array.Resize(ref _attackValueTexts, count);
+            Array.Resize(ref _hpValueTexts, count);
+            for (var i = oldCount; i < count; i++)
+            {
+                var clone = Instantiate(template.gameObject, template.transform.parent, false);
+                clone.name = $"MulliganCard_{i:00}";
+                var button = clone.GetComponent<UnityEngine.UI.Button>();
+                button.onClick = new UnityEngine.UI.Button.ButtonClickedEvent();
+                _cardButtons[i] = button;
+                _cardArtworkImages[i] = MapClonedSlot(GetAt(_cardArtworkImages, templateIndex), template.transform, clone.transform);
+                _selectionOverlays[i] = MapClonedSlot(GetAt(_selectionOverlays, templateIndex), template.transform, clone.transform);
+                _fallbackCardIdTexts[i] = MapClonedSlot(GetAt(_fallbackCardIdTexts, templateIndex), template.transform, clone.transform);
+                _attackValueTexts[i] = MapClonedSlot(GetAt(_attackValueTexts, templateIndex), template.transform, clone.transform);
+                _hpValueTexts[i] = MapClonedSlot(GetAt(_hpValueTexts, templateIndex), template.transform, clone.transform);
+            }
+            _designApplied = false;
+            _designCanvasSize = Vector2.zero;
+            EnsureCardStatTexts();
+            ApplyKoreanFonts();
+            BindButtons();
+            ApplyPresentationDesign();
+        }
+
+        private static T MapClonedSlot<T>(T source, Transform template, Transform clone) where T : Component
+        {
+            if (source == null) return null;
+            var indices = new Stack<int>();
+            var current = source.transform;
+            while (current != template)
+            {
+                if (current == null) return null;
+                indices.Push(current.GetSiblingIndex());
+                current = current.parent;
+            }
+            while (indices.Count > 0) clone = clone.GetChild(indices.Pop());
+            return clone.GetComponent<T>();
+        }
+
         private void BeginSession(BattleState battleState)
         {
             if (_resultSequence != null)
@@ -387,6 +439,7 @@ namespace Project333.Runtime.Presentation.Battle
 
             _openingHandCardIds.Clear();
             var openingHandCardIds = battleState?.Player?.Hand?.CardIds;
+            EnsureCardCapacity(openingHandCardIds?.Count ?? 0);
             if (openingHandCardIds != null)
             {
                 for (var i = 0; i < openingHandCardIds.Count && i < _cardButtons.Length; i++)

@@ -108,7 +108,7 @@ Example field:
 
 - First player / second player is decided randomly.
 - Each player's deck is shuffled independently before either opening hand is drawn.
-- Starting hand size: both players draw `3` cards.
+- Starting hand size: both players draw `5` cards.
 - Starting mana: `0`
 - Starting qi: `0`
 - Starting power: `0`
@@ -132,7 +132,7 @@ Example field:
 - Mulligan does not create a Coin card or any other bonus card.
 - Opening cards are shown as large card images in a center-screen mulligan overlay.
 - Presentation (2026-10-02): `시작 핸드 카드` / `교환할 카드 선택`, green keep auras, large red X and `교체` labels for selected slots, and a `확인` button below. See [mulligan presentation](mulligan_presentation.md).
-- When entering an unconfirmed mulligan, the three opening card images fly one by one from the bottom-right own deck and flip face up. Selection is enabled after about 0.74 seconds. This is presentation only: no extra draw/resource/event mutation, and the server's 33-second timer continues. Already-confirmed reconnects skip the entrance.
+- When entering an unconfirmed mulligan, the five opening card images fly one by one from the bottom-right own deck and flip face up. Selection is enabled after about 1.00 second. This is presentation only: no extra draw/resource/event mutation, and the server's 33-second timer continues. Already-confirmed reconnects skip the entrance.
 - The player selects replacement cards in that overlay, then presses the mulligan confirm button once.
 - On confirmation, only selected card slots disappear while awaiting the authoritative replacement hand. New cards fly from the own deck into those same selected positions using the opening entrance animation; kept cards stay visible. Submission failure restores the selected cards. Repeated snapshots do not repeat the flight.
 - A PvP player who confirms first completes their replacement immediately and sees `상대의 멀리건을 기다리는 중...` until the opponent confirms or times out.
@@ -170,7 +170,7 @@ Each turn follows this sequence:
 
 ### Base draw behavior (2026-10-08)
 
-The base draw attempts one card on every own turn, including the opening turns. Opening hand/mulligan still use three cards. A card drawn at the hand limit burns; an empty-deck attempt increments the failed-draw count and applies the existing escalating damage. Card effects that draw multiple cards still resolve each attempt independently and stop when the battle ends.
+The base draw attempts one card on every own turn, including the opening turns. Opening hand/mulligan use five cards. A card drawn at the hand limit burns; an empty-deck attempt increments the failed-draw count and applies the existing escalating damage. Card effects that draw multiple cards still resolve each attempt independently and stop when the battle ends.
 
 ### Card-Based Gain
 

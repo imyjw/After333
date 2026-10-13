@@ -60,6 +60,28 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
+        public void BuildConfirmedCardLayout_WithFiveOpeningCards_ReplacesFourthAndFifthSlotsOnly()
+        {
+            var result = BattleMulliganOverlayPresenter.BuildConfirmedCardLayout(
+                new[] { "A", "A", "B", "C", "D" },
+                new HashSet<int> { 3, 4 },
+                new[] { "A", "A", "B", "X", "Y", "TURN_DRAW" });
+
+            Assert.That(result, Is.EqualTo(new[] { "A", "A", "B", "X", "Y" }));
+        }
+
+        [Test]
+        public void BuildConfirmedCardLayout_WithAllFiveSelected_IgnoresSixthTurnStartDraw()
+        {
+            var result = BattleMulliganOverlayPresenter.BuildConfirmedCardLayout(
+                new[] { "A", "B", "C", "D", "E" },
+                new HashSet<int> { 0, 1, 2, 3, 4 },
+                new[] { "V", "W", "X", "Y", "Z", "TURN_DRAW" });
+
+            Assert.That(result, Is.EqualTo(new[] { "V", "W", "X", "Y", "Z" }));
+        }
+
+        [Test]
         public void TryBuildCardStatValues_UnitUsesOwnedCardUpgradeBonuses()
         {
             var definition = new UnitCardDefinition(

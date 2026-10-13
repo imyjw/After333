@@ -29,8 +29,9 @@ namespace Project333.Runtime.Application.Tutorial
         }
         public static IReadOnlyList<string> CreateDeck()
         {
+            // Five opening cards, then the exchanged archer and normal turn draws.
             // DeckState draws from the end. This order is independent of real deck/upgrades.
-            var drawOrder = new List<string> { "Goblin", "ManaPond", "firebolt", "SkeletonArcher", "PowerPlant", "firebolt" };
+            var drawOrder = new List<string> { "Goblin", "ManaPond", "firebolt", "ManaShield", "PlasmaShield", "SkeletonArcher", "PowerPlant", "firebolt" };
             var pool = new[] { "Goblin", "ManaPond", "SkeletonArcher", "PowerPlant", "ManaShield", "PlasmaShield", "GaebangBranch", "ManaCannon", "OrcBerserker", "ElfLongbowScout", "A-301" };
             var copies = new Dictionary<string, int>();
             foreach (var id in drawOrder) copies[id] = copies.TryGetValue(id, out var count) ? count + 1 : 1;

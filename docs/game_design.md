@@ -130,7 +130,7 @@ Some cards may occupy more than one tile.
 ### Battle System
 
 - Random first player / second player
-- Opening hands of `3` for both players
+- Opening hands of `5` for both players
 - One mulligan per player, using Hearthstone-style partial replacement
 - Starting resources of `0 mana`, `0 qi`, `0 power`, and gold `3` for the first player / `4` for the second player, assigned before mulligan; neither first turn adds base gold (battle turns `1` and `2`); normal own-turn gain is `gold +3` from battle turn `3` onward
 - Turn structure with base draw of 1 card every own turn (including opening turns), resource calculation/gain, science power payment, main phase, and turn end

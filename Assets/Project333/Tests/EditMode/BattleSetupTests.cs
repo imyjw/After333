@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using Project333.Runtime.Application.Services;
 using Project333.Runtime.Domain.Battle;
@@ -31,10 +32,10 @@ namespace Project333.Tests.EditMode
             AssertResources(battleState.Player.Resources, 3);
             AssertResources(battleState.AI.Resources, 4);
 
-            Assert.That(battleState.Player.Hand.Count, Is.EqualTo(3));
-            Assert.That(battleState.AI.Hand.Count, Is.EqualTo(3));
-            Assert.That(battleState.Player.Deck.Count, Is.EqualTo(7));
-            Assert.That(battleState.AI.Deck.Count, Is.EqualTo(7));
+            Assert.That(battleState.Player.Hand.Count, Is.EqualTo(5));
+            Assert.That(battleState.AI.Hand.Count, Is.EqualTo(5));
+            Assert.That(battleState.Player.Deck.Count, Is.EqualTo(5));
+            Assert.That(battleState.AI.Deck.Count, Is.EqualTo(5));
             Assert.That(battleState.Player.HasUsedMulligan, Is.False);
             Assert.That(battleState.AI.HasUsedMulligan, Is.True);
             Assert.That(battleState.CardDrawEvents, Is.Empty);
@@ -51,10 +52,10 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.ActivePlayerId, Is.EqualTo(PlayerId.AI));
             AssertResources(battleState.AI.Resources, 3);
             AssertResources(battleState.Player.Resources, 4);
-            Assert.That(battleState.Player.Hand.Count, Is.EqualTo(3));
-            Assert.That(battleState.AI.Hand.Count, Is.EqualTo(3));
-            Assert.That(battleState.Player.Deck.Count, Is.EqualTo(7));
-            Assert.That(battleState.AI.Deck.Count, Is.EqualTo(7));
+            Assert.That(battleState.Player.Hand.Count, Is.EqualTo(5));
+            Assert.That(battleState.AI.Hand.Count, Is.EqualTo(5));
+            Assert.That(battleState.Player.Deck.Count, Is.EqualTo(5));
+            Assert.That(battleState.AI.Deck.Count, Is.EqualTo(5));
         }
 
         [Test]
@@ -106,10 +107,10 @@ namespace Project333.Tests.EditMode
             Assert.That(shuffler.ShuffleCount, Is.EqualTo(2));
             Assert.That(
                 battleState.Player.Hand.CardIds,
-                Is.EqualTo(new[] { "P-00", "P-01", "P-02" }));
+                Is.EqualTo(new[] { "P-00", "P-01", "P-02", "P-03", "P-04" }));
             Assert.That(
                 battleState.AI.Hand.CardIds,
-                Is.EqualTo(new[] { "A-00", "A-01", "A-02" }));
+                Is.EqualTo(new[] { "A-00", "A-01", "A-02", "A-03", "A-04" }));
         }
 
         [Test]
@@ -170,9 +171,9 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.Player.HasUsedMulligan, Is.True);
             Assert.That(battleState.Phase, Is.EqualTo(PhaseType.TurnStart));
             Assert.That(battleState.TurnNumber, Is.EqualTo(1));
-            Assert.That(battleState.Player.Hand.Count, Is.EqualTo(3));
+            Assert.That(battleState.Player.Hand.Count, Is.EqualTo(5));
             Assert.That(battleState.Player.Hand.Contains(selectedCardId), Is.False);
-            Assert.That(battleState.Player.Deck.Count, Is.EqualTo(7));
+            Assert.That(battleState.Player.Deck.Count, Is.EqualTo(5));
             Assert.That(battleState.CardDrawEvents, Has.Count.EqualTo(1));
             Assert.That(battleState.CardDrawEvents[0].OwnerId, Is.EqualTo(PlayerId.Player));
         }
@@ -192,8 +193,69 @@ namespace Project333.Tests.EditMode
 
             Assert.That(battleState.Player.Hand.Contains(selectedCardId), Is.False);
             Assert.That(battleState.Player.Deck.CardIds, Does.Contain(selectedCardId));
-            Assert.That(battleState.Player.Hand.Count, Is.EqualTo(3));
-            Assert.That(battleState.Player.Deck.Count, Is.EqualTo(7));
+            Assert.That(battleState.Player.Hand.Count, Is.EqualTo(5));
+            Assert.That(battleState.Player.Deck.Count, Is.EqualTo(5));
+        }
+
+        [TestCase(PlayerId.Player)]
+        [TestCase(PlayerId.AI)]
+        public void CreateInitialState_ThirtyThreeCardDecks_DealFiveToBothSeatsAndConserveCards(PlayerId first)
+        {
+            var playerDeck = Enumerable.Range(0, 33).Select(i => "P-" + i).ToArray();
+            var opponentDeck = Enumerable.Range(0, 33).Select(i => "A-" + i).ToArray();
+            var state = new BattleSetupService(new NoOpDeckShuffler()).CreateInitialState(
+                new BattleSetupRequest(playerDeck, opponentDeck, first, aiMulliganEnabled: true));
+
+            foreach (var owner in new[] { PlayerId.Player, PlayerId.AI })
+            {
+                var player = state.GetPlayer(owner);
+                Assert.That(player.Hand.Count, Is.EqualTo(5));
+                Assert.That(player.Deck.Count, Is.EqualTo(28));
+                Assert.That(player.Hand.Cards.Select(card => card.RuntimeId).Distinct().Count(), Is.EqualTo(5));
+                CollectionAssert.AreEquivalent(owner == PlayerId.Player ? playerDeck : opponentDeck,
+                    player.Hand.CardIds.Concat(player.Deck.CardIds));
+                AssertResources(player.Resources, owner == first ? 3 : 4);
+                Assert.That(player.HasUsedMulligan, Is.False);
+            }
+            Assert.That(state.CardDrawEvents, Is.Empty, "Opening cards are not normal turn-start draws.");
+            Assert.That(state.ResourceChangeEvents, Is.Empty);
+        }
+
+        [TestCase(PlayerId.Player)]
+        [TestCase(PlayerId.AI)]
+        public void ApplyMulligan_AllFiveWithDuplicateCards_ReplacesAllCopiesAndConservesDeck(PlayerId owner)
+        {
+            var opening = new[] { "same", "same", "opening-2", "opening-3", "opening-4" };
+            var replacements = new[] { "same", "replacement-1", "replacement-2", "replacement-3", "replacement-4" };
+            var deck = replacements.Reverse().Concat(opening.Reverse()).ToArray();
+            var state = new BattleSetupService(new NoOpDeckShuffler()).CreateInitialState(
+                new BattleSetupRequest(deck, deck, owner, aiMulliganEnabled: true));
+            var player = state.GetPlayer(owner);
+            Assert.That(player.Hand.CardIds, Is.EqualTo(opening));
+
+            var mulligan = new MulliganService();
+            mulligan.ApplyMulligan(state, owner, opening, new NoOpDeckShuffler());
+
+            Assert.That(player.Hand.CardIds, Is.EqualTo(replacements),
+                "Only copies left in the deck can replace the five selected copies, including another copy of the same type.");
+            Assert.That(player.Hand.Count, Is.EqualTo(5));
+            Assert.That(player.Deck.Count, Is.EqualTo(5));
+            CollectionAssert.AreEquivalent(opening, player.Deck.CardIds);
+            CollectionAssert.AreEquivalent(deck, player.Hand.CardIds.Concat(player.Deck.CardIds));
+            Assert.That(state.CardDrawEvents, Has.Count.EqualTo(5));
+            Assert.That(state.CardDrawEvents.Select(e => e.OwnerId), Is.All.EqualTo(owner));
+            Assert.That(player.HasUsedMulligan, Is.True);
+            Assert.That(state.Phase, Is.EqualTo(PhaseType.Mulligan), "The other human seat must still confirm.");
+            AssertResources(player.Resources, 3);
+            AssertResources(state.GetOpponent(owner).Resources, 4);
+
+            mulligan.PassMulligan(state, state.GetOpponent(owner).Id);
+            Assert.That(state.Phase, Is.EqualTo(PhaseType.TurnStart));
+            Assert.That(state.TurnNumber, Is.EqualTo(1));
+            Assert.Throws<InvalidOperationException>(() =>
+                mulligan.ApplyMulligan(state, owner, replacements, new NoOpDeckShuffler()));
+            Assert.That(player.Hand.CardIds, Is.EqualTo(replacements));
+            Assert.That(player.Deck.Count, Is.EqualTo(5));
         }
 
         private static BattleSetupRequest CreateRequest(PlayerId firstPlayerId)

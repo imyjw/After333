@@ -163,8 +163,8 @@ Online work must pass through a gateway boundary.
 
 - First player is random.
 - Each player's deck is shuffled independently before either opening hand is drawn.
-- First player starts with `3` cards.
-- Second player starts with `3` cards.
+- First player starts with `5` cards.
+- Second player starts with `5` cards.
 - Starting resources are:
   - mana `0`
   - qi `0`

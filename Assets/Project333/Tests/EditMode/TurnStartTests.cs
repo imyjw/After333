@@ -90,6 +90,36 @@ namespace Project333.Tests.EditMode
             Assert.That(battleState.AI.Resources.Gold, Is.EqualTo(3));
         }
 
+        [TestCase(PlayerId.Player)]
+        [TestCase(PlayerId.AI)]
+        public void ResolveTurnStart_AfterFiveCardMulligan_DrawsExactlyOneForEachOpeningTurn(PlayerId first)
+        {
+            var state = CreateBattleState(first);
+            var second = state.GetOpponent(first).Id;
+            var service = new TurnStartService();
+            Assert.That(state.GetPlayer(first).Hand.Count, Is.EqualTo(5));
+            Assert.That(state.GetPlayer(second).Hand.Count, Is.EqualTo(5));
+            var firstDeckCount = state.GetPlayer(first).Deck.Count;
+            var secondDeckCount = state.GetPlayer(second).Deck.Count;
+
+            service.ResolveTurnStart(state);
+            Assert.That(state.GetPlayer(first).Hand.Count, Is.EqualTo(6));
+            Assert.That(state.GetPlayer(first).Deck.Count, Is.EqualTo(firstDeckCount - 1));
+            Assert.That(state.GetPlayer(second).Hand.Count, Is.EqualTo(5));
+            Assert.That(state.GetPlayer(first).Resources.Gold, Is.EqualTo(3));
+            Assert.That(state.CardDrawEvents, Has.Count.EqualTo(1));
+            Assert.That(state.CardDrawEvents[0].OwnerId, Is.EqualTo(first));
+
+            state.StartNextTurn(second);
+            service.ResolveTurnStart(state);
+            Assert.That(state.GetPlayer(first).Hand.Count, Is.EqualTo(6));
+            Assert.That(state.GetPlayer(second).Hand.Count, Is.EqualTo(6));
+            Assert.That(state.GetPlayer(second).Deck.Count, Is.EqualTo(secondDeckCount - 1));
+            Assert.That(state.GetPlayer(second).Resources.Gold, Is.EqualTo(4));
+            Assert.That(state.CardDrawEvents, Has.Count.EqualTo(2));
+            Assert.That(state.CardDrawEvents[1].OwnerId, Is.EqualTo(second));
+        }
+
         [Test]
         public void ResolveTurnStart_WhenHandIsFull_RemovesDrawnCardAndKeepsHandAtMaxHandSize()
         {

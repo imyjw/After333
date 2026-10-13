@@ -518,7 +518,7 @@ namespace Project333.Tests.EditMode
             Assert.That(battle.CurrentBattleState.ActivePlayerId, Is.EqualTo(PlayerId.Player));
             Assert.That(battle.CurrentBattleState.Phase, Is.EqualTo(PhaseType.TurnStart));
             Assert.That(battle.CurrentBattleState.Player.Master.CurrentHp, Is.EqualTo(333));
-            Assert.That(battle.CurrentBattleState.Player.Hand.Count, Is.EqualTo(3));
+            Assert.That(battle.CurrentBattleState.Player.Hand.Count, Is.EqualTo(5));
             var hand = battle.CurrentBattleState.Player.Hand.CardIds.ToArray();
             var state = battle.CurrentBattleState;
             controller.AttachPracticeScene(_borrowedScenes["Battle_VSlice"]);

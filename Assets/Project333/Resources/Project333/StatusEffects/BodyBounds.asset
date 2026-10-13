@@ -4719,10 +4719,10 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.04288499
-      y: 0.03125
-      width: 0.920078
-      height: 0.8261719
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
+      height: 0.82421875
   - VisualKey: ManaPond
     TextureName: Idle
     SpriteName: Idle_1
@@ -4734,10 +4734,10 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.038986355
-      y: 0.03125
-      width: 0.9239766
-      height: 0.8222656
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
+      height: 0.8203125
   - VisualKey: ManaPond
     TextureName: Idle
     SpriteName: Idle_2
@@ -4749,9 +4749,9 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.0331384
-      y: 0.03125
-      width: 0.9298246
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
       height: 0.8261719
   - VisualKey: ManaPond
     TextureName: Idle
@@ -4764,9 +4764,9 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.029239766
-      y: 0.03125
-      width: 0.9337232
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
       height: 0.83203125
   - VisualKey: ManaPond
     TextureName: Idle
@@ -4779,10 +4779,10 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.048732944
-      y: 0.03125
-      width: 0.91423005
-      height: 0.8378906
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
+      height: 0.8359375
   - VisualKey: ManaPond
     TextureName: Idle
     SpriteName: Idle_5
@@ -4794,10 +4794,10 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.04483431
-      y: 0.03125
-      width: 0.91812867
-      height: 0.8417969
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
+      height: 0.83984375
   - VisualKey: ManaPond
     TextureName: Idle
     SpriteName: Idle_6
@@ -4809,10 +4809,10 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.04288499
-      y: 0.03125
-      width: 0.920078
-      height: 0.8457031
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
+      height: 0.84375
   - VisualKey: ManaPond
     TextureName: Idle
     SpriteName: Idle_7
@@ -4824,10 +4824,10 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.037037037
-      y: 0.03125
-      width: 0.9259259
-      height: 0.83984375
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
+      height: 0.8378906
   - VisualKey: ManaPond
     TextureName: Idle
     SpriteName: Idle_8
@@ -4839,10 +4839,10 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.03125
-      y: 0.03125
-      width: 0.93359375
-      height: 0.8339844
+      x: 0.052734375
+      y: 0.00390625
+      width: 0.9121094
+      height: 0.83203125
   - VisualKey: ManaWeaver
     TextureName: Attack
     SpriteName: Attack_0
@@ -5140,7 +5140,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.015625
-      y: 0.01953125
+      y: 0
       width: 0.96875
       height: 0.6113281
   - VisualKey: MerchantCaravan
@@ -5155,7 +5155,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.015625
-      y: 0.01953125
+      y: 0
       width: 0.96875
       height: 0.6113281
   - VisualKey: MerchantCaravan
@@ -5170,7 +5170,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.015625
-      y: 0.01953125
+      y: 0
       width: 0.96875
       height: 0.6113281
   - VisualKey: MerchantCaravan
@@ -5185,7 +5185,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.015625
-      y: 0.01953125
+      y: 0
       width: 0.96875
       height: 0.6113281
   - VisualKey: MerchantCaravan
@@ -5200,7 +5200,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.015625
-      y: 0.01953125
+      y: 0
       width: 0.96875
       height: 0.6113281
   - VisualKey: MerchantCaravan
@@ -5215,7 +5215,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.015625
-      y: 0.01953125
+      y: 0
       width: 0.96875
       height: 0.6113281
   - VisualKey: NuclearPowerPlant
@@ -5230,7 +5230,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.115234375
-      y: 0.109375
+      y: 0.001953125
       width: 0.8378906
       height: 0.71875
   - VisualKey: NuclearPowerPlant
@@ -5245,7 +5245,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.115234375
-      y: 0.109375
+      y: 0.001953125
       width: 0.8378906
       height: 0.71875
   - VisualKey: NuclearPowerPlant
@@ -5260,7 +5260,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.115234375
-      y: 0.109375
+      y: 0.001953125
       width: 0.8378906
       height: 0.71875
   - VisualKey: NuclearPowerPlant
@@ -5275,7 +5275,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.115234375
-      y: 0.109375
+      y: 0.001953125
       width: 0.8378906
       height: 0.71875
   - VisualKey: OrcBerserker
@@ -6310,7 +6310,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.03125
-      y: 0.029296875
+      y: 0.001953125
       width: 0.9375
       height: 0.6972656
   - VisualKey: PowerPlant
@@ -6325,7 +6325,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.03125
-      y: 0.029296875
+      y: 0.001953125
       width: 0.9375
       height: 0.6972656
   - VisualKey: PowerPlant
@@ -6340,7 +6340,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.03125
-      y: 0.029296875
+      y: 0.001953125
       width: 0.9375
       height: 0.6972656
   - VisualKey: PowerPlant
@@ -6355,7 +6355,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.03125
-      y: 0.029296875
+      y: 0.001953125
       width: 0.9375
       height: 0.6972656
   - VisualKey: RedDragon
@@ -8874,10 +8874,10 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.04288499
-      y: 0.03125
-      width: 0.920078
-      height: 0.8261719
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
+      height: 0.82421875
   - VisualKey: unit:Assets/Building/ManaPond
     TextureName: Idle
     SpriteName: Idle_1
@@ -8889,10 +8889,10 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.038986355
-      y: 0.03125
-      width: 0.9239766
-      height: 0.8222656
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
+      height: 0.8203125
   - VisualKey: unit:Assets/Building/ManaPond
     TextureName: Idle
     SpriteName: Idle_2
@@ -8904,9 +8904,9 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.0331384
-      y: 0.03125
-      width: 0.9298246
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
       height: 0.8261719
   - VisualKey: unit:Assets/Building/ManaPond
     TextureName: Idle
@@ -8919,9 +8919,9 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.029239766
-      y: 0.03125
-      width: 0.9337232
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
       height: 0.83203125
   - VisualKey: unit:Assets/Building/ManaPond
     TextureName: Idle
@@ -8934,10 +8934,10 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.048732944
-      y: 0.03125
-      width: 0.91423005
-      height: 0.8378906
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
+      height: 0.8359375
   - VisualKey: unit:Assets/Building/ManaPond
     TextureName: Idle
     SpriteName: Idle_5
@@ -8949,10 +8949,10 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.04483431
-      y: 0.03125
-      width: 0.91812867
-      height: 0.8417969
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
+      height: 0.83984375
   - VisualKey: unit:Assets/Building/ManaPond
     TextureName: Idle
     SpriteName: Idle_6
@@ -8964,10 +8964,10 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.04288499
-      y: 0.03125
-      width: 0.920078
-      height: 0.8457031
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
+      height: 0.84375
   - VisualKey: unit:Assets/Building/ManaPond
     TextureName: Idle
     SpriteName: Idle_7
@@ -8979,10 +8979,10 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.037037037
-      y: 0.03125
-      width: 0.9259259
-      height: 0.83984375
+      x: 0.05263158
+      y: 0.00390625
+      width: 0.91033137
+      height: 0.8378906
   - VisualKey: unit:Assets/Building/ManaPond
     TextureName: Idle
     SpriteName: Idle_8
@@ -8994,10 +8994,10 @@ MonoBehaviour:
       height: 228
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.03125
-      y: 0.03125
-      width: 0.93359375
-      height: 0.8339844
+      x: 0.052734375
+      y: 0.00390625
+      width: 0.9121094
+      height: 0.83203125
   - VisualKey: unit:Assets/Building/MerchantCaravan
     TextureName: Idle
     SpriteName: Idle_0
@@ -9010,7 +9010,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.015625
-      y: 0.01953125
+      y: 0
       width: 0.96875
       height: 0.6113281
   - VisualKey: unit:Assets/Building/MerchantCaravan
@@ -9025,7 +9025,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.015625
-      y: 0.01953125
+      y: 0
       width: 0.96875
       height: 0.6113281
   - VisualKey: unit:Assets/Building/MerchantCaravan
@@ -9040,7 +9040,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.015625
-      y: 0.01953125
+      y: 0
       width: 0.96875
       height: 0.6113281
   - VisualKey: unit:Assets/Building/MerchantCaravan
@@ -9055,7 +9055,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.015625
-      y: 0.01953125
+      y: 0
       width: 0.96875
       height: 0.6113281
   - VisualKey: unit:Assets/Building/MerchantCaravan
@@ -9070,7 +9070,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.015625
-      y: 0.01953125
+      y: 0
       width: 0.96875
       height: 0.6113281
   - VisualKey: unit:Assets/Building/MerchantCaravan
@@ -9085,7 +9085,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.015625
-      y: 0.01953125
+      y: 0
       width: 0.96875
       height: 0.6113281
   - VisualKey: unit:Assets/Building/NuclearPowerPlant
@@ -9100,7 +9100,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.115234375
-      y: 0.109375
+      y: 0.001953125
       width: 0.8378906
       height: 0.71875
   - VisualKey: unit:Assets/Building/NuclearPowerPlant
@@ -9115,7 +9115,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.115234375
-      y: 0.109375
+      y: 0.001953125
       width: 0.8378906
       height: 0.71875
   - VisualKey: unit:Assets/Building/NuclearPowerPlant
@@ -9130,7 +9130,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.115234375
-      y: 0.109375
+      y: 0.001953125
       width: 0.8378906
       height: 0.71875
   - VisualKey: unit:Assets/Building/NuclearPowerPlant
@@ -9145,7 +9145,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.115234375
-      y: 0.109375
+      y: 0.001953125
       width: 0.8378906
       height: 0.71875
   - VisualKey: unit:Assets/Building/PowerPlant
@@ -9160,7 +9160,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.03125
-      y: 0.029296875
+      y: 0.001953125
       width: 0.9375
       height: 0.6972656
   - VisualKey: unit:Assets/Building/PowerPlant
@@ -9175,7 +9175,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.03125
-      y: 0.029296875
+      y: 0.001953125
       width: 0.9375
       height: 0.6972656
   - VisualKey: unit:Assets/Building/PowerPlant
@@ -9190,7 +9190,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.03125
-      y: 0.029296875
+      y: 0.001953125
       width: 0.9375
       height: 0.6972656
   - VisualKey: unit:Assets/Building/PowerPlant
@@ -9205,7 +9205,7 @@ MonoBehaviour:
     NormalizedBounds:
       serializedVersion: 2
       x: 0.03125
-      y: 0.029296875
+      y: 0.001953125
       width: 0.9375
       height: 0.6972656
   - VisualKey: unit:Assets/Unit/A-111

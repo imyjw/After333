@@ -82,7 +82,7 @@ namespace Project333.Runtime.Application.Tutorial
             new TutorialStep("이제 골드 던전으로 전투를 배워보세. 이번 연습에서는 실제 도전 횟수가 줄어들지 않네.", TutorialCue.GoldDungeonPractice),
             new TutorialStep("초록색으로 표시한 ‘골드 던전’ 버튼을 눌러보게. 실제 계정과 연결되지 않은 연습 전투로 들어가겠네.", TutorialCue.GoldDungeonPractice, TutorialAction.StartGoldDungeon),
             new TutorialStep("잘했네! 연습 전투에 들어왔군. 다음에는 자원과 전투를 배워보세.", TutorialCue.BattleEntry),
-            new TutorialStep("전투를 시작하기 전에는 처음 받은 카드 세 장 중에서 바꾸고 싶은 카드를 고를 수 있네. 이것을 ‘멀리건’이라고 하지.", TutorialCue.MulliganIntro),
+            new TutorialStep("전투를 시작하기 전에는 처음 받은 카드 다섯 장 중에서 바꾸고 싶은 카드를 고를 수 있네. 이것을 ‘멀리건’이라고 하지.", TutorialCue.MulliganIntro),
             new TutorialStep("이번에는 표시한 파이어볼을 눌러보게. 붉은 X와 ‘교체’가 표시되면 바꿀 카드로 선택된 것이네. 다시 누르면 취소할 수 있지.", TutorialCue.MulliganSelection, TutorialAction.SelectMulliganCard),
             new TutorialStep("좋네. 이제 아래의 ‘확인’을 눌러보게. 고른 카드들만 새 카드로 바꾸고, 나머지는 그대로 가져가네.", TutorialCue.MulliganConfirm, TutorialAction.ConfirmMulligan),
             new TutorialStep("전투의 목표는 상대 마스터 유닛의 체력을 0 이하로 만드는 것이네. 반대로 자네 마스터가 쓰러지면 패배하지.", TutorialCue.MasterObjective),
