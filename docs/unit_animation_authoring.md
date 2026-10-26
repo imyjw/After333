@@ -1,5 +1,7 @@
 # 소환물 애니메이션 편집
 
+2026-10-20 현재 등록 유닛의 Controller→clip 키 수·Samples·StopTime·Loop Time은 [전체 연결 메타데이터](unit_animation_snapshot.md)에 다시 추출했다. 이 문서의 사용자 제작 규격은 유지하며 날짜별 옛 제작 값으로 사용자의 최신 Assets를 되돌리지 않는다.
+
 2026-10-01 현재 소스·native 연결 대조. 소환물 모션은 PNG → Animation Clip → 카드에 등록한 Animator Controller 경로를 사용한다. 아래 날짜별 제작 표는 최초 제작 기록이며 현재 컷 수·Samples·Loop Time은 현재 `.anim`과 연결한 Controller가 결정한다.
 
 ## 공통 제작 기준 — 2026-09-27 사용자 확정
@@ -43,7 +45,7 @@
 | A-301 | 6컷/12fps/0.5초 | 6컷/12fps/0.5초 | 2컷/12fps/약0.167초 | Controller에 없음 | 8컷/12fps/약0.667초 |
 | 오크 족장 | 2컷/12fps/약0.167초 | 4컷/12fps/약0.333초 | 2컷/12fps/약0.167초 | 4컷/12fps/약0.333초 | 5컷/12fps/약0.417초 |
 
-광마는 Idle/Run만 Loop Time을 켜고 나머지 세 모션은 끈다. 블루드래곤·레드드래곤·A-301·오크 족장의 위 연결 클립은 현재 Loop Time이 켜져 있다. 공격·사망 처리의 대기/다음 상태 전환은 공통 전투 연출 코드가 담당한다. 블루드래곤·광마·레드드래곤은 `Drained.anim` 파일이 남아 있어도 현재 Controller에 Drained 상태가 없다. A-301의 방전 시각 상태는 기존 `Disabled`(8컷/12fps/약0.667초)를 사용한다.
+광마는 Idle/Run만 Loop Time을 켜고 나머지 세 모션은 끈다. 2026-10-20 대조 당시 블루드래곤·레드드래곤·A-301·오크 족장의 위 연결 클립은 Loop Time이 켜져 있었다. 2026-10-26 확인한 오크 족장의 Attack은 Loop Time=0, Idle은 Loop Time=1이며 현재 사용자 자산을 보존한다. 공격·사망 처리의 대기/다음 상태 전환은 공통 전투 연출 코드가 담당한다. 블루드래곤·광마·레드드래곤은 `Drained.anim` 파일이 남아 있어도 현재 Controller에 Drained 상태가 없다. A-301의 방전 시각 상태는 기존 `Disabled`(8컷/12fps/약0.667초)를 사용한다.
 
 ## 블루드래곤·광마 이전 당시 규격 — 2026-09-26 기록
 
@@ -159,3 +161,7 @@ Idle·Attack·Death 각 8컷, PNG 4096×512px/개별 컷 512×512px이며 24컷�
 ## 스턴·빙결 표시와 본체 일시정지 — 2026-10-01
 
 스턴은 머리 위의 금색 별 8컷 순환, 빙결은 반투명 큰 얼음 결정으로 표시한다. 빙결 중 본체 Animator와 공통 클립 샘플러만 정지하고 해제 시 원래 속도·재생 위치를 이어 사용한다. 별·얼음은 독립 시계로 계속 재생된다. Death는 정지를 풀고 진행한다. 기존 Unit PNG/AnimationClip/Animator Controller/카드 연결·표시 배율은 변경하지 않았다. 실제 알파 영역을 metadata-only 캐시에 저장해 기존 Unit를 Readable로 바꾸지 않는다. 새 효과 그림·속도·투명도·캐시 작성기·검사 증거는 [스턴·빙결 VFX](stun_freeze_status_vfx.md)에 있다.
+
+## 무피해 반격 후 Idle 복귀 (2026-10-26)
+
+피해0·무적으로 공격을 막고 반격하면, 공통 전투 연출의 복귀 목록에 빠져 Attack의 마지막 프레임에 남던 경로를 수정했다. 살아남은 반격자만 동일 RuntimeId를 확인해 Idle로 돌리며 사망자는 Death를 유지한다. 오크 족장 PNG/anim/controller는 바꾸지 않았다. 실제 Play 재현2실패→3/3 및 관련 고유 검사41개 최종 통과. 자세한 원인·검증·앱 반영은 [반격 연출](counterattack_presentation.md).

@@ -13,7 +13,7 @@ using UnityEngine.UI;
 
 namespace Project333.Runtime.Presentation.Hand
 {
-    public sealed class HandCardTextView : MonoBehaviour
+    public sealed partial class HandCardTextView : MonoBehaviour
     {
         [SerializeField] private HandCardView _handCardView;
         [SerializeField] private TMP_Text _text;
@@ -299,9 +299,10 @@ namespace Project333.Runtime.Presentation.Hand
                 _runtimeCardRect.gameObject.SetActive(shouldShowRuntimeCard);
             }
 
-            _runtimeCanvasGroup.alpha = shouldShowRuntimeCard ? 1f : 0f;
-            _runtimeCanvasGroup.blocksRaycasts = shouldShowRuntimeCard;
-            _runtimeCanvasGroup.interactable = shouldShowRuntimeCard;
+            var allowRuntimeCard = shouldShowRuntimeCard && !IsHandPresentationSuppressed;
+            _runtimeCanvasGroup.alpha = allowRuntimeCard ? 1f : 0f;
+            _runtimeCanvasGroup.blocksRaycasts = allowRuntimeCard;
+            _runtimeCanvasGroup.interactable = allowRuntimeCard;
         }
 
         [ContextMenu("Refresh")]
@@ -313,10 +314,12 @@ namespace Project333.Runtime.Presentation.Hand
             {
                 RefreshRuntimeVisual();
                 SetLegacyCanvasVisible(false);
+                RefreshTemporaryReplicateHourglass();
                 return;
             }
 
             RefreshLegacyVisual();
+            RefreshTemporaryReplicateHourglass();
         }
 
         private void RefreshLegacyVisual()
@@ -1172,6 +1175,13 @@ namespace Project333.Runtime.Presentation.Hand
 
         private void ApplyRuntimeAnimation()
         {
+            if (IsHandPresentationSuppressed && _runtimeCanvasGroup != null)
+            {
+                _runtimeCanvasGroup.alpha = 0f;
+                _runtimeCanvasGroup.blocksRaycasts = false;
+                _runtimeCanvasGroup.interactable = false;
+                return;
+            }
             if (!HasRuntimeVisual || !_runtimeCardRect.gameObject.activeSelf)
             {
                 return;
@@ -1378,7 +1388,7 @@ namespace Project333.Runtime.Presentation.Hand
             _targetRuntimeSortingOrder = ResolveRuntimeSortingOrder(_runtimeCardRect.GetSiblingIndex());
             ApplyRuntimeSortingOrder();
             var visible = isActiveAndEnabled && _runtimeCardRect.gameObject.activeInHierarchy &&
-                          _targetRuntimeVisible && _hasCard;
+                          _targetRuntimeVisible && _hasCard && !IsHandPresentationSuppressed;
             _runtimeCanvasGroup.alpha = visible ? 1f : 0f;
             _runtimeCanvasGroup.blocksRaycasts = visible;
             _runtimeCanvasGroup.interactable = visible;

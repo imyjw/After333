@@ -121,7 +121,8 @@ public sealed record MeResponse(
 public sealed record AuthenticatedAccount(
     AuthAccountDto Account,
     WalletDto Wallet,
-    CollectionSummaryDto CollectionSummary);
+    CollectionSummaryDto CollectionSummary,
+    Guid? LoginFamilyId = null);
 
 public sealed record PvpReconnectStatusResponse(
     bool HasReconnectableBattle,

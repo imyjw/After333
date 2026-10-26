@@ -1,12 +1,14 @@
 # Account Persistence DB Design
 
+**2026-10-20 운영 기록 갱신:** 서울 Lightsail + Caddy + PostgreSQL18로 이전했고 공개 주소는 `https://api.after333.com`, 운영DB는 `project333_live`다. 사용자 전환 결과에서 migration24개/latest`0024_elf_elder_card_id`를 확인했다. 아래 과거 날짜의 노트북/Tunnel·DB버전·미배포 문구는 당시 기록이다. 현재 실행·백업 절차는 [Lightsail 운영](lightsail_operations.md), 확인 범위와 남은 시험은 [현재 상태](current_project_status.md)를 우선한다. 오늘 원격 재확인을 수행하지 않았다.
+
 실제 적용 상태(2026-10-09): 사용자 요청으로 운영 DB에 `0023_ai_challenge_run_usage` 적용 완료(총23개/latest0023). 적용 전 전체 백업과 아카이브 읽기를 검증했고, 기존33개 테이블의 행 수·전체 행 해시 및 도전25건이 보존되었다. 이번에는 서버 배포·재시작이나 클라이언트 빌드·설치를 수행하지 않았다. 상세 [운영 적용 기록](battle_modes.md#운영-db-마이그레이션-적용-2026-10-09).
 
 실제 적용 상태(2026-10-02): 아래 소스 대조의 운영 미조회 설명은 배포 전 기록이다. 후속 별도 승인으로 운영 DB0020/0021/0022·카드팩 서버 적용 및 Android APK(versionCode5) 빌드를 완료했고, 실제 스키마는 총22개/latest0022로 확인했다. [실제 적용 기록](shop_card_packs.md)에31보호 테이블 보존 및 대기열2행의 검증된 시작 시 상태 변경을 구분해 기록했다. 실기기 실행은 미검증이다.
 
-## 현재 구현과 설계 예시의 구분 (2026-10-09)
+## 현재 구현과 설계 예시의 구분 (2026-10-21 소스 확인)
 
-현재 소스에는 SQL 마이그레이션 `0001`~`0024`가 있다. `0020_card_upgrade_costs_revision.sql`은 2026-10-01 확정 비용표의 13개 전이를 설정한 기록으로 유지하고, `0021_card_upgrade_level2_cost_revision.sql`은 2026-10-02 확정한 Lv.1→Lv.2의 동일 카드·계정 골드 비용만 6/6으로 갱신한다. 이후 `0022_card_pack_purchase_receipts.sql`은 영수증 작업 종류에 `card_pack_purchase`를 추가한다. `0023_ai_challenge_run_usage.sql`은 계정·런별 비환급 골드 던전 도전 조회 인덱스만 추가하며 기존 기록을 초기화하거나 재정산하지 않는다. 계정·인증/자동 로그인·서버 드래프트·강화·런 보상·광고 티켓·티켓/카드팩 구매와 강화의 요청 영수증·취소·관리자 선물함·골드 던전·사람 우선 매칭/AI 전환이 구현되어 있다. 카드팩은 33계정 골드 차감과 10장 지급을 한 트랜잭션에서 확정하고, 개봉 전에도 이미 보유카드에 포함한다. [카드팩 계약](shop_card_packs.md)을 따른다. 실제 DB의 적용 버전과 운영 실행본은 별도 점검 대상이며 이번 문서 대조에서 조회하지 않았다.
+현재 소스에는 SQL 마이그레이션 `0001`~`0025`가 있다. `0025_single_login_family.sql`은 한 계정의 최신 독립 로그인만 유지하는 family 연결과 기존 세션 변환을 추가한다. 0025는 운영 미적용이며 마지막 사용자 확인 운영 DB는 24개/latest0024다. 상세 계약·검증·적용 조건은 [단일 로그인](single_device_login.md)을 따른다. `0020_card_upgrade_costs_revision.sql`은 2026-10-01 확정 비용표의 13개 전이를 설정한 기록으로 유지하고, `0021_card_upgrade_level2_cost_revision.sql`은 2026-10-02 확정한 Lv.1→Lv.2의 동일 카드·계정 골드 비용만 6/6으로 갱신한다. 이후 `0022_card_pack_purchase_receipts.sql`은 영수증 작업 종류에 `card_pack_purchase`를 추가한다. `0023_ai_challenge_run_usage.sql`은 계정·런별 비환급 골드 던전 도전 조회 인덱스만 추가하며 기존 기록을 초기화하거나 재정산하지 않는다. 계정·인증/자동 로그인·서버 드래프트·강화·런 보상·광고 티켓·티켓/카드팩 구매와 강화의 요청 영수증·취소·관리자 선물함·골드 던전·사람 우선 매칭/AI 전환이 구현되어 있다. 카드팩은 33계정 골드 차감과 10장 지급을 한 트랜잭션에서 확정하고, 개봉 전에도 이미 보유카드에 포함한다. [카드팩 계약](shop_card_packs.md)을 따른다. 실제 DB의 적용 버전과 운영 실행본은 별도 점검 대상이며 이번 문서 대조에서 조회하지 않았다.
 
 문서의 `Suggested fields`와 미구현 미개봉 팩 재고/개별 카드 상점/제작은 설계 예시다. 실제 스키마는 `Server/Project333.PvpServer/Persistence/Migrations`와 서비스 코드가 기준이다. 게스트 및 계정 연결 경로는 현재 제공하지 않으며 Game ID 또는 Google 로그인과 저장 세션 복구를 사용한다. 시작 씬 톱니바퀴 메뉴에는 확인 후 로그아웃이 있다. 로그아웃은 로컬 자격 증명을 지우고 로그인 게이트를 다시 표시하며 계정 소유 데이터는 삭제하지 않는다.
 
@@ -242,11 +244,13 @@ Rules:
 - iOS player builds use Keychain generic-password entries with `AfterFirstUnlockThisDeviceOnly` accessibility.
 - Unity Editor and the current Windows development build use scoped `PlayerPrefs` only as development storage; this is not the mobile release security model.
 - On the first mobile launch after upgrading from an older build, a legacy scoped `PlayerPrefs` credential is copied to secure storage and deleted only after the secure write succeeds.
-- A `sessionToken` is valid only while its session row is not revoked and not expired.
+- A `sessionToken` is valid only while its session row is unrevoked, unexpired and belongs to the account's active login family.
 - A `refreshToken` is stored only as a hash in `auth_refresh_tokens` and is rotated on every successful refresh.
 - Reusing an already rotated refresh token revokes its token family and requires an explicit login.
 - Successful server logout revokes the current session and refresh token. Unity always clears local credentials afterward, including when the request fails, and requires a new login.
-- Logging in again can create a new session without changing the account.
+- A successful independent Game ID or Google login creates a new active family and revokes older access/refresh credentials without changing account-owned data. The older device receives HTTP 401 / `session_replaced` and the exact message `다른 기기에서 로그인하여 연결이 종료되었습니다.`
+- Normal refresh rotates tokens inside the same family and retains its live battle socket. An old device's logout cannot revoke the replacement family. Existing 70-second reconnect and server-authoritative results remain unchanged.
+- The client suppresses automatic Google re-login after replacement and preserves pending economy/reward/ad recovery ledgers. See [single-device login](single_device_login.md) for polling, migration, compatibility and rollout limits; source implementation is not live deployment.
 - Public identity linking is not part of the current API. Confirmed logout revokes the current device session when the server request succeeds and always clears the local credentials; it does not delete or merge account rows.
 
 ### Card Definition
@@ -912,7 +916,8 @@ Implemented account/meta endpoints:
 | `POST /auth/google` | Validate Google identity and log in/create registered account |
 | `POST /auth/google/desktop-token` | Exchange Desktop authorization code for immediate Google login |
 | `POST /auth/refresh` | Rotate saved device credentials |
-| `POST /auth/logout` | Revoke the current device session |
+| `POST /auth/logout` | Revoke the current login family |
+| `GET /auth/session-status` | Lightweight current-login validation; replaced credentials return 401 / session_replaced |
 | `GET /me` | Current profile |
 | `POST /wallet/purchase-ticket` | Buy tickets with Resource Gold |
 | `POST /shop/purchase-card-pack` | Purchase the fixed 33 Resource Gold pack with RequestId; atomically grant 10 cards |
@@ -938,7 +943,7 @@ PvP battle endpoints should still use server-authoritative command messages.
 
 ### Implemented
 
-- Source migrations `0001` through `0022` for account/meta data, rotating sessions, rewards/ads, guest disabling, draft and matchmaking atomicity, battle receipts, operation resolution, gifts, battle modes, revised upgrade costs and card-pack receipts
+- Source migrations `0001` through `0025` for account/meta data, rotating sessions, rewards/ads, guest disabling, draft and matchmaking atomicity, battle receipts, operation resolution, gifts, battle modes, revised upgrade costs, card-pack receipts, run-scoped challenge usage, ElfElder ID normalization and single-login families; production last confirmed through `0024`
 - Opaque session-token authentication for registered accounts; guest creation/resume rejected
 - Game ID registration/login using stable server account identity
 - Google ID-token verification and Google login/account creation; provider identities are not automatically merged
@@ -960,7 +965,7 @@ PvP battle endpoints should still use server-authoritative command messages.
 
 ### Partially Implemented
 
-- Google Cloud Desktop, Web application, and Android client registration plus live-token smoke testing are still pending external setup.
+- These registrations were pending at the original design checkpoint. They were configured and transferred to Lightsail; Android production login and Windows Editor Play Google login were later user-confirmed. The current operator guide describes the remaining platform-specific verification scope.
   - Android requires package `com.after333.game`, the signing-certificate SHA, and the Web application client ID as its server audience.
   - Android/iOS secure credential storage is implemented, but each platform still needs a real-device build smoke test before release.
 - Identity schema supports `kakao` and `naver`, but their production token verification and Unity provider login flows are not implemented.

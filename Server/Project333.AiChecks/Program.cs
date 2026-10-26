@@ -13,6 +13,7 @@ using ServerEventType = Project333.PvpServer.Messages.BattleEventType;
 using ServerPlayerId = Project333.PvpServer.Messages.PlayerIdDto;
 
 // Offline checks only: no HTTP listener, database, accounts, rewards or production matches.
+if (args.Contains("--turn-timeout-delivery-only")) { await TurnTimeoutDeliveryChecks.RunAsync(); return; }
 if (args.Contains("--opening-gold-only")) { OpeningGoldChecks.Run(); return; }
 if (args.Contains("--daehwandan-only")) { DaehwandanChecks.Run(); return; }
 if (args.Contains("--stun-freeze-only")) { ActionDebuffOnlineChecks.Run(); return; }

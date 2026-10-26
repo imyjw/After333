@@ -23,6 +23,7 @@ namespace Project333.Runtime.Presentation.Draft
         private Text _fallback;
         private Text _attack;
         private Text _hp;
+        private TemporaryReplicateHourglass _temporaryReplicateHourglass;
 
         public static void ShowFor(Component owner, string cardId, CardDefinitionAsset asset, Font font, CardStatDisplay? statsOverride = null, CardDefinition definition = null, HandCardView handCard = null, System.Func<BattleState> battleProvider = null, int? upgradeLevelOverride = null)
         {
@@ -155,6 +156,7 @@ namespace Project333.Runtime.Presentation.Draft
             var layout = CardPreviewTooltipLayout.Calculate(size.x, size.y, 384, 528,
                 VisibleCount(_abilities), VisibleCount(_attached), VisibleCount(_influences), MeasureTooltip);
             SetPreviewRect(_artwork.rectTransform, layout.Card);
+            TemporaryReplicateHourglass.Present(ref _temporaryReplicateHourglass, _artwork, _shownTemporary);
             LayoutPanels(_abilities, layout.Abilities, layout.TextScale);
             LayoutPanels(_attached, layout.Attached, layout.TextScale);
             LayoutPanels(_influences, layout.Influences, layout.TextScale);
@@ -200,7 +202,8 @@ namespace Project333.Runtime.Presentation.Draft
 
             var attached = new System.Collections.Generic.List<OccupantSpecialEffectTooltip>();
             if (_handCard != null && _handCard.IsTemporaryReplicate)
-                attached.Add(new OccupantSpecialEffectTooltip("임시 복제", string.Empty, OccupantTooltipKind.State));
+                attached.Add(new OccupantSpecialEffectTooltip("임시 복제",
+                    "사용하지 않으면 이번 턴 종료 시 손패에서 사라집니다.", OccupantTooltipKind.State));
 
             var influences = new System.Collections.Generic.List<OccupantSpecialEffectTooltip>();
             var battle = _handCard != null ? _battleProvider?.Invoke() : null;

@@ -58,6 +58,8 @@ namespace Project333.Runtime.Presentation.Settings
         [SerializeField] private Text _masterVolumeValueText;
         [SerializeField] private Slider _musicVolumeSlider;
         [SerializeField] private Text _musicVolumeValueText;
+        [SerializeField] private Slider _effectsVolumeSlider;
+        [SerializeField] private Text _effectsVolumeValueText;
         [SerializeField] private Button _audioBackButton;
 
         [Header("Confirmation")]
@@ -155,6 +157,18 @@ namespace Project333.Runtime.Presentation.Settings
             }
 
             safeAreaFitter.Configure();
+            // Wallet graphics share this high settings Canvas in the authored
+            // start scene. Keep just that row beneath login; the gear/menu retain
+            // their original30000 priority and stay available before sign-in.
+            if (gameObject.scene.name == "GameStart_VSlice" &&
+                _safeAreaRoot.Find("WalletPanel") is RectTransform wallet)
+            {
+                var walletCanvas = wallet.GetComponent<Canvas>();
+                if (walletCanvas == null) walletCanvas = wallet.gameObject.AddComponent<Canvas>();
+                walletCanvas.overrideSorting = true;
+                walletCanvas.sortingLayerID = _canvas.sortingLayerID;
+                walletCanvas.sortingOrder = AccountLoginGateView.SortingOrder - 1;
+            }
             EnsureGearButton();
             EnsureModalHierarchy();
         }
@@ -485,8 +499,10 @@ namespace Project333.Runtime.Presentation.Settings
                 _audioPanel,
                 "AudioPanel",
                 _modalRoot,
-                new Vector2(720f, 560f),
+                new Vector2(720f, 720f),
                 new Color(0.025f, 0.065f, 0.085f, 0.99f));
+            // Existing saved panels retain their authored dimensions; make room for the third row.
+            _audioPanel.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, Mathf.Max(720f, _audioPanel.rect.height));
             ResolveOrCreateText(
                 null,
                 "TitleText",
@@ -552,6 +568,35 @@ namespace Project333.Runtime.Presentation.Settings
                 new Vector2(1f, 1f),
                 new Vector2(110f, 48f),
                 new Vector2(-64f, -296f),
+                25,
+                FontStyle.Bold,
+                "100%");
+
+            ResolveOrCreateText(
+                null,
+                "EffectsVolumeLabel",
+                _audioPanel,
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f),
+                new Vector2(300f, 48f),
+                new Vector2(72f, -442f),
+                26,
+                FontStyle.Bold,
+                "효과음 볼륨",
+                TextAnchor.MiddleLeft);
+            _effectsVolumeSlider = ResolveOrCreateSlider(
+                _effectsVolumeSlider,
+                "EffectsVolumeSlider",
+                _audioPanel,
+                new Vector2(0f, -510f));
+            _effectsVolumeValueText = ResolveOrCreateText(
+                _effectsVolumeValueText,
+                "EffectsVolumeValueText",
+                _audioPanel,
+                new Vector2(1f, 1f),
+                new Vector2(1f, 1f),
+                new Vector2(110f, 48f),
+                new Vector2(-64f, -442f),
                 25,
                 FontStyle.Bold,
                 "100%");
@@ -649,6 +694,12 @@ namespace Project333.Runtime.Presentation.Settings
                 _musicVolumeSlider.onValueChanged.RemoveListener(HandleMusicVolumeChanged);
                 _musicVolumeSlider.onValueChanged.AddListener(HandleMusicVolumeChanged);
             }
+
+            if (_effectsVolumeSlider != null)
+            {
+                _effectsVolumeSlider.onValueChanged.RemoveListener(HandleEffectsVolumeChanged);
+                _effectsVolumeSlider.onValueChanged.AddListener(HandleEffectsVolumeChanged);
+            }
         }
 
         private void RefreshContextButtons()
@@ -689,6 +740,11 @@ namespace Project333.Runtime.Presentation.Settings
                 _musicVolumeSlider.SetValueWithoutNotify(After333AudioSettings.MusicVolume);
             }
 
+            if (_effectsVolumeSlider != null)
+            {
+                _effectsVolumeSlider.SetValueWithoutNotify(After333AudioSettings.EffectsVolume);
+            }
+
             RefreshVolumeLabels();
             ShowOnly(_audioPanel);
         }
@@ -715,6 +771,13 @@ namespace Project333.Runtime.Presentation.Settings
             RefreshVolumeLabels();
         }
 
+        private void HandleEffectsVolumeChanged(float value)
+        {
+            if (IsTutorialPracticeMode) return;
+            After333AudioSettings.SetEffectsVolume(value);
+            RefreshVolumeLabels();
+        }
+
         private void RefreshVolumeLabels()
         {
             if (_masterVolumeValueText != null)
@@ -725,6 +788,11 @@ namespace Project333.Runtime.Presentation.Settings
             if (_musicVolumeValueText != null)
             {
                 _musicVolumeValueText.text = $"{Mathf.RoundToInt(After333AudioSettings.MusicVolume * 100f)}%";
+            }
+
+            if (_effectsVolumeValueText != null)
+            {
+                _effectsVolumeValueText.text = $"{Mathf.RoundToInt(After333AudioSettings.EffectsVolume * 100f)}%";
             }
         }
 

@@ -13,7 +13,7 @@ namespace Project333.Runtime.Application.Services
             HasHp = hasHp;
         }
 
-        // The lower-left badge shows attack for occupants or damage per hit/tick for spells.
+        // The lower-left badge shows occupant attack or a spell's damage/effect magnitude.
         public int Attack { get; }
         public int Hp { get; }
         public bool HasHp { get; }
@@ -33,6 +33,11 @@ namespace Project333.Runtime.Application.Services
                     stats = new CardStatDisplay(
                         CardLevelStatRules.ApplyAttackBonus(building.CardId, building.Attack, upgradeLevel),
                         CardLevelStatRules.ApplyHpBonus(building.CardId, building.Health, upgradeLevel), true);
+                    return true;
+                case ScriptedSpellCardDefinition spell when spell.CardId == DaehwandanCardRules.CardId &&
+                    spell.EffectId == DaehwandanCardRules.EffectId:
+                    stats = new CardStatDisplay(
+                        DaehwandanCardRules.GetAttackBonus(spell.EffectAmount, upgradeLevel), 0, false);
                     return true;
                 default:
                     if (!TryGetSpellDamage(definition, upgradeLevel, spellPower, out var damage))

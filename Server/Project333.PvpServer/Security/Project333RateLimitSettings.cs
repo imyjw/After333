@@ -168,6 +168,10 @@ public static class Project333RateLimiting
 
     private static RateLimitCategory ResolveCategory(PathString path)
     {
+        // Foreground session probes must not exhaust the smaller login-attempt budget.
+        if (path.Equals("/auth/session-status", StringComparison.OrdinalIgnoreCase))
+            return RateLimitCategory.AccountApi;
+
         if (path.StartsWithSegments("/auth"))
         {
             return RateLimitCategory.Auth;

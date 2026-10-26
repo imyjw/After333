@@ -41,9 +41,16 @@ namespace Project333.Runtime.Presentation.Tutorial
             Place(_dialogue.rectTransform,new Vector2(0,.05f),new Vector2(.875f,.72f));
             _dialogue.rectTransform.offsetMin = new Vector2(22,8); _dialogue.rectTransform.offsetMax = new Vector2(-18,-3);
             _dialogue.resizeTextForBestFit = true; _dialogue.resizeTextMinSize = 19; _dialogue.resizeTextMaxSize = 26;
+            _previousButton = MakeButton(dialoguePanel,"PreviousButton","이전",PreviousDialogue);
             _nextButton = MakeButton(dialoguePanel,"NextButton","다음",Advance);
-            Place(_nextButton.GetComponent<RectTransform>(),new Vector2(.885f,.12f),new Vector2(.985f,.56f));
-            _nextLabel = _nextButton.GetComponentInChildren<Text>(); _nextLabel.fontSize = 25;
+            _nextLabel = _nextButton.GetComponentInChildren<Text>();
+            foreach (var button in new[] { _previousButton, _nextButton })
+            {
+                var label = button.GetComponentInChildren<Text>();
+                label.fontSize = 25; label.resizeTextForBestFit = true;
+                label.resizeTextMinSize = 16; label.resizeTextMaxSize = 25;
+            }
+            RefreshDialogueNavigationLayout();
             BuildChapterOneVisualAids();
         }
         private void RefreshTutorialControlsLayout()

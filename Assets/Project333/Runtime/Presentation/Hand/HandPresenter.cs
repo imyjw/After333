@@ -12,7 +12,7 @@ using UnityEditor.SceneManagement;
 
 namespace Project333.Runtime.Presentation.Hand
 {
-    public sealed class HandPresenter : MonoBehaviour
+    public sealed partial class HandPresenter : MonoBehaviour
     {
         private const int MinimumHandSlotCount = 10;
 
@@ -137,10 +137,14 @@ namespace Project333.Runtime.Presentation.Hand
             EnsureRuntimeHandCanvas();
             BindRuntimeVisualParents();
             ApplyCurvedLayout();
+            TickCardDraws();
         }
 
         private void OnDestroy()
         {
+            CancelTemporaryReplicateExpiry();
+            CancelSpellCardUses();
+            CancelCardDraws();
             if (_createdRuntimeCanvasAtRuntime && _runtimeCanvas != null)
             {
                 Destroy(_runtimeCanvas.gameObject);
@@ -157,6 +161,8 @@ namespace Project333.Runtime.Presentation.Hand
         public void Present(HandState handState, int spellPower = 0)
         {
             EnsureCardRegistry();
+            PresentTemporaryReplicateExpiry(handState);
+            PresentSpellCardUses(handState);
 
             for (var i = 0; i < _handCardViews.Length; i++)
             {
@@ -183,7 +189,10 @@ namespace Project333.Runtime.Presentation.Hand
 
             EnsureRuntimeHandCanvas();
             BindRuntimeVisualParents();
+            PlanCardDraws(handState);
+            ApplySpellUseSuppressionToViews();
             ApplyCurvedLayout();
+            TickCardDraws();
         }
 
         private void EnsureCardRegistry()

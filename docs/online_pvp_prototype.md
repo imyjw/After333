@@ -1,5 +1,7 @@
 # After333 온라인 전투와 연결 설정
 
+**2026-10-20 운영 기록 갱신:** 서울 Lightsail + Caddy + PostgreSQL18로 이전했고 공개 주소는 `https://api.after333.com`, 운영DB는 `project333_live`다. 사용자 전환 결과에서 migration24개/latest`0024_elf_elder_card_id`를 확인했다. 아래 과거 날짜의 노트북/Tunnel·DB버전·미배포 문구는 당시 기록이다. 현재 실행·백업 절차는 [Lightsail 운영](lightsail_operations.md), 확인 범위와 남은 시험은 [현재 상태](current_project_status.md)를 우선한다. 오늘 원격 재확인을 수행하지 않았다.
+
 ## Target Direction
 
 Current online battles use account-based matchmaking, independent Gold Dungeon attempts limited to three per paid run and authenticated running-server reconnect. The older custom-room smoke-test procedures below are preserved as development history.
@@ -11,13 +13,14 @@ For HTTPS/WSS reverse proxy setup, see `docs/https_wss_reverse_proxy_setup.md`.
 Target rules:
 
 - PvP clients must be authenticated with a server account before entering matchmaking.
-- Guest accounts are valid server accounts.
+- Current public entry requires Game ID or Google authentication. Guest creation/resume and identity-link routes are disabled; older room/guest examples below are historical.
 - Game ID and social login identities must attach to `auth_identities`.
 - Matchmaking must associate a queued player with `account_id`, not only a temporary player token.
 - The server owns matchmaking, battle seats, command validation, battle resolution, and battle results.
 - The server stores language-neutral structured combat-log records as part of the reconnectable battle snapshot.
 - Unity converts those structured records into localized sentences and owns the combat-log UI.
 - A reconnecting client must recover its active match from account identity and server-side match-player state.
+- The 2026-10-21 [single-device login](single_device_login.md) source change keeps the newest successful independent Game ID/Google login, revokes old HTTP credentials and disconnects old WebSockets with `session_replaced`. Refresh remains in the same family. The latest device can resume the account's original battle within the existing 70-second grace without the old connection ID. This change, migration 0025 and updated clients have not been deployed to production.
 - The existing custom-room tester remains useful for transport and command smoke tests only.
 
 Required future storage:
@@ -294,3 +297,5 @@ When online input routing is enabled, the client does not mutate the local battl
 OnlineBattleGateway closes gameplay submission synchronously before enqueueing EndTurn. Both EndTurn entry points use the same gate. BattleBootstrapper exposes it through IsBusy, and BattleScreenPresenter immediately disables the turn button, refreshing it as the authoritative turn changes. Local battle input also locks through the opponent turn; AI execution uses the underlying gateway and continues normally.
 
 ClientBattleCommandMessage.ExpectedTurnNumber is nullable and stamped from the current server view; BattleSession rejects mismatches under its existing command lock before changing battle state. Legacy messages without the field are accepted for compatibility. OnlineBattleErrorDto.CommandSequence optionally identifies the rejected command, allowing only the matching pending EndTurn to unlock on command_rejected. No retry timer or buffered EndTurn is introduced. Full rollout requires the updated client and server; no database migration.
+
+2026-10-25 턴 만료 전달 수정: 일반 자동 EndTurn은 다음 타이머를 먼저 예약하고, 기기별 이벤트→전용 StateView를 다른 기기의 전송/감사·DB 기록보다 먼저 전달한다. 전투 종료 시 최종 결과 저장 순서는 유지한다. 실제 함수 재현 수정 전6/12→최종16/16, 기존 전투 시작/행동 상태 검사 통과. 운영 반영에는 서버 업데이트 필요. [원인·검증·절차](turn_timeout_handoff.md).

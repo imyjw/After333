@@ -123,7 +123,7 @@ namespace Project333.Editor
                 Region(deckTitle.rectTransform, 0.05f, 0.90f, 0.95f, 0.99f);
                 Style(deckTitle, font, 27, Cream, TextAnchor.MiddleCenter);
                 var list = Ref<Text>(serialized, "_deckListText");
-                Style(list, font, 22, new Color(0.85f, 0.91f, 0.87f), TextAnchor.UpperLeft);
+                Style(list, font, 32, new Color(0.85f, 0.91f, 0.87f), TextAnchor.UpperLeft);
                 list.resizeTextForBestFit = false;
                 list.verticalOverflow = VerticalWrapMode.Overflow;
                 list.lineSpacing = 1.15f;

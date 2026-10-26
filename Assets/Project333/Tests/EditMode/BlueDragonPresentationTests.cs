@@ -105,8 +105,6 @@ namespace Project333.Tests.EditMode
         [TestCase("WaterCannonCharge")]
         [TestCase("WaterCannonLaunch")]
         [TestCase("WaterCannonImpact")]
-        [TestCase("DragonHurt")]
-        [TestCase("DragonDeath")]
         public void Sound_IsPackagedAndPlayable(string soundName)
         {
             var clip = (AudioClip)AssetsType.GetMethod("GetSound", StaticMembers)

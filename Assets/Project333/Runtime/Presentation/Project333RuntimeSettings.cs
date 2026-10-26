@@ -49,6 +49,7 @@ namespace Project333.Runtime.Presentation
 
             GlobalSettingsMenuController.EnsureForScene(scene);
             After333BackgroundMusic.EnsureForScene(scene);
+            After333SoundEffects.RegisterSceneSources(scene);
         }
 
         private static void ConfigureNamedRoot(Scene scene, string rootName)

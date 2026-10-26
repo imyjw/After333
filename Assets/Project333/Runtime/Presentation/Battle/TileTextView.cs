@@ -1,3 +1,4 @@
+using Project333.Runtime.Presentation.Settings;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -202,6 +203,7 @@ namespace Project333.Runtime.Presentation.Battle
         private GameObject _sampleAnimationObject;
         private SpriteRenderer _sampleSpriteRenderer;
         private RectTransform _occupantStatRoot;
+        private Canvas _occupantStatCanvas;
         private Image _occupantStatBackgroundImage;
         private Image _occupantStatHeartImage;
         private TMP_Text _occupantStatHpText;
@@ -568,12 +570,6 @@ namespace Project333.Runtime.Presentation.Battle
                 _lastCommonHitFrame = -1;
             }
         }
-        private void PlayBlueDragonSound(string name, float volume)
-        {
-            if (_lastVisualCardId != BlueDragonPresentationAssets.CardId || !UnityEngine.Application.isPlaying) return;
-            PlayCharacterSound(BlueDragonPresentationAssets.GetSound(name), volume);
-        }
-
         private void PlayGwangmaSound(string name, float volume)
         {
             if (_lastVisualCardId != GwangmaPresentationAssets.CardId || !UnityEngine.Application.isPlaying) return;
@@ -589,7 +585,7 @@ namespace Project333.Runtime.Presentation.Battle
                 _characterAudio.playOnAwake = false;
                 _characterAudio.spatialBlend = 0f;
             }
-            _characterAudio.PlayOneShot(clip, volume);
+            After333SoundEffects.PlayOneShot(_characterAudio, clip, volume);
         }
 
         public void PlayIdleAnimation()
@@ -652,7 +648,6 @@ namespace Project333.Runtime.Presentation.Battle
         public void PlayDeathAnimation()
         {
             PlayAnimationState(_deathStateName);
-            PlayBlueDragonSound("DragonDeath", 0.5f);
             PlayGwangmaSound("GwangmaDeath", 0.48f);
         }
 
@@ -1107,6 +1102,9 @@ namespace Project333.Runtime.Presentation.Battle
             _isBindingVisual = true;
             _isDeathPresentation = false;
             StopCharacterSound();
+            // Release the previous controller before setting the incoming occupant sprite.
+            // Animator teardown can restore its old sprite when the new controller has no states.
+            _occupantVisualAnimator.runtimeAnimatorController = null;
             EnsureOccupantVisualSpriteRenderer();
             _occupantVisualImage.sprite = boardSprite;
             _occupantVisualImage.enabled = boardSprite != null;
@@ -2582,6 +2580,24 @@ namespace Project333.Runtime.Presentation.Battle
                 _occupantStatAttackTypeImage = CreateStatImage("AttackTypeIcon", _occupantStatRoot);
                 _occupantStatAttackText = CreateStatText("AttackText", _occupantStatRoot, TextAlignmentOptions.Left);
             }
+
+            if (_occupantStatCanvas == null)
+            {
+                _occupantStatCanvas = _occupantStatRoot.GetComponent<Canvas>();
+
+                if (_occupantStatCanvas == null)
+                {
+                    _occupantStatCanvas =
+                        _occupantStatRoot.gameObject.AddComponent<Canvas>();
+                }
+            }
+
+            _occupantStatCanvas.overrideSorting = true;
+            _occupantStatCanvas.sortingLayerID =
+                _occupantVisualCanvas != null
+                    ? _occupantVisualCanvas.sortingLayerID
+                    : 0;
+            _occupantStatCanvas.sortingOrder = 4950;
 
             EnsureRuntimeHuanShuStatusIcon();
             ApplyStatBarLayout();

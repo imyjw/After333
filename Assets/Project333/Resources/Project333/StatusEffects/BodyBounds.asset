@@ -2009,6 +2009,171 @@ MonoBehaviour:
       width: 0.6328125
       height: 0.3828125
   - VisualKey: ElfElder
+    TextureName: Attack
+    SpriteName: Attack_0
+    SpriteRect:
+      serializedVersion: 2
+      x: 0
+      y: 0
+      width: 512
+      height: 512
+    NormalizedBounds:
+      serializedVersion: 2
+      x: 0.34375
+      y: 0.025390625
+      width: 0.28125
+      height: 0.35546875
+  - VisualKey: ElfElder
+    TextureName: Attack
+    SpriteName: Attack_1
+    SpriteRect:
+      serializedVersion: 2
+      x: 512
+      y: 0
+      width: 512
+      height: 512
+    NormalizedBounds:
+      serializedVersion: 2
+      x: 0.34570312
+      y: 0.025390625
+      width: 0.31835938
+      height: 0.35546875
+  - VisualKey: ElfElder
+    TextureName: Attack
+    SpriteName: Attack_2
+    SpriteRect:
+      serializedVersion: 2
+      x: 1024
+      y: 0
+      width: 512
+      height: 512
+    NormalizedBounds:
+      serializedVersion: 2
+      x: 0.34570312
+      y: 0.025390625
+      width: 0.37695312
+      height: 0.35546875
+  - VisualKey: ElfElder
+    TextureName: Attack
+    SpriteName: Attack_3
+    SpriteRect:
+      serializedVersion: 2
+      x: 1536
+      y: 0
+      width: 512
+      height: 512
+    NormalizedBounds:
+      serializedVersion: 2
+      x: 0.34570312
+      y: 0.025390625
+      width: 0.6542969
+      height: 0.35546875
+  - VisualKey: ElfElder
+    TextureName: BeAttacked
+    SpriteName: BeAttacked_0
+    SpriteRect:
+      serializedVersion: 2
+      x: 0
+      y: 0
+      width: 512
+      height: 512
+    NormalizedBounds:
+      serializedVersion: 2
+      x: 0.34375
+      y: 0.0625
+      width: 0.35742188
+      height: 0.31835938
+  - VisualKey: ElfElder
+    TextureName: BeAttacked
+    SpriteName: BeAttacked_1
+    SpriteRect:
+      serializedVersion: 2
+      x: 512
+      y: 0
+      width: 512
+      height: 512
+    NormalizedBounds:
+      serializedVersion: 2
+      x: 0.34375
+      y: 0.0625
+      width: 0.35742188
+      height: 0.31835938
+  - VisualKey: ElfElder
+    TextureName: Death
+    SpriteName: Death_0
+    SpriteRect:
+      serializedVersion: 2
+      x: 0
+      y: 0
+      width: 409.6
+      height: 410
+    NormalizedBounds:
+      serializedVersion: 2
+      x: 0.34307992
+      y: 0.0625
+      width: 0.35672516
+      height: 0.31835938
+  - VisualKey: ElfElder
+    TextureName: Death
+    SpriteName: Death_1
+    SpriteRect:
+      serializedVersion: 2
+      x: 409.6
+      y: 0
+      width: 409.6
+      height: 410
+    NormalizedBounds:
+      serializedVersion: 2
+      x: 0.36842105
+      y: 0.0625
+      width: 0.35672516
+      height: 0.2421875
+  - VisualKey: ElfElder
+    TextureName: Death
+    SpriteName: Death_2
+    SpriteRect:
+      serializedVersion: 2
+      x: 819.2
+      y: 0
+      width: 409.6
+      height: 410
+    NormalizedBounds:
+      serializedVersion: 2
+      x: 0.43664718
+      y: 0.044921875
+      width: 0.26120856
+      height: 0.22265625
+  - VisualKey: ElfElder
+    TextureName: Death
+    SpriteName: Death_3
+    SpriteRect:
+      serializedVersion: 2
+      x: 1228.8
+      y: 0
+      width: 409.6
+      height: 410
+    NormalizedBounds:
+      serializedVersion: 2
+      x: 0.43664718
+      y: 0.044921875
+      width: 0.26120856
+      height: 0.22265625
+  - VisualKey: ElfElder
+    TextureName: Death
+    SpriteName: Death_4
+    SpriteRect:
+      serializedVersion: 2
+      x: 1638.4
+      y: 0
+      width: 409.6
+      height: 410
+    NormalizedBounds:
+      serializedVersion: 2
+      x: 0.4375
+      y: 0.044921875
+      width: 0.26171875
+      height: 0.22265625
+  - VisualKey: ElfElder
     TextureName: Idle
     SpriteName: Idle_0
     SpriteRect:
@@ -2023,6 +2188,21 @@ MonoBehaviour:
       y: 0.0625
       width: 0.35742188
       height: 0.31835938
+  - VisualKey: ElfElder
+    TextureName: Idle
+    SpriteName: Idle_1
+    SpriteRect:
+      serializedVersion: 2
+      x: 512
+      y: 0
+      width: 512
+      height: 512
+    NormalizedBounds:
+      serializedVersion: 2
+      x: 0.34375
+      y: 0.0625
+      width: 0.35546875
+      height: 0.29882812
   - VisualKey: ElfLongbowScout
     TextureName: Attack
     SpriteName: Attack_0
@@ -5289,7 +5469,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.21875
+      x: 0.28125
       y: 0.03125
       width: 0.4375
       height: 0.53125
@@ -5304,7 +5484,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.16601562
+      x: 0.22851562
       y: 0.0625
       width: 0.46875
       height: 0.5
@@ -5319,7 +5499,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.25
+      x: 0.3125
       y: 0.0625
       width: 0.6875
       height: 0.59375
@@ -5334,7 +5514,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.28125
+      x: 0.34375
       y: 0
       width: 0.625
       height: 0.53125
@@ -5349,7 +5529,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.21875
+      x: 0.28125
       y: 0.03125
       width: 0.4375
       height: 0.53125
@@ -5364,7 +5544,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.21875
+      x: 0.28125
       y: 0.03125
       width: 0.4375
       height: 0.53125
@@ -5379,8 +5559,8 @@ MonoBehaviour:
       height: 410
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.21832359
-      y: 0.0625
+      x: 0.28070176
+      y: 0.03125
       width: 0.43664718
       height: 0.53125
   - VisualKey: OrcBerserker
@@ -5394,8 +5574,8 @@ MonoBehaviour:
       height: 410
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.24951267
-      y: 0.03125
+      x: 0.31189084
+      y: 0.01171875
       width: 0.43664718
       height: 0.4375
   - VisualKey: OrcBerserker
@@ -5409,7 +5589,7 @@ MonoBehaviour:
       height: 410
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.374269
+      x: 0.43664718
       y: 0
       width: 0.49902534
       height: 0.40625
@@ -5424,7 +5604,7 @@ MonoBehaviour:
       height: 410
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.37816763
+      x: 0.4405458
       y: 0
       width: 0.49902534
       height: 0.40625
@@ -5439,7 +5619,7 @@ MonoBehaviour:
       height: 410
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.37890625
+      x: 0.44140625
       y: 0
       width: 0.5
       height: 0.40625
@@ -5454,7 +5634,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.21875
+      x: 0.28125
       y: 0.03125
       width: 0.4375
       height: 0.53125
@@ -5469,7 +5649,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.21875
+      x: 0.28125
       y: 0.015625
       width: 0.4375
       height: 0.53125
@@ -5484,7 +5664,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.21875
+      x: 0.28125
       y: 0.03125
       width: 0.4375
       height: 0.53125
@@ -5499,7 +5679,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.1875
+      x: 0.25
       y: 0.03125
       width: 0.46875
       height: 0.5
@@ -5514,7 +5694,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.25
+      x: 0.3125
       y: 0.03125
       width: 0.4375
       height: 0.53125
@@ -5529,7 +5709,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.25
+      x: 0.3125
       y: 0.03125
       width: 0.5
       height: 0.5
@@ -19059,7 +19239,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.21875
+      x: 0.28125
       y: 0.03125
       width: 0.4375
       height: 0.53125
@@ -19074,7 +19254,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.16601562
+      x: 0.22851562
       y: 0.0625
       width: 0.46875
       height: 0.5
@@ -19089,7 +19269,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.25
+      x: 0.3125
       y: 0.0625
       width: 0.6875
       height: 0.59375
@@ -19104,7 +19284,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.28125
+      x: 0.34375
       y: 0
       width: 0.625
       height: 0.53125
@@ -19119,7 +19299,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.21875
+      x: 0.28125
       y: 0.03125
       width: 0.4375
       height: 0.53125
@@ -19134,7 +19314,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.21875
+      x: 0.28125
       y: 0.03125
       width: 0.4375
       height: 0.53125
@@ -19149,8 +19329,8 @@ MonoBehaviour:
       height: 410
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.21832359
-      y: 0.0625
+      x: 0.28070176
+      y: 0.03125
       width: 0.43664718
       height: 0.53125
   - VisualKey: unit:Assets/Unit/OrcBerserker
@@ -19164,8 +19344,8 @@ MonoBehaviour:
       height: 410
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.24951267
-      y: 0.03125
+      x: 0.31189084
+      y: 0.01171875
       width: 0.43664718
       height: 0.4375
   - VisualKey: unit:Assets/Unit/OrcBerserker
@@ -19179,7 +19359,7 @@ MonoBehaviour:
       height: 410
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.374269
+      x: 0.43664718
       y: 0
       width: 0.49902534
       height: 0.40625
@@ -19194,7 +19374,7 @@ MonoBehaviour:
       height: 410
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.37816763
+      x: 0.4405458
       y: 0
       width: 0.49902534
       height: 0.40625
@@ -19209,7 +19389,7 @@ MonoBehaviour:
       height: 410
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.37890625
+      x: 0.44140625
       y: 0
       width: 0.5
       height: 0.40625
@@ -19224,7 +19404,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.21875
+      x: 0.28125
       y: 0.03125
       width: 0.4375
       height: 0.53125
@@ -19239,7 +19419,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.21875
+      x: 0.28125
       y: 0.015625
       width: 0.4375
       height: 0.53125
@@ -19254,7 +19434,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.21875
+      x: 0.28125
       y: 0.03125
       width: 0.4375
       height: 0.53125
@@ -19269,7 +19449,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.1875
+      x: 0.25
       y: 0.03125
       width: 0.46875
       height: 0.5
@@ -19284,7 +19464,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.25
+      x: 0.3125
       y: 0.03125
       width: 0.4375
       height: 0.53125
@@ -19299,7 +19479,7 @@ MonoBehaviour:
       height: 512
     NormalizedBounds:
       serializedVersion: 2
-      x: 0.25
+      x: 0.3125
       y: 0.03125
       width: 0.5
       height: 0.5

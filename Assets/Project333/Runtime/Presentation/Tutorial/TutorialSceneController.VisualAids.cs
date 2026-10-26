@@ -91,8 +91,8 @@ namespace Project333.Runtime.Presentation.Tutorial
         }
         private void RefreshChapterOneVisualAids()
         {
-            var available = _session != null && _session.Chapter == 1 && CanPractice && !_session.IsComplete;
-            var cue = _session != null ? _session.CurrentStep.Cue : TutorialCue.Introduction;
+            var available = _session != null && DisplayedDialogueChapter == 1 && CanNavigateDialogue && (!_session.IsComplete || IsReviewingDialogue);
+            var cue = _session != null ? DisplayedDialogueStep.Cue : TutorialCue.Introduction;
             SetAidVisible(_civilizationResourceAid, available && cue == TutorialCue.Resources);
             SetAidVisible(_goldSubstitutionAid, available && (cue == TutorialCue.Gold || cue == TutorialCue.Substitution));
             SetAidVisible(_cardKindsAid, available && cue == TutorialCue.CardKinds);

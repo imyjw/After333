@@ -98,6 +98,8 @@ var jsonOptions = new JsonSerializerOptions
     WriteIndented = false
 };
 jsonOptions.Converters.Add(new JsonStringEnumConverter());
+var battleLoginSessions = new BattleLoginSessionRegistry(guestAuthService);
+guestAuthService.LoginSessionsChanged += battleLoginSessions.NotifyLoginChanged;
 
 // Completed results survive restart. Only battles without a committed/durable result are canceled.
 await app.Services.GetRequiredService<BattleResultOutbox>().ReplayBeforeStartupCancellationAsync(CancellationToken.None);
@@ -240,6 +242,22 @@ app.MapGet("/server/status", async (
 });
 
 app.MapGet("/sessions", () => Results.Json(sessionManager.SnapshotSessions()));
+
+// A small authenticated probe for idle clients; no collection or wallet is loaded.
+app.MapGet("/auth/session-status", async (HttpContext context, GuestAuthService authentication) =>
+{
+    if (!authentication.IsDatabaseConfigured)
+        return AuthErrorResult("db_not_configured", "Account authentication is unavailable.", StatusCodes.Status503ServiceUnavailable);
+    try
+    {
+        await authentication.ValidateSessionAsync(context.Request.Headers.Authorization.ToString(), context.RequestAborted);
+        return Results.Json(new { Status = "Ok" });
+    }
+    catch (AuthServiceException ex)
+    {
+        return AuthErrorResult(ex.Code, ex.Message, StatusCodes.Status401Unauthorized);
+    }
+});
 
 app.MapGet("/pvp/reconnect-status", async (
     HttpContext context,
@@ -1490,6 +1508,7 @@ app.Map("/battle", async (
                 break;
             }
 
+            if (connection.IsLoginReplaced) break;
             if (!guard.TryAcceptMessage())
                 throw new BattleMessageException(WebSocketCloseStatus.PolicyViolation, "message_rate_limited");
             connection.MarkClientMessageReceived();
@@ -1577,7 +1596,10 @@ app.Map("/battle", async (
                 }
 
                 if (!connection.IsOpen) break;
-                var admission = guard.Authenticate(authenticatedAccount!.Account.Id);
+                var authenticatedLogin = authenticatedAccount ?? throw new InvalidOperationException("Authenticated login was not resolved.");
+                // Finish stale-transport cleanup before consuming new authenticated capacity.
+                await battleLoginSessions.DisconnectStaleAsync(authenticatedLogin.Account.Id, connectionLifetime.Token);
+                var admission = guard.Authenticate(authenticatedLogin.Account.Id);
                 if (admission == BattleAuthenticationAdmission.IdentityMismatch)
                 {
                     await SendErrorAsync(connection, "battle_participant_mismatch",
@@ -1587,8 +1609,7 @@ app.Map("/battle", async (
                 if (admission != BattleAuthenticationAdmission.Accepted)
                     throw new BattleMessageException(WebSocketCloseStatus.PolicyViolation,
                         admission == BattleAuthenticationAdmission.ConnectionLimit ? "account_connection_limit" : "authentication_timeout");
-                var accountId = authenticatedAccount?.Account.Id.ToString("D") ??
-                                (envelope.AccountId ?? string.Empty).Trim();
+                var accountId = authenticatedLogin.Account.Id.ToString("D");
                 if (connection.HasAssignedSeat &&
                     !string.Equals(connection.AccountId, accountId, StringComparison.Ordinal))
                 {
@@ -1602,8 +1623,40 @@ app.Map("/battle", async (
                     continue;
                 }
 
+                ApplyAuthenticatedAccount(connection, authenticatedLogin, accountId);
+                battleLoginSessions.Track(connection, async () =>
+                {
+                    // Normal disconnect semantics preserve the seat and its 70-second grace.
+                    guard.Dispose();
+                    if (session != null)
+                        await DisconnectBattleConnectionAsync(session, connection, sessionManager,
+                            runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService,
+                            disconnectReconnectGracePeriod, jsonOptions);
+                    try
+                    {
+                        await SendErrorAsync(connection, "session_replaced", "다른 기기에서 로그인하여 연결이 종료되었습니다.", jsonOptions, CancellationToken.None);
+                    }
+                    catch (Exception ex) when (ex is WebSocketException or OperationCanceledException)
+                    { Console.WriteLine($"[{connectionId}] replacement notification failed: {ex.GetType().Name}"); }
+                    finally
+                    {
+                        try { await connection.CloseTransportAsync(WebSocketCloseStatus.PolicyViolation, "session_replaced", CancellationToken.None, waitForPeerClose: true, readerActive: true); }
+                        catch (Exception ex) when (ex is WebSocketException or OperationCanceledException)
+                        { Console.WriteLine($"[{connectionId}] replacement close failed: {ex.GetType().Name}"); }
+                        finally { connection.TerminateTransport(); }
+                    }
+                });
+                if (!await battleLoginSessions.EnsureCurrentAsync(connection, connectionLifetime.Token)) continue;
+
                 using var accountJoinLease = string.IsNullOrWhiteSpace(accountId) ? null
                     : await sessionManager.AcquireAccountJoinAsync(accountId, connectionLifetime.Token);
+                await battleLoginSessions.DisconnectStaleAsync(authenticatedLogin.Account.Id, connectionLifetime.Token);
+                if (!authenticatedLogin.LoginFamilyId.HasValue ||
+                    !await guestAuthService.IsLoginFamilyCurrentAsync(authenticatedLogin.Account.Id, authenticatedLogin.LoginFamilyId.Value, connectionLifetime.Token))
+                {
+                    await SendErrorAsync(connection, "session_replaced", "다른 기기에서 로그인하여 연결이 종료되었습니다.", jsonOptions, connectionLifetime.Token);
+                    throw new BattleMessageException(WebSocketCloseStatus.PolicyViolation, "session_replaced");
+                }
                 if (!envelope.UseMatchmakingQueue && envelope.UseServerAiOpponent &&
                     (sessionManager.FindConnectedPvpSession(accountId) != null || sessionManager.FindReconnectStatus(accountId) != null))
                 {
@@ -1950,6 +2003,9 @@ app.Map("/battle", async (
                     Console.WriteLine($"[match:{session.MatchId}] refreshed metadata connection={connectionId} {FormatJoinMetadata(connection)}");
                 }
 
+                // Covers a login committed while this socket was still joining/unregistered.
+                if (!await battleLoginSessions.EnsureCurrentAsync(connection, connectionLifetime.Token)) continue;
+
                 if (envelope.UseMatchmakingQueue || (session.UseServerAiOpponent && session.AiChallengeAttemptId == null))
                 {
                     try
@@ -2133,7 +2189,19 @@ app.Map("/battle", async (
             IReadOnlyList<BattleEventDto> commandEvents;
             try
             {
-                commandEvents = session.ApplyCommand(command);
+                if (!connection.LoginFamilyId.HasValue || !Guid.TryParse(connection.AccountId, out var commandAccountId))
+                    throw new AuthServiceException("session_replaced", "다른 기기에서 로그인하여 연결이 종료되었습니다.");
+                commandEvents = await guestAuthService.ExecuteWithCurrentLoginFamilyAsync(commandAccountId, connection.LoginFamilyId.Value, () =>
+                {
+                    if (connection.IsLoginReplaced)
+                        throw new AuthServiceException("session_replaced", "다른 기기에서 로그인하여 연결이 종료되었습니다.");
+                    return session.ApplyCommand(command);
+                }, connectionLifetime.Token);
+            }
+            catch (AuthServiceException ex) when (ex.Code == "session_replaced")
+            {
+                await battleLoginSessions.DisconnectAsync(connection);
+                break;
             }
             catch (Exception ex) when (ex is InvalidOperationException || ex is ArgumentException)
             {
@@ -2194,6 +2262,12 @@ app.Map("/battle", async (
     }
     finally
     {
+        // A late message can unwind this reader while takeover cleanup is still
+        // persisting the reserved seat. Let its Error/close finish before aborting
+        // the transport; otherwise the old client loses the replacement reason.
+        if (connection.IsLoginReplaced)
+            await battleLoginSessions.DisconnectAsync(connection);
+        battleLoginSessions.Untrack(connection);
         guard.Dispose(); // Release capacity before potentially slow DB disconnect cleanup.
         heartbeatCancellation.Cancel();
         try
@@ -2521,6 +2595,15 @@ static async Task ResolveTurnTimeoutAsync(
             var timeoutLabel = isMulliganTimeout ? "mulligan timer" : "turn timer";
             var timeoutAction = isMulliganTimeout ? "automatic keep-hand confirmation" : "automatic EndTurn";
             Console.WriteLine($"[match:{session.MatchId}] {timeoutLabel} expired. Broadcasting {timeoutAction}.");
+            // The next authoritative turn already exists. Neither disk/DB logging nor a slow
+            // peer may hold its state/timer notification behind the expired turn's countdown.
+            ScheduleTurnTimeoutIfNeeded(session, sessionManager, runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService, jsonOptions);
+            var battleEndedOnTimeout = turnTimeoutEnvelope.BattleEvents.Any(
+                battleEvent => battleEvent.EventType == BattleEventType.BattleEnded);
+            if (battleEndedOnTimeout)
+                await BroadcastEnvelopeAsync(session, turnTimeoutEnvelope, jsonOptions, CancellationToken.None);
+            else
+                await BroadcastTurnTransitionAsync(session, turnTimeoutEnvelope, jsonOptions);
             await auditLogService.LogAsync(
                 isMulliganTimeout ? "battle.mulligan_timer.expired" : "battle.turn_timer.expired",
                 new
@@ -2530,7 +2613,6 @@ static async Task ResolveTurnTimeoutAsync(
                     TimerVersion = timerVersion,
                     DeadlineUtc = deadlineUtc
                 });
-            await BroadcastEnvelopeAsync(session, turnTimeoutEnvelope, jsonOptions, CancellationToken.None);
             await RecordPvpBattleSnapshotAsync(
                 session,
                 pvpBattlePersistenceService,
@@ -2538,9 +2620,12 @@ static async Task ResolveTurnTimeoutAsync(
                 jsonOptions,
                 CancellationToken.None);
             await RecordRunResultsIfBattleEndedAsync(session);
-            await BroadcastStateViewsAsync(session, jsonOptions, CancellationToken.None);
+            // Final result views retain the existing durable-result barrier.
+            if (battleEndedOnTimeout)
+                await BroadcastStateViewsAsync(session, jsonOptions, CancellationToken.None);
             await BroadcastServerAiTurnIfNeededAsync(session, runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService, jsonOptions, CancellationToken.None);
-            ScheduleTurnTimeoutIfNeeded(session, sessionManager, runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService, jsonOptions);
+            if (session.UseServerAiOpponent)
+                ScheduleTurnTimeoutIfNeeded(session, sessionManager, runStartService, pvpMatchmakingService, pvpBattlePersistenceService, auditLogService, jsonOptions);
         }
         else
         {
@@ -3164,6 +3249,37 @@ static Task RecordRunResultsIfBattleEndedAsync(BattleSession session)
     return session.PersistResultAsync(CancellationToken.None);
 }
 
+// Keep event -> viewer-filtered state order for each peer, without serially waiting
+// for the other socket's five-second send deadline before delivering a healthy peer's state.
+static async Task BroadcastTurnTransitionAsync(
+    BattleSession session,
+    OnlineBattleEnvelope envelope,
+    JsonSerializerOptions jsonOptions)
+{
+    var connections = session.SnapshotConnections();
+    Console.WriteLine($"[match:{session.MatchId}] turn transition events/state -> {connections.Count} client(s)");
+    var deliveries = connections.Select(async connection =>
+    {
+        if (!connection.IsOpen)
+        {
+            connection.TerminateTransport();
+            return;
+        }
+        try
+        {
+            await SendEnvelopeAsync(connection, envelope, jsonOptions, CancellationToken.None);
+            // Existing SendStateViewAsync builds the private view inside this socket's send gate.
+            await SendStateViewAsync(session, connection, jsonOptions, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{connection.ConnectionId}] turn transition send failed: {ex.Message}");
+            connection.TerminateTransport();
+        }
+    }).ToArray();
+    await Task.WhenAll(deliveries);
+}
+
 static async Task BroadcastEnvelopeAsync(
     BattleSession session,
     OnlineBattleEnvelope envelope,
@@ -3344,6 +3460,7 @@ static void ApplyAuthenticatedAccount(
         connection.AccountId = authenticatedAccount.Account.Id.ToString("D");
         connection.DisplayName = authenticatedAccount.Account.DisplayName ?? string.Empty;
         connection.AccountKind = authenticatedAccount.Account.AccountKind ?? string.Empty;
+        connection.LoginFamilyId = authenticatedAccount.LoginFamilyId;
         return;
     }
 

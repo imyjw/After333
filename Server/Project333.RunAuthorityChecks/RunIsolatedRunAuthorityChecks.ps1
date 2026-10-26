@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ServerOutput,
     [string]$PostgresBin = 'C:\Program Files\PostgreSQL\18\bin',
-    [switch]$GoldDungeonOnly
+    [switch]$GoldDungeonOnly,
+    [switch]$SingleLoginOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -63,9 +64,15 @@ $environment = @{
     TEMP = $tempPrefix.TrimEnd('\')
     TMP = $tempPrefix.TrimEnd('\')
 }
+# Test children must never inherit production credentials, callbacks or live URLs.
+# Save and clear all project settings first; set only the synthetic values above.
 $savedEnvironment = @{}
+foreach ($entry in Get-ChildItem Env:PROJECT333_*) {
+    $savedEnvironment[$entry.Name] = $entry.Value
+    [Environment]::SetEnvironmentVariable($entry.Name, $null, 'Process')
+}
 foreach ($key in $environment.Keys) {
-    $savedEnvironment[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
+    if (-not $savedEnvironment.ContainsKey($key)) { $savedEnvironment[$key] = [Environment]::GetEnvironmentVariable($key, 'Process') }
     [Environment]::SetEnvironmentVariable($key, $environment[$key], 'Process')
 }
 $restartClient = $null
@@ -139,6 +146,7 @@ try {
     $harnessDll = Join-Path $harnessArtifacts 'bin\RunAuthorityChecks\release\RunAuthorityChecks.dll'
     $harnessArguments = @('"' + $harnessDll + '"')
     if ($GoldDungeonOnly) { $harnessArguments += '--gold-dungeon-only' }
+    if ($SingleLoginOnly) { $harnessArguments += '--single-login-only' }
     $harness = Start-Process dotnet -ArgumentList $harnessArguments -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput (Join-Path $runRoot 'checks.log') -RedirectStandardError (Join-Path $runRoot 'checks.err.log')
     $null = $harness.Handle
@@ -152,8 +160,8 @@ try {
     $harness.Refresh()
     if ($harness.ExitCode -ne 0) { throw 'Run authority checks failed. See checks.log and checks.err.log.' }
     Get-Content -LiteralPath (Join-Path $runRoot 'checks.log')
-    if ($GoldDungeonOnly) {
-        Write-Output 'Gold Dungeon-only checks passed; the runner will stop only its own isolated server and PostgreSQL cluster.'
+    if ($GoldDungeonOnly -or $SingleLoginOnly) {
+        Write-Output 'Focused checks passed; the runner will stop only its own isolated server and PostgreSQL cluster.'
         return
     }
 

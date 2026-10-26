@@ -224,7 +224,7 @@ namespace Project333.Editor
             deckScrollView.RectTransform.offsetMin = new Vector2(20f, 20f);
             deckScrollView.RectTransform.offsetMax = new Vector2(-20f, -68f);
 
-            var deckListText = CreateText("DeckListText", deckScrollView.Content, 22, FontStyle.Normal, TextAnchor.UpperLeft);
+            var deckListText = CreateText("DeckListText", deckScrollView.Content, 32, FontStyle.Normal, TextAnchor.UpperLeft);
             deckListText.text = "No drafted deck yet.";
             deckListText.horizontalOverflow = HorizontalWrapMode.Wrap;
             deckListText.verticalOverflow = VerticalWrapMode.Overflow;

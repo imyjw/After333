@@ -2,7 +2,8 @@
   "name": "Project333.Editor",
   "rootNamespace": "Project333",
   "references": [
-    "Project333.Runtime"
+    "Project333.Runtime",
+    "Unity.TextMeshPro"
   ],
   "includePlatforms": [
     "Editor"

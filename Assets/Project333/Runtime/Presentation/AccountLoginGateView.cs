@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -8,6 +8,10 @@ namespace Project333.Runtime.Presentation.Startup
     [DisallowMultipleComponent]
     public sealed class AccountLoginGateView : MonoBehaviour
     {
+        // Above tutorial/gifts/wallet, while the settings gear and menu remain at 30000.
+        public const int SortingOrder = 29995;
+        private Canvas _canvas;
+        private readonly Vector3[] _screenCorners = new Vector3[4];
         [SerializeField] private Image _backdrop;
         [SerializeField] private RectTransform _panel;
         [SerializeField] private Text _titleText;
@@ -47,7 +51,8 @@ namespace Project333.Runtime.Presentation.Startup
 
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.overrideSorting = true;
-            canvas.sortingOrder = 5000;
+            canvas.sortingOrder = SortingOrder;
+            _canvas = canvas;
 
             var scaler = GetComponent<CanvasScaler>();
             if (scaler == null)
@@ -75,6 +80,8 @@ namespace Project333.Runtime.Presentation.Startup
                 Vector2.zero,
                 new Color(0.005f, 0.012f, 0.02f, 0.9f));
             _backdrop.raycastTarget = true;
+            _backdrop.transform.SetAsFirstSibling();
+            ApplyBackdropLayout();
 
             _panel = ResolveOrCreatePanel(_panel);
             _titleText = ResolveOrCreateText(
@@ -138,6 +145,42 @@ namespace Project333.Runtime.Presentation.Startup
                 new Vector2(0f, -470f),
                 new Vector2(650f, 62f),
                 out _googleButtonLabel);
+        }
+
+        private void OnEnable() => ApplyBackdropLayout();
+        private void OnRectTransformDimensionsChange() => ApplyBackdropLayout();
+        private void LateUpdate() => ApplyBackdropLayout();
+
+        private void ApplyBackdropLayout()
+        {
+            if (_backdrop == null || !(transform is RectTransform container)) return;
+            if (_canvas == null) _canvas = GetComponent<Canvas>();
+            if (_canvas == null || !(_canvas.rootCanvas.transform is RectTransform screenRoot)) return;
+
+            // This view lives inside the start screen's safe area. Convert the
+            // actual root Canvas corners back into its local coordinates so only
+            // the dim/input blocker extends through cutout margins and rotation.
+            screenRoot.GetWorldCorners(_screenCorners);
+            var first = container.InverseTransformPoint(_screenCorners[0]);
+            var min = new Vector2(first.x, first.y);
+            var max = min;
+            for (var i = 1; i < _screenCorners.Length; i++)
+            {
+                var point = container.InverseTransformPoint(_screenCorners[i]);
+                min = Vector2.Min(min, new Vector2(point.x, point.y));
+                max = Vector2.Max(max, new Vector2(point.x, point.y));
+            }
+            var size = max - min;
+            if (size.x <= 0f || size.y <= 0f) return;
+            var rect = _backdrop.rectTransform;
+            var position = (min + max) * 0.5f - container.rect.min;
+            if (rect.anchorMin != Vector2.zero) rect.anchorMin = Vector2.zero;
+            if (rect.anchorMax != Vector2.zero) rect.anchorMax = Vector2.zero;
+            if (rect.pivot != new Vector2(0.5f, 0.5f)) rect.pivot = new Vector2(0.5f, 0.5f);
+            if (rect.localScale != Vector3.one) rect.localScale = Vector3.one;
+            if (rect.localRotation != Quaternion.identity) rect.localRotation = Quaternion.identity;
+            if (rect.sizeDelta != size) rect.sizeDelta = size;
+            if (rect.anchoredPosition != position) rect.anchoredPosition = position;
         }
 
         public void Bind(

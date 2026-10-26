@@ -134,6 +134,8 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
+            // The current opening hand has five slots, including before Play.
+            EnsureCardCapacity(5);
             EnsureCardStatTexts();
             UnityEditor.EditorUtility.SetDirty(this);
             if (gameObject.scene.IsValid())

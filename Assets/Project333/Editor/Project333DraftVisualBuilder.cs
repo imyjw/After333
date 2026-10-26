@@ -171,7 +171,7 @@ namespace Project333.Editor
             Region(summary.rectTransform, 0.035f, 0.05f, 0.965f, 0.95f);
             Style(summary, font, 23, Cream, TextAnchor.MiddleLeft);
             var list = Ref<Text>(serialized, "_runtimeDeckPanelText");
-            Style(list, font, 26, new Color(0.85f, 0.91f, 0.87f), TextAnchor.UpperLeft);
+            Style(list, font, 32, new Color(0.85f, 0.91f, 0.87f), TextAnchor.UpperLeft);
             list.resizeTextForBestFit = false;
             list.verticalOverflow = VerticalWrapMode.Overflow;
             list.lineSpacing = 1.18f;

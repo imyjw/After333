@@ -155,7 +155,13 @@ namespace Project333.Tests.EditMode
                 pointerId = 1, button = PointerEventData.InputButton.Left,
                 eligibleForClick = true, position = point, pressPosition = point,
             };
-            ExecuteEvents.Execute(target, data, ExecuteEvents.pointerDownHandler);
+            // EditMode does not run this runtime audio component's Awake.
+            // Keep its unrelated sound playback out of native input simulations.
+            var sound = target.GetComponent<ButtonTouchSound>();
+            var soundEnabled = sound != null && sound.enabled;
+            if (sound != null) sound.enabled = false;
+            try { ExecuteEvents.Execute(target, data, ExecuteEvents.pointerDownHandler); }
+            finally { if (sound != null) sound.enabled = soundEnabled; }
             return data;
         }
 
@@ -538,6 +544,243 @@ namespace Project333.Tests.EditMode
             Assert.That(PracticeComponent<BattleBootstrapper>().CurrentBattleState.Player.Hand.CardIds, Is.EqualTo(hand));
             Assert.That(RealAccountState(), Is.EqualTo(account));
             foreach (var entry in runFields) Assert.That(entry.Key.GetValue(null), Is.EqualTo(entry.Value), entry.Key.Name);
+        }
+
+        private Text DialogueText() => _host.GetComponentsInChildren<Text>(true).Single(x => x.name == "DialogueText");
+
+        [Test]
+        public void PreviousReviewsVisitedDialogueWithoutRewindingOrSkippingTheLesson()
+        {
+            var controller = Create();
+            var first = DialogueText().text;
+            Assert.That(Button("PreviousButton").interactable, Is.False);
+            Button("PreviousButton").onClick.Invoke();
+            Assert.That(DialogueText().text, Is.EqualTo(first));
+            Button("NextButton").onClick.Invoke(); var second = DialogueText().text;
+            Button("NextButton").onClick.Invoke(); var current = DialogueText().text;
+            var step = controller.Session.StepIndex;
+            Button("PreviousButton").onClick.Invoke();
+            Assert.That(DialogueText().text, Is.EqualTo(second));
+            Button("PreviousButton").onClick.Invoke();
+            Assert.That(DialogueText().text, Is.EqualTo(first));
+            Assert.That(Button("PreviousButton").interactable, Is.False);
+            Assert.That(controller.Session.StepIndex, Is.EqualTo(step));
+            Button("NextButton").onClick.Invoke(); Button("NextButton").onClick.Invoke();
+            Assert.That(DialogueText().text, Is.EqualTo(current));
+            Assert.That(controller.Session.StepIndex, Is.EqualTo(step));
+            Button("NextButton").onClick.Invoke();
+            Assert.That(controller.Session.StepIndex, Is.EqualTo(step + 1));
+        }
+
+        [Test]
+        public void ReviewingARequiredPracticeBlocksInputAndRestoresItsHiddenNextAndAuras()
+        {
+            var controller = Create(); SelectChapterTwo(); AdvanceToAction(controller, TutorialAction.PreviewOffer);
+            HoldRelease(Offer()); // The actual next action is selecting a card.
+            Assert.That(controller.Session.CurrentStep.RequiredAction, Is.EqualTo(TutorialAction.PickCard));
+            var current = DialogueText().text; var step = controller.Session.StepIndex;
+            Button("PreviousButton").onClick.Invoke();
+            Assert.That(Button("NextButton").gameObject.activeSelf, Is.True);
+            Assert.That(VisiblePracticeAuras(), Is.Empty);
+            var blocker = _host.GetComponentsInChildren<TutorialPracticeInputBlocker>(true).Single();
+            Assert.That(blocker.gameObject.activeSelf, Is.True);
+            Assert.That(blocker.IsRaycastLocationValid(Vector2.zero, null), Is.True);
+            ShortTap(Offer()); HoldReleaseWhileReviewing();
+            Assert.That(controller.Session.ManualPickCount, Is.Zero);
+            Assert.That(controller.Session.StepIndex, Is.EqualTo(step));
+            Button("NextButton").onClick.Invoke();
+            Assert.That(DialogueText().text, Is.EqualTo(current));
+            AssertPracticeFeedback(3);
+            Assert.That(blocker.gameObject.activeSelf, Is.False);
+            Button("NextButton").onClick.Invoke();
+            Assert.That(controller.Session.StepIndex, Is.EqualTo(step), "Review must not complete an unperformed action.");
+            ShortTap(Offer());
+            Assert.That(controller.Session.ManualPickCount, Is.EqualTo(1));
+        }
+
+        private void HoldReleaseWhileReviewing()
+        {
+            var target = Offer(); var data = Press(target); AdvanceHold(target, .5f);
+            ExecuteEvents.Execute(target, data, ExecuteEvents.pointerUpHandler);
+        }
+
+        [Test]
+        public void ReviewingCompletedCardSelectionDoesNotAddAnotherCardOrResetOffers()
+        {
+            var account = RealAccountState();
+            var controller = Create(); SelectChapterTwo(); AdvanceToAction(controller, TutorialAction.PreviewOffer);
+            HoldRelease(Offer()); ShortTap(Offer());
+            var cards = controller.Session.DraftCardIds.ToArray();
+            var offers = controller.Session.CurrentOfferCardIds.ToArray();
+            var step = controller.Session.StepIndex; var current = DialogueText().text;
+            Button("PreviousButton").onClick.Invoke();
+            ShortTap(Offer());
+            Button("NextButton").onClick.Invoke();
+            Assert.That(DialogueText().text, Is.EqualTo(current));
+            Assert.That(controller.Session.StepIndex, Is.EqualTo(step));
+            Assert.That(controller.Session.ManualPickCount, Is.EqualTo(1));
+            Assert.That(controller.Session.DraftCardIds, Is.EqualTo(cards));
+            Assert.That(controller.Session.CurrentOfferCardIds, Is.EqualTo(offers));
+            Assert.That(RealAccountState(), Is.EqualTo(account));
+        }
+
+        [Test]
+        public void PreviousAcrossChapterBoundaryKeepsCurrentSceneAndSpentPracticeTickets()
+        {
+            var controller = Create(); AdvanceToAction(controller, TutorialAction.StartRun);
+            var instruction = DialogueText().text;
+            RealStartButton().onClick.Invoke();
+            Assert.That(Button("PreviousButton").interactable, Is.False, "Do not navigate during additive scene loading.");
+            AttachCurrentScene();
+            var scene = controller.PracticeSceneName;
+            var step = controller.Session.StepIndex;
+            Button("PreviousButton").onClick.Invoke();
+            Assert.That(DialogueText().text, Is.EqualTo(instruction));
+            Assert.That(controller.PracticeSceneName, Is.EqualTo(scene));
+            Assert.That(controller.IsPracticeSceneReady, Is.True);
+            Assert.That(controller.Session.PracticeTickets, Is.Zero);
+            Button("NextButton").onClick.Invoke();
+            Assert.That(controller.Session.StepIndex, Is.EqualTo(step));
+            Assert.That(controller.Session.PracticeTickets, Is.Zero);
+        }
+
+        [Test]
+        public void ChapterChoiceClearsReviewHistoryAndModalBlocksPrevious()
+        {
+            var controller = Create(); Button("NextButton").onClick.Invoke(); Button("NextButton").onClick.Invoke();
+            var current = DialogueText().text;
+            Button("TutorialSelectionButton").onClick.Invoke();
+            Button("PreviousButton").onClick.Invoke();
+            Assert.That(DialogueText().text, Is.EqualTo(current));
+            Button("Chapter2").onClick.Invoke(); AttachCurrentScene();
+            Assert.That(Button("PreviousButton").interactable, Is.False);
+            Assert.That(controller.Session.StepIndex, Is.EqualTo(TutorialSession.SecondChapterStep));
+            Button("NextButton").onClick.Invoke();
+            Button("PreviousButton").onClick.Invoke();
+            Button("TutorialSelectionButton").onClick.Invoke(); Button("Chapter1").onClick.Invoke(); AttachCurrentScene();
+            Assert.That(Button("PreviousButton").interactable, Is.False);
+            Assert.That(controller.Session.StepIndex, Is.EqualTo(TutorialSession.FirstChapterStep));
+        }
+
+        [Test]
+        public void ReviewingChapterOneRestoresTheVisualAidForTheDisplayedDialogue()
+        {
+            var controller = Create();
+            while (controller.Session.CurrentStep.Cue != TutorialCue.Resources) Button("NextButton").onClick.Invoke();
+            var resources = _host.GetComponentsInChildren<RectTransform>(true).Single(x => x.name == "CivilizationResources");
+            var gold = _host.GetComponentsInChildren<RectTransform>(true).Single(x => x.name == "GoldSubstitution");
+            Button("NextButton").onClick.Invoke();
+            Assert.That(gold.gameObject.activeSelf, Is.True);
+            Button("PreviousButton").onClick.Invoke();
+            Assert.That(resources.gameObject.activeSelf, Is.True);
+            Assert.That(gold.gameObject.activeSelf, Is.False);
+            Button("NextButton").onClick.Invoke();
+            Assert.That(resources.gameObject.activeSelf, Is.False);
+            Assert.That(gold.gameObject.activeSelf, Is.True);
+        }
+
+        [TestCase(500f, 230f)]
+        [TestCase(1600f, 160f)]
+        public void PreviousSitsLeftOfNextWithoutCoveringDialogue(float width, float height)
+        {
+            Create();
+            var panel = (RectTransform)DialogueText().transform.parent;
+            panel.anchorMin = panel.anchorMax = new Vector2(.5f, .5f);
+            panel.sizeDelta = new Vector2(width, height);
+            typeof(TutorialSceneController).GetMethod("RefreshDialogueNavigationLayout", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(_controller, null);
+            var previous = Button("PreviousButton").GetComponent<RectTransform>();
+            var next = Button("NextButton").GetComponent<RectTransform>();
+            Rect Bounds(RectTransform child)
+            {
+                var corners = new Vector3[4]; child.GetWorldCorners(corners);
+                var min = (Vector2)panel.InverseTransformPoint(corners[0]);
+                var max = (Vector2)panel.InverseTransformPoint(corners[2]);
+                return new Rect(min, max-min);
+            }
+            var left = Bounds(previous); var right = Bounds(next); var text = Bounds(DialogueText().rectTransform);
+            Assert.That(left.xMax, Is.LessThan(right.xMin));
+            Assert.That(text.Overlaps(left) || text.Overlaps(right), Is.False);
+            Assert.That(panel.rect.Contains(left.min) && panel.rect.Contains(right.max), Is.True);
+            Assert.That(left.height, Is.GreaterThanOrEqualTo(44f));
+            Assert.That(text.height, Is.GreaterThan(45f));
+        }
+
+        [Test]
+        public void BattleReviewPreservesMulliganAndCancellationDoesNotAccumulateHistory()
+        {
+            var controller = Create();
+            Button("TutorialSelectionButton").onClick.Invoke(); Button("Chapter4").onClick.Invoke(); AttachCurrentScene();
+            var battle = PracticeComponent<BattleBootstrapper>();
+            Button("NextButton").onClick.Invoke();
+            var state = battle.CurrentBattleState;
+            var hand = state.Player.Hand.CardIds.ToArray();
+            var step = controller.Session.StepIndex;
+            var instruction = DialogueText().text;
+            Button("PreviousButton").onClick.Invoke();
+            var intro = DialogueText().text;
+            battle.TutorialMulliganSelectionChanged(true);
+            Assert.That(controller.Session.StepIndex, Is.EqualTo(step));
+            Button("NextButton").onClick.Invoke();
+            Assert.That(DialogueText().text, Is.EqualTo(instruction));
+            Assert.That(battle.CurrentBattleState, Is.SameAs(state));
+            Assert.That(state.Player.Hand.CardIds, Is.EqualTo(hand));
+            Assert.That(state.Phase, Is.EqualTo(PhaseType.Mulligan));
+            for (var i = 0; i < 3; i++)
+            {
+                battle.TutorialMulliganSelectionChanged(true);
+                Assert.That(controller.Session.CurrentStep.RequiredAction, Is.EqualTo(TutorialAction.ConfirmMulligan));
+                battle.TutorialMulliganSelectionChanged(false);
+                Assert.That(controller.Session.StepIndex, Is.EqualTo(step));
+            }
+            Button("PreviousButton").onClick.Invoke();
+            Assert.That(DialogueText().text, Is.EqualTo(intro));
+            Assert.That(Button("PreviousButton").interactable, Is.False);
+        }
+
+        [Test]
+        public void BattleResolutionLocksPreviousUntilTheActionCompletes()
+        {
+            var controller = Create();
+            Button("TutorialSelectionButton").onClick.Invoke(); Button("Chapter4").onClick.Invoke(); AttachCurrentScene();
+            Button("NextButton").onClick.Invoke();
+            var battle = PracticeComponent<BattleBootstrapper>(); var instruction = DialogueText().text;
+            var resolving = typeof(BattleBootstrapper).GetField("_tutorialResolving", BindingFlags.Instance | BindingFlags.NonPublic);
+            var refresh = typeof(TutorialSceneController).GetMethod("RefreshBattlePracticeInput", BindingFlags.Instance | BindingFlags.NonPublic);
+            resolving.SetValue(battle, true); refresh.Invoke(controller, null);
+            Assert.That(Button("PreviousButton").interactable, Is.False);
+            Button("PreviousButton").onClick.Invoke();
+            Assert.That(DialogueText().text, Is.EqualTo(instruction));
+            resolving.SetValue(battle, false); refresh.Invoke(controller, null);
+            Assert.That(Button("PreviousButton").interactable, Is.True);
+        }
+
+        [Test]
+        public void ReviewingTheFarewellDoesNotExitUntilCurrentFinishIsPressed()
+        {
+            var controller = Create(); var returned = 0; controller.ConfigureReturnAction(() => returned++);
+            // Prepare the existing final chapter model up to the concluding dialogue.
+            controller.Session.SelectChapter(6);
+            while (controller.Session.CurrentStep.Cue != TutorialCue.TutorialConclusion)
+            {
+                if (!controller.Session.WaitingForAction) { Assert.That(controller.Session.TryAdvance(), Is.True); continue; }
+                if (controller.Session.CurrentStep.RequiredAction == TutorialAction.UpgradePracticeCard)
+                {
+                    controller.TryGetCardDefinitionAsset("Goblin", out var card);
+                    Assert.That(controller.Session.UpgradePractice.TryUpgrade(card.ToDefinition()), Is.True);
+                }
+                Assert.That(controller.Session.PerformAction(controller.Session.CurrentStep.RequiredAction), Is.True);
+            }
+            typeof(TutorialSceneController).GetMethod("PresentStep", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(controller, null);
+            while (!controller.Session.IsComplete) Button("NextButton").onClick.Invoke();
+            var farewell = DialogueText().text;
+            Button("PreviousButton").onClick.Invoke();
+            Assert.That(Button("NextButton").GetComponentInChildren<Text>().text, Is.EqualTo("다음"));
+            Button("NextButton").onClick.Invoke();
+            Assert.That(DialogueText().text, Is.EqualTo(farewell));
+            Assert.That(returned, Is.Zero);
+            Assert.That(Button("NextButton").GetComponentInChildren<Text>().text, Is.EqualTo("튜토리얼 마치기"));
+            Button("NextButton").onClick.Invoke();
+            Assert.That(returned, Is.EqualTo(1));
         }
 
         [Test]

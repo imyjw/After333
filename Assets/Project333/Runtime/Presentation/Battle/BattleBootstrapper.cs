@@ -245,6 +245,11 @@ namespace Project333.Runtime.Presentation.Battle
 
         public void CancelCombatPresentation()
         {
+            _battleScreenPresenter?.CancelTemporaryReplicateExpiry();
+            _battleScreenPresenter?.TutorialHand?.CancelSpellCardUses();
+            _battleScreenPresenter?.TutorialHand?.CancelCardDraws();
+            _lastLocalDrawBattleState = null;
+            _lastLocalDrawEventCount = 0;
             _combatPresentationGeneration++;
             _pendingOnlineIronDomeImpacts = 0;
             _pendingOnlineIronDomeGroups = 0;
@@ -580,6 +585,10 @@ namespace Project333.Runtime.Presentation.Battle
 
         public string LastInteractionStatus => _lastInteractionStatus;
 
+        // Card reveals stay independent of action input, but must finish before the result/scene return.
+        public bool IsOpponentPlayedCardRevealPending =>
+            _opponentPlayedCardRevealCoroutine != null || _opponentPlayedCardRevealQueue.Count > 0;
+
         public bool IsBusy => _tutorialResolving || _isBusy || IsEndTurnInputLocked || IsRedDragonOnlinePresentationPending || IsMeteorOnlinePresentationPending || IsFireSpearOnlinePresentationPending || IsPlasmaShieldOnlinePresentationPending || IsManaShieldOnlinePresentationPending || IsReactiveArmourOnlinePresentationPending || IsIronDomeOnlinePresentationPending || IsSummonTrapOnlinePresentationPending;
 
         public bool CanPlayerEndTurn => TutorialAllowsEndTurn && !IsBusy && CurrentBattleState != null &&
@@ -708,6 +717,8 @@ namespace Project333.Runtime.Presentation.Battle
         {
             ShowOnlineToast(message, _onlineSuccessToastPanelColor);
         }
+
+        public void CancelPendingSpellCardUse() => _battleScreenPresenter?.TutorialHand?.CancelPendingSpellCardUses();
 
         public void ShowCommandErrorToast(string message)
         {
@@ -1539,15 +1550,36 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             var cardDrawCount = 0;
+            var hasAcceptedUnitMove = false;
             var startsLocalPlayerTurn = false;
             for (var eventIndex = 0; eventIndex < battleEvents.Count; eventIndex++)
             {
                 var battleEvent = battleEvents[eventIndex];
+                if (battleEvent?.EventType == BattleEventType.OccupantMoved &&
+                    battleEvent.SourceCoord != null && battleEvent.TargetCoord != null &&
+                    (battleEvent.SourceOwnerId != battleEvent.TargetOwnerId ||
+                     battleEvent.SourceCoord.Column != battleEvent.TargetCoord.Column ||
+                     battleEvent.SourceCoord.Row != battleEvent.TargetCoord.Row))
+                    hasAcceptedUnitMove = true;
+
+                if (battleEvent?.EventType == BattleEventType.TrapInstalled &&
+                    battleEvent.SourceOwnerId == PlayerId.Player)
+                    _battleScreenPresenter?.TutorialHand?.ConfirmTrapCardUse();
+
+                if (battleEvent?.EventType == BattleEventType.SpellCast &&
+                    battleEvent.SourceOwnerId == PlayerId.Player)
+                    _battleScreenPresenter?.TutorialHand?.ConfirmSpellCardUse(
+                        string.IsNullOrEmpty(battleEvent.CardId) ? battleEvent.SourceCardId : battleEvent.CardId);
+
                 if (battleEvent?.EventType == BattleEventType.CardDrawn &&
                     battleEvent.SourceOwnerId == PlayerId.Player)
                 {
                     cardDrawCount += Mathf.Max(1, battleEvent.Amount);
                 }
+
+                if (battleEvent?.EventType == BattleEventType.TurnEnded &&
+                    battleEvent.SourceOwnerId == PlayerId.Player)
+                    _battleScreenPresenter?.QueueTemporaryReplicateExpiry();
 
                 if (battleEvent?.EventType == BattleEventType.TurnStarted &&
                     battleEvent.SourceOwnerId == PlayerId.Player)
@@ -1556,7 +1588,11 @@ namespace Project333.Runtime.Presentation.Battle
                 }
             }
 
+            _battleScreenPresenter?.QueueCardDrawAnimations(cardDrawCount);
             _battleScreenPresenter?.QueueCardDrawSounds(cardDrawCount);
+            // A swap contains two OccupantMoved events, but is one audible action.
+            // This remains independent of the optional visual movement animation.
+            if (hasAcceptedUnitMove) _battleScreenPresenter?.PlayUnitMoveSound();
             var hasTimedBombCountdown = FindFirstBattleEvent(battleEvents, BattleEventType.TimedBombCountdown) != null;
             var endsBattle = FindFirstBattleEvent(battleEvents, BattleEventType.BattleEnded) != null;
             if (startsLocalPlayerTurn && !hasTimedBombCountdown && !endsBattle)
@@ -3280,6 +3316,7 @@ namespace Project333.Runtime.Presentation.Battle
                 _endTurnSubmittedNumber = -1;
                 throw;
             }
+            _battleScreenPresenter?.QueueTemporaryReplicateExpiry();
             var afterSnapshot = CaptureBattleSnapshot(CurrentBattleState);
             var impactRequest = BuildImpactAnimationRequest(beforeSnapshot, afterSnapshot, CloneValuePopupEvents(CurrentBattleState));
             if (ShouldAnimateAttackSequences() && HasPresentationImpact(impactRequest))
@@ -3383,6 +3420,7 @@ namespace Project333.Runtime.Presentation.Battle
             {
                 var isSwap = CurrentBattleState.PlayerBoard.GetOccupant(toCoord) != null;
                 _battleGateway.ExecuteCommand(PlayerId.Player, new MoveOccupantCommand(fromCoord, toCoord));
+                _battleScreenPresenter?.PlayUnitMoveSound();
                 message = isSwap
                     ? CombatLogFormatter.FormatSwap(fromCoord, toCoord)
                     : $"Moved unit from {fromCoord} to {toCoord}.";
@@ -3598,17 +3636,7 @@ namespace Project333.Runtime.Presentation.Battle
 
                     case CardType.Spell:
                         if (definition.HasTrap)
-                        {
-                            if (targetOwnerId != PlayerId.Player || CurrentBattleState.GetBoard(PlayerId.Player).GetOccupant(targetCoord)?.Kind != OccupantKind.Master)
-                                return FailPlayerCardUseSilently("내 마스터에 트랩을 설치하세요.", out message);
-                            if (HasPlayerArmedTrap(cardId))
-                                return FailPlayerCardUseSilently("이미 설치된 트랩입니다.", out message);
-                            var installCommand = new InstallTrapCommand(cardId, handCardRuntimeId);
-                            if (ShouldRoutePlayerActionsOnline())
-                                return TrySendOnlinePlayerCommand(installCommand, "트랩을 설치했습니다.", out message);
-                            _battleGateway.ExecuteCommand(PlayerId.Player, installCommand);
-                            break;
-                        }
+                            return TryCastPlayerPersistentSpell(cardId, handCardRuntimeId, out message);
                         if (definition is DamageSpellCardDefinition)
                         {
                             var castDamageCommand = new CastDamageSpellCommand(
@@ -3858,8 +3886,19 @@ namespace Project333.Runtime.Presentation.Battle
             try
             {
                 var definition = _cardDefinitionProvider.GetRequired(cardId);
-                if (definition is PersistentResourceSpellCardDefinition)
+                if (definition.HasTrap)
                 {
+                    _battleScreenPresenter?.TutorialHand?.PrepareTrapCardUse(cardId, handCardRuntimeId);
+                    var installCommand = new InstallTrapCommand(cardId, handCardRuntimeId);
+                    if (ShouldRoutePlayerActionsOnline())
+                        return TrySendOnlinePlayerCommand(installCommand, "트랩을 설치했습니다.", out message);
+                    _battleGateway.ExecuteCommand(PlayerId.Player, installCommand);
+                    _battleScreenPresenter?.TutorialHand?.ConfirmSpellCardUse(cardId, handCardRuntimeId);
+                    message = "트랩을 설치했습니다.";
+                }
+                else if (definition is PersistentResourceSpellCardDefinition)
+                {
+                    _battleScreenPresenter?.TutorialHand?.PrepareSpellCardUse(cardId, handCardRuntimeId);
                     var castPersistentCommand = new CastPersistentResourceSpellCommand(
                         cardId,
                         handCardRuntimeId);
@@ -3872,6 +3911,7 @@ namespace Project333.Runtime.Presentation.Battle
                     }
 
                     _battleGateway.ExecuteCommand(PlayerId.Player, castPersistentCommand);
+                    _battleScreenPresenter?.TutorialHand?.ConfirmSpellCardUse(cardId, handCardRuntimeId);
                     message = $"Cast persistent spell '{cardId}'.";
                 }
                 else if (definition is ScriptedSpellCardDefinition scriptedSpellDefinition &&
@@ -3885,6 +3925,7 @@ namespace Project333.Runtime.Presentation.Battle
                           string.Equals(scriptedSpellDefinition.EffectId, ManaStoneRules.EffectId, StringComparison.Ordinal) ||
                           string.Equals(scriptedSpellDefinition.EffectId, ManaStoneBundleRules.EffectId, StringComparison.Ordinal)))
                 {
+                    _battleScreenPresenter?.TutorialHand?.PrepareSpellCardUse(cardId, handCardRuntimeId);
                     var castScriptedCommand = new CastScriptedSpellCommand(
                         cardId,
                         handCardRuntimeId);
@@ -3900,6 +3941,7 @@ namespace Project333.Runtime.Presentation.Battle
                                           scriptedSpellDefinition.EffectId == MeteorRules.EffectId) && ShouldAnimateAttackSequences()
                         ? CaptureBattleSnapshot(CurrentBattleState) : null;
                     _battleGateway.ExecuteCommand(PlayerId.Player, castScriptedCommand);
+                    _battleScreenPresenter?.TutorialHand?.ConfirmSpellCardUse(cardId, handCardRuntimeId);
                     message = CombatLogFormatter.FormatCommand(PlayerId.Player, castScriptedCommand,
                         CurrentBattleState, ResolveCombatLogCardDisplayName);
                     if (beforeAreaCast != null)
@@ -3925,6 +3967,7 @@ namespace Project333.Runtime.Presentation.Battle
             }
             catch (Exception ex)
             {
+                CancelPendingSpellCardUse();
                 FailPlayerCardUse(ex.Message, out message);
                 Debug.LogWarning($"Cast persistent spell interaction failed for '{cardId}': {ex.Message}");
                 return false;
@@ -4029,9 +4072,31 @@ namespace Project333.Runtime.Presentation.Battle
             }
         }
 
+        private BattleState _lastLocalDrawBattleState;
+        private int _lastLocalDrawEventCount;
+
+        private void QueueLocalCardDrawAnimations()
+        {
+            if (_sendPlayerActionsToOnlineGateway) return;
+            var state = CurrentBattleState;
+            if (!ReferenceEquals(state, _lastLocalDrawBattleState))
+            {
+                _lastLocalDrawBattleState = state;
+                _lastLocalDrawEventCount = state?.CardDrawEvents.Count ?? 0;
+                return;
+            }
+            if (state == null) return;
+            var count = 0;
+            for (var i = _lastLocalDrawEventCount; i < state.CardDrawEvents.Count; i++)
+                if (state.CardDrawEvents[i].OwnerId == PlayerId.Player) count++;
+            _lastLocalDrawEventCount = state.CardDrawEvents.Count;
+            _battleScreenPresenter?.QueueCardDrawAnimations(count);
+        }
+
         private void RefreshPresenter()
         {
             QueueLocalTrapReveals();
+            QueueLocalCardDrawAnimations();
             _battleScreenPresenter?.Present(CurrentBattleState);
 
             if (ShouldQueueDraftSceneReturn())
@@ -4080,6 +4145,7 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             message = sendMessage;
+            CancelPendingSpellCardUse();
             ShowCommandErrorToast(message);
             return false;
         }
@@ -4213,7 +4279,21 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
+            var beforeAiMovement = _battleScreenPresenter != null ? CaptureBattleSnapshot(CurrentBattleState) : null;
             _aiTurnRunner.RunAiTurn(_battleGateway, AddCombatLogEntry, ResolveCombatLogCardDisplayName);
+            // The non-animated debug runner completes its actions in one synchronous batch.
+            if (beforeAiMovement != null)
+            {
+                var afterAiMovement = CaptureBattleSnapshot(CurrentBattleState);
+                foreach (var before in beforeAiMovement.Occupants)
+                {
+                    var after = afterAiMovement.FindByRuntimeId(before.RuntimeId);
+                    if (after == null || after.OwnerId != before.OwnerId || after.Coord == before.Coord) continue;
+                    _battleScreenPresenter.PlayUnitMoveSound();
+                    break;
+                }
+            }
+
 
             if (_autoResolvePlayerTurnStartAfterAi &&
                 CurrentBattleState != null &&
@@ -4437,10 +4517,21 @@ namespace Project333.Runtime.Presentation.Battle
         {
             _hasQueuedDraftSceneReturn = true;
 
-            if (_returnToDraftSceneDelaySeconds > 0f)
+            // Let the lethal attack/death presentation finish before the result's hold time.
+            // Online projection can replace the state object with an equivalent final snapshot.
+            while ((IsBusy || IsOpponentPlayedCardRevealPending) && CurrentBattleState != null && CurrentBattleState.IsEnded)
             {
-                yield return new WaitForSecondsRealtime(_returnToDraftSceneDelaySeconds);
+                yield return null;
             }
+
+            if (CurrentBattleState == null || !CurrentBattleState.IsEnded)
+            {
+                _hasQueuedDraftSceneReturn = false;
+                yield break;
+            }
+
+            yield return new WaitForSecondsRealtime(Mathf.Max(
+                _returnToDraftSceneDelaySeconds, BattleOutcomeBannerView.MinimumDisplaySeconds));
 
             if (CurrentBattleState == null || !CurrentBattleState.IsEnded)
             {
@@ -4744,6 +4835,7 @@ namespace Project333.Runtime.Presentation.Battle
                 var commandLog = CombatLogFormatter.FormatCommand(PlayerId.AI, command,
                     CurrentBattleState, ResolveCombatLogCardDisplayName);
                 _battleGateway.ExecuteCommand(PlayerId.AI, command);
+                if (command is MoveOccupantCommand) _battleScreenPresenter?.PlayUnitMoveSound();
                 var summonTrapImpact = BuildLocalSummonTrapImpact(beforeSummon);
                 if (summonTrapImpact != null)
                 {
@@ -5671,6 +5763,7 @@ namespace Project333.Runtime.Presentation.Battle
             }
             var hasAnyDeath = false;
             var deathDuration = 0f;
+            var counterattackerFinalized = false;
             foreach (var impact in request.DefenderImpacts)
             {
                 var impactView = FindTileTextView(impact.OwnerId, impact.Coord);
@@ -5678,6 +5771,9 @@ namespace Project333.Runtime.Presentation.Battle
                 {
                     continue;
                 }
+
+                if (impactView == destinationView && (impact.Died || impact.TookDamage))
+                    counterattackerFinalized = true;
 
                 if (impact.Died)
                 {
@@ -5690,6 +5786,13 @@ namespace Project333.Runtime.Presentation.Battle
                     impactView.PlayIdleAnimation();
                 }
             }
+
+            // A blocked/invincible hit can cause a counterattack without a defender
+            // damage impact. Restore that survivor before the attacker's lethal exit.
+            if (request.DefenderCounterattacked && !counterattackerFinalized &&
+                destinationView != null && destinationView.isActiveAndEnabled &&
+                destinationView.VisualRuntimeId == targetRuntimeId)
+                destinationView.PlayIdleAnimation();
 
             if (request.AttackerDied)
             {

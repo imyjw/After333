@@ -69,6 +69,7 @@ namespace Project333.Runtime.Presentation.Hand
         private Sprite _generatedCardBackSprite;
         private Texture2D _generatedSpriteSource;
         private Coroutine _hideTooltipCoroutine;
+        private readonly Vector3[] _cardBackCorners = new Vector3[4];
         private static Font s_runtimeKoreanFont;
 
         public int RemainingDeckCount => _remainingDeckCount;
@@ -316,7 +317,10 @@ namespace Project333.Runtime.Presentation.Hand
                 _deckRoot = safeAreaRoot.Find(DeckRootName) as RectTransform;
             }
 
-            if (_deckRoot == null && safeAreaRoot != null)
+            // Existing native scene transforms are authored layout, not generated defaults.
+            if (_deckRoot != null) return;
+
+            if (safeAreaRoot != null)
             {
                 var rootObject = new GameObject(DeckRootName, typeof(RectTransform));
                 _deckRoot = rootObject.GetComponent<RectTransform>();
@@ -374,6 +378,7 @@ namespace Project333.Runtime.Presentation.Hand
             for (var index = 0; index < _cardBackImages.Length; index++)
             {
                 var image = _cardBackImages[index];
+                var wasCreated = false;
                 if (image == null)
                 {
                     var childName = $"{CardBackObjectPrefix}{index:00}";
@@ -388,12 +393,14 @@ namespace Project333.Runtime.Presentation.Hand
                             typeof(Image));
                         cardObject.transform.SetParent(_deckRoot, false);
                         image = cardObject.GetComponent<Image>();
+                        wasCreated = true;
                     }
 
                     _cardBackImages[index] = image;
                 }
 
                 image.raycastTarget = false;
+                if (!wasCreated) continue;
                 image.preserveAspect = true;
                 image.type = Image.Type.Simple;
                 image.color = Color.white;
@@ -458,10 +465,25 @@ namespace Project333.Runtime.Presentation.Hand
             _touchTarget.onClick.AddListener(ShowDeckCountFromUi);
 
             var touchRect = _touchTarget.transform as RectTransform;
-            touchRect.anchorMin = Vector2.zero;
-            touchRect.anchorMax = Vector2.one;
-            touchRect.offsetMin = Vector2.zero;
-            touchRect.offsetMax = Vector2.zero;
+            // Follow the authored cards, including offsets/rotation outside the old deck root.
+            var bounds = _deckRoot.rect;
+            var hasCardBounds = false;
+            foreach (var image in _cardBackImages)
+            {
+                if (image == null) continue;
+                image.rectTransform.GetWorldCorners(_cardBackCorners);
+                foreach (var corner in _cardBackCorners)
+                {
+                    var point = (Vector2)_deckRoot.InverseTransformPoint(corner);
+                    if (!hasCardBounds) { bounds = new Rect(point, Vector2.zero); hasCardBounds = true; }
+                    else bounds = Rect.MinMaxRect(Mathf.Min(bounds.xMin, point.x), Mathf.Min(bounds.yMin, point.y),
+                        Mathf.Max(bounds.xMax, point.x), Mathf.Max(bounds.yMax, point.y));
+                }
+            }
+            touchRect.anchorMin = touchRect.anchorMax = Vector2.zero;
+            touchRect.pivot = new Vector2(.5f, .5f);
+            touchRect.anchoredPosition = bounds.center - _deckRoot.rect.min;
+            touchRect.sizeDelta = bounds.size;
             touchRect.localScale = Vector3.one;
             touchRect.localRotation = Quaternion.identity;
         }
@@ -637,8 +659,8 @@ namespace Project333.Runtime.Presentation.Hand
                     continue;
                 }
 
-                image.sprite = _cardBackSprite;
-                image.color = Color.white;
+                // Image.Source Image in the saved scene takes precedence over the fallback.
+                if (image.sprite == null) image.sprite = _cardBackSprite;
             }
         }
 

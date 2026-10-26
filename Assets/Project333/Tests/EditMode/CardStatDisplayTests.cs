@@ -14,6 +14,23 @@ namespace Project333.Tests.EditMode
 {
     public sealed class CardStatDisplayTests
     {
+        [TestCase(30, 0, 30)]
+        [TestCase(30, 1, 31)]
+        [TestCase(30, 13, 43)]
+        [TestCase(47, 13, 60)]
+        [TestCase(30, -1, 30)]
+        [TestCase(30, 14, 30)]
+        public void Daehwandan_DisplaysAttackBuffMagnitudeWithoutHpOrSpellPower(int baseAmount, int level, int expected)
+        {
+            var spell = new ScriptedSpellCardDefinition(DaehwandanCardRules.CardId, "대환단",
+                new ResourceSet(), DaehwandanCardRules.EffectId, effectAmount: baseAmount);
+            Assert.That(CardStatDisplay.TryCreate(spell, level, out var stats, spellPower: 999), Is.True);
+            Assert.That(stats.Attack, Is.EqualTo(expected));
+            Assert.That(stats.HasHp, Is.False);
+            Assert.That(CardStatDisplay.TryGetSpellDamage(spell, level, 999, out _), Is.False,
+                "An attack buff is still not spell damage.");
+        }
+
         [TestCase(0, 10)]
         [TestCase(5, 15)]
         [TestCase(13, 23)]

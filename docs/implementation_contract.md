@@ -1,5 +1,7 @@
 # Implementation contract reference
 
+2026-10-20 문서 동기화: 현재 기본값은 [전투 규칙](battle_rules.md)·[카드 목록](card_catalog.md), 운영 전환/백업은 [현재 상태](current_project_status.md)를 따른다. 아래 보존된 과거 whitelist·운영/미구현 표현으로 이미 구현된6단계 튜토리얼·카드팩·트랩·온라인 계정 기능을 되돌리지 않는다.
+
 Extracted from the active project's AGENTS.md on 2026-09-21 so detailed rules are read only when relevant. This is a reference document, not an instruction to preload its entire contents.
 
 ## Authority and known legacy wording

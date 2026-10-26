@@ -1,39 +1,34 @@
 # After333 배경음악
 
-2026-09-26 제작·수정. 사용자의 최신 요청은 평상시 음악을 **밝은 분위기의 잔잔하고 조용한 음악**으로 만드는 것이다. 로비 곡은 이 요청에 맞춰 장조의 느린 피아노 곡으로 다시 썼다. 두 곡 모두 가사 없는 오리지널 음악이다. 외부 음원이나 샘플을 사용하지 않고 악보와 음색을 직접 작성한 합성 음악이며, 실제 악기 녹음은 아니다.
+2026-10-23: 사용자가 제공한 두 음원으로 교체했다. 로비 첨부 파일은 실제로 **MP3**이며 WAV로 변환하거나 확장자만 바꾸지 않고 그대로 가져왔다. 기존 합성 음악의 곡명·측정값·20초 미리듣기는 현재 음악을 설명하지 않는다.
 
-| 용도 | 곡 | 길이 / 템포 | 구성 |
-| --- | --- | --- | --- |
-| 시작·드래프트·덱 빌딩·보유 카드·상점 | Sunlit Garden — 햇살 정원 | 2분 13.333초 / 72 BPM | 부드러운 피아노, 중음역 선율과 쉼, 아주 작은 패드 반주 |
-| 전투 | Convergence of Three — 세 문명의 격돌 | 2분 / 128 BPM | 짧은 현악 리듬, 낮은 북, 관악 계열 주선율, 플루트 응답 |
+| 용도 | 사용자 원본 | Unity 리소스 파일 |
+| --- | --- | --- |
+| 게임 시작·드래프트·덱 빌딩·보유 카드·상점·튜토리얼 | After333_Lobby.mp3 | Assets/Project333/Resources/Project333/Audio/BGM/After333_Lobby.mp3 |
+| 전투 | BattleBGM2.wav | Assets/Project333/Resources/Project333/Audio/BGM/After333_Battle.wav |
 
-로비는 F장조의 여유로운 피아노 곡으로, 2마디마다 화성이 바뀌며 긴 쉼과 느린 전개를 둔다. 이전 로비의 단조·높은 플루트·북·셰이커는 사용하지 않는다. 전투 곡은 기존 D단조와 D–F–A 모티프를 유지한다. 곡 끝의 악기 잔향과 리버브가 첫 부분으로 이어지도록 렌더링했다.
+두 파일 모두 첨부 원본과 SHA256이 일치한다. 전투 파일은 기존 리소스 이름을 유지했으며, 로비 파일은 MP3 확장자를 사용한다. 기존 AudioClip GUID를 모두 유지하고 중복되는 로비 WAV는 제거했다. 리소스 키는 확장자를 제외하므로 기존 연결을 그대로 사용한다.
 
-## 미리듣기와 파일
+## 재생과 음량
 
-- [대기 곡 20초 미리듣기](audio/After333_Lobby_Preview.wav)
-- [전투 곡 20초 미리듣기](audio/After333_Battle_Preview.wav)
-- 전체 원본: `Assets/Project333/Resources/Project333/Audio/BGM/After333_Lobby.wav`, `After333_Battle.wav`.
-- 원본은 스테레오 44.1 kHz / 16-bit PCM WAV다. Unity에서는 Vorbis 0.65 품질·Streaming·백그라운드 로딩으로 가져온다. 원본 WAV 합계가 그대로 앱의 압축 음악 용량을 뜻하지는 않는다. 실제 빌드 용량은 아직 측정하지 않았다.
-- [작곡·음색·출처·재생성 기록](../Tools/Audio/After333Music.md)
+`Project333RuntimeSettings`의 씬 로드 처리가 `After333BackgroundMusic.EnsureForScene`을 호출한다. 씬 파일을 수정하지 않고 하나의 지속 재생 오브젝트를 사용한다.
 
-## 게임 연결
+- `GameStart_VSlice`, `Draft_VSlice`, `DeckBuilding_VSlice`, `OwnedCards_VSlice`, `Shop_VSlice`, `Tutorial_VSlice`: 로비 음악. 메뉴 사이를 이동해도 같은 곡의 재생 위치를 유지한다. 튜토리얼의 전투 실습은 `Battle_VSlice`에서 전투 음악을 사용한다.
+- `Battle_VSlice`: 전투 음악. 곡 변경 시 기존 곡은 0.35초 페이드 아웃, 새 곡은 0.65초 페이드 인한다. 게임 시간 정지 중에도 전환한다.
+- 기존 설정의 **전체 음량**과 **배경음악 음량**을 유지한다. 기준 음량은 0.48이다. 반복 재생, 중복 플레이어 방지, 비활성화 후 재개와 AudioListener 전환도 유지한다.
+- 두 음원 모두 Streaming·Vorbis 품질 0.65·백그라운드 로딩으로 가져오며 스테레오를 유지한다. 실제 앱 용량은 Unity 압축·플랫폼 설정에 따라 달라진다.
 
-`Project333RuntimeSettings`의 기존 씬 로드 처리가 `After333BackgroundMusic.EnsureForScene`을 호출한다. 씬 파일에 별도 오브젝트를 저장하지 않고 런타임에서 하나의 지속 재생 오브젝트를 만든다.
+효과음 볼륨은 음악에 영향을 주지 않는다. 마스터·배경음악·효과음 세 가지의 관계와 저장 방식은 [오디오 설정](audio_settings.md)을 참고한다.
 
-- `GameStart_VSlice`, `Draft_VSlice`, `DeckBuilding_VSlice`, `OwnedCards_VSlice`, `Shop_VSlice`: 대기 곡. 이 씬 사이를 이동해도 재생 위치를 유지한다.
-- `Battle_VSlice`: 전투 곡. 곡 변경 시 기존 곡을 0.35초 동안 줄이고 새 곡을 0.65초 동안 키운다. 게임 시간이 정지되어도 전환은 동작한다.
-- 기존 설정의 **전체 음량**과 **배경음악 음량**을 그대로 사용한다. 음악 기준 음량은 0.48이며 배경음악 음량·전환 음량을 곱한다. 전체 음량은 기존 AudioListener 경로에서 한 번 적용한다.
-- 다른 AudioListener가 없는 메뉴에서는 보조 AudioListener를 사용하고, 전투 씬의 기존 리스너가 활성화되면 보조 리스너를 끈다.
-- 반복 재생, 중복 플레이어 방지, 비활성화 후 재개를 지원한다. 자식/helper 씬 등 음악과 무관한 씬만으로는 새 음악 플레이어를 만들지 않는다.
+## 이후 교체 방법
+
+위 두 리소스 파일을 원하는 음원으로 교체하고 기존 `.meta` GUID를 유지한다. 파일 형식을 바꾸면 올바른 확장자로 저장하고 같은 리소스 이름의 옛 파일을 함께 남기지 않는다. Unity 임포트가 끝나면 Play를 다시 시작한다. 새 음악은 새 클라이언트를 빌드·설치해야 휴대폰에 반영된다. 서버 변경은 필요 없다.
+
+`Tools/Audio/GenerateAfter333Music.ps1`, `After333Music.cs`, `InspectAfter333Music.mjs`와 [과거 제작 기록](../Tools/Audio/After333Music.md)은 이전 합성 음악용이다. 현재 음원의 재생성·검증 도구로 실행하지 않는다. 특히 옛 생성기를 현재 Assets 경로에 실행하면 전투 음악을 덮어쓰고 로비 WAV 중복을 만들 수 있다. `docs/audio`의 옛 미리듣기도 현재 곡의 미리듣기가 아니다.
 
 ## 검증
 
-- 독립 PCM 검사: 두 곡 모두 클리핑 0. 수정된 로비 피크 -9 dBFS, 평균 RMS -24.97 dBFS, 첫/마지막 샘플 차이 0. 기존 로비보다 평균 레벨이 약 8.9 dB 낮다. 전투는 피크 -3 dBFS / RMS -17.1 dBFS / 경계 차이 1/32768로 유지. 스테레오·길이·DC·반복 경계 수치 검사 통과.
-- [독립 측정 결과](../Tools/Audio/After333MusicIndependentValidation.json). 검사 및 미리듣기 생성: `node Tools/Audio/InspectAfter333Music.mjs`.
-- Unity 6000.3.12f1 별도 최소 검증 프로젝트에서 **3/3 통과**: 실제 WAV 가져오기 2건과 PlayMode 코루틴 1건. 메뉴 연속성, 전투 전환, 음량/음소거, 시간 정지 중 전환, 중복 플레이어, 비활성화/재개, 리스너 소유권을 검사했다.
-- 검증 프로젝트에는 실제 런타임 두 파일·테스트 파일·WAV/.meta를 복사했다. 새 로비 음원으로 다시 3/3 통과했다. 최신 증거: `TempBuild/MusicRevision_20260926/music-tests.xml`, `unity.log`. 이전 실행은 `TempBuild/MusicValidation_20260926`에 남아 있다.
-- 전체 프로젝트의 Runtime·EditMode 어셈블리 소스 컴파일 통과. 증거: `TempBuild/BackgroundMusic_20260926/`.
-- 기존 Unity 편집기에 저장되지 않은 작업이 있어 그 씬을 바꾸거나 테스트를 실행하지 않았다. 실제 전투 화면·Android 청취, 압축 후 루프의 주관적 청취 검증은 아직 수행하지 않았다. 수치 검사를 청취 평가와 동일시하지 않는다.
-
-사용자가 최신 클라이언트를 빌드하면 음악이 연결된다. 이 변경만을 위해 서버를 재시작할 필요는 없다. 클라이언트 빌드·설치, 서버 재배포·재시작, 커밋·푸시는 수행하지 않았다.
+- Unity 6000.3.12f1 별도 최소 프로젝트: 기존 `After333BackgroundMusicTests` **3/3 통과**. 실제 MP3/WAV 가져오기 2건과 Play 진입을 포함한 재생 검사 1건이다. 메뉴·튜토리얼 연속성, 전투 전환, 음량/음소거, 일시정지, 중복 방지, 비활성화/재개, 리스너 소유권을 검사했다.
+- 활성 프로젝트의 음원·메타·관련 런타임 두 파일·테스트 파일은 검증 복사본과 SHA256이 일치한다. 기존 AudioClip GUID와 임포트 설정 유지도 확인했다.
+- 증거: 세션 시각화 폴더 `UserBackgroundMusic_20261023/MusicTests.xml`, `MusicTests.log`, `input_hashes.json`, `verification.json`. 원본 교체 전 파일은 같은 폴더의 `before`에 보관했다.
+- 실제 휴대폰 청취나 새 클라이언트 빌드·설치, 서버/DB 작업은 수행하지 않았다. 반복 재생 기능 검사는 새 음원의 반복 경계에 대한 청취 평가와 구분한다.

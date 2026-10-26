@@ -73,7 +73,9 @@ namespace Project333.Runtime.Application.Services
                     (enemy.Kind == OccupantKind.Unit && enemy.Attack >= 10 && enemy.CurrentHp <= enemy.Attack);
             }
             // Real counterattack losses and destruction chains remain in the board evaluation.
-            return valuableKill ? -8 : killed ? -80 : -120;
+            // Only melee producers reserve attacks that remove no enemy.
+            if (!killed) return attacker.AttackType == AttackType.Melee ? -120 : 0;
+            return valuableKill ? -8 : -80;
         }
 
         private double HuanShuDisruptionValue(BattleState state, OccupantState unit)

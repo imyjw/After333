@@ -830,7 +830,7 @@ namespace Project333.Runtime.Presentation.Battle
                         return;
                     }
 
-                    if (playerOccupant != null && !IsSelectedTrapCard())
+                    if (playerOccupant != null)
                     {
                         ClearCardSelection();
 
@@ -1000,8 +1000,7 @@ namespace Project333.Runtime.Presentation.Battle
                 return false;
             }
 
-            if (definition.HasTrap)
-                return CanInstallTrapOnMaster(battleState, definition, occupant);
+            if (definition.HasTrap) return false;
 
             if (definition is DamageSpellCardDefinition)
             {
@@ -1448,9 +1447,7 @@ namespace Project333.Runtime.Presentation.Battle
                            battleState.PlayerBoard.GetOccupant(tileView.Coord) == null;
 
                 case CardType.Spell:
-                    if (definition.HasTrap)
-                        return tileView.OwnerId == PlayerId.Player && CanInstallTrapOnMaster(battleState, definition,
-                            battleState.PlayerBoard.GetOccupant(tileView.Coord));
+                    if (definition.HasTrap) return false;
                     if (definition is DamageSpellCardDefinition)
                     {
                         var board = tileView.OwnerId == PlayerId.Player
@@ -1529,7 +1526,7 @@ namespace Project333.Runtime.Presentation.Battle
                 return false;
             }
 
-            if (definition.HasTrap) return false;
+            if (definition.HasTrap) return true;
             if (definition is DamageSpellCardDefinition)
             {
                 return false;
@@ -1619,7 +1616,7 @@ namespace Project333.Runtime.Presentation.Battle
                 return "해당 카드를 사용할 수 없는 상태입니다.";
             }
 
-            if (definition.HasTrap) return "내 마스터에 트랩을 설치하세요.";
+            if (definition.HasTrap) return "위로 드래그한 뒤 놓아 트랩을 설치하세요.";
 
             if (dragReleasedUpwardEnough && !CanCardCastWithoutTarget(battleState, cardId))
             {
@@ -1687,16 +1684,6 @@ namespace Project333.Runtime.Presentation.Battle
 
             return !IsHuanShuDefinition(definition) ||
                    HuanShuRules.CanCast(battleState, PlayerId.Player);
-        }
-
-        private bool IsSelectedTrapCard() => _battleBootstrapper != null &&
-            _battleBootstrapper.TryGetCardDefinition(_selectedCardId, out var definition) && definition?.HasTrap == true;
-
-        private static bool CanInstallTrapOnMaster(BattleState battle, CardDefinition definition, OccupantState occupant)
-        {
-            return battle != null && battle.Phase == PhaseType.Main && battle.ActivePlayerId == PlayerId.Player &&
-                   occupant != null && occupant.OwnerId == PlayerId.Player && occupant.Kind == OccupantKind.Master &&
-                   occupant.IsAlive && ReferenceEquals(battle.Player.Master, occupant) && IsCardBoardConditionMet(battle, definition);
         }
 
         private static bool HasDuplicateTrap(BattleState battle, string cardId)
@@ -2008,8 +1995,10 @@ namespace Project333.Runtime.Presentation.Battle
             return $"Selected '{cardId}' from slot {slotIndex}. Drag it onto a tile to use it, or drag upward to cast self-use spells.";
         }
 
-        private static string BuildDragMessage(string cardId)
+        private string BuildDragMessage(string cardId)
         {
+            if (_battleBootstrapper != null && _battleBootstrapper.TryGetCardDefinition(cardId, out var definition) && definition?.HasTrap == true)
+                return "위로 드래그한 뒤 놓아 트랩을 설치하세요.";
             return $"Dragging '{cardId}'. Release over a valid tile to use it.";
         }
 

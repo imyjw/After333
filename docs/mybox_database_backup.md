@@ -1,5 +1,15 @@
 # After333 MYBOX DB 백업 — 2026-09-13
 
+## 현재 백업 — 2026-10-19 확인, 2026-10-20 정리
+
+매일21시 Windows 예약은 이제 노트북의 `project333`이 아니라 **Lightsail의 `project333_live`**에서 새 덤프를 생성한다. 다운로드·원본 manifest·전체 아카이브 읽기·age 암호화 왕복·N:드라이브 읽기 검증 후 평문을 제거한다. 예약 실행본은 `%LOCALAPPDATA%\After333\Server\CloudBackup\Lightsail` 아래의 검증 패키지다. 아래9월의 `BackupPostgresToMybox.ps1`/설정 경로는 이전 노트북 백업 기록이며 현재 예약 실행본으로 덮어쓰지 않는다.
+
+2026-10-19 예약 시각21:00:00, 새RunId `20261019-120002-b49b6849`, 완료21:00:22.255, 결과0/Ready와 모든 검증 플래그를 확인했다. Windows 로그인·노트북 가동·MYBOX/N:·SSH 허용이 필요하며 로컬 PostgreSQL은 더 이상 이 작업의 데이터 원본이 아니다. StartWhenAvailable은 설정돼 있으나 PC 종료 후 보충 실행의 실제 시험은 별도다.
+
+MYBOX 독립 웹 다운로드한10월18일 백업은10월19일 격리DB에 실제 복원해34테이블 전체 내용·열·건수·시퀀스·migration24개·제약/인덱스를 비교했다. 서버 외부57파일도 별도 수동 암호화 백업/웹 다운로드 일치를 확인했다. DB 일일 작업이 서버 설정까지 자동 백업하거나 클라우드 업로드를 웹에서 독립 검증하는 것은 아니다. 상세 [복원 기록](postgres_restore_runbook.md), [현재 상태](current_project_status.md)를 따른다.
+
+**2026-10-20 운영 기록 갱신:** 서울 Lightsail + Caddy + PostgreSQL18로 이전했고 공개 주소는 `https://api.after333.com`, 운영DB는 `project333_live`다. 사용자 전환 결과에서 migration24개/latest`0024_elf_elder_card_id`를 확인했다. 아래 과거 날짜의 노트북/Tunnel·DB버전·미배포 문구는 당시 기록이다. 현재 실행·백업 절차는 [Lightsail 운영](lightsail_operations.md), 확인 범위와 남은 시험은 [현재 상태](current_project_status.md)를 우선한다. 오늘 원격 재확인을 수행하지 않았다.
+
 ## 설정 기록과 현재 확인 범위
 
 예약 작업 등록·실행 확인은 2026-09-13, 마지막 기록된 실행과 독립 웹 다운로드/격리 복원은 2026-09-21이다. 아래는 그때 확인한 설정과 증거다. 2026-10-01 문서 동기화에서는 예약 작업·MYBOX·DB·복구 키·운영 프로세스를 조회하거나 실행하지 않았으므로 지금의 업로드/가동 성공을 새로 보장하지 않는다. 게임 서버 자동 시작은 별도이며 아직 설정 범위에 포함하지 않는다.

@@ -1,3 +1,4 @@
+using Project333.Runtime.Presentation.Settings;
 using System;
 using Project333.Runtime.Domain.Battle;
 using UnityEngine;
@@ -64,7 +65,7 @@ namespace Project333.Runtime.Presentation.Battle
                     _audio.loop = false;
                 }
                 // Master volume is already applied once by After333AudioSettings via AudioListener.
-                _audio.PlayOneShot(_sound, SoundGain);
+                After333SoundEffects.PlayOneShot(_audio, _sound, SoundGain);
             }
             return DurationSeconds;
         }

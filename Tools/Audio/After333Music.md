@@ -1,3 +1,5 @@
+> Historical record (superseded 2026-10-23). Current music uses user-provided After333_Lobby.mp3 and BattleBGM2.wav; see [current music documentation](../../docs/background_music.md). The scores, measurements, previews and generators below describe the old synthesized tracks. Do not run the old generator against current Assets: it would overwrite the battle track and recreate a duplicate lobby WAV.
+
 # After333 original background music
 
 Updated 2026-09-26. The user rejected the first lobby track and clarified the direction: **bright, calm, quiet background music**. The lobby composition was replaced in full with **Sunlit Garden / 햇살 정원**, a slow F-major piano piece. The battle audio and its Unity metadata were preserved byte-for-byte.

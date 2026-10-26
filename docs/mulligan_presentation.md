@@ -49,3 +49,10 @@
 - 원본 씬·자산·설정 7797개와 기존 실행 중인 Editor를 보존했다. 당시 소스와 검증 사본의 기록된 입력 2659개가 일치했다. 새 스크립트와 검사 파일의 .meta는 네이티브 Unity가 생성한 파일을 사용한다.
 - 앞선 실패 실행은 attempts에 보존했다. Unity 컴포넌트의 fake-null 생성 오류, 숨겨진 예비 슬롯을 포함한 카드 배치, 화면 갱신 시 표시 상태를 수정했다. 테스트의 실제 씬 슬롯 수와 캡처 시간 가정도 실제 실행 방식에 맞췄다.
 - 증거: TempBuild/MulliganRedesign_20261002/unity-results.xml, unity-summary.json, final-preservation-proof.json, captures/. 클라이언트 빌드·기기 설치·실서버 연결/배포는 이 작업에서 실행하지 않았다.
+
+
+## Play 전 다섯 번째 슬롯 준비 (2026-10-23)
+
+저장된 전투 씬의 멀리건 슬롯이 00~03까지만 존재하던 경로를 수정했다. BattleMulliganOverlayPresenter의 지연된 편집 검사와 BattleScreenPresenter의 편집 UI 준비가 기존 EnsureCardCapacity(5)를 호출하여 MulliganCard_04와 카드 그림·선택 표시·ATK/HP 참조를 준비한다. 기존 네 슬롯을 재사용하며 중복 생성하지 않고, 멀리건 오버레이의 기본 숨김 상태를 바꾸지 않는다. Unity 컴파일 후 Battle_VSlice를 다시 열면 Hierarchy에서 확인할 수 있고 Ctrl+S로 저장한다. Play 중 드로우·멀리건 판정은 그대로다.
+
+격리 Unity 6000.3.12f1: 실제 4슬롯 씬에서 수정 전 1개 재현 검사가 Expected 5 / But was 4로 실패했다. 수정 후 기존 UI 포함 95/95 통과. 저장 사본을 다시 열어 다섯 슬롯의 참조·기존 버튼 유지·반복 생성 방지·오버레이 가시성 보존·전투 미시작을 확인했다. 메인 Editor 조작, 클라이언트 빌드·설치, 실서버·DB 작업은 수행하지 않았다.

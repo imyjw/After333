@@ -1,5 +1,7 @@
 # Android, public endpoint and concurrent PvP checks
 
+> 이 문서는 작성 당시의 보고서·검증 이력이다. 과거 카드/DB버전·미완료 항목·가동 상태를 오늘의 상태로 적용하지 않는다. 2026-10-20 현재 정리는 [프로젝트 상태](current_project_status.md), 운영은 [Lightsail 안내](lightsail_operations.md)를 따른다. 당시 측정값·성공/실패 기록은 보존한다.
+
 Date: 2026-09-06 (KST)
 
 ## Scope and isolation

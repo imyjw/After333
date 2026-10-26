@@ -1,3 +1,4 @@
+using Project333.Runtime.Presentation.Settings;
 using System;
 using System.Collections.Generic;
 using Project333.Runtime.Domain.Battle;
@@ -83,7 +84,7 @@ namespace Project333.Runtime.Presentation.Battle
                 // Include resource loading and source creation before starting the presentation clock.
                 _startedAt = Time.unscaledTime;
                 // After333AudioSettings applies master volume once through AudioListener.
-                _audio.PlayOneShot(_sound, SoundGain);
+                After333SoundEffects.PlayOneShot(_audio, _sound, SoundGain);
             }
             else _startedAt = Time.unscaledTime;
             return DurationSeconds;

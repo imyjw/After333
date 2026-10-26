@@ -1,3 +1,4 @@
+using Project333.Runtime.Presentation.Settings;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
@@ -39,7 +40,7 @@ namespace Project333.Runtime.Presentation.Battle
                     _audio = gameObject.AddComponent<AudioSource>();
                     _audio.playOnAwake = false; _audio.spatialBlend = 0f; _audio.dopplerLevel = 0f;
                 }
-                _audio.PlayOneShot(clip, 0.30f);
+                After333SoundEffects.PlayOneShot(_audio, clip, 0.30f);
             }
             var startedAt = Time.unscaledTime;
             var duration = Mathf.Max(A301PresentationAssets.ImpactDuration, clip == null ? 0f : clip.length);

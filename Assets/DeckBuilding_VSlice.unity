@@ -446,7 +446,7 @@ RectTransform:
   m_GameObject: {fileID: 99091129}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.83657146, y: 0.83657146, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1336897370}
@@ -457,7 +457,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
   m_AnchoredPosition: {x: 24, y: -40}
-  m_SizeDelta: {x: 1944, y: 733}
+  m_SizeDelta: {x: 1750, y: 733}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!114 &99091131
 MonoBehaviour:
@@ -500,7 +500,7 @@ MonoBehaviour:
   m_IgnoreLayout: 1
   m_MinWidth: -1
   m_MinHeight: -1
-  m_PreferredWidth: 1944
+  m_PreferredWidth: 1750
   m_PreferredHeight: 733
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
@@ -654,7 +654,7 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 12800000, guid: 6da2612b112d42729c0f0d2ef865310b, type: 3}
-    m_FontSize: 22
+    m_FontSize: 32
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 14
@@ -1768,8 +1768,8 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
-    m_FontSize: 66
-    m_FontStyle: 0
+    m_FontSize: 52
+    m_FontStyle: 1
     m_BestFit: 0
     m_MinSize: 0
     m_MaxSize: 66
@@ -1927,7 +1927,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &286829827
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2155,6 +2155,7 @@ GameObject:
   - component: {fileID: 316004719}
   - component: {fileID: 316004718}
   - component: {fileID: 316004722}
+  - component: {fileID: 316004723}
   m_Layer: 0
   m_Name: DraftOption_2
   m_TagString: Untagged
@@ -2299,6 +2300,18 @@ MonoBehaviour:
   m_EffectColor: {r: 0.78, g: 0.59, b: 0.29, a: 1}
   m_EffectDistance: {x: 4, y: -4}
   m_UseGraphicAlpha: 0
+--- !u!114 &316004723
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 316004716}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 561c0197f3fd5bf4ab38fa2b7408aefe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Presentation.ButtonTouchSound
 --- !u!1 &329998708
 GameObject:
   m_ObjectHideFlags: 0
@@ -2819,8 +2832,8 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
-    m_FontSize: 66
-    m_FontStyle: 0
+    m_FontSize: 52
+    m_FontStyle: 1
     m_BestFit: 0
     m_MinSize: 0
     m_MaxSize: 66
@@ -6529,7 +6542,7 @@ MonoBehaviour:
   _titleReferenceFontSize: 42
   _statusReferenceFontSize: 22
   _deckTitleReferenceFontSize: 26
-  _deckListReferenceFontSize: 16
+  _deckListReferenceFontSize: 32
   _optionSpacing: 50
   _optionAreaLeftPadding: 24
   _optionDeckPanelGap: 24
@@ -6740,6 +6753,7 @@ GameObject:
   - component: {fileID: 1009113378}
   - component: {fileID: 1009113377}
   - component: {fileID: 1009113376}
+  - component: {fileID: 1009113379}
   m_Layer: 0
   m_Name: BackToStartButton
   m_TagString: Untagged
@@ -6849,6 +6863,18 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1009113374}
   m_CullTransparentMesh: 1
+--- !u!114 &1009113379
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1009113374}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 561c0197f3fd5bf4ab38fa2b7408aefe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Presentation.ButtonTouchSound
 --- !u!21 &1010255284
 Material:
   serializedVersion: 8
@@ -7141,7 +7167,7 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 1623811328}
-    m_FontSize: 22
+    m_FontSize: 32
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
@@ -7347,8 +7373,8 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
-    m_FontSize: 66
-    m_FontStyle: 0
+    m_FontSize: 52
+    m_FontStyle: 1
     m_BestFit: 0
     m_MinSize: 6
     m_MaxSize: 66
@@ -7538,7 +7564,7 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 1623811328}
-    m_FontSize: 22
+    m_FontSize: 32
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
@@ -7633,8 +7659,8 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
-    m_FontSize: 66
-    m_FontStyle: 0
+    m_FontSize: 52
+    m_FontStyle: 1
     m_BestFit: 0
     m_MinSize: 6
     m_MaxSize: 66
@@ -8635,6 +8661,7 @@ GameObject:
   - component: {fileID: 1336897372}
   - component: {fileID: 1336897371}
   - component: {fileID: 1336897375}
+  - component: {fileID: 1336897376}
   m_Layer: 0
   m_Name: DraftOption_0
   m_TagString: Untagged
@@ -8779,6 +8806,18 @@ MonoBehaviour:
   m_EffectColor: {r: 0.78, g: 0.59, b: 0.29, a: 1}
   m_EffectDistance: {x: 4, y: -4}
   m_UseGraphicAlpha: 0
+--- !u!114 &1336897376
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1336897369}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 561c0197f3fd5bf4ab38fa2b7408aefe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Presentation.ButtonTouchSound
 --- !u!28 &1349916386
 Texture2D:
   m_ObjectHideFlags: 0
@@ -11056,6 +11095,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e09dba531cf5a54d884c08b7ad7607b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Presentation.Draft.DraftSceneController
+  _editableUiVersion: 3
   _draftVisualVersion: 0
   _cardCatalogAsset: {fileID: 11400000, guid: d932562c5c4766d43adce3f999c666c8, type: 2}
   _draftOverlayPresenter: {fileID: 969906292}
@@ -11873,8 +11913,8 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
-    m_FontSize: 66
-    m_FontStyle: 0
+    m_FontSize: 52
+    m_FontStyle: 1
     m_BestFit: 0
     m_MinSize: 6
     m_MaxSize: 66
@@ -11927,10 +11967,10 @@ RectTransform:
   - {fileID: 280845796}
   m_Father: {fileID: 1667726319}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 100, y: 100}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1805294247
 MonoBehaviour:
@@ -11986,14 +12026,14 @@ Canvas:
   m_PlaneDistance: 100
   m_PixelPerfect: 0
   m_ReceivesEvents: 1
-  m_OverrideSorting: 0
+  m_OverrideSorting: 1
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
   m_AdditionalShaderChannelsFlag: 0
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 3350
   m_TargetDisplay: 0
 --- !u!1 &1832089965
 GameObject:
@@ -12009,6 +12049,7 @@ GameObject:
   - component: {fileID: 1832089968}
   - component: {fileID: 1832089967}
   - component: {fileID: 1832089971}
+  - component: {fileID: 1832089972}
   m_Layer: 0
   m_Name: DraftOption_1
   m_TagString: Untagged
@@ -12153,6 +12194,18 @@ MonoBehaviour:
   m_EffectColor: {r: 0.78, g: 0.59, b: 0.29, a: 1}
   m_EffectDistance: {x: 4, y: -4}
   m_UseGraphicAlpha: 0
+--- !u!114 &1832089972
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1832089965}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 561c0197f3fd5bf4ab38fa2b7408aefe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Presentation.ButtonTouchSound
 --- !u!1 &1838834449
 GameObject:
   m_ObjectHideFlags: 0
@@ -12509,6 +12562,8 @@ GameObject:
   - component: {fileID: 1885269682}
   - component: {fileID: 1885269681}
   - component: {fileID: 1885269683}
+  - component: {fileID: 1885269684}
+  - component: {fileID: 1885269685}
   m_Layer: 0
   m_Name: GearButton
   m_TagString: Untagged
@@ -12619,6 +12674,30 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &1885269684
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1885269679}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 561c0197f3fd5bf4ab38fa2b7408aefe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Presentation.ButtonTouchSound
+--- !u!114 &1885269685
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1885269679}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b5c3228b2914931b88faf96b3421c86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Project333.Runtime::Project333.Runtime.Presentation.Hand.PreserveExpandedHand
 --- !u!1 &1896361270
 GameObject:
   m_ObjectHideFlags: 0
@@ -13281,7 +13360,7 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 1623811328}
-    m_FontSize: 21
+    m_FontSize: 32
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
@@ -13720,8 +13799,8 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 12800000, guid: 585188cdc4600544eb408bee749e4b3a, type: 3}
-    m_FontSize: 66
-    m_FontStyle: 0
+    m_FontSize: 52
+    m_FontStyle: 1
     m_BestFit: 0
     m_MinSize: 0
     m_MaxSize: 66

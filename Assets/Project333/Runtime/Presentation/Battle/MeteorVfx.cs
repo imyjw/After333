@@ -1,3 +1,4 @@
+using Project333.Runtime.Presentation.Settings;
 using System;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Board;
@@ -72,7 +73,7 @@ namespace Project333.Runtime.Presentation.Battle
             // Unity rebuilds nested Canvas sorting on parenting and activation; assign it last.
             _overlayCanvas.overrideSorting = true;
             _overlayCanvas.sortingOrder = 4908;
-            if (_audio != null && _incomingSound != null) _audio.PlayOneShot(_incomingSound, SoundGain);
+            if (_audio != null && _incomingSound != null) After333SoundEffects.PlayOneShot(_audio, _incomingSound, SoundGain);
             return DurationSeconds;
         }
 
@@ -228,7 +229,7 @@ namespace Project333.Runtime.Presentation.Battle
             _impactImage.sprite = _impactFrames[0];
             _impactImage.color = Color.white;
             _impactImage.gameObject.SetActive(true);
-            if (_audio != null && _impactSound != null) _audio.PlayOneShot(_impactSound, SoundGain);
+            if (_audio != null && _impactSound != null) After333SoundEffects.PlayOneShot(_audio, _impactSound, SoundGain);
             return true;
         }
 

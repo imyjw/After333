@@ -49,3 +49,8 @@ Additional audit correction: firebolt footprint OneByOne→None. Isolated Unity 
 ## Current specification examples
 
 The native collection contains 51 cards; the shared database defines 58, including unreleased definitions. Current JSON values override stale serialized detail values. OrcWarrior and OrcBerserker both have base ATK 20, with HP 40/50 and Lv.13 base stats 24/49 and 24/59. Their table still prints ATK+1 at Lv.3/6/9/13 and HP+1 at other levels. Golem has Physical Defense 3 and ManaWeaver has ATK 1. The full current values and per-level schedules live in [card_details.md](card_details.md) and [meta_rules.md](meta_rules.md); battle-only bonuses are not printed as permanent account upgrades.
+
+
+## Editable UI before Play (2026-10-23)
+
+The shared editor coordinator now prepares the current saved UI before Play, preserving existing scene objects and attached button components. See [editable_scene_layouts.md](editable_scene_layouts.md) for the common menu, dirty-scene saving policy and the distinction between editable UI templates and live account/battle data.

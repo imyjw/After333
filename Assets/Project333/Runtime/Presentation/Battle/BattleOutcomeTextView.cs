@@ -3,63 +3,57 @@ using UnityEngine;
 
 namespace Project333.Runtime.Presentation.Battle
 {
+    // Retains the authored scene references while replacing the old small outcome text.
     public sealed class BattleOutcomeTextView : MonoBehaviour
     {
         [SerializeField] private BattleBootstrapper _battleBootstrapper;
         [SerializeField] private TMP_Text _text;
-        [SerializeField] private float _pulseScale = 1.06f;
-        [SerializeField] private float _pulseSpeed = 4f;
 
-        private string _lastOutcomeText;
-        private Vector3 _baseScale = Vector3.one;
+        private BattleOutcomeBannerView _banner;
 
         private void Awake()
         {
-            if (_text != null)
-            {
-                _baseScale = _text.rectTransform.localScale;
-            }
+            ClearLegacyText();
         }
 
         private void LateUpdate()
         {
             Refresh();
-            ApplyPulse();
         }
 
         [ContextMenu("Refresh")]
         public void Refresh()
         {
-            var outcomeText = BattleOutcomeFormatter.Format(_battleBootstrapper?.CurrentBattleState);
-            if (_text == null || _lastOutcomeText == outcomeText)
+            ClearLegacyText();
+            var state = _battleBootstrapper == null ? null : _battleBootstrapper.CurrentBattleState;
+            var outcome = BattleOutcomeFormatter.Format(state);
+            if (string.IsNullOrEmpty(outcome))
             {
+                _banner?.Hide();
                 return;
             }
-
-            _text.text = BattleRichTextStyler.StyleOutcome(outcomeText);
-            _lastOutcomeText = outcomeText;
+            // Finish lethal reactions and every already accepted card reveal before covering the center.
+            if (_battleBootstrapper.IsBusy || _battleBootstrapper.IsOpponentPlayedCardRevealPending) return;
+            if (_banner == null)
+            {
+                var bannerObject = new GameObject("BattleOutcomeBanner", typeof(RectTransform));
+                bannerObject.transform.SetParent(transform, false);
+                _banner = bannerObject.AddComponent<BattleOutcomeBannerView>();
+            }
+            _banner.Show(outcome);
         }
 
-        private void ApplyPulse()
+        private void ClearLegacyText()
         {
-            if (_text == null)
-            {
-                return;
-            }
+            if (_text == null) return;
+            _text.text = string.Empty;
+            _text.raycastTarget = false;
+        }
 
-            var hasOutcome = !string.IsNullOrWhiteSpace(_lastOutcomeText);
-            var targetScale = _baseScale;
-
-            if (hasOutcome)
-            {
-                var pulse = 1f + (Mathf.Sin(Time.unscaledTime * _pulseSpeed) * (_pulseScale - 1f));
-                targetScale = _baseScale * pulse;
-            }
-
-            _text.rectTransform.localScale = Vector3.Lerp(
-                _text.rectTransform.localScale,
-                targetScale,
-                Time.unscaledDeltaTime * 10f);
+        private void OnDisable()
+        {
+            _banner?.Hide();
+            ClearLegacyText();
         }
     }
 }

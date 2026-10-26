@@ -38,7 +38,7 @@ namespace Project333.Runtime.Presentation.Tutorial
             if (_practiceResourceNote != null && _session.Chapter != 4) _practiceResourceNote.gameObject.SetActive(false);
             RefreshTutorialControlsLayout();
             HidePracticeHighlights();
-            _practiceInputBlocker.gameObject.SetActive(_session.PracticeBattleStarted || _session.Chapter == 6);
+            RefreshDialogueInputBlocker();
             if (IsPracticeSceneReady) { PresentRealScene(); RefreshPracticeAdvanceButton(); return; }
             CancelPracticePreviews();
             RefreshPracticeAdvanceButton();
@@ -195,8 +195,9 @@ namespace Project333.Runtime.Presentation.Tutorial
         private void RefreshPracticeAdvanceButton()
         {
             if (_nextButton == null) return;
-            _nextButton.gameObject.SetActive(!RequiresPlayerPractice);
-            _nextButton.interactable = CanPractice && !RequiresPlayerPractice;
+            _nextButton.gameObject.SetActive(IsReviewingDialogue || !RequiresPlayerPractice);
+            _nextButton.interactable = CanNavigateDialogue && (IsReviewingDialogue || !RequiresPlayerPractice);
+            _previousButton.interactable = CanNavigateDialogue && _dialoguePageIndex > 0;
         }
         private bool RequiresPlayerPractice => !_session.IsComplete && _session.WaitingForAction &&
             _session.CurrentStep.RequiredAction != Project333.Runtime.Application.Tutorial.TutorialAction.CompleteDeck;
@@ -312,6 +313,7 @@ namespace Project333.Runtime.Presentation.Tutorial
         }
         private void HidePracticeHighlights()
         {
+            if (_combatActionHint != null) _combatActionHint.gameObject.SetActive(false);
             foreach (var highlight in _practiceHighlights)
             { highlight.Assigned = false; highlight.Frame.gameObject.SetActive(false); }
         }

@@ -1,3 +1,4 @@
+using Project333.Runtime.Presentation.Settings;
 using System;
 using Project333.Runtime.Domain.Battle;
 using UnityEngine;
@@ -171,7 +172,7 @@ namespace Project333.Runtime.Presentation.Battle
                 {
                     if (_audio == null) { _audio = gameObject.AddComponent<AudioSource>(); _audio.playOnAwake = false; _audio.spatialBlend = 0; _audio.loop = false; }
                     // Master volume is already applied once by After333AudioSettings via AudioListener.
-                    _audio.PlayOneShot(_sound, SoundGain);
+                    After333SoundEffects.PlayOneShot(_audio, _sound, SoundGain);
                 }
             }
             var sprite = _frames[Mathf.Min(ExplosionFrameCount - 1, Mathf.FloorToInt(explosionAge * ExplosionFrameCount))];

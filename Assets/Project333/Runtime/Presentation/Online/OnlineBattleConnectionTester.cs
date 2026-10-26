@@ -90,6 +90,13 @@ namespace Project333.Runtime.Presentation.Online
         private int _lastPresentedAutomaticReconnectSeconds = -1;
         private float _nextClientHeartbeatRealtime;
         private string _automaticReconnectPreviousConnectionId = string.Empty;
+        private string _connectionSessionToken = string.Empty;
+        private string _connectionServerUrl = string.Empty;
+        private int _connectionGeneration;
+        private Action<OnlineBattleEnvelope> _socketMessageHandler;
+        private Action<string> _socketErrorHandler;
+        private Action<string> _socketCloseHandler;
+        private bool _sessionWasReplaced;
         private string _matchmakingFailureMessage = string.Empty;
         private long _latestCombatLogSequence;
 
@@ -133,6 +140,34 @@ namespace Project333.Runtime.Presentation.Online
 
         public IReadOnlyList<BattleCombatLogEntryDto> CombatLogEntries => _combatLogEntries;
 
+        private void OnEnable() => AccountSessionState.SessionReplaced += StopForSessionReplacement;
+
+        private void OnDisable() => AccountSessionState.SessionReplaced -= StopForSessionReplacement;
+
+        private void StopForSessionReplacement()
+        {
+            _sessionWasReplaced = true;
+            StopAutomaticReconnect(hideStatus: true);
+            _automaticallyReconnectDuringBattle = false;
+            StopPresentationQueue();
+            CleanupSender(); // Closing the transport is not surrender and creates no local result.
+            lock (_queueLock)
+            {
+                _receivedMessages.Clear();
+                _receivedErrors.Clear();
+                _connectionClosedReasons.Clear();
+            }
+            SetStatus(AccountSessionState.SessionReplacedMessage);
+        }
+
+        private void HandleSocketSessionReplacement()
+        {
+            var endpoint = _connectionServerUrl;
+            var token = _connectionSessionToken;
+            StopForSessionReplacement();
+            AccountSessionState.TryHandleSessionReplacement(endpoint, token);
+        }
+
         private void Awake()
         {
             if (TutorialRuntimeIsolation.IsActive) return;
@@ -169,7 +204,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private void Update()
         {
-            if (TutorialRuntimeIsolation.IsActive) return;
+            if (TutorialRuntimeIsolation.IsActive || _sessionWasReplaced) return;
             DrainQueuedMessages();
             if (_presentationQueueCoroutine == null && _presentationMessages.Count > 0)
                 _presentationQueueCoroutine = StartCoroutine(ProcessPresentationQueue());
@@ -515,7 +550,7 @@ namespace Project333.Runtime.Presentation.Online
 
         private async System.Threading.Tasks.Task ConnectAsync()
         {
-            if (TutorialRuntimeIsolation.IsActive) return;
+            if (TutorialRuntimeIsolation.IsActive || _sessionWasReplaced || AccountSessionState.WasSessionReplaced) return;
             if (!UnityEngine.Application.isPlaying)
             {
                 return;
@@ -548,9 +583,15 @@ namespace Project333.Runtime.Presentation.Online
                 var resolvedServerUrl = ServerUrl;
                 var resolvedClientVersion = ResolvedClientVersion;
                 _messageSender = new WebSocketBattleMessageSender(resolvedServerUrl, resolvedClientVersion);
-                _messageSender.MessageReceived += QueueMessage;
-                _messageSender.ErrorReceived += QueueError;
-                _messageSender.ConnectionClosed += QueueConnectionClosed;
+                _connectionSessionToken = sessionToken;
+                _connectionServerUrl = resolvedServerUrl;
+                var generation = ++_connectionGeneration;
+                _socketMessageHandler = message => { if (generation == _connectionGeneration) QueueMessage(message); };
+                _socketErrorHandler = error => { if (generation == _connectionGeneration) QueueError(error); };
+                _socketCloseHandler = reason => { if (generation == _connectionGeneration) QueueConnectionClosed(reason); };
+                _messageSender.MessageReceived += _socketMessageHandler;
+                _messageSender.ErrorReceived += _socketErrorHandler;
+                _messageSender.ConnectionClosed += _socketCloseHandler;
                 _gateway = new OnlineBattleGateway(
                     _matchId,
                     _playerToken,
@@ -724,11 +765,12 @@ namespace Project333.Runtime.Presentation.Online
 
         private void CleanupSender()
         {
+            _connectionGeneration++;
             if (_messageSender != null)
             {
-                _messageSender.MessageReceived -= QueueMessage;
-                _messageSender.ErrorReceived -= QueueError;
-                _messageSender.ConnectionClosed -= QueueConnectionClosed;
+                _messageSender.MessageReceived -= _socketMessageHandler;
+                _messageSender.ErrorReceived -= _socketErrorHandler;
+                _messageSender.ConnectionClosed -= _socketCloseHandler;
                 _messageSender.Dispose();
             }
 
@@ -781,6 +823,11 @@ namespace Project333.Runtime.Presentation.Online
             if (TutorialRuntimeIsolation.IsActive) return;
             while (TryDequeueConnectionClosed(out var closeReason))
             {
+                if (closeReason == AccountSessionState.SessionReplacedCode)
+                {
+                    HandleSocketSessionReplacement();
+                    return;
+                }
                 if (CanAutomaticallyRecoverCurrentBattle())
                 {
                     BeginAutomaticReconnect(closeReason, resetCurrentSender: true);
@@ -818,6 +865,12 @@ namespace Project333.Runtime.Presentation.Online
             while (TryDequeueMessage(out var queuedEnvelope))
             {
                 var envelope = queuedEnvelope.Envelope;
+                if (envelope.MessageType == OnlineBattleMessageType.Error &&
+                    envelope.Error?.Code == AccountSessionState.SessionReplacedCode)
+                {
+                    HandleSocketSessionReplacement();
+                    return;
+                }
                 if (envelope.MessageType == OnlineBattleMessageType.StateView)
                 {
                     UpdateServerClockOffset(envelope.StateView, queuedEnvelope.ReceivedLocalUnixTimeMilliseconds);
@@ -1137,7 +1190,8 @@ namespace Project333.Runtime.Presentation.Online
 
         private bool CanAutomaticallyRecoverCurrentBattle()
         {
-            return _automaticallyReconnectDuringBattle &&
+            return !_sessionWasReplaced && !AccountSessionState.WasSessionReplaced &&
+                   _automaticallyReconnectDuringBattle &&
                    !_isDestroying &&
                    _hasReceivedFirstStateView &&
                    _currentProjectedBattleState != null &&
@@ -1423,7 +1477,16 @@ namespace Project333.Runtime.Presentation.Online
 
                 case OnlineBattleMessageType.Error:
                     var errorCode = envelope.Error?.Code ?? string.Empty;
-                    if (errorCode == "command_rejected") _gateway?.RejectCommand(envelope.Error?.CommandSequence);
+                    if (errorCode == AccountSessionState.SessionReplacedCode)
+                    {
+                        HandleSocketSessionReplacement();
+                        return 0f;
+                    }
+                    if (errorCode == "command_rejected")
+                    {
+                        _gateway?.RejectCommand(envelope.Error?.CommandSequence);
+                        _battleBootstrapper?.CancelPendingSpellCardUse();
+                    }
                     if (!_hasReceivedFirstStateView && !_isAutomaticReconnectActive &&
                         (string.Equals(errorCode, "battle_reconnect_required", StringComparison.Ordinal) ||
                          string.Equals(errorCode, "already_in_pve_match", StringComparison.Ordinal)))

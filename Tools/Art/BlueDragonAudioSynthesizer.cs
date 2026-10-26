@@ -148,8 +148,6 @@ public static class BlueDragonAudioSynthesizer
         reports.Add(Write(dir, "WaterCannonCharge", Water(0), 0.63, 0.26));
         reports.Add(Write(dir, "WaterCannonLaunch", Water(1), 0.78, 0.55));
         reports.Add(Write(dir, "WaterCannonImpact", Water(2), 0.82, 0.65));
-        reports.Add(Write(dir, "DragonHurt", Creature(false), 0.70, 0.45));
-        reports.Add(Write(dir, "DragonDeath", Creature(true), 0.72, 0.50));
         return "{\"format\":\"PCM16 mono\",\"sampleRate\":44100,\"source\":\"Original deterministic synthesis; no recordings\",\"clips\":[" + string.Join(",", reports.ToArray()) + "]}";
     }
 }

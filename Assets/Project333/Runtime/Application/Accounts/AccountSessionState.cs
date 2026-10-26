@@ -19,6 +19,52 @@ namespace Project333.Runtime.Application.Accounts
         private static readonly List<string> LatestDraftPickCardIds = new List<string>();
         private static readonly List<string> LatestDraftOfferCardIds = new List<string>();
 
+        public const string SessionReplacedCode = "session_replaced";
+        public const string SessionReplacedMessage = "다른 기기에서 로그인하여 연결이 종료되었습니다.";
+        public static string ServerUrl { get; private set; } = string.Empty;
+        public static bool WasSessionReplaced { get; private set; }
+        public static event Action SessionReplaced;
+
+        // Capture the actual account endpoint, including Inspector defaults, before restoring credentials.
+        public static void BindServerEndpoint(string serverUrl) => ServerUrl = NormalizeServerOrigin(serverUrl);
+
+        public static bool IsCurrentCredential(string serverUrl, string sessionToken, string refreshToken = null)
+        {
+            if (string.IsNullOrWhiteSpace(ServerUrl) ||
+                !string.Equals(ServerUrl, NormalizeServerOrigin(serverUrl), StringComparison.OrdinalIgnoreCase)) return false;
+            if (!string.IsNullOrWhiteSpace(refreshToken))
+                return string.Equals(RefreshToken, refreshToken, StringComparison.Ordinal);
+            return !string.IsNullOrWhiteSpace(sessionToken) &&
+                   string.Equals(SessionToken, sessionToken, StringComparison.Ordinal);
+        }
+
+        public static bool TryHandleSessionReplacement(string serverUrl, string sessionToken, string refreshToken = null)
+        {
+            if (!IsCurrentCredential(serverUrl, sessionToken, refreshToken)) return false;
+            ClearSavedSession();
+            WasSessionReplaced = true;
+            SetAutomaticGoogleSignInSuppressed(true);
+            // Intent/reward/ad ledgers are account-scoped and deliberately retained for safe recovery.
+            SessionReplaced?.Invoke();
+            return true;
+        }
+
+        public static string NormalizeServerOrigin(string serverUrl)
+        {
+            if (!Uri.TryCreate(serverUrl, UriKind.Absolute, out var uri)) return string.Empty;
+            if (uri.Scheme == "ws" || uri.Scheme == "wss")
+                uri = new UriBuilder(uri) { Scheme = uri.Scheme == "wss" ? "https" : "http" }.Uri;
+            return uri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetSessionReplacementObservers()
+        {
+            SessionReplaced = null;
+            WasSessionReplaced = false;
+            ServerUrl = string.Empty;
+        }
+
         public static string AccountId { get; private set; } = string.Empty;
         public static string DisplayName { get; private set; } = string.Empty;
         public static string AccountKind { get; private set; } = string.Empty;
@@ -108,6 +154,8 @@ namespace Project333.Runtime.Application.Accounts
                 return;
             }
 
+            WasSessionReplaced = false;
+
             var account = response.ResolvedAccount;
             var wallet = response.ResolvedWallet;
 
@@ -135,6 +183,8 @@ namespace Project333.Runtime.Application.Accounts
                 return;
             }
 
+            WasSessionReplaced = false;
+
             var account = response.ResolvedAccount;
             var wallet = response.ResolvedWallet;
 
@@ -161,6 +211,8 @@ namespace Project333.Runtime.Application.Accounts
             {
                 return;
             }
+
+            WasSessionReplaced = false;
 
             var account = response.ResolvedAccount;
             var wallet = response.ResolvedWallet;
@@ -727,6 +779,7 @@ namespace Project333.Runtime.Application.Accounts
 
         public static void ClearSavedSession()
         {
+            WasSessionReplaced = false;
             AccountId = string.Empty;
             DisplayName = string.Empty;
             AccountKind = string.Empty;

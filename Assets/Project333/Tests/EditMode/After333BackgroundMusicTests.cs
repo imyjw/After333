@@ -78,7 +78,7 @@ namespace Project333.Tests.EditMode
                 Assert.That(AudioListener.volume, Is.EqualTo(0.7f).Within(0.001f));
                 var lobbyClip = source.clip;
 
-                var menuNames = new[] { "Draft_VSlice", "DeckBuilding_VSlice", "OwnedCards_VSlice", "Shop_VSlice" };
+                var menuNames = new[] { "Draft_VSlice", "DeckBuilding_VSlice", "OwnedCards_VSlice", "Shop_VSlice", "Tutorial_VSlice" };
                 var lastMenu = lobby;
                 foreach (var sceneName in menuNames)
                 {

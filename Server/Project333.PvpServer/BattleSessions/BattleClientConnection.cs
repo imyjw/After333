@@ -12,6 +12,7 @@ public sealed class BattleClientConnection
 {
     private long _lastClientMessageUtcTicks = DateTime.UtcNow.Ticks;
     private int _isSuperseded;
+    private int _isLoginReplaced;
     private int _transportTerminated;
     private readonly SemaphoreSlim _sendGate = new(1, 1);
     private readonly TaskCompletionSource _peerCloseReceived = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -35,6 +36,12 @@ public sealed class BattleClientConnection
     public string DisplayName { get; set; } = string.Empty;
 
     public string AccountKind { get; set; } = string.Empty;
+
+    public Guid? LoginFamilyId { get; set; }
+
+    public bool IsLoginReplaced => Volatile.Read(ref _isLoginReplaced) != 0;
+
+    public void MarkLoginReplaced() => Interlocked.Exchange(ref _isLoginReplaced, 1);
 
     public List<string> PlayerDeckCardIds { get; } = new();
 

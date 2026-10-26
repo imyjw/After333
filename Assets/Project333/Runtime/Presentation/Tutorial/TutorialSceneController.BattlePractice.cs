@@ -161,7 +161,7 @@ namespace Project333.Runtime.Presentation.Tutorial
                 Place(_practiceResourceNote.rectTransform, new Vector2(.30f,.74f),new Vector2(.74f,.81f));
             }
             var cue = _session.CurrentStep.Cue;
-            _practiceResourceNote.gameObject.SetActive(cue == TutorialCue.PracticeGrant || cue == TutorialCue.ResourcesReturned);
+            _practiceResourceNote.gameObject.SetActive(!IsReviewingDialogue && (cue == TutorialCue.PracticeGrant || cue == TutorialCue.ResourcesReturned));
             _practiceResourceNote.text = cue == TutorialCue.PracticeGrant ? "연습 자원: 마나 +" + _practiceBattle.TutorialManaGrant + " · 골드 +" + _practiceBattle.TutorialGoldGrant : "골드 +3 · 마나 +3 · 카드 +1";
         }
     }

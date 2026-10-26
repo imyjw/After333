@@ -195,6 +195,14 @@ namespace Project333.Runtime.Application.Accounts
                 cancellationToken);
         }
 
+        public async Task CheckSessionStatusAsync(string sessionToken, CancellationToken cancellationToken)
+        {
+            await GetJsonAsync<SessionStatusResponse>("/auth/session-status", sessionToken, cancellationToken);
+        }
+
+        [Serializable]
+        private sealed class SessionStatusResponse { public string Status; public string status; }
+
         public async Task<ServerStatusResponse> GetServerStatusAsync(CancellationToken cancellationToken)
         {
             return await GetPublicJsonAsync<ServerStatusResponse>(

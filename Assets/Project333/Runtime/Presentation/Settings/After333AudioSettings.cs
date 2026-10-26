@@ -7,13 +7,18 @@ namespace Project333.Runtime.Presentation.Settings
     {
         private const string MasterVolumeKey = "After333.Audio.MasterVolume";
         private const string MusicVolumeKey = "After333.Audio.MusicVolume";
+        private const string EffectsVolumeKey = "After333.Audio.EffectsVolume";
         private const float DefaultVolume = 1f;
+        private const float DefaultMasterVolume = 0.5f;
 
         public static event Action<float> MusicVolumeChanged;
+        public static event Action<float> EffectsVolumeChanged;
 
-        public static float MasterVolume { get; private set; } = DefaultVolume;
+        public static float MasterVolume { get; private set; } = DefaultMasterVolume;
 
         public static float MusicVolume { get; private set; } = DefaultVolume;
+
+        public static float EffectsVolume { get; private set; } = DefaultVolume;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Initialize()
@@ -23,10 +28,12 @@ namespace Project333.Runtime.Presentation.Settings
 
         public static void Reload()
         {
-            MasterVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(MasterVolumeKey, DefaultVolume));
+            MasterVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(MasterVolumeKey, DefaultMasterVolume));
             MusicVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(MusicVolumeKey, DefaultVolume));
+            EffectsVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(EffectsVolumeKey, DefaultVolume));
             ApplyMasterVolume();
             MusicVolumeChanged?.Invoke(MusicVolume);
+            EffectsVolumeChanged?.Invoke(EffectsVolume);
         }
 
         public static void SetMasterVolume(float value)
@@ -41,6 +48,13 @@ namespace Project333.Runtime.Presentation.Settings
             MusicVolume = Mathf.Clamp01(value);
             PlayerPrefs.SetFloat(MusicVolumeKey, MusicVolume);
             MusicVolumeChanged?.Invoke(MusicVolume);
+        }
+
+        public static void SetEffectsVolume(float value)
+        {
+            EffectsVolume = Mathf.Clamp01(value);
+            PlayerPrefs.SetFloat(EffectsVolumeKey, EffectsVolume);
+            EffectsVolumeChanged?.Invoke(EffectsVolume);
         }
 
         public static void Save()

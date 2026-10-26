@@ -127,3 +127,30 @@ InitTestScene*.unity*
 # Generated per-player build identity (including failed build residue).
 /Assets/Project333/Resources/Project333/ClientBuild.json
 /Assets/Project333/Resources/Project333/ClientBuild.json.meta
+
+# Shared-agent work: keep AGENTS.md, PROGRESS.md and reusable rules versioned.
+# Ignore local secrets/backups, not SQL migrations or source project files.
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.pem
+*.key
+*.agekey
+*.dump
+*.dump.gz
+*.dump.age
+*.sql.gz
+*.sql.age
+*.tar.gz.age
+/server*.env
+/Server/**/server*.env
+
+# Local verification output (test source under Assets remains versioned).
+/TestResults/
+/TestResults.xml
+*.trx
+/coverage/
+.DS_Store
+Thumbs.db
+Desktop.ini

@@ -248,7 +248,10 @@ namespace Project333.Runtime.Application.Online
                             result = await _socket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
                             if (result.MessageType == WebSocketMessageType.Close)
                             {
-                                SignalConnectionClosed("The server closed the WebSocket connection.");
+                                SignalConnectionClosed(string.Equals(result.CloseStatusDescription,
+                                    Accounts.AccountSessionState.SessionReplacedCode, StringComparison.Ordinal)
+                                    ? Accounts.AccountSessionState.SessionReplacedCode
+                                    : "The server closed the WebSocket connection.");
                                 return;
                             }
 

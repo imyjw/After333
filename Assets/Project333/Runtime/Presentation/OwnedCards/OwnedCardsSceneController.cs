@@ -21,6 +21,8 @@ namespace Project333.Runtime.Presentation.OwnedCards
 {
     public sealed partial class OwnedCardsSceneController : MonoBehaviour
     {
+        [SerializeField, HideInInspector] private int _editableUiVersion;
+        public int EditableUiVersion => _editableUiVersion;
         [SerializeField, HideInInspector] private int _collectionVisualVersion;
         public int CollectionVisualVersion => _collectionVisualVersion;
 

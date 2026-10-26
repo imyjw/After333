@@ -35,6 +35,20 @@ The button's legacy PVP field/method names do not restrict it to human opponents
 
 ## Local tutorial entry (2026-10-02)
 
-The bottom-left `튜토리얼` button opens `Tutorial_VSlice` without requiring login, tickets or a server. Its small child Canvas sorts above the account login gate and inherits the start menu safe area. Only the button intercepts clicks; it does not cover the normal menu. Existing serialized start menu layouts remain unchanged.
+The bottom-left `튜토리얼` button opens the local `Tutorial_VSlice` without consuming tickets or calling a server. The login gate covers and blocks this entry while it is visible (2026-10-22 user decision, replacing the earlier pre-login shortcut). The button otherwise inherits the start menu safe area. Tutorial simulation remains isolated from accounts and economy. Existing serialized start menu layouts remain unchanged.
 
-The current lesson includes the introduction and chapter 1 only. Six topic buttons are visible in tutorial selection; chapters 2–6 remain disabled as `준비 중`. Skip returns to `GameStart_VSlice`. The practice `게임 시작` button spends three ephemeral tutorial tickets and shows a local deck-building preview, without invoking the actual account-backed start/draft scenes. The fixed lesson restarts from the same state. See [the revised script](tutorial_script_ko.md).
+All six chapters are implemented (2026-10-20 review). The lesson borrows the actual GameStart, DeckBuilding, Draft, Battle, Shop and OwnedCards UI, with GaebangChief and dialogue layered above it. Practice uses deterministic local state rather than live account/run/economy APIs. Required actions hide Next and highlight the actual target green; all six topics are selectable. Skip/completion return to GameStart. See [implementation and editing](tutorial_implementation.md) and [the user-authored script](tutorial_script_ko.md).
+
+
+## Login backdrop and input order (2026-10-22)
+
+`AccountLoginGateView` stays under the start menu safe area so its authored panel and controls retain their placement. Only its translucent Backdrop expands to the full root Canvas, using transformed Canvas corners rather than a fixed phone inset. Opening the gate and later safe-area/resolution changes refresh the coverage.
+
+Login sorts at 29995, above Tutorial (5001), Gifts (29990) and the start wallet (29994). `GlobalSettingsMenuController` creates the wallet-only nested Canvas at runtime because the authored wallet otherwise shares the Settings Canvas. The gear and its settings/confirmation menus keep 30000 and remain usable. The session-replacement confirmation uses 29996 so it also stays visible above login. Backdrop raycasts block the covered start-menu controls; hiding login restores their ordinary input.
+
+Isolated Unity 6000.3.12f1 EditMode 94/94 passed, including the native start scene, rendered pointer raycasts and asymmetric safe areas at 1280×720, 1920×1080, 2340×1080 and 2560×1080. A separate PlayMode lifecycle check passed 1/1, including forced-logout Google readiness and the replacement confirmation above login. This is simulated layout/input validation, not a phone retest. No source scene asset was changed; the user must rebuild/install the client. No server or DB change is required.
+
+
+## Editable UI before Play (2026-10-23)
+
+The shared editor coordinator now prepares the current saved UI before Play, preserving existing scene objects and attached button components. See [editable_scene_layouts.md](editable_scene_layouts.md) for the common menu, dirty-scene saving policy and the distinction between editable UI templates and live account/battle data.

@@ -1,8 +1,10 @@
 # Meta Rules
 
+현재 운영·DB/백업·사용자 확인 범위는 [프로젝트 상태](current_project_status.md)를 따른다. 아래10월2일 등의 배포 기록은 당시 사실이며 오늘 새 배포/경제 작업을 실행한 결과가 아니다. 기본 수치·비용은 현재 [카드 목록](card_catalog.md)과 상세 원본JSON으로 대조한다.
+
 실제 적용 상태(2026-10-02): 별도 승인 후 운영 DB0020/0021/0022 및 카드팩 서버를 적용하고 Android APK(versionCode5)를 빌드했다. 현재 운영 강화 비용도 아래3/6/10/20/30/33표와 일치한다. [실제 적용·보존 검증](shop_card_packs.md)을 참고한다. 과거 소스 작업의 미배포 기록과 실기기 미검증은 구분한다.
 
-최신 기준: 2026-10-02. 현재 카드 정의·강화 코드·서버 보상 필터와 대조하고 런 종료 보상 상자·결과 표시 복구 및 상점 카드팩 구매·개봉을 반영했다. 과거 날짜의 결정·검증 기록은 그대로 유지한다.
+최신 기준: 2026-10-20. 현재 카드 정의·강화 코드·서버 보상 필터와 대조하고 런 종료 보상 상자·결과 표시 복구 및 상점 카드팩 구매·개봉을 반영했다. 과거 날짜의 결정·검증 기록은 그대로 유지한다.
 
 ## Document Purpose
 
@@ -79,7 +81,7 @@ Still deferred:
 - The Master card is never included in random card rewards.
 - If an eligible rarity has no rewardable card, the roll is normalized across the remaining eligible rarities.
 
-현재 카드 현황(2026-10-08): JSON/domain 정의 60종, 드래프트 On 54종, 강화 가능 44종이다. `includeInRewards`의 적용값은 On 43종/Off 17종이며, 천라지망·초소형 발전기는 플래그 On이어도 강화 불가 정책으로 제외되어 실제 랜덤 보상 대상은 41종이다. 대환단은 강화 가능으로 변경되어 보상·카드팩 풀에 포함된다. 트랩: 리턴의 비강화 보상 예외는 포함하고 미러 필드·반응 장갑·아이언 돔은 제외한다. Unity 네이티브 카탈로그는 트랩 5종을 포함한 53종으로 공유 정의 60종과 별도로 집계한다. [카드 목록](card_catalog.md).
+현재 카드 현황(2026-10-08): JSON/domain 정의 60종, 드래프트 On 54종, 강화 가능 44종이다. `includeInRewards`의 적용값은 On 43종/Off 17종이며, 천라지망·초소형 발전기는 플래그 On이어도 강화 불가 정책으로 제외되어 실제 랜덤 보상 대상은 41종이다. 대환단은 강화 가능으로 변경되어 보상·카드팩 풀에 포함된다. 트랩: 리턴의 비강화 보상 예외는 포함하고 미러 필드·반응 장갑·아이언 돔은 제외한다. Unity 네이티브 카탈로그는 트랩 5종을 포함한 54종으로 공유 정의 60종과 별도로 집계한다. [카드 목록](card_catalog.md).
 
 > TBD: The final reward formula is not fixed yet.
 
@@ -182,7 +184,7 @@ Confirmed rules (upgrade costs revised 2026-10-01; Lv.2 revised 2026-10-02):
 - Confirmed 2026-09-30: Meteor is a Unique Fantasy spell costing `7 Mana`, enabled in draft and random rewards. Each level Lv.1-13 adds `+1` base Magic damage: `40 + level` (Lv.13: 53). Current allied SpellPower is added once per target before Magic Defense; the Mana cost does not increase. The user explicitly confirmed Fantasy affiliation and subsequently requested Unique rarity. See [Meteor presentation and card rules](meteor_presentation.md).
 - Confirmed 2026-10-01: GaebangChief / 개방 방주 is a Unique Murim Human Unit costing `7 Qi`, enabled in draft and random rewards, with melee Physical base `10 ATK / 60 HP`, defense `0 / 0`, movement and no innate traits. Explicit upgrades are base ATK `+1` at Lv.3/6/9/13 and HP `+1` at all other levels through Lv.13, yielding printed `14 ATK / 69 HP`. The live bonus is `10 * current owner's battle Gold`, does not consume Gold, and is separate from upgraded BaseAttack and account Resource Gold. With `3 Gold`, active Lv.0/Lv.13 current ATK is `40/44`. Death, Drained, Erasure and Sealbound suppress this bonus; Gu immediately changes the resource owner. Gold used for cost substitution is deducted before calculating the bonus. Cost, defenses, race and Gold multiplier do not increase with upgrades.
 - 2026-10-01 사용자 확정: ManaCannon / 마나 대포는 판타지 언커먼·종족 없는 Unit, 소환 마나 `2`, 원거리 Magic 기본 `40 ATK / 10 HP`, 방어 `0 / 0`, 이동 가능·고유 특수효과 없음이며 드래프트·보상에 포함한다. Lv.3/6/9/13 기본 ATK `+1`, 나머지 Lv.1–13 HP `+1`로 Lv.13은 `44 ATK / 19 HP`다. 적법한 일반 공격마다 마나 `1`을 한 번 지불하고 부족하면 전투 골드 `1`로 대신 낸다. 망각 중 비용 효과는 억제되며 검증 실패 시 미차감. 강화로 소환·공격 비용, 골드 대체율, 방어, 이동, 종족 없음은 바뀌지 않는다.
-- Confirmed 2026-10-01: FireSpear is a Common Fantasy spell costing 3 Mana, enabled in draft and random rewards. A living allied/enemy Unit, Building or Master anchors its own field column (front/rear two cells). Each Lv.1–13 adds +1 Magic damage to base15, reaching28 before current caster SpellPower and defense. Cost and area remain fixed. See [FireSpear rules and presentation](fire_spear_presentation.md).
+- Confirmed 2026-10-01: FireSpear is a Common Fantasy spell costing 3 Mana, enabled in draft and random rewards. A living allied/enemy Unit, Building or Master anchors its own field column (front/rear two cells). Each Lv.1–13 adds +1 Magic damage to base30, reaching43 before current caster SpellPower and defense. Cost and area remain fixed. See [FireSpear rules and presentation](fire_spear_presentation.md).
 - Revised 2026-10-03: PlasmaShield / 플라즈마 쉴드 is a Common ScienceCivilization spell costing Power1, draft enabled, rewards/card packs disabled, and not upgradeable. Grants permanent stackable Physical Defense +10 to one allied/enemy living Unit (Master excluded) or Building. No damage, duration/count or SpellPower bonus. Formation VFX disappears after one cast. [Rules and assets](plasma_shield_presentation.md).
 - Revised 2026-10-03: ManaShield / 마나쉴드 is a Common Fantasy scripted spell costing Mana 1 (existing Gold 1 substitution), with draft enabled, rewards/card packs disabled, and no upgrades. It grants one allied/enemy living Unit (Master excluded) or Building permanent, stackable Magic Defense +10; granted defense stays +10 regardless of stored levels. Physical Defense is unchanged and stacks independently with PlasmaShield. There is no damage, duration/count or SpellPower bonus. Existing target validation, Erasure removal, Drained suppression, Gu transfer and snapshot restoration rules remain. A smooth transparent mana sphere plays once for about 0.817 seconds and disappears, with Image peak alpha 0.28 and original source alpha/isotropic shape preserved. [Rules and assets](mana_shield_presentation.md).
 - 2026-10-01 사용자 확정: 트랩-미러 필드(TrapMirrorField)는 판타지 Rare 마법, 설치 무료·발동 전투 마나2(골드 대체 가능), 강화 불가·드래프트 On·랜덤 보상 Off. Lv.1–13 수치 증가가 없고 공격자 현재 ATK와 발동 시 트랩 소유자 주문력을 사용한다. 트랩: 리턴의 보상 예외를 이 카드로 확대하지 않는다.

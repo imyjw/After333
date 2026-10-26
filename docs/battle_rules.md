@@ -1,5 +1,7 @@
 # Battle Rules
 
+2026-10-20 문서 대조: 현재 카드 기본값·비용은 [카드 목록](card_catalog.md)을 따르며 상단 기5·개방 분타 기2·마정석 꾸러미 골드6·파이어스피어30·파이어월15·뉴클리어 전력13을 반영했다. 시작 손패5장, 첫 턴 전 배정 골드3/4, 이후 기본 골드+3·드로우1 및 기존 판정 순서는 유지한다.
+
 ## Document Purpose
 
 This document is the source of truth for battle setup, tile notation, actions, targeting, and combat resolution.
@@ -280,6 +282,8 @@ If a draw would exceed the maximum hand size:
 - A reveal fades in for `0.15` seconds, remains visible, then fades out for `0.15` seconds without dimming the battle background.
 - Normal total display time is `3` seconds. While another card is waiting in the FIFO reveal queue, the current total display time is shortened to `2` seconds.
 - Reconnecting clients do not replay card-use history from before the reconnect.
+- RobotFusionResolved publicly reveals the opponent RobotFusion card once; OccupantAbsorbed does not repeat it.
+- Already accepted card reveals finish before the final outcome banner covers the center and before the scene-return hold begins. This presentation wait does not lock battle actions. See [opponent_card_reveal.md](opponent_card_reveal.md).
 - 트랩 설치는 상대에게 실제 카드 대신 금색 물음표 그림과 “트랩”만 공개한다. 자신의 설치는 중앙 재생이 필요 없다. 트랩 발동은 진짜 카드를 양쪽에 공개하며 같은 FIFO·3초/대기열2초·0.15초 페이드 규칙을 사용한다. 복원된 트랩 개수만으로 과거 공개 연출을 다시 만들지 않는다.
 
 ### Discard Pile
@@ -480,7 +484,7 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 
 ### Gaebang Branch
 
-- Gaebang Branch is a Common, non-attacking `1x1` Murim building with cost `2 Gold`, ATK `0`, HP `20`, defense `0/0`, and DamageType `None`.
+- Gaebang Branch is a Common, non-attacking `1x1` Murim building with cost `2 Qi`, ATK `0`, HP `20`, defense `0/0`, and DamageType `None`.
 - At the end of its owner's turn, it draws `2` cards if that owner's current Gold is exactly `0`.
 - A Gaebang Branch summoned during the current turn can trigger at that same turn end.
 - Every living Gaebang Branch whose effects are not suppressed resolves independently in fixed tile order `(0,0), (0,1), ... (4,1)`.
@@ -491,7 +495,7 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 
 ### Merchant Caravan
 
-- Merchant Caravan (`MerchantCaravan`, `상단`) is an Uncommon, non-attacking `1x1` Murim building with cost `4 Gold`, ATK `0`, HP `20`, defense `0/0`, and DamageType `None`.
+- Merchant Caravan (`MerchantCaravan`, `상단`) is an Uncommon, non-attacking `1x1` Murim building with cost `5 Qi`, ATK `0`, HP `20`, defense `0/0`, and DamageType `None`.
 - It starts triggering on its owner's next turn start after it is summoned; it never triggers immediately on summon.
 - During the active-occupant resource-gain step, each living Merchant Caravan whose effects are not suppressed grants its owner `3 Gold`.
 - Multiple active Merchant Caravans stack and each grants `3 Gold` independently.
@@ -527,7 +531,7 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 
 ### Mana Stone Bundle
 
-- Mana Stone Bundle is an Uncommon Fantasy scripted spell with cost `5 Gold` and no board target.
+- Mana Stone Bundle is an Uncommon Fantasy scripted spell with cost `6 Gold` and no board target.
 - It can be cast only during its owner's main phase by dragging it upward from the hand.
 - Casting first pays the full `5 Gold` cost and moves the card from hand to discard, then immediately grants that player `9 Mana`.
 - It creates no persistent effect and cannot use Gold to pay its printed Gold cost through substitution.
@@ -555,10 +559,10 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 
 ### FireSpear
 
-- FireSpear (`FireSpear` / 파이어스피어) is a Common Fantasy immediate scripted spell costing `3 Mana`, with base `15 Magic` damage. Draft/rewards are enabled; no persistent effect.
+- FireSpear (`FireSpear` / 파이어스피어) is a Common Fantasy immediate scripted spell costing `3 Mana`, with base `30 Magic` damage. Draft/rewards are enabled; no persistent effect.
 - A living allied or enemy Unit, Building or Master anchors its owner's own field column: front/rear two cells, following existing per-field column/Piercing coordinates. Empty tiles, Sealbound anchors and enemy Hiding anchors are invalid. Allied Hiding may be selected.
 - Validate before paying once under existing Mana/Gold substitution and discarding the exact hand card once. Rejected casts preserve resources, hand and state.
-- Both occupied column cells each receive one area Magic packet. Upgrade Lv.1–13 adds +1 per level (Lv.13:28). Read current caster SpellPower once before any direct damage, then apply matching Magic Defense and existing state protections to each target.
+- Both occupied column cells each receive one area Magic packet. Upgrade Lv.1–13 adds +1 per level (Lv.13:43). Read current caster SpellPower once before any direct damage, then apply matching Magic Defense and existing state protections to each target.
 - Collateral Hiding does not avoid damage; Shielder redirection and Flying reduction do not apply to area spell packets. Sealbound, Invincible, Endure, Drained, destruction, revival and Master defeat retain their existing rules. Apply all direct packets before resolving destruction chains. Other columns and the other player's field take no direct FireSpear damage.
 - Successful local/AI/online commands display a flame spear entering, passing through and exiting the selected owner's two-cell column. The current speed is 1.5×: 15fps, impact at 0.20 seconds and nominal total about 0.533 seconds. TileBackground Canvas anchors and screen-coordinate projection support the actual independent tile Canvases in both directions. Presentation never repeats authoritative damage, and restored snapshots do not replay a cast. See [FireSpear presentation](fire_spear_presentation.md).
 ### Meteor
@@ -587,7 +591,7 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 
 ### Firewall
 
-- Firewall is a persistent scripted spell with a base cost of `3 Mana` and base damage of `33 Magic`.
+- Firewall is a persistent scripted spell with a base cost of `3 Mana` and base damage of `15 Magic`.
 - The caster selects row `0` or row `1` on either player's field by targeting any tile in that row.
 - An entirely empty row on either field is still a legal target.
 - The selected row is fixed when the spell is cast. Units moving into or out of that row before a trigger are evaluated at trigger time.
@@ -789,6 +793,7 @@ The matrix lists damage before mitigation; each hit uses the defenses and effect
 - The owning account's battle-start card upgrade level is resolved normally whenever a copy is played. Account upgrade progression is not a temporary hand modification.
 - Every hand card has a runtime identity. This distinguishes permanent copies from temporary Replicate copies even when their CardIds match.
 - Unused temporary Replicate copies vanish at the end of their owner's turn. They do not enter the discard pile.
+- Client presentation (2026-10-24): owned temporary hand instances show a small top-right hourglass, no text badge; their preview states `임시 복제: 사용하지 않으면 이번 턴 종료 시 손패에서 사라집니다.`. Confirmed turn-end removal dissolves the card edges into grey particles for0.65s. This cosmetic cue never changes rules, reveals opponent hand identities, or replays from reconnect snapshots; details: compact_battle_hand.md.
 - A played copy resolves like the underlying card: units and buildings enter the field, while played spells enter discard after resolving normally.
 - The opponent sees only the resulting hand-count change and never receives the temporary copy's hidden identity.
 - Reconnect snapshots preserve each hand card's runtime identity and temporary-Replicate flag.
@@ -1034,7 +1039,7 @@ The matrix lists damage before mitigation; each hit uses the defenses and effect
 ### 트랩 (Trap)
 
 - 트랩은 마법 카드의 별도 설치 유형이다. 자신의 Main 행동 턴에 손패의 트랩을 무료로 설치하며, 발동 비용은 설치 비용과 별도로 저장한다. 설치 당시 발동 조건·효과·발동 비용·강화가 반영된 효과 수치·레벨·설치 순서를 보존한다.
-- 설치에는 살아 있는 자신의 마스터가 필요하다. UI에서 손패 카드를 자신의 마스터에 드래그하거나 카드 선택 후 자신의 마스터를 클릭한다. 이 지정은 설치 편의를 위한 입력이며 `InstallTrapCommand` 자체는 효과 대상 좌표를 받지 않는다. 상대 유닛을 직접 지정해 시전하지 않는다.
+- 설치에는 살아 있는 자신의 마스터가 필요하다. UI에서는 대환단·보조배터리처럼 손패 카드를 위로 드래그한 뒤 허공에 놓아 설치한다. 마스터나 타일을 지정하지 않으며, `InstallTrapCommand`는 효과 대상 좌표를 받지 않는다. 설치 확정 시 놓은 위치에서 공통 푸른 조각 연출이 재생된다. 상대에게 트랩 정체를 공개하지 않는다.
 - 발동 비용이 부족해도 설치할 수 있다. 같은 소유자는 동일 CardId를 동시에 하나만 설치할 수 있으며, 중복 설치는 손패·자원을 소비하지 않고 거절한다. 다른 CardId의 트랩은 함께 설치할 수 있다.
 - 설치된 트랩은 필드 타일을 차지하지 않고 손패에서 별도 비밀 영역으로 이동한다. 설치 직후 버리지 않으며, 성공적으로 한 번 발동하면 소비되어 버림 더미로 간다. 기본 턴 만료는 없다.
 - 하나의 조건이 발생하면 설치 순서대로 검사한다. 조건이 맞지 않거나 발동 비용을 낼 수 없는 트랩은 건너뛰고 그대로 유지한다. 처음으로 조건·비용을 모두 충족한 트랩 하나만 비용을 지불하고 발동·소모한다.
@@ -1078,7 +1083,7 @@ The matrix lists damage before mitigation; each hit uses the defenses and effect
 
 ### Nuclear and Fallout
 
-Updated 2026-10-08: Nuclear is a Legendary Science spell costing 10 Power. It immediately deals one Fixed packet of 100 + account upgrade level to every current occupant on the opponent board, including the Master. It does not destroy the entire field directly. All area packets resolve before defeated-occupant triggers/chains and Master outcome checks; standard Invincible, Endure, Sealbound and Drained rules apply, Shielder/Hiding do not avoid area damage, and defense/SpellPower do not apply. Nuclear is upgradeable, +1 immediate damage at every level through Lv.13 (113); draft/rewards are enabled following the user-provided card artwork registration. Each cast also permanently adds one Fallout stack only to Units already on the opponent board at cast time, including the Master. Later summons receive no inherited stacks; each later cast adds only one new stack to its own current eligible recipients. Buildings receive neither new Fallout stacks nor Fallout turn-start damage; the immediate hit still includes them. Fallout deals one Fixed packet of 10 times stacks at every global turn start, after resource gains and before area damage, upkeep, factory generation, and draw; Nuclear upgrades do not increase this tick. Erasure and ownership transfer do not remove acquired Fallout. Only acquired occupant stacks survive transfer/reconnect. The legacy board counter is retained for snapshot compatibility but has no ongoing effect. Sealbound prevents new stacks during the cast; release/revival/placement never inherit historical board stacks. See [complete rules](nuclear_fallout.md).
+Updated 2026-10-08: Nuclear is a Legendary Science spell costing 13 Power. It immediately deals one Fixed packet of 100 + account upgrade level to every current occupant on the opponent board, including the Master. It does not destroy the entire field directly. All area packets resolve before defeated-occupant triggers/chains and Master outcome checks; standard Invincible, Endure, Sealbound and Drained rules apply, Shielder/Hiding do not avoid area damage, and defense/SpellPower do not apply. Nuclear is upgradeable, +1 immediate damage at every level through Lv.13 (113); draft/rewards are enabled following the user-provided card artwork registration. Each cast also permanently adds one Fallout stack only to Units already on the opponent board at cast time, including the Master. Later summons receive no inherited stacks; each later cast adds only one new stack to its own current eligible recipients. Buildings receive neither new Fallout stacks nor Fallout turn-start damage; the immediate hit still includes them. Fallout deals one Fixed packet of 10 times stacks at every global turn start, after resource gains and before area damage, upkeep, factory generation, and draw; Nuclear upgrades do not increase this tick. Erasure and ownership transfer do not remove acquired Fallout. Only acquired occupant stacks survive transfer/reconnect. The legacy board counter is retained for snapshot compatibility but has no ongoing effect. Sealbound prevents new stacks during the cast; release/revival/placement never inherit historical board stacks. See [complete rules](nuclear_fallout.md).
 
 ### Magic Amplification Circle
 

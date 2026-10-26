@@ -2,19 +2,19 @@
 
 최초 작성 기준일: 2026-09-07 / 강화 규칙·공통 설명 갱신: 2026-09-12 / n연타 반격 규칙 갱신: 2026-09-13 / 종족 설정·뉴클리어·마법 증폭진 추가 갱신: 2026-09-21 / 뉴클리어 효과·강화 및 지진·메테오·오크 광전사·오크 족장·스켈레톤아처·엘프 장로 신규 카드 갱신: 2026-09-30 / 개방 방주·마나 대포·파이어스피어·플라즈마 쉴드·마나쉴드·트랩: 리턴·트랩-미러 필드·트랩 - 반응 장갑·트랩 - 아이언 돔·트랩 - 서먼 트랩 신규 카드 갱신: 2026-10-01
 
-최신 대조 기준: 2026-10-03. 현재 카드 JSON 60종, 네이티브 카탈로그 53종, 강화 코드와 서버 보상 필터를 정적으로 비교했다. 아래 과거 실행 검증 기록은 그 날짜의 결과이며 이번 문서 대조가 Unity 실행·클라이언트 빌드·운영 서버 배포를 뜻하지 않는다.
+최신 대조 기준: 2026-10-20. 현재 카드 JSON 60종, 네이티브 카탈로그 54종, 강화 코드와 서버 보상 필터를 정적으로 비교했다. 아래 과거 실행 검증 기록은 그 날짜의 결과이며 이번 문서 대조가 Unity 실행·클라이언트 빌드·운영 서버 배포를 뜻하지 않는다.
 
 반응 장갑 추가 실행 검증(2026-10-01): 분리 Unity 6000.3.12f1의 관련 17개 fixture에서 468/468 통과, 네이티브 등록 50→51 및 반복 등록·기존 자산 보존 확인. 복사 실제 서버 빌드 오류 0·기존 경고 95, `BattleSession` 12그룹 통과. 증거는 `TempBuild/ExplosiveReactiveArmour_20261001/`에 있으며 사용자 앱 빌드·설치나 운영 배포는 수행하지 않았다.
 
-최근 밸런스: 오크 전사·오크 광전사 기본 ATK 20, 마나 대포 기본 ATK 40/HP 10·Lv.13 44/19 (2026-10-01), 블루 드래곤 ATK/HP 40/50, 레드 드래곤 40/40, 생화학폭탄 기본 고정 피해 25. 두 드래곤의 Lv.13은 각각 44/59와 44/49이며, 생화학폭탄의 Lv.13 피해는 38이다.
+최근 밸런스(2026-10-20 소스 대조): A-212 HP30, 고블린 마나2·ATK/HP20/20, 좀비 ATK20, 레드 드래곤 ATK/HP50/40·턴 종료 마법 피해20, 소림1대제자10/40, 방패병HP40, 파이어스피어 피해30, 파이어월 피해15, 뉴클리어 전력13. 상단 기5, 개방 분타 기2, 만년설삼 기3+골드1, 마정석 꾸러미 골드6. Lv.13 결과는 해당 카드 절과 현재 강화 규칙을 따른다.
 
 이 문서는 카드 원본 데이터, 강화 코드, 개별 전투 효과 및 과거 대화 복원 기록을 대조한 현재 설정의 스냅샷이다. 개별 카드 추가와 밸런스 변경은 아래 날짜별 확정 스펙에 반영한다.
 
 ## 1. 범위와 읽는 방법
 
-- JSON/domain 카드 정의 60종: 판타지 29, 무림 11, 과학 문명 15, 중립 5. Unity 네이티브 `StarterTenCardCatalog` 자산은 트랩 5종을 포함해 53종으로 구분한다.
+- JSON/domain 카드 정의 60종: 판타지 29, 무림 11, 과학 문명 15, 중립 5. Unity 네이티브 `StarterTenCardCatalog` 자산은 트랩 5종을 포함해 54종으로 구분한다.
 - 종류: 유닛 27, 건물 7, 마법 26. 마스터는 덱 카드가 아니므로 60종에서 제외한다.
-- 덱 빌딩 On 53종 / Off 7종. 강화 가능 43종 / 불가 17종. `includeInRewards` 적용값 On 42종 / Off 18종과 실제 랜덤 보상 대상 39종을 구분한다(강화 불가 트랩: 리턴의 사용자 지정 예외 포함).
+- 덱 빌딩 On 54종 / Off 6종. 강화 가능 44종 / 불가 16종. `includeInRewards` 적용값 On 43종 / Off 17종과 실제 랜덤 보상 대상 41종을 구분한다(강화 불가 트랩: 리턴의 사용자 지정 예외 포함).
 - 미등록 기획 1종: Card Grader. 확인되지 않은 항목은 미확정으로 남긴다.
 - 기본 능력치는 Lv.0이다. 현재 HP, 버프·디버프, 부활 누적, 웨어울프 효과, 개방 방주 골드 보너스, 주문력 등 전투 중 값은 별도로 계산된다.
 - On/Off는 등장 설정이지 이미지 완성도나 실기기 최종 검증 여부가 아니다.
@@ -123,16 +123,16 @@
 | 이름 / CardId | A-212 / A-212 |
 | 종족 | 로봇 |
 | 종류 / 문명 / 희귀도 | 유닛 / 과학 문명 / 레어 |
-| 비용 | 전력 4 (마나 0, 기 0, 골드 0); 부족한 전력은 골드로 대체 |
+| 비용 | 전력 4 |
 | 차지 타일 / 이동 | 1×1 / 가능 |
 | 공격 유형 / 데미지 속성 | 근거리 / 물리 |
-| 기본 ATK / HP | 6 / 22 |
+| 기본 ATK / HP | 6 / 30 |
 | 물리 / 마법 방어력 | 0 / 0 |
 | 특수효과 | 4연타, 전력 소모:2 |
 | 일반 효과 | 없음 |
 | 덱 빌딩 / 랜덤 보상 | On / On |
 | 강화 | 최대 Lv.13. Lv.1~12마다 HP +1, Lv.13에는 ATK +1 |
-| Lv.12 / Lv.13 ATK·HP | 6/34 / 7/34 |
+| Lv.12 / Lv.13 ATK·HP | 6/42 / 7/42 |
 | 소환 턴 공격 | 불가 (속공 없음) |
 | 카드 이미지 | Assets/Project333/Resources/Project333/CardArtwork/A-212.png |
 | 애니메이션 | Assets/Unit/A-212: Idle, Run, Attack, BeAttacked, Death. 방전은 Idle 대체 |
@@ -149,7 +149,9 @@
   "id": "A-212",
   "displayName": "A-212",
   "definitionType": "Unit",
-  "races": ["Robot"],
+  "races": [
+    "Robot"
+  ],
   "rarity": "Rare",
   "includeInDraft": true,
   "includeInRewards": true,
@@ -162,13 +164,12 @@
   "attackType": "Melee",
   "damageType": "Physical",
   "attack": 6,
-  "health": 22,
+  "health": 30,
   "physicalDefense": 0,
   "magicDefense": 0,
   "canMove": true,
   "isScience": true,
   "sciencePowerUpkeep": 2,
-
   "hitsPerAttack": 4
 }
 ```
@@ -509,17 +510,17 @@
 | 초기 주문력 | 0 |
 | 소환 직후 봉인 횟수 | 0 (마왕 사망 후 봉인은 별도 처리) |
 | 초기 무적 설정 | None / 횟수 0 |
-| 덱 빌딩 등장 | Off |
-| 랜덤 보상 설정값 | Off |
-| 실제 랜덤 보상 대상 | 제외 (includeInRewards=false) |
+| 덱 빌딩 등장 | On |
+| 랜덤 보상 설정값 | On |
+| 실제 랜덤 보상 대상 | 포함 |
 | 강화 가능 여부 | 가능 / 최대 Lv.13 |
 | 레벨별 강화 규칙 | 매 레벨 효과 피해 +1 |
-| Lv.13 결과 | 효과 피해 46 (매 발동/대상 기준, 주문력·방어력 등 미반영) |
-| 효과 문구 원문 | 매 턴 시작 시, 선택한 5X1 타일에 33 마법 데미지를 입힌다. |
+| Lv.13 결과 | 효과 피해 28 (주문력·방어력 등 미반영) |
+| 효과 문구 원문 | 다음 2턴 시작 시, 선택한 5X1 타일에 마법 데미지를 입힌다. |
 | 특수효과 문구 원문 | 2턴 지속 |
-| 효과 요약 | 자기편 또는 상대편의 선택한 5x1 한 줄에 매 턴 시작마다 마법 피해 33. 총 2회 발동한다. 피해 발동 시점의 현재 주문력을 적용한다. |
+| 효과 요약 | 다음 2턴 시작 시, 선택한 5X1 타일에 마법 데미지를 입힌다. |
 | 개별 효과 ID | `firewall` |
-| 피해 마법의 기본 피해 / 속성 | 33 / 마법 (Magic) |
+| 피해 마법의 기본 피해 / 속성 | 15 / 마법 (Magic) |
 | triggerCount 필드 | 2 (의미는 아래 효과 설명 참조) |
 | ownerTurnStartsRemaining 필드 | 미지정 / 해당 없음 |
 | 지속 종료 문구 | 미지정. 개별 효과는 효과 설명의 종료 조건 참조 |
@@ -539,17 +540,17 @@
   "displayName": "파이어월",
   "definitionType": "ScriptedSpell",
   "rarity": "Uncommon",
-  "includeInDraft": false,
-  "includeInRewards": false,
+  "includeInDraft": true,
+  "includeInRewards": true,
   "affiliation": "Fantasy",
   "chargeTileFootprint": "None",
   "cost": {
     "mana": 3
   },
-  "effectText": "매 턴 시작 시, 선택한 5X1 타일에 33 마법 데미지를 입힌다.",
+  "effectText": "다음 2턴 시작 시, 선택한 5X1 타일에 마법 데미지를 입힌다.",
   "specialEffectText": "2턴 지속",
   "damageType": "Magic",
-  "damage": 33,
+  "damage": 15,
   "effectId": "firewall",
   "triggerCount": 2
 }
@@ -568,9 +569,9 @@
 | 종류 / 내부 정의 타입 | 유닛 / `Unit` |
 | 문명 | 판타지 (Fantasy) |
 | 희귀도 | 커먼 (Common) |
-| 사용 비용 | 마나 1 / 기 0 / 전력 0 / 골드 0 |
+| 사용 비용 | 마나 2 / 기 0 / 전력 0 / 골드 0 |
 | 차지 타일 | 1×1 / OneByOne |
-| 기본 ATK / HP | 10 / 10 |
+| 기본 ATK / HP | 20 / 20 |
 | 기본 물리 / 마법 방어력 | 0 / 0 |
 | 일반 공격 유형 | 근거리 (Melee) |
 | 일반 공격 데미지 속성 | 물리 (Physical) |
@@ -586,12 +587,12 @@
 | 초기 주문력 | 0 |
 | 소환 직후 봉인 횟수 | 0 (마왕 사망 후 봉인은 별도 처리) |
 | 초기 무적 설정 | None / 횟수 0 |
-| 덱 빌딩 등장 | On (includeInDraft 생략: 기본 true) |
-| 랜덤 보상 설정값 | On (includeInRewards 생략: 기본 true) |
+| 덱 빌딩 등장 | On |
+| 랜덤 보상 설정값 | On |
 | 실제 랜덤 보상 대상 | 포함 |
 | 강화 가능 여부 | 가능 / 최대 Lv.13 |
 | 레벨별 강화 규칙 | Lv.3/6/9/13 ATK +1, 나머지 레벨 HP +1 |
-| Lv.13 결과 | ATK 14 / HP 19 (전투 중 추가 효과 미반영) |
+| Lv.13 결과 | ATK 24 / HP 29 (전투 중 버프·효과 미반영) |
 | 효과 문구 원문 | 없음 / 빈 문자열 |
 | 특수효과 문구 원문 | 없음 / 빈 문자열 |
 | 효과 요약 | 별도 효과 없음. |
@@ -611,17 +612,19 @@
   "id": "Goblin",
   "displayName": "고블린",
   "definitionType": "Unit",
-  "races": ["Goblin"],
+  "races": [
+    "Goblin"
+  ],
   "rarity": "Common",
   "affiliation": "Fantasy",
   "chargeTileFootprint": "OneByOne",
   "cost": {
-    "mana": 1
+    "mana": 2
   },
   "attackType": "Melee",
   "damageType": "Physical",
-  "attack": 10,
-  "health": 10,
+  "attack": 20,
+  "health": 20,
   "physicalDefense": 0,
   "magicDefense": 0,
   "canMove": true
@@ -718,7 +721,7 @@
 | 희귀도 | 커먼 (Common) |
 | 사용 비용 | 마나 1 / 기 0 / 전력 0 / 골드 0 |
 | 차지 타일 | 1×1 / OneByOne |
-| 기본 ATK / HP | 15 / 1 |
+| 기본 ATK / HP | 20 / 1 |
 | 기본 물리 / 마법 방어력 | 0 / 0 |
 | 일반 공격 유형 | 근거리 (Melee) |
 | 일반 공격 데미지 속성 | 물리 (Physical) |
@@ -739,7 +742,7 @@
 | 실제 랜덤 보상 대상 | 포함 |
 | 강화 가능 여부 | 가능 / 최대 Lv.13 |
 | 레벨별 강화 규칙 | Lv.3/6/9/13 ATK +1, 나머지 레벨 HP +1 |
-| Lv.13 결과 | ATK 19 / HP 10 (전투 중 추가 효과 미반영) |
+| Lv.13 결과 | ATK 24 / HP 10 (전투 중 버프·효과 미반영) |
 | 효과 문구 원문 | 없음 / 빈 문자열 |
 | 특수효과 문구 원문 | 없음 / 빈 문자열 |
 | 효과 요약 | 별도 효과 없음. |
@@ -759,7 +762,9 @@
   "id": "Zombie",
   "displayName": "좀비",
   "definitionType": "Unit",
-  "races": ["Undead"],
+  "races": [
+    "Undead"
+  ],
   "rarity": "Common",
   "includeInDraft": true,
   "includeInRewards": true,
@@ -770,7 +775,7 @@
   },
   "attackType": "Melee",
   "damageType": "Physical",
-  "attack": 15,
+  "attack": 20,
   "health": 1,
   "physicalDefense": 0,
   "magicDefense": 0,
@@ -1417,7 +1422,7 @@
 | 종류 / 내부 정의 타입 | 마법 / 개별 효과 / `ScriptedSpell` |
 | 문명 | 판타지 (Fantasy) |
 | 희귀도 | 언커먼 (Uncommon) |
-| 사용 비용 | 마나 0 / 기 0 / 전력 0 / 골드 5 |
+| 사용 비용 | 마나 0 / 기 0 / 전력 0 / 골드 6 |
 | 차지 타일 | 없음 / None |
 | 기본 ATK / HP | 해당 없음: 마법 카드 |
 | 기본 물리 / 마법 방어력 | 해당 없음 |
@@ -1437,7 +1442,7 @@
 | 초기 무적 설정 | None / 횟수 0 |
 | 덱 빌딩 등장 | On |
 | 랜덤 보상 설정값 | Off |
-| 실제 랜덤 보상 대상 | 제외 (강화 불가) |
+| 실제 랜덤 보상 대상 | 제외 |
 | 강화 가능 여부 | 불가 |
 | 레벨별 강화 규칙 | 강화 불가 |
 | Lv.13 결과 | 해당 없음 |
@@ -1466,7 +1471,7 @@
   "affiliation": "Fantasy",
   "chargeTileFootprint": "None",
   "cost": {
-    "gold": 5
+    "gold": 6
   },
   "effectText": "사용 시 마나 +9",
   "damageType": "None",
@@ -1490,7 +1495,7 @@
 | 희귀도 | 레전더리 (Legendary) |
 | 사용 비용 | 마나 10 / 기 0 / 전력 0 / 골드 0 |
 | 차지 타일 | 1×1 / OneByOne |
-| 기본 ATK / HP | 40 / 40 |
+| 기본 ATK / HP | 50 / 40 |
 | 기본 물리 / 마법 방어력 | 0 / 0 |
 | 일반 공격 유형 | 근거리 (Melee) |
 | 일반 공격 데미지 속성 | 마법 (Magic) |
@@ -1506,12 +1511,12 @@
 | 초기 주문력 | 0 |
 | 소환 직후 봉인 횟수 | 0 (마왕 사망 후 봉인은 별도 처리) |
 | 초기 무적 설정 | None / 횟수 0 |
-| 덱 빌딩 등장 | On (includeInDraft 생략: 기본 true) |
-| 랜덤 보상 설정값 | On (includeInRewards 생략: 기본 true) |
+| 덱 빌딩 등장 | On |
+| 랜덤 보상 설정값 | On |
 | 실제 랜덤 보상 대상 | 포함 |
 | 강화 가능 여부 | 가능 / 최대 Lv.13 |
 | 레벨별 강화 규칙 | Lv.3/6/9/13 ATK +1, 나머지 레벨 HP +1 |
-| Lv.13 결과 | ATK 44 / HP 49 (전투 중 추가 효과 미반영) |
+| Lv.13 결과 | ATK 54 / HP 49 (전투 중 버프·효과 미반영) |
 | 효과 문구 원문 | 내 턴 종료 시 상대방 타일 전체에 20 마법 피해 |
 | 특수효과 문구 원문 | 비행 |
 | 효과 요약 | 비행. 내 턴 종료 시 상대 전장의 봉인되지 않은 모든 소환물과 마스터에게 마법 피해 33. |
@@ -1535,7 +1540,9 @@
   "id": "RedDragon",
   "displayName": "레드 드래곤",
   "definitionType": "Unit",
-  "races": ["Dragon"],
+  "races": [
+    "Dragon"
+  ],
   "rarity": "Legendary",
   "affiliation": "Fantasy",
   "chargeTileFootprint": "OneByOne",
@@ -1546,7 +1553,7 @@
   "specialEffectText": "비행",
   "attackType": "Melee",
   "damageType": "Magic",
-  "attack": 40,
+  "attack": 50,
   "health": 40,
   "physicalDefense": 0,
   "magicDefense": 0,
@@ -1805,7 +1812,7 @@
 | 종류 / 내부 정의 타입 | 마법 / 지속 자원 / `PersistentResourceSpell` |
 | 문명 | 무림 (Murim) |
 | 희귀도 | 유니크 (Unique) |
-| 사용 비용 | 마나 0 / 기 0 / 전력 0 / 골드 4 |
+| 사용 비용 | 마나 0 / 기 3 / 전력 0 / 골드 1 |
 | 차지 타일 | 없음 / None |
 | 기본 ATK / HP | 해당 없음: 마법 카드 |
 | 기본 물리 / 마법 방어력 | 해당 없음 |
@@ -1825,7 +1832,7 @@
 | 초기 무적 설정 | None / 횟수 0 |
 | 덱 빌딩 등장 | On |
 | 랜덤 보상 설정값 | Off |
-| 실제 랜덤 보상 대상 | 제외 (강화 불가) |
+| 실제 랜덤 보상 대상 | 제외 |
 | 강화 가능 여부 | 불가 |
 | 레벨별 강화 규칙 | 강화 불가 |
 | Lv.13 결과 | 해당 없음 |
@@ -1854,7 +1861,8 @@
   "affiliation": "Murim",
   "chargeTileFootprint": "None",
   "cost": {
-    "gold": 4
+    "qi": 3,
+    "gold": 1
   },
   "effectText": "사용 시 다음 3번의 내 턴 시작마다 기 +3",
   "specialEffectText": "지속 마법: 다음 3번의 내 턴 시작 후 종료됩니다.",
@@ -2030,7 +2038,7 @@
 | 종류 / 내부 정의 타입 | 건물 / `Building` |
 | 문명 | 무림 (Murim) |
 | 희귀도 | 커먼 (Common) |
-| 사용 비용 | 마나 0 / 기 0 / 전력 0 / 골드 2 |
+| 사용 비용 | 마나 0 / 기 2 / 전력 0 / 골드 0 |
 | 차지 타일 | 1×1 / OneByOne |
 | 기본 ATK / HP | 0 / 20 |
 | 기본 물리 / 마법 방어력 | 0 / 0 |
@@ -2053,7 +2061,7 @@
 | 실제 랜덤 보상 대상 | 포함 |
 | 강화 가능 여부 | 가능 / 최대 Lv.13 |
 | 레벨별 강화 규칙 | 매 레벨 HP +1 |
-| Lv.13 결과 | ATK 0 / HP 33 (전투 중 추가 효과 미반영) |
+| Lv.13 결과 | ATK 0 / HP 33 (전투 중 버프·효과 미반영) |
 | 효과 문구 원문 | 내 턴 종료 시 내 골드가 0이라면 카드 2장 드로우 |
 | 특수효과 문구 원문 | 없음 / 빈 문자열 |
 | 효과 요약 | 내 턴 종료 시 내 골드가 0이면 카드 2장을 뽑는다. 소환한 턴에도 발동하고 여러 장이면 타일 순서대로 각각 발동한다. |
@@ -2083,7 +2091,7 @@
   "affiliation": "Murim",
   "chargeTileFootprint": "OneByOne",
   "cost": {
-    "gold": 2
+    "qi": 2
   },
   "effectText": "내 턴 종료 시 내 골드가 0이라면 카드 2장 드로우",
   "damageType": "None",
@@ -2107,7 +2115,7 @@
 | 종류 / 내부 정의 타입 | 건물 / `Building` |
 | 문명 | 무림 (Murim) |
 | 희귀도 | 언커먼 (Uncommon) |
-| 사용 비용 | 마나 0 / 기 0 / 전력 0 / 골드 4 |
+| 사용 비용 | 마나 0 / 기 5 / 전력 0 / 골드 0 |
 | 차지 타일 | 1×1 / OneByOne |
 | 기본 ATK / HP | 0 / 20 |
 | 기본 물리 / 마법 방어력 | 0 / 0 |
@@ -2130,7 +2138,7 @@
 | 실제 랜덤 보상 대상 | 포함 |
 | 강화 가능 여부 | 가능 / 최대 Lv.13 |
 | 레벨별 강화 규칙 | 매 레벨 HP +1 |
-| Lv.13 결과 | ATK 0 / HP 33 (전투 중 추가 효과 미반영) |
+| Lv.13 결과 | ATK 0 / HP 33 (전투 중 버프·효과 미반영) |
 | 효과 문구 원문 | 내 턴 시작 시 골드 +3 |
 | 특수효과 문구 원문 | 없음 / 빈 문자열 |
 | 효과 요약 | 소유자 턴 시작에 골드 +3. |
@@ -2156,7 +2164,7 @@
   "affiliation": "Murim",
   "chargeTileFootprint": "OneByOne",
   "cost": {
-    "gold": 4
+    "qi": 5
   },
   "effectText": "내 턴 시작 시 골드 +3",
   "damageType": "None",
@@ -2338,7 +2346,7 @@
 | 희귀도 | 커먼 (Common) |
 | 사용 비용 | 마나 0 / 기 2 / 전력 0 / 골드 0 |
 | 차지 타일 | 1×1 / OneByOne |
-| 기본 ATK / HP | 13 / 33 |
+| 기본 ATK / HP | 10 / 40 |
 | 기본 물리 / 마법 방어력 | 0 / 0 |
 | 일반 공격 유형 | 근거리 (Melee) |
 | 일반 공격 데미지 속성 | 물리 (Physical) |
@@ -2354,12 +2362,12 @@
 | 초기 주문력 | 0 |
 | 소환 직후 봉인 횟수 | 0 (마왕 사망 후 봉인은 별도 처리) |
 | 초기 무적 설정 | None / 횟수 0 |
-| 덱 빌딩 등장 | On (includeInDraft 생략: 기본 true) |
-| 랜덤 보상 설정값 | On (includeInRewards 생략: 기본 true) |
+| 덱 빌딩 등장 | On |
+| 랜덤 보상 설정값 | On |
 | 실제 랜덤 보상 대상 | 포함 |
 | 강화 가능 여부 | 가능 / 최대 Lv.13 |
 | 레벨별 강화 규칙 | Lv.3/6/9/13 ATK +1, 나머지 레벨 HP +1 |
-| Lv.13 결과 | ATK 17 / HP 42 (전투 중 추가 효과 미반영) |
+| Lv.13 결과 | ATK 14 / HP 49 (전투 중 버프·효과 미반영) |
 | 효과 문구 원문 | 없음 / 빈 문자열 |
 | 특수효과 문구 원문 | Endure |
 | 효과 요약 | 불굴: 처음 받는 치명적인 피해를 버티고 HP 1로 생존한다. |
@@ -2383,7 +2391,9 @@
   "id": "Shaolin_1st_Disciple",
   "displayName": "소림 1대 제자",
   "definitionType": "Unit",
-  "races": ["Human"],
+  "races": [
+    "Human"
+  ],
   "rarity": "Common",
   "affiliation": "Murim",
   "chargeTileFootprint": "OneByOne",
@@ -2393,8 +2403,8 @@
   "specialEffectText": "Endure",
   "attackType": "Melee",
   "damageType": "Physical",
-  "attack": 13,
-  "health": 33,
+  "attack": 10,
+  "health": 40,
   "physicalDefense": 0,
   "magicDefense": 0,
   "canMove": true,
@@ -3265,7 +3275,7 @@
 | 희귀도 | 커먼 (Common) |
 | 사용 비용 | 마나 0 / 기 0 / 전력 0 / 골드 2 |
 | 차지 타일 | 1×1 / OneByOne |
-| 기본 ATK / HP | 0 / 33 |
+| 기본 ATK / HP | 0 / 40 |
 | 기본 물리 / 마법 방어력 | 0 / 0 |
 | 일반 공격 유형 | 근거리 (Melee) |
 | 일반 공격 데미지 속성 | 물리 (Physical) |
@@ -3281,12 +3291,12 @@
 | 초기 주문력 | 0 |
 | 소환 직후 봉인 횟수 | 0 (마왕 사망 후 봉인은 별도 처리) |
 | 초기 무적 설정 | None / 횟수 0 |
-| 덱 빌딩 등장 | On (includeInDraft 생략: 기본 true) |
-| 랜덤 보상 설정값 | On (includeInRewards 생략: 기본 true) |
+| 덱 빌딩 등장 | On |
+| 랜덤 보상 설정값 | On |
 | 실제 랜덤 보상 대상 | 포함 |
 | 강화 가능 여부 | 가능 / 최대 Lv.13 |
 | 레벨별 강화 규칙 | Lv.3/6/9/13 ATK +1, 나머지 레벨 HP +1 |
-| Lv.13 결과 | ATK 4 / HP 42 (전투 중 추가 효과 미반영) |
+| Lv.13 결과 | ATK 4 / HP 49 (전투 중 버프·효과 미반영) |
 | 효과 문구 원문 | 없음 / 빈 문자열 |
 | 특수효과 문구 원문 | 쉴더 |
 | 효과 요약 | 쉴더: 바로 뒤 아군이 받는 일반 공격과 단일 대상 마법 피해를 대신 받으며 초과 피해는 원래 대상에게 전달한다. 관통으로 뒤 아군에게 발생하는 추가 피해도 정상적인 쉴더 판정을 거친다. ATK 0이므로 현재 일반 공격과 반격은 할 수 없다. |
@@ -3310,7 +3320,9 @@ ATK=0이어서 현재 일반 공격·반격은 불가능하지만 이동 가능 
   "id": "Shieldbearer",
   "displayName": "방패병",
   "definitionType": "Unit",
-  "races": ["Human"],
+  "races": [
+    "Human"
+  ],
   "rarity": "Common",
   "affiliation": "Neutral",
   "chargeTileFootprint": "OneByOne",
@@ -3321,7 +3333,7 @@ ATK=0이어서 현재 일반 공격·반격은 불가능하지만 이동 가능 
   "attackType": "Melee",
   "damageType": "Physical",
   "attack": 0,
-  "health": 33,
+  "health": 40,
   "physicalDefense": 0,
   "magicDefense": 0,
   "canMove": true,
@@ -3336,7 +3348,7 @@ ATK=0이어서 현재 일반 공격·반격은 불가능하지만 이동 가능 
 | 항목 | 설정 |
 |---|---|
 | 종류 / 희귀도 / 문명 | ScriptedSpell / Legendary / ScienceCivilization |
-| 비용 / 차지 타일 | 전력 10 / None |
+| 비용 / 차지 타일 | 전력 13 / None |
 | 효과 | (사용 즉시) 상대방 전장 전체에 고정 데미지 100을 입힌다. 사용 당시 상대 전장에 있는 유닛(마스터 포함)에 영구 낙진 +1중첩. 양쪽 턴 시작마다 중첩당 고정 피해 10. |
 | 즉시 피해 대상·판정 | 적 마스터·유닛·건물. 광역 고정 피해이므로 방어력·주문력·쉴더 미적용; 무적·불굴·봉인·방전 및 사망 연쇄는 기존 피해 규칙 적용 |
 | 낙진 | 사용 당시 상대 전장에 있는 유닛(마스터 포함)에 영구 부여. 건물은 중첩 부여와 낙진 피해에서 제외. 양쪽 턴 시작마다 중첩당 고정 피해 10. 망각으로 제거 불가, 고독으로 가져와도 유지 |
@@ -3353,22 +3365,22 @@ ATK=0이어서 현재 일반 공격·반격은 불가능하지만 이동 가능 
 
 ```json
 {
-    "id":  "Nuclear",
-    "displayName":  "뉴클리어",
-    "definitionType":  "ScriptedSpell",
-    "rarity":  "Legendary",
-    "affiliation":  "ScienceCivilization",
-    "chargeTileFootprint":  "None",
-    "includeInDraft":  true,
-    "includeInRewards":  true,
-    "cost":  {
-                 "power":  10
-             },
-    "effectId":  "nuclear",
-    "damage":  100,
-    "effectText":  "(사용 즉시) 상대방 전장 전체에 고정 데미지 100을 입힌다. 사용 당시 상대 전장에 있는 유닛(마스터 포함)에 영구 낙진 +1중첩. 양쪽 턴 시작마다 중첩당 고정 피해 10.",
-    "specialEffectText":  "낙진: 양쪽 턴 시작마다 중첩당 고정 피해 10을 받는다.",
-    "damageType":  "Fixed"
+  "id": "Nuclear",
+  "displayName": "뉴클리어",
+  "definitionType": "ScriptedSpell",
+  "rarity": "Legendary",
+  "affiliation": "ScienceCivilization",
+  "chargeTileFootprint": "None",
+  "includeInDraft": true,
+  "includeInRewards": true,
+  "cost": {
+    "power": 13
+  },
+  "effectId": "nuclear",
+  "damage": 100,
+  "effectText": "(사용 즉시) 상대방 전장 전체에 고정 데미지 100을 입힌다. 사용 당시 상대 전장에 있는 유닛(마스터 포함)에 영구 낙진 +1중첩. 양쪽 턴 시작마다 중첩당 고정 피해 10.",
+  "specialEffectText": "낙진: 양쪽 턴 시작마다 중첩당 고정 피해 10을 받는다.",
+  "damageType": "Fixed"
 }
 ```
 
@@ -4029,7 +4041,7 @@ CardId는 사용자 변경(2026-10-09)에 따라 공백 없는 `ElfElder`로 통
 | 효과 요약 | 현재 소유자의 자원에서 공격 행동당 한 번 지불. 검증 실패 시 미차감, 망각 중에는 비용 효과 억제 |
 | 개별 효과 ID | 없음. CardId 기반 공격 비용 규칙이며 고유 특수효과 플래그를 추가하지 않음 |
 | 카드 이미지 경로 | `Assets/Project333/Resources/Project333/CardArtwork/ManaCannon.png` |
-| 네이티브 카드 경로 | `Assets/Project333/ScriptableObjects/StarterTen/Cards/ManaCannon.asset`. 카탈로그 등록 확인. 트랩: 리턴·트랩-미러 필드를 포함한 현재 카탈로그 53종. 실행 검증 결과는 별도 기록 |
+| 네이티브 카드 경로 | `Assets/Project333/ScriptableObjects/StarterTen/Cards/ManaCannon.asset`. 카탈로그 등록 확인. 트랩: 리턴·트랩-미러 필드를 포함한 현재 카탈로그 54종. 실행 검증 결과는 별도 기록 |
 | 보드 Animator 경로 | `Assets/Unit/ManaCannon/ManaCannon.controller`. PNG → 클립 → 컨트롤러 → 카드의 기존 연결을 사용하며 실제 분할·모션·임포트 결과는 별도 제작 기록에서 확인 |
 | 공격·마나 폭발음 | `Project333/Units/ManaCannon/Audio/ManaShot`(0.400초)·`Project333/Units/ManaCannon/Audio/ManaExplosion`(0.350초). 발사 0.300초/Attack 10fps frame 3에 맞춘 quiet mono PCM16/44.1kHz, 제안 gain 0.45/0.40. 기존 공통 UnitHit는 유지 |
 
@@ -4097,15 +4109,15 @@ CardId는 사용자 변경(2026-10-09)에 따라 공백 없는 `ElfElder`로 통
 | 이름 / CardId | 파이어스피어 / `FireSpear` |
 | 종류 / 효과 ID | 즉시 마법 / `ScriptedSpell`, `fire_spear` |
 | 소속 / 희귀도 | 판타지 / 커먼 |
-| 비용 | 마나 3. 부족한 마나는 골드로 1:1 대체 |
+| 비용 | 마나 3 |
 | 사용 대상 | 살아 있는 아군 또는 적 유닛·건물·마스터 |
 | 적용 범위 | 선택한 대상 전장의 같은 열 앞·뒤 2칸 |
 | 직접 선택 불가 | 빈 칸·봉인된 대상·은신한 적. 은신한 아군은 선택 가능 |
-| 피해 / 발동 | 기본 마법 피해 15 / 즉시 각 소환물에 1회 |
+| 피해 / 발동 | 기본 마법 피해 30 / 즉시 각 소환물에 1회 |
 | 주문력 / 방어 | 시전자 현재 주문력을 한 번 읽어 각 대상에 추가 후 마법 방어 적용 |
 | 특수효과 / 차지 타일 | 없음 / None. 유닛의 hasPiercing와 별도인 마법 범위 규칙 |
 | 덱 빌딩 / 랜덤 보상 | 등장 / 등장 |
-| 강화 | Lv.1–13 매 레벨 피해 +1, Lv.13 기본 피해 28 |
+| 강화 | Lv.1–13 매 레벨 피해 +1, Lv.13 기본 피해 43 |
 | 카드 그림 | `Assets/Project333/Resources/Project333/CardArtwork/FireSpear.png` |
 | 네이티브 카드 | `Assets/Project333/ScriptableObjects/StarterTen/Cards/FireSpear.asset` |
 | 관통 VFX | `Project333/SpellEffects/FireSpear/FlameSpear`, 512px 8컷 |
@@ -4133,22 +4145,22 @@ CardId는 사용자 변경(2026-10-09)에 따라 공백 없는 `ElfElder`로 통
 
 ```json
 {
-    "id":  "FireSpear",
-    "displayName":  "파이어스피어",
-    "definitionType":  "ScriptedSpell",
-    "rarity":  "Common",
-    "affiliation":  "Fantasy",
-    "includeInDraft":  true,
-    "includeInRewards":  true,
-    "chargeTileFootprint":  "None",
-    "cost":  {
-                 "mana":  3
-             },
-    "effectText":  "선택한 대상이 속한 전장의 같은 열 소환물 모두에게 마법 데미지 15를 입힌다.",
-    "specialEffectText":  "",
-    "effectId":  "fire_spear",
-    "damage":  15,
-    "damageType":  "Magic"
+  "id": "FireSpear",
+  "displayName": "파이어스피어",
+  "definitionType": "ScriptedSpell",
+  "rarity": "Common",
+  "affiliation": "Fantasy",
+  "includeInDraft": true,
+  "includeInRewards": true,
+  "chargeTileFootprint": "None",
+  "cost": {
+    "mana": 3
+  },
+  "effectText": "선택한 대상이 속한 전장의 같은 열 소환물 모두에게 마법 데미지를 입힌다.",
+  "specialEffectText": "",
+  "effectId": "fire_spear",
+  "damage": 30,
+  "damageType": "Magic"
 }
 ```
 
@@ -4262,7 +4274,7 @@ CardId는 사용자 변경(2026-10-09)에 따라 공백 없는 `ElfElder`로 통
 | 설치 비용 / 발동 비용 | 설치 무료 / 발동 때 전투 골드 4. 계정 Resource Gold와 별개 |
 | 효과 / 특수효과 | 일반 효과 문구 없음 / 트랩 |
 | 특수효과 문구 | 트랩: 골드-4. 상대방 유닛이 내 마스터 공격 시, 그 유닛을 패로 되돌린다.(마스터 제외) |
-| 설치 입력 | 내 Main 행동 턴, 살아 있는 내 마스터로 드래그 또는 카드 선택 후 마스터 클릭. 실제 설치 명령은 효과 대상 좌표 없음 |
+| 설치 입력 | 내 Main 행동 턴, 살아 있는 내 마스터 필요. 손패에서 위로 드래그해 허공에 놓아 설치하며 마스터·타일 지정 없음. 설치 확정 시 공통 푸른 조각 연출 |
 | 발동 조건 / 효과 | `EnemyUnitAttacksMaster` / `ReturnAttackerToHand` |
 | 대상 | 상대의 적법한 일반 공격자 중 일반 유닛. 마스터·건물 공격자는 제외 |
 | 발동 시점 | 환술 최종 대상·공격 비용 처리 후, 쉴더·HP 피해·연타·관통·반격 전 |
@@ -4319,13 +4331,13 @@ CardId는 사용자 변경(2026-10-09)에 따라 공백 없는 `ElfElder`로 통
 | 설치 / 발동 비용 | 설치 무료 / 발동 마나 2, 부족한 마나는 골드로 1:1 대체 |
 | 덱 빌딩 / 랜덤 보상 | On / Off |
 | 강화 | 불가. Lv.1–13 증가량 없음, 공격자 현재 ATK를 사용 |
-| 설치 입력 | 살아 있는 내 마스터. 설치는 효과 대상 선택이 아님 |
+| 설치 입력 | 살아 있는 내 마스터 필요. 손패에서 위로 드래그해 허공에 놓아 설치. 마스터·타일 지정 없음 |
 | 발동 대상 | 상대 유닛·마스터가 내 유닛·마스터를 공격할 때. 건물 제외 |
 | 효과 | 공격 전체 취소 후 공격자의 현재 ATK를 기본값으로 본인에게 Magic 피해. 내 현재 주문력 및 대상의 마법 방어·피해 보호 적용 |
 | 수명 / 중복 | 조건과 발동 비용 충족 시 한 번 소모해 버림. 기본 만료 없음, 같은 소유자의 동일 CardId 동시 설치 불가 |
 | 특수효과 | 트랩. 설치 순서·비용 부족 시 유지·상대 비공개·성공 발동 시 실제 이미지 공개 |
 | 그림 | `Assets/Project333/Resources/Project333/CardArtwork/TrapMirrorField.png`. 투명한 1254×1254 거울·반사 광선 일러스트, native FullRect |
-| 네이티브 카드 | `Assets/Project333/ScriptableObjects/StarterTen/TrapMirrorField.asset`. 현재 53종 카탈로그에 1회 등록 |
+| 네이티브 카드 | `Assets/Project333/ScriptableObjects/StarterTen/TrapMirrorField.asset`. 현재 54종 카탈로그에 1회 등록 |
 | 판정 상세 | [전투 규칙](battle_rules.md#trapmirrorfield). 반사는 명시된 공격자 본인에게 직접 적용하며 다른 단일 마법 규칙은 유지 |
 
 **원본 카드 데이터: 설정된 모든 필드**
@@ -4373,14 +4385,14 @@ CardId는 사용자 변경(2026-10-09)에 따라 공백 없는 `ElfElder`로 통
 | 설치 / 발동 비용 | 설치 무료 / 발동 전력 4. 전력을 먼저 쓰고 부족분은 골드로 1:1 대체 |
 | 덱 빌딩 / 랜덤 보상 | On / Off |
 | 강화 | 불가. Lv.1–13 증가량 및 효과 수치 없음 |
-| 설치 입력 | 살아 있는 내 마스터. 설치 시 발동 비용이 없어도 가능 |
+| 설치 입력 | 살아 있는 내 마스터 필요. 손패에서 위로 드래그해 허공에 놓아 설치. 발동 비용이 없어도 설치 가능 |
 | 발동 조건 | 상대 일반 근거리 유닛(`AttackType.Melee`)이 내 마스터를 적법하게 근접 공격할 때. 원거리 유닛·마스터·건물 공격자 제외, 환술의 실제 최종 대상 기준. 거리·피해 속성이 아닌 공격 방식으로 판정 |
 | 효과 | 피해·쉴더·연타·관통·반격 전에 승인된 공격을 취소하고 공격자를 직접 파괴. 피해 방어·무적·불굴로 막지 않으며 정상 사망·오라 연쇄·마왕 부활·승패 처리 적용 |
 | 공격 비용 | 승인된 공격 1회와 이미 낸 명시 공격 비용은 반환하지 않음 |
 | 수명 / 중복 | 조건·비용 충족 시 1회 소모, 기본 만료 없음. 비용 부족 시 유지하며 다음 설치 트랩 검사. 같은 소유자의 동일 CardId 동시 설치 불가 |
 | 표시 | 설치 시 상대에게 물음표 공통 카드·마스터 ?/Xn만 공개. 성공 발동 시 양쪽 화면 중앙에 실제 카드 이미지 표시. 배리어·폭발과 실제 공격자 사망 연출 표시 |
 | 카드 그림 | `Assets/Project333/Resources/Project333/CardArtwork/ExplosiveReactiveArmour.png`. 1254×1254 투명 그림: 금색 팔각형 에너지 배리어에 탄환이 닿으며 배리어 쪽으로 폭발 |
-| 네이티브 카드 | `Assets/Project333/ScriptableObjects/StarterTen/ExplosiveReactiveArmour.asset`. 53종 카탈로그에 1회 등록, FullRect·Point 그림 연결 |
+| 네이티브 카드 | `Assets/Project333/ScriptableObjects/StarterTen/ExplosiveReactiveArmour.asset`. 54종 카탈로그에 1회 등록, FullRect·Point 그림 연결 |
 | 판정 상세 | [전투 규칙](battle_rules.md#explosivereactivearmour). 별도 피해 패킷·가짜 피해 수치·피격음 없음. 위 전력4·근접 전용 정의는 신규 설치에 적용하며, 수정 전 설치·복원된 트랩은 설치 당시 포착한 조건·비용을 유지 |
 
 **원본 카드 데이터: 설정된 모든 필드**
@@ -4429,14 +4441,14 @@ CardId는 사용자 변경(2026-10-09)에 따라 공백 없는 `ElfElder`로 통
 | 설치 / 발동 비용 | 설치 무료 / 발동 전력 4. 전력을 먼저 쓰고 부족분은 전투 골드로 1:1 대체 |
 | 덱 빌딩 / 랜덤 보상 | On / Off |
 | 강화 | 불가. Lv.1–13 증가량 및 효과 수치 없음 |
-| 설치 입력 | 살아 있는 내 마스터. 발동 비용이 없어도 설치 가능 |
+| 설치 입력 | 살아 있는 내 마스터 필요. 손패에서 위로 드래그해 허공에 놓아 설치. 발동 비용이 없어도 설치 가능 |
 | 발동 조건 | 상대 일반 원거리 유닛(`AttackType.Ranged`)의 적법한 일반 공격에서 실제 최종 대상이 내 실제 마스터일 때. 근거리 유닛·마스터·건물 공격자 제외, 환술의 실제 최종 대상 기준. 타일 거리·비행·피해 속성으로 판정하지 않음 |
 | 효과 | 피해·쉴더·연타·관통·반격 전에 승인된 공격 전체 취소 및 공격자 직접 파괴. 방어·무적·불굴로 막지 않으며 공통 사망·오라 연쇄·유언·부활·승패 처리 적용 |
 | 공격 비용 | 승인된 공격 1회와 이미 낸 명시 공격 비용은 반환하지 않음 |
 | 수명 / 중복 | 조건·비용 충족 시 1회 소모, 기본 만료 없음. 비용 부족 시 유지하며 다음 설치 트랩 검사. 같은 소유자의 동일 CardId 동시 설치 불가 |
 | 표시 | 설치 시 상대에게 공통 물음표 카드와 마스터 ?/Xn만 공개. 성공 발동 때 실제 카드 공개 후 설치자 마스터에서 공격자까지 0.5초 직선 미사일 발사. 공격자 위치에서 시한폭탄 폭발 16컷을 재사용하며 폭발 최대 확장 시 실제 Death 재생. 부활 대기는 영구 사망으로 표시하지 않음. 추가 음원 없음. [연출 안내](iron_dome.md) |
 | 카드 그림 | `Assets/Project333/Resources/Project333/CardArtwork/IronDome.png`. 날아오는 미사일을 요격 미사일이 맞혀 공중에서 폭파하는 장면 |
-| 네이티브 카드 | `Assets/Project333/ScriptableObjects/StarterTen/IronDome.asset`. 53종 카탈로그에 1회 등록, FullRect·Point 그림 연결 |
+| 네이티브 카드 | `Assets/Project333/ScriptableObjects/StarterTen/IronDome.asset`. 54종 카탈로그에 1회 등록, FullRect·Point 그림 연결 |
 | 타입화된 조건 / 효과 | `EnemyRangedUnitAttacksMaster`(4) / `DestroyAttacker`(3), 실제 피해 수치 없음 (`damage: 0`, `damageType: "None"`) |
 | 판정 상세 | [전투 규칙](battle_rules.md#irondome), [카드·그림·등록 안내](iron_dome.md). 설치 당시 조건·비용·효과를 보존하며 상대 정체를 모의 실행에서 읽지 않음 |
 
@@ -4476,7 +4488,7 @@ CardId는 사용자 변경(2026-10-09)에 따라 공백 없는 `ElfElder`로 통
 | 설치 / 발동 비용 | 설치 무료 / 성공 발동 시 전투 골드 1. 계정 Resource Gold와 별개 |
 | 덱 빌딩 / 랜덤 보상 | On / On |
 | 강화 | 가능. Lv.1–13 매 레벨 물리 피해 +1; Lv.0 20, Lv.13 33. 설치·발동 비용은 불변 |
-| 설치 입력 | 살아 있는 내 마스터. 발동 골드가 부족해도 설치 가능 |
+| 설치 입력 | 살아 있는 내 마스터 필요. 손패에서 위로 드래그해 허공에 놓아 설치. 발동 골드가 부족해도 설치 가능 |
 | 발동 조건 | 상대 일반 유닛의 성공한 손패 소환(`PlayUnitCard`). 마스터·건물 제외. 실패한 소환, 이동·고독·패 반환·부활은 조건이 아님 |
 | 발동 순서 | 손패·소환 비용·정상 배치·강화·속공·오라·낙진·무적 등 기존 소환 초기화 완료 뒤 판정. 이후 해당 소환물에 직접 피해를 주며 정상 소환을 취소하거나 이미 낸 비용/손패를 복구하지 않음 |
 | 효과 | 설치 때 포착한 `20 + 레벨`의 직접 Physical 피해. 물리 방어·무적·봉인 보호·불굴·방전 3배·실제 HP 감소 시 은신 해제·정상 사망/오라 철회/연쇄/마왕 부활 처리 적용 |

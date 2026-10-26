@@ -20,7 +20,7 @@ namespace Project333.Runtime.Presentation.Tutorial
         private RectTransform _safeRoot;
         private Image _guidePortrait;
         private Text _dialogue, _stepCounter, _nextLabel;
-        private Button _nextButton, _skipButton, _chapterSelectionButton;
+        private Button _previousButton, _nextButton, _skipButton, _chapterSelectionButton;
         private GameObject _selectionModal;
         private int _lastIdleFrame = -1;
         private bool _returning;
@@ -58,14 +58,15 @@ namespace Project333.Runtime.Presentation.Tutorial
         private void RefreshPracticePresentationLayouts()
         {
             RefreshPracticeDialogueLayout();
+            RefreshDialogueNavigationLayout();
             RefreshPracticeHighlightLayouts();
             RefreshChapterOneVisualAids();
         }
         private void RefreshGuidePortrait()
         {
             if (_guidePortrait == null) return;
-            if (_guideGoldFrame != null && _session != null && !_session.IsComplete && !_session.IsExited &&
-                (_session.CurrentStep.Cue == TutorialCue.Gold || _session.CurrentStep.Cue == TutorialCue.GoldDungeonReward))
+            if (_guideGoldFrame != null && _session != null && (!_session.IsComplete || IsReviewingDialogue) && !_session.IsExited &&
+                (DisplayedDialogueStep.Cue == TutorialCue.Gold || DisplayedDialogueStep.Cue == TutorialCue.GoldDungeonReward))
                 _guidePortrait.sprite = _guideGoldFrame;
             else if (_guideIdleFrames.Length > 0)
             {
@@ -83,7 +84,8 @@ namespace Project333.Runtime.Presentation.Tutorial
         }
         private void Advance()
         {
-            if (!CanPractice) return;
+            if (!CanNavigateDialogue) return;
+            if (IsReviewingDialogue) { _dialoguePageIndex++; PresentDialoguePage(); return; }
             if (_session.IsComplete) { ReturnToStart(); return; }
             if (_session.CurrentStep.RequiredAction == TutorialAction.CompleteDeck)
             { AutoCompleteTutorialDeck(); return; }
@@ -91,7 +93,8 @@ namespace Project333.Runtime.Presentation.Tutorial
         }
         private void StartPractice()
         { if (CanPractice && _session.PerformAction(TutorialAction.StartRun)) PresentStep(); }
-        private bool CanPractice => (_practiceBattle == null || !_practiceBattle.IsTutorialResolving) && (_practiceCollection == null || !_practiceCollection.IsTutorialFlipAnimating) && !_returning && _selectionModal == null && !_session.IsExited && IsPracticeSceneReady;
+        private bool CanPractice => !IsReviewingDialogue && CanNavigateDialogue;
+        private bool CanNavigateDialogue => (_practiceBattle == null || !_practiceBattle.IsTutorialResolving) && (_practiceCollection == null || !_practiceCollection.IsTutorialFlipAnimating) && !_returning && _selectionModal == null && !_session.IsExited && IsPracticeSceneReady;
         private void OnTutorialOfferSelected(int cardIndex)
         { if (CanPractice && _session.PerformAction(TutorialAction.PickCard, cardIndex)) PresentStep(); }
         private void OnTutorialPreviewReleased(bool isDeckList, int cardIndex)
@@ -126,13 +129,8 @@ namespace Project333.Runtime.Presentation.Tutorial
         }
         private void PresentStep()
         {
-            RefreshGuidePortrait();
-            _dialogue.text = _session.CurrentStep.Dialogue;
-            _stepCounter.text = _session.Chapter == 0 ? "개방 방주의 안내" :
-                _session.Chapter == 1 ? "1. 게임에 대한 설명" :
-                _session.Chapter == 2 ? "2. 덱 빌딩" : _session.Chapter == 3 ? "3. 게임 모드" : _session.Chapter == 4 ? "4. 자원 시스템과 전투 1" : _session.Chapter == 5 ? "5. 전투 2" : "6. 카드 업그레이드 시스템";
-            _nextLabel.text = _session.IsComplete ? "튜토리얼 마치기"
-                : _session.CurrentStep.RequiredAction == TutorialAction.CompleteDeck ? "계속" : "다음";
+            RecordDialoguePage();
+            PresentDialoguePage();
             RequestPracticeScene();
             RefreshChapterOneVisualAids();
         }

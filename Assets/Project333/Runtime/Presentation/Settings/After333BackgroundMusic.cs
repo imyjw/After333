@@ -72,6 +72,7 @@ namespace Project333.Runtime.Presentation.Settings
                 case "DeckBuilding_VSlice":
                 case "OwnedCards_VSlice":
                 case "Shop_VSlice":
+                case "Tutorial_VSlice":
                     return LobbyResource;
                 case "Battle_VSlice":
                     return BattleResource;

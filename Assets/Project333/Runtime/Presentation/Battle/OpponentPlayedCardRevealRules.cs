@@ -15,7 +15,8 @@ namespace Project333.Runtime.Presentation.Battle
                 return !string.IsNullOrWhiteSpace(battleEvent.CardId);
             if (battleEvent.SourceOwnerId != PlayerId.AI || string.IsNullOrWhiteSpace(battleEvent.CardId)) return false;
             return battleEvent.EventType == BattleEventType.CardPlayed ||
-                   battleEvent.EventType == BattleEventType.SpellCast;
+                   battleEvent.EventType == BattleEventType.SpellCast ||
+                   battleEvent.EventType == BattleEventType.RobotFusionResolved;
         }
 
         public static bool IsBoardCardPlay(BattleEventDto battleEvent)

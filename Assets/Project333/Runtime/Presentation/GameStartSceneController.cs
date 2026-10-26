@@ -17,6 +17,8 @@ namespace Project333.Runtime.Presentation.Startup
 {
     public sealed partial class GameStartSceneController : MonoBehaviour
     {
+        [SerializeField, HideInInspector] private int _editableUiVersion;
+        public int EditableUiVersion => _editableUiVersion;
         [SerializeField, HideInInspector] private int _pixelMenuLayoutVersion = 0;
         public int PixelMenuLayoutVersion => _pixelMenuLayoutVersion;
         [SerializeField] private Image _backgroundImage;
@@ -156,6 +158,7 @@ namespace Project333.Runtime.Presentation.Startup
         [SerializeField] private int _ticketCost = 3;
 
         private CancellationTokenSource _authCancellation;
+        private CancellationTokenSource _replacementReadinessCancellation;
         private CancellationTokenSource _gameIdAuthCancellation;
         private CancellationTokenSource _googleAuthCancellation;
         private CancellationTokenSource _logoutCancellation;
@@ -312,6 +315,7 @@ namespace Project333.Runtime.Presentation.Startup
         {
             UnbindTutorialEntryButton();
             CancelAccountRestore();
+            CancelReplacementLoginReadiness();
             CancelGameIdAuth();
             CancelGoogleAuth();
             CancelLogout();
@@ -370,6 +374,20 @@ namespace Project333.Runtime.Presentation.Startup
         }
 
 #if UNITY_EDITOR
+        // Editor authoring only: construct UI without credentials, login,
+        // reconnect, server status requests or the runtime account lifecycle.
+        public void MaterializeStartUiForEditor()
+        {
+            if (UnityEngine.Application.isPlaying) return;
+            MaterializeMissingStartUiObjects();
+            EnsureTutorialEntryButton();
+            Project333.Runtime.Presentation.Settings.GlobalSettingsMenuController.EnsureForScene(gameObject.scene);
+            GiftInboxController.EnsureForScene(gameObject.scene)?.Close();
+            // Conditional overlays stay editable in the hierarchy but do not
+            // cover the default menu preview. Runtime RefreshUi chooses visibility.
+            _accountLoginGate?.SetVisible(false);
+        }
+
         private void QueueEditorStartUiRefresh()
         {
             if (_hasQueuedEditorStartUiRefresh)
@@ -1105,7 +1123,7 @@ namespace Project333.Runtime.Presentation.Startup
                         SetStatus("자동 로그인 완료.");
                         return;
                     }
-                    catch (Exception ex) when (!(ex is OperationCanceledException))
+                    catch (Exception ex) when (!(ex is OperationCanceledException) && !(ex is AccountSessionReplacedException))
                     {
                         Debug.LogWarning($"After333 saved session restore failed: {ex.Message}");
                         AccountSessionState.ClearAccessToken();
@@ -1129,7 +1147,7 @@ namespace Project333.Runtime.Presentation.Startup
                         SetStatus("자동 로그인 완료.");
                         return;
                     }
-                    catch (Exception ex) when (!(ex is OperationCanceledException))
+                    catch (Exception ex) when (!(ex is OperationCanceledException) && !(ex is AccountSessionReplacedException))
                     {
                         Debug.LogWarning($"After333 refresh-token restore failed: {ex.Message}");
                         AccountSessionState.ClearSavedSession();
@@ -1149,6 +1167,11 @@ namespace Project333.Runtime.Presentation.Startup
                     ? "자동 로그인 정보가 만료되었습니다. Game ID 또는 Google로 다시 로그인해주세요."
                     : "게임을 이용하려면 Game ID 또는 Google로 로그인해주세요.");
             }
+            catch (AccountSessionReplacedException)
+            {
+                _authFailed = false;
+                SetStatus(AccountSessionState.SessionReplacedMessage);
+            }
             catch (OperationCanceledException)
             {
             }
@@ -1165,6 +1188,68 @@ namespace Project333.Runtime.Presentation.Startup
             }
         }
 
+        public void HandleSessionReplacementFromServer()
+        {
+            if (IsTutorialPracticeMode) return;
+            CancelAccountRestore();
+            CancelGameIdAuth();
+            CancelGoogleAuth();
+            CancelLogout();
+            CancelRunStart();
+            ClearPvpReconnectStatus();
+            // Clear presentation state even if cancellation already disposed its source.
+            _isAuthenticating = false;
+            _isGameIdAuthBusy = false;
+            _isLoggingOut = false;
+            _authFailed = false;
+            SetStatus(AccountSessionState.SessionReplacedMessage);
+            RefreshUi();
+            RefreshReplacementLoginReadiness();
+        }
+
+        private async void RefreshReplacementLoginReadiness()
+        {
+            // sceneLoaded can cancel OnEnable's initial /server/status together
+            // with credential restore. Recheck only public provider availability;
+            // never restore tokens or start Google sign-in after a takeover.
+            if (IsTutorialPracticeMode || !isActiveAndEnabled || !_useServerAccount || _serverStatus != null ||
+                _replacementReadinessCancellation != null) return;
+
+            var cancellation = new CancellationTokenSource();
+            _replacementReadinessCancellation = cancellation;
+            var endpoint = AccountServerUrl;
+            try
+            {
+                var status = await new GuestAuthClient(endpoint).GetServerStatusAsync(cancellation.Token);
+                cancellation.Token.ThrowIfCancellationRequested();
+                if (_replacementReadinessCancellation != cancellation ||
+                    !string.Equals(endpoint, AccountServerUrl, StringComparison.OrdinalIgnoreCase)) return;
+                _serverStatus = status;
+                _serverStatusError = string.Empty;
+                RefreshUi();
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                if (_replacementReadinessCancellation != cancellation) return;
+                _serverStatus = null;
+                _serverStatusError = ex.Message;
+                Debug.LogWarning($"After333 server status check failed: {ex.Message}");
+                RefreshUi();
+            }
+            finally
+            {
+                if (_replacementReadinessCancellation == cancellation) _replacementReadinessCancellation = null;
+                cancellation.Dispose();
+            }
+        }
+
+        private void CancelReplacementLoginReadiness()
+        {
+            _replacementReadinessCancellation?.Cancel();
+            _replacementReadinessCancellation = null;
+        }
+
         private void LoadSavedAccountCredentials()
         {
             if (_hasLoadedSavedAccountCredentials || !_useServerAccount)
@@ -1172,6 +1257,7 @@ namespace Project333.Runtime.Presentation.Startup
                 return;
             }
 
+            AccountSessionState.BindServerEndpoint(AccountServerUrl);
             AccountSessionState.LoadSavedLoginCredentials();
             _hasLoadedSavedAccountCredentials = true;
             Debug.Log(
@@ -1229,7 +1315,7 @@ namespace Project333.Runtime.Presentation.Startup
                 {
                     await RefreshServerAccountStateAsync(cancellationToken);
                 }
-                catch (Exception ex) when (!(ex is OperationCanceledException))
+                catch (Exception ex) when (!(ex is OperationCanceledException) && !(ex is AccountSessionReplacedException))
                 {
                     Debug.LogWarning($"After333 automatic Google login account refresh failed: {ex.Message}");
                 }
@@ -1937,10 +2023,12 @@ namespace Project333.Runtime.Presentation.Startup
             if (hasChanged)
             {
                 CancelAccountRestore();
+                CancelReplacementLoginReadiness();
                 CancelGameIdAuth();
                 CancelGoogleAuth();
                 ClearPvpReconnectStatus();
                 AccountSessionState.ClearSavedSession();
+                AccountSessionState.BindServerEndpoint(newUrl);
                 _serverStatus = null;
                 _serverStatusError = string.Empty;
                 _authFailed = false;

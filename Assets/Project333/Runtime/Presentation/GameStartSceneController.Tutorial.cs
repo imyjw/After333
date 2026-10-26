@@ -54,8 +54,8 @@ namespace Project333.Runtime.Presentation.Startup
                 entryRoot.offsetMax = Vector2.zero;
             }
 
-            // The login gate covers the normal menu at sorting 5000. Local tutorials
-            // remain reachable before login and when no server connection is available.
+            // This stays above the ordinary menu. The login gate now covers and
+            // blocks tutorial entry until the player returns to the start menu.
             var canvas = entryRoot.GetComponent<Canvas>();
             if (entryRoot.GetComponentInParent<Canvas>() == canvas && canvas.rootCanvas == canvas)
             {

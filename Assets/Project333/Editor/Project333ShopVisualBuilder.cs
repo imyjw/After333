@@ -28,6 +28,11 @@ namespace Project333.Editor
         private static void QueueInitialLayout()
         {
             EditorApplication.delayCall += ApplyInitialLayout;
+            EditorSceneManager.sceneOpened += (scene, mode) =>
+            {
+                if (scene.path == ScenePath)
+                    EditorApplication.delayCall += ApplyInitialLayout;
+            };
             EditorApplication.playModeStateChanged += state =>
             {
                 if (state == PlayModeStateChange.EnteredEditMode)
@@ -44,10 +49,46 @@ namespace Project333.Editor
             var scene = SceneManager.GetSceneByPath(ScenePath);
             if (scene.IsValid() && scene.isLoaded)
             {
-                if (FindController(scene)?.ShopVisualVersion >= 2) return;
+                if (FindController(scene)?.ShopVisualVersion >= ShopSceneController.CurrentShopVisualVersion) return;
             }
-            else if (File.ReadAllText(ScenePath).Contains("_shopVisualVersion: 2")) return;
-            UpdateShopGoldIcon();
+            else
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(
+                    File.ReadAllText(ScenePath), @"_shopVisualVersion:\s*(\d+)");
+                if (match.Success && int.TryParse(match.Groups[1].Value, out var version) &&
+                    version >= ShopSceneController.CurrentShopVisualVersion) return;
+            }
+            UpdateCurrentShopLayout();
+        }
+
+        [MenuItem("Tools/Project333/Shop/Update Current Shop Layout")]
+        public static void UpdateCurrentShopLayout()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            var scene = SceneManager.GetSceneByPath(ScenePath);
+            var closeAfter = !scene.IsValid() || !scene.isLoaded;
+            if (closeAfter) scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Additive);
+            var wasDirty = scene.isDirty;
+            try
+            {
+                var controller = FindController(scene);
+                if (controller == null) throw new System.InvalidOperationException("Shop controller was not found.");
+                if (controller.ShopVisualVersion == 0) ApplyPixelShopLayout();
+                controller.EnsureEditableHierarchy();
+                var serialized = new SerializedObject(controller);
+                serialized.FindProperty("_shopVisualVersion").intValue = Mathf.Max(
+                    controller.ShopVisualVersion, ShopSceneController.CurrentShopVisualVersion);
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(controller);
+                EditorSceneManager.MarkSceneDirty(scene);
+                // Respect unsaved user edits in an already-open scene.
+                if (closeAfter || !wasDirty) EditorSceneManager.SaveScene(scene);
+                Debug.Log("After333 current shop products are editable before Play. Save the scene if it already had unsaved edits.");
+            }
+            finally
+            {
+                if (closeAfter) EditorSceneManager.CloseScene(scene, true);
+            }
         }
 
         [MenuItem("Tools/Project333/Shop/Update Gold Icon")]
@@ -79,7 +120,7 @@ namespace Project333.Editor
                     icon.preserveAspect = true;
                     icon.raycastTarget = false;
                     EditorUtility.SetDirty(icon);
-                    serialized.FindProperty("_shopVisualVersion").intValue = 2;
+                    serialized.FindProperty("_shopVisualVersion").intValue = Mathf.Max(controller.ShopVisualVersion, 2);
                     serialized.ApplyModifiedPropertiesWithoutUndo();
                 }
                 EditorSceneManager.MarkSceneDirty(scene);
@@ -202,6 +243,10 @@ namespace Project333.Editor
                     0.09f, 0.035f, 0.91f, 0.09f);
 
                 serialized.FindProperty("_shopVisualVersion").intValue = 2;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                controller.EnsureEditableHierarchy();
+                serialized.Update();
+                serialized.FindProperty("_shopVisualVersion").intValue = ShopSceneController.CurrentShopVisualVersion;
                 serialized.ApplyModifiedPropertiesWithoutUndo();
                 EditorUtility.SetDirty(ads);
                 EditorSceneManager.MarkSceneDirty(scene);

@@ -70,6 +70,13 @@ var resultStore = new BattleResultStore(new DbConnectionFactory(configuration));
 var passCount = 0;
 var battleCount = 0;
 var resultCount = 0;
+if (args.SequenceEqual(new[] { "--single-login-only" }))
+{
+    await SingleLoginSessionChecks.Run(http, db, configuration, Pass, ct);
+    await SingleLoginWireChecks.Run(http, db, Pass, ct);
+    Console.WriteLine($"PASS: {passCount} single-login regression groups completed; fresh isolated database and loopback HTTP/WebSockets only.");
+    return;
+}
 await AiChallengeChecks.Run(db, configuration, Pass, ct);
 if (args.SequenceEqual(new[] { "--gold-dungeon-only" }))
 {

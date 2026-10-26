@@ -27,9 +27,12 @@
     <Compile Include="GiftInboxChecks.cs" />
     <Compile Include="BattleConnectionLimitChecks.cs" />
     <Compile Include="MatchmakingReservationChecks.cs" />
+    <Compile Include="SingleLoginSessionChecks.cs" />
+    <Compile Include="SingleLoginWireChecks.cs" />
     <Reference Include="Project333.PvpServer"><HintPath>$(ServerOutput)\Project333.PvpServer.dll</HintPath></Reference>
     <Reference Include="Npgsql"><HintPath>$(ServerOutput)\Npgsql.dll</HintPath></Reference>
     <Content Include="$(ServerOutput)\Data\*.json" Link="Data\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(ServerOutput)\Persistence\Migrations\0025_single_login_family.sql" Link="Persistence\Migrations\0025_single_login_family.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="RequireBuiltServer" BeforeTargets="ResolveReferences">
     <Error Condition="!Exists('$(ServerOutput)\Project333.PvpServer.dll')" Text="Pass -p:ServerOutput=the freshly built isolated server output directory." />

@@ -1,3 +1,4 @@
+using Project333.Runtime.Presentation.Settings;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
@@ -119,7 +120,7 @@ namespace Project333.Runtime.Presentation.Battle
                 _audio[slot] = gameObject.AddComponent<AudioSource>();
                 _audio[slot].playOnAwake = false; _audio[slot].spatialBlend = 0f; _audio[slot].dopplerLevel = 0f;
             }
-            _audio[slot].PlayOneShot(clip, 0.55f);
+            After333SoundEffects.PlayOneShot(_audio[slot], clip, 0.55f);
         }
 
         private void StopSlot(int slot)

@@ -355,8 +355,8 @@ namespace Project333.Runtime.Presentation.Hand
                     continue;
                 }
 
-                image.sprite = _cardBackSprite;
-                image.color = Color.white;
+                // Keep each authored back, including currently hidden hand slots.
+                if (image.sprite == null) image.sprite = _cardBackSprite;
             }
         }
 

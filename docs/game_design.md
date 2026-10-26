@@ -1,5 +1,7 @@
 # After333 Game Design
 
+Current overview reviewed 2026-10-20. All six deterministic local tutorial chapters are implemented; mandatory practice uses actual game UI over isolated client state. Online service now runs on Seoul Lightsail through Caddy, with PostgreSQL18 and migrations0001–0024. [Current status](current_project_status.md) separates source, rollout and observed runtime checks.
+
 Actual release status (2026-10-02): the separately approved card-pack server/DB0020–0022 rollout and Android APK(versionCode5) build passed. See [actual release evidence](shop_card_packs.md). Earlier source-only snapshots retain their scope; physical-device installation/runtime remains untested.
 
 Updated 2026-10-02 for confirmed shop card-pack purchase/opening; the earlier card-content snapshot below retains its own scope. This describes source behavior; it does not certify the version installed on a device or deployed to production.
@@ -170,8 +172,8 @@ See [meta_rules.md](./meta_rules.md).
 
 ## Current Content and Presentation
 
-- Shared definitions: 59 cards (27 units, 7 buildings, 25 spells); native catalog and draft pool: 52. Actual random reward pool: 40; upgradeable definitions: 44. See the catalog for flags and unreleased cards rather than treating all definitions as playable.
-- Four hidden traps share free installation, captured activation costs, ordered one-shot triggers and duplicate-card exclusion. Reactive Armour protects the owner Master from ordinary melee Units; Iron Dome protects that Master from ordinary ranged Units. Both cost 4 Power on activation with Gold substitution, cancel the attack and destroy its attacker. See [battle rules](battle_rules.md#irondome).
+- Shared definitions: 60 cards (27 units, 7 buildings, 26 spells); native catalog and draft pool: 54. Actual random reward pool: 41; upgradeable definitions: 44. See the catalog for flags and unreleased cards rather than treating all definitions as playable.
+- Five hidden traps share free installation, captured activation costs, ordered one-shot triggers and duplicate-card exclusion. Reactive Armour protects the owner Master from ordinary melee Units; Iron Dome protects that Master from ordinary ranged Units. Both cost 4 Power on activation with Gold substitution, cancel the attack and destroy its attacker. See [battle rules](battle_rules.md#irondome).
 - Hand cards fold at bottom center, expand on click and move/scale smoothly. Both fields, the settings gear and End Turn preserve the expanded hand. End Turn locks actions immediately while keeping hand inspection available.
 - Affordable selected cards pulse their legal tile targets with reduced white brightness. Untargeted spells only show tile hints where their input rules explicitly support them.
 - Long-press previews share trait/effect information across supported card surfaces; live board previews additionally show statuses and applied effects from the actual occupant.

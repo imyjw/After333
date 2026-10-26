@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
@@ -21,6 +21,8 @@ namespace Project333.Runtime.Presentation.Draft
 {
     public sealed partial class DraftSceneController : MonoBehaviour, IDraftOverlayHost
     {
+        [SerializeField, HideInInspector] private int _editableUiVersion;
+        public int EditableUiVersion => _editableUiVersion;
         [SerializeField, HideInInspector] private int _draftVisualVersion;
         public int DraftVisualVersion => _draftVisualVersion;
 
@@ -1745,38 +1747,29 @@ namespace Project333.Runtime.Presentation.Draft
 
         private RectTransform EnsureClaimRewardsCanvasRoot()
         {
-            if (_claimRewardsCanvas != null)
+            if (_claimRewardsCanvas == null)
             {
-                return _claimRewardsCanvas.transform as RectTransform;
+                var existing = transform.Find("DraftClaimRewardsCanvas");
+                if (existing != null && existing.TryGetComponent<Canvas>(out var existingCanvas))
+                {
+                    _claimRewardsCanvas = existingCanvas;
+                }
+                else
+                {
+                    var canvasObject = new GameObject(
+                        "DraftClaimRewardsCanvas",
+                        typeof(RectTransform),
+                        typeof(Canvas),
+                        typeof(CanvasScaler),
+                        typeof(GraphicRaycaster));
+                    RegisterEditorCreatedObject(canvasObject);
+                    canvasObject.transform.SetParent(transform, false);
+                    _claimRewardsCanvas = canvasObject.GetComponent<Canvas>();
+                }
             }
 
-            var existing = transform.Find("DraftClaimRewardsCanvas");
-            if (existing != null && existing.TryGetComponent<Canvas>(out var existingCanvas))
-            {
-                _claimRewardsCanvas = existingCanvas;
-                EnsureClaimRewardsCanvasComponents(existingCanvas.gameObject);
-                return existing as RectTransform;
-            }
-
-            var canvasObject = new GameObject(
-                "DraftClaimRewardsCanvas",
-                typeof(RectTransform),
-                typeof(Canvas),
-                typeof(CanvasScaler),
-                typeof(GraphicRaycaster));
-            RegisterEditorCreatedObject(canvasObject);
-            canvasObject.transform.SetParent(transform, false);
-
-            _claimRewardsCanvas = canvasObject.GetComponent<Canvas>();
-            _claimRewardsCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            _claimRewardsCanvas.sortingOrder = _claimRewardsCanvasSortingOrder;
-
-            var scaler = canvasObject.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.matchWidthOrHeight = 1f;
-
-            return canvasObject.GetComponent<RectTransform>();
+            EnsureClaimRewardsCanvasComponents(_claimRewardsCanvas.gameObject);
+            return _claimRewardsCanvas.transform as RectTransform;
         }
 
         private void EnsureClaimRewardsCanvasComponents(GameObject canvasObject)
@@ -1803,7 +1796,18 @@ namespace Project333.Runtime.Presentation.Draft
             if (canvasObject.TryGetComponent<Canvas>(out var canvas))
             {
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvas.overrideSorting = true;
                 canvas.sortingOrder = _claimRewardsCanvasSortingOrder;
+                // Nested Canvases inherit their root Canvas size/scale only through their
+                // RectTransform. The authored scene kept this one centered at 100 x 100.
+                var rect = (RectTransform)canvas.transform;
+                rect.localScale = Vector3.one;
+                rect.localRotation = Quaternion.identity;
+                rect.anchorMin = Vector2.zero;
+                rect.anchorMax = Vector2.one;
+                rect.offsetMin = Vector2.zero;
+                rect.offsetMax = Vector2.zero;
+                rect.anchoredPosition3D = Vector3.zero;
             }
         }
 
@@ -4253,7 +4257,7 @@ namespace Project333.Runtime.Presentation.Draft
             else
             {
                 displayText.font = ResolveRuntimeFont();
-                displayText.fontSize = 22;
+                displayText.fontSize = 32;
                 displayText.fontStyle = FontStyle.Normal;
                 displayText.color = Color.white;
             }
@@ -4372,7 +4376,7 @@ namespace Project333.Runtime.Presentation.Draft
                 summaryText.color = _deckSummaryTextColor;
 
                 panelText.font = _deckListText.font;
-                panelText.fontSize = Mathf.Max(18, _deckListText.fontSize - 1);
+                panelText.fontSize = Mathf.Max(18, _deckListText.fontSize);
                 panelText.fontStyle = _deckListText.fontStyle;
                 panelText.color = _deckPanelTextColor;
             }
@@ -4384,7 +4388,7 @@ namespace Project333.Runtime.Presentation.Draft
                 summaryText.color = _deckSummaryTextColor;
 
                 panelText.font = ResolveRuntimeFont();
-                panelText.fontSize = 20;
+                panelText.fontSize = 32;
                 panelText.fontStyle = FontStyle.Normal;
                 panelText.color = _deckPanelTextColor;
             }

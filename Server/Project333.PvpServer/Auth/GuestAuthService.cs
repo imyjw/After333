@@ -8,7 +8,7 @@ using Project333.PvpServer.Persistence.Db;
 
 namespace Project333.PvpServer.Auth;
 
-public sealed class GuestAuthService
+public sealed partial class GuestAuthService
 {
     private const string GuestProvider = "guest";
     private const string GameIdProvider = "game_id";
@@ -93,13 +93,12 @@ public sealed class GuestAuthService
             account.Id,
             wallet,
             cancellationToken);
-        await InsertSessionPairAsync(
+        await StartIndependentLoginAsync(
             connection,
             transaction,
             account.Id,
             tokenPair,
             clientContext,
-            Guid.NewGuid(),
             cancellationToken);
         await TouchIdentityLoginAsync(
             connection,
@@ -118,6 +117,7 @@ public sealed class GuestAuthService
             previousAccountId: null,
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        NotifyLoginSessionsChanged(account.Id);
 
         return new GameIdAuthResponse(
             tokenPair.SessionToken,
@@ -153,13 +153,12 @@ public sealed class GuestAuthService
         }
 
         var wallet = await LoadWalletAsync(connection, transaction, account.Id, cancellationToken);
-        await InsertSessionPairAsync(
+        await StartIndependentLoginAsync(
             connection,
             transaction,
             account.Id,
             tokenPair,
             clientContext,
-            Guid.NewGuid(),
             cancellationToken);
         await TouchIdentityLoginAsync(
             connection,
@@ -178,6 +177,7 @@ public sealed class GuestAuthService
             previousAccountId: null,
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        NotifyLoginSessionsChanged(account.Id);
 
         return new GameIdAuthResponse(
             tokenPair.SessionToken,
@@ -316,13 +316,12 @@ public sealed class GuestAuthService
                 cancellationToken);
         }
 
-        await InsertSessionPairAsync(
+        await StartIndependentLoginAsync(
             connection,
             transaction,
             account.Id,
             tokenPair,
             clientContext,
-            Guid.NewGuid(),
             cancellationToken);
         await TouchIdentityLoginAsync(
             connection,
@@ -341,6 +340,7 @@ public sealed class GuestAuthService
             previousAccountId: null,
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        NotifyLoginSessionsChanged(account.Id);
 
         return new GoogleAuthResponse(
             tokenPair.SessionToken,
@@ -472,6 +472,8 @@ public sealed class GuestAuthService
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
+        // Account locks precede token row locks so a refresh cannot revive a replaced login.
+        var currentFamily = await LockRefreshAccountAsync(connection, transaction, refreshTokenHash, cancellationToken);
         var storedToken = await FindRefreshTokenForUpdateAsync(
             connection,
             transaction,
@@ -480,6 +482,11 @@ public sealed class GuestAuthService
         if (storedToken == null)
         {
             throw new AuthServiceException("invalid_refresh_token", "Refresh token is invalid.");
+        }
+
+        if (currentFamily != storedToken.TokenFamilyId)
+        {
+            throw SessionReplaced();
         }
 
         if (storedToken.RevokedAt != null)
@@ -584,6 +591,7 @@ public sealed class GuestAuthService
 
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await LockLogoutAccountsAsync(connection, transaction, sessionTokenHash, refreshTokenHash, cancellationToken);
         await RevokeCurrentDeviceSessionAsync(
             connection,
             transaction,
@@ -609,12 +617,17 @@ public sealed class GuestAuthService
         await using var connection = await _connectionFactory.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-        var account = await FindAccountBySessionAsync(connection, transaction, sessionTokenHash, cancellationToken);
-        if (account == null)
+        var sessionAccount = await FindAccountBySessionAsync(connection, transaction, sessionTokenHash, cancellationToken);
+        if (sessionAccount?.IsReplaced == true)
+        {
+            throw SessionReplaced();
+        }
+        if (sessionAccount == null || !sessionAccount.IsValid)
         {
             throw new AuthServiceException("invalid_session_token", "Session token is invalid, expired, or revoked.");
         }
 
+        var account = sessionAccount.Account;
         if (account.IsBanned ||
             !string.Equals(account.AccountStatus, "active", StringComparison.OrdinalIgnoreCase))
         {
@@ -623,6 +636,7 @@ public sealed class GuestAuthService
 
         if (string.Equals(account.AccountKind, GuestAccountKind, StringComparison.OrdinalIgnoreCase))
         {
+            await LockLogoutAccountsAsync(connection, transaction, sessionTokenHash, null, cancellationToken);
             await RevokeCurrentDeviceSessionAsync(
                 connection,
                 transaction,
@@ -643,7 +657,7 @@ public sealed class GuestAuthService
         return new AuthenticatedAccount(
             ToAccountDto(account),
             wallet,
-            collectionSummary);
+            collectionSummary, sessionAccount.LoginFamilyId);
     }
 
     public async Task<PurchaseTicketResponse> PurchaseTicketAsync(
@@ -760,7 +774,7 @@ public sealed class GuestAuthService
     {
         const string sql = """
             update auth_sessions s
-               set revoked_at = coalesce(s.revoked_at, now())
+               set revoked_at = coalesce(s.revoked_at, clock_timestamp())
              where s.id in (
                  select rt.session_id
                    from auth_refresh_tokens rt
@@ -768,8 +782,8 @@ public sealed class GuestAuthService
              );
 
             update auth_refresh_tokens
-               set revoked_at = coalesce(revoked_at, now()),
-                   last_used_at = now()
+               set revoked_at = coalesce(revoked_at, clock_timestamp()),
+                   last_used_at = clock_timestamp()
              where token_family_id = @tokenFamilyId;
             """;
 
@@ -787,12 +801,12 @@ public sealed class GuestAuthService
     {
         const string sql = """
             update auth_sessions
-               set revoked_at = coalesce(revoked_at, now())
+               set revoked_at = coalesce(revoked_at, clock_timestamp())
              where id = @sessionId;
 
             update auth_refresh_tokens
-               set revoked_at = coalesce(revoked_at, now()),
-                   last_used_at = now()
+               set revoked_at = coalesce(revoked_at, clock_timestamp()),
+                   last_used_at = clock_timestamp()
              where id = @refreshTokenId;
             """;
 
@@ -812,12 +826,12 @@ public sealed class GuestAuthService
     {
         const string sql = """
             update auth_sessions
-               set revoked_at = coalesce(revoked_at, now())
+               set revoked_at = coalesce(revoked_at, clock_timestamp())
              where id = @previousSessionId;
 
             update auth_refresh_tokens
-               set revoked_at = coalesce(revoked_at, now()),
-                   last_used_at = now(),
+               set revoked_at = coalesce(revoked_at, clock_timestamp()),
+                   last_used_at = clock_timestamp(),
                    replaced_by_token_id = @replacementRefreshTokenId
              where id = @previousRefreshTokenId;
             """;
@@ -836,25 +850,21 @@ public sealed class GuestAuthService
         string? refreshTokenHash,
         CancellationToken cancellationToken)
     {
+        // A logout belongs to its supplied login family, including earlier
+        // rotated tokens. It must never revoke a later independent login.
         const string sql = """
-            update auth_refresh_tokens rt
-               set revoked_at = coalesce(rt.revoked_at, now()),
-                   last_used_at = now()
-             where (@refreshTokenHash <> '' and rt.refresh_token_hash = @refreshTokenHash)
-                or (@sessionTokenHash <> '' and rt.session_id in (
-                    select s.id
-                      from auth_sessions s
-                     where s.session_token_hash = @sessionTokenHash
-                ));
-
-            update auth_sessions s
-               set revoked_at = coalesce(s.revoked_at, now())
-             where (@sessionTokenHash <> '' and s.session_token_hash = @sessionTokenHash)
-                or (@refreshTokenHash <> '' and s.id in (
-                    select rt.session_id
-                      from auth_refresh_tokens rt
-                     where rt.refresh_token_hash = @refreshTokenHash
-                ));
+            with families as (
+                select login_family_id as id from auth_sessions where session_token_hash=@sessionTokenHash
+                union select token_family_id as id from auth_refresh_tokens where refresh_token_hash=@refreshTokenHash
+            )
+            update auth_refresh_tokens rt set revoked_at=coalesce(rt.revoked_at,clock_timestamp()),last_used_at=clock_timestamp()
+            where rt.token_family_id in (select id from families);
+            with families as (
+                select login_family_id as id from auth_sessions where session_token_hash=@sessionTokenHash
+                union select token_family_id as id from auth_refresh_tokens where refresh_token_hash=@refreshTokenHash
+            )
+            update auth_sessions s set revoked_at=coalesce(s.revoked_at,clock_timestamp())
+            where s.login_family_id in (select id from families);
             """;
 
         await using var command = new NpgsqlCommand(sql, connection, transaction);
@@ -891,7 +901,7 @@ public sealed class GuestAuthService
         return await reader.ReadAsync(cancellationToken) ? ReadAccount(reader) : null;
     }
 
-    private async Task<AccountRow?> FindAccountBySessionAsync(
+    private async Task<SessionAccountRow?> FindAccountBySessionAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         string sessionTokenHash,
@@ -903,19 +913,22 @@ public sealed class GuestAuthService
                 a.display_name,
                 a.account_kind,
                 a.is_banned,
-                a.account_status
+                a.account_status,
+                s.login_family_id,
+                s.superseded_at is not null or (s.login_family_id is not null and s.login_family_id is distinct from a.active_login_family_id),
+                s.revoked_at is null and s.expires_at > now() and s.login_family_id is not null
             from auth_sessions s
             join accounts a on a.id = s.account_id
             where s.session_token_hash = @sessionTokenHash
-              and s.revoked_at is null
-              and s.expires_at > now()
             limit 1;
             """;
 
         await using var command = new NpgsqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("sessionTokenHash", sessionTokenHash);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken) ? ReadAccount(reader) : null;
+        return await reader.ReadAsync(cancellationToken)
+            ? new SessionAccountRow(ReadAccount(reader), reader.IsDBNull(5) ? null : reader.GetGuid(5), reader.GetBoolean(6), reader.GetBoolean(7))
+            : null;
     }
 
     private async Task<GameIdIdentityRow?> FindGameIdIdentityAsync(
@@ -1575,6 +1588,7 @@ public sealed class GuestAuthService
             accountId,
             tokenPair.SessionTokenHash,
             tokenPair.SessionExpiresAt,
+            tokenFamilyId,
             clientContext.UserAgent,
             clientContext.ClientVersion,
             clientContext.RemoteIp,
@@ -1601,6 +1615,7 @@ public sealed class GuestAuthService
         Guid accountId,
         string sessionTokenHash,
         DateTimeOffset expiresAt,
+        Guid loginFamilyId,
         string? userAgent,
         string? clientVersion,
         string? remoteIp,
@@ -1610,6 +1625,7 @@ public sealed class GuestAuthService
             insert into auth_sessions(
                 account_id,
                 session_token_hash,
+                login_family_id,
                 expires_at,
                 user_agent,
                 client_version,
@@ -1617,6 +1633,7 @@ public sealed class GuestAuthService
             values (
                 @accountId,
                 @sessionTokenHash,
+                @loginFamilyId,
                 @expiresAt,
                 @userAgent,
                 @clientVersion,
@@ -1628,6 +1645,7 @@ public sealed class GuestAuthService
         command.Parameters.AddWithValue("accountId", accountId);
         command.Parameters.AddWithValue("sessionTokenHash", sessionTokenHash);
         command.Parameters.AddWithValue("expiresAt", expiresAt);
+        command.Parameters.AddWithValue("loginFamilyId", loginFamilyId);
         command.Parameters.AddWithValue("userAgent", (object?)userAgent ?? DBNull.Value);
         command.Parameters.AddWithValue("clientVersion", (object?)clientVersion ?? DBNull.Value);
         command.Parameters.AddWithValue("ipAddress", (object?)remoteIp ?? DBNull.Value);

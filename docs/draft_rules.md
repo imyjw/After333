@@ -1,6 +1,6 @@
 # Draft Rules
 
-최신 대조 기준: 2026-10-03. 현재 공유 카드 정의 60종 중 드래프트 On 53종이며 Unity 네이티브 카탈로그도 53종이다. includeInRewards 적용값 On 42종과 실제 랜덤 보상 39종은 드래프트 후보와 별도 기준이다.
+최신 대조 기준: 2026-10-24. 공유 카드 정의 60종 중 드래프트 On 54종이며 Unity 네이티브 카탈로그도 54종이다. includeInRewards 적용값 On 43종과 실제 랜덤 보상 41종은 드래프트 후보와 별도 기준이다. 생략된 include 플래그의 기본값은 true이며, 최종 보상은 RewardCardEligibility의 추가 조건을 적용한다.
 
 ## Document Purpose
 

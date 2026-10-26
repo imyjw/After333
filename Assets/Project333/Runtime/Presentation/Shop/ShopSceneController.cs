@@ -14,6 +14,7 @@ namespace Project333.Runtime.Presentation.Shop
     [RequireComponent(typeof(RewardedTicketController))]
     public sealed partial class ShopSceneController : MonoBehaviour
     {
+        public const int CurrentShopVisualVersion = 3;
         [SerializeField, HideInInspector] private int _shopVisualVersion;
         public int ShopVisualVersion => _shopVisualVersion;
         [SerializeField] private Text _titleText;
@@ -315,19 +316,32 @@ namespace Project333.Runtime.Presentation.Shop
 
         public void RefreshUiFromExternalState() => RefreshUi();
 
+        // Editor preparation builds presentation only. Do not call Awake/OnEnable:
+        // those paths also restore purchases, initialize ads and contact the server.
+        [ContextMenu("Prepare Editable Shop Products")]
+        public void EnsureEditableHierarchy() => EnsureShopProducts();
+
         private void EnsureShopProducts()
         {
+            var root = transform as RectTransform;
+            if (root == null) return;
+            var hasAuthoredProducts = _shopVisualVersion >= CurrentShopVisualVersion &&
+                root.Find("TicketProductPanel") != null &&
+                root.Find("RewardedTicketProductPanel") != null &&
+                root.Find("CardPackProductPanel/PurchaseCardPackButton") != null;
             var rewardedPanel = EnsureRewardedProductPanel();
             _rewardedTicketController ??= GetComponent<RewardedTicketController>();
             if (_rewardedTicketController == null) _rewardedTicketController = gameObject.AddComponent<RewardedTicketController>();
             _rewardedTicketController.EnsureEditableHierarchy();
             _rewardedTicketController.ConfigureShopUi(rewardedPanel);
-            var root = transform as RectTransform;
-            if (root == null) return;
+            var cardPackPanel = EnsureCardPackProductPanel(root);
+            // Rebind existing controls, but retain the scene's Inspector-authored
+            // positions, fonts, artwork and attached button components in Play.
+            if (hasAuthoredProducts) return;
             var ticketPanel = root.Find("TicketProductPanel") as RectTransform;
             FitProduct(ticketPanel, .055f, .335f);
             FitProduct(rewardedPanel, .665f, .945f);
-            FitProduct(EnsureCardPackProductPanel(root), .36f, .64f);
+            FitProduct(cardPackPanel, .36f, .64f);
             StyleTicketProduct(ticketPanel, false);
             StyleTicketProduct(rewardedPanel, true);
         }

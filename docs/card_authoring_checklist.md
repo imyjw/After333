@@ -2,7 +2,7 @@
 
 이 문서는 새 카드 1장을 추가하거나 기존 카드를 수정할 때 따르는 표준 작업 순서다.
 
-현재 구현된 전체 카드와 아직 기획에만 남아 있는 카드는 `docs/card_catalog.md`에서 확인한다. 2026-10-03 현재 카드 데이터·네이티브 자산·강화·보상 코드를 대조한 기준으로 JSON/domain 정의 60종, 드래프트 On 54종, Unity 네이티브 카드 53종이다. 강화 가능 44종, includeInRewards 적용값 On 43종과 서버 실제 보상 41종은 별도로 집계한다.
+현재 구현된 전체 카드와 아직 기획에만 남아 있는 카드는 `docs/card_catalog.md`에서 확인한다. 2026-10-20 현재 카드 데이터·네이티브 자산·강화·보상 코드를 대조한 기준으로 JSON/domain 정의 60종, 드래프트 On 54종, Unity 네이티브 카드 54종이다. 강화 가능 44종, includeInRewards 적용값 On 43종과 서버 실제 보상 41종은 별도로 집계한다.
 
 핵심 원칙:
 
@@ -50,10 +50,10 @@
 - 플라즈마 쉴드: `PlasmaShield`, 과학문명 커먼 ScriptedSpell, 전력1, `effectId: "plasma_shield"`, `effectAmount: 10`, `damage: 0`, `damageType: "None"`. 내·적 유닛(마스터 제외) 또는 건물 하나의 물리 방어력을 영구 증가, 출처별 중첩. 강화 불가·부여량 +10 고정. 드래프트 On·보상 Off. 보호막은 시전 때 한 번만 재생. EffectAmount는 피해 필드와 구분하며 누락 시0, 새 카드에 사용하려면 해당 Rules/검증/표시/시전 처리를 모두 연결한다. [상세](plasma_shield_presentation.md)
 - 마나쉴드: `ManaShield`, 판타지 커먼 ScriptedSpell, 마나 1(부족하면 골드 1 대체), `effectId: "mana_shield"`, `effectAmount: 10`, `damage: 0`, `damageType: "None"`. 살아 있는 내·적 유닛(마스터 제외) 또는 건물 하나의 마법 방어력을 영구 증가하며 중첩 가능. 물리 방어력은 바꾸지 않고 플라즈마 쉴드와 독립적으로 합산한다. 강화 불가·부여량 +10 고정, 주문력·마법 증폭진 보너스 없음. 드래프트 On·보상 Off. 기존 대상·망각·방전·고독·온라인 복원 규칙을 유지한다. 매끄럽고 투명한 마나 구체는 약 0.817초 동안 한 번만 재생 후 숨기며 피해·피격·효과음이 없다. [상세](mana_shield_presentation.md)
 
-- 파이어스피어: FireSpear, 판타지 커먼 ScriptedSpell, 마나3, effectId fire_spear, Magic15. 살아 있는 아군·적 유닛/건물/마스터를 지정하여 같은 전장의 열 앞·뒤2칸에 즉시 광역 피해. 빈 칸·봉인·적 은신 직접 지정 불가, collateral은 광역 규칙. 매 Lv.1–13 피해+1, Lv.13 28+현재 주문력. 드래프트·보상 On. [규칙·편집 경로](fire_spear_presentation.md)
+- 파이어스피어: FireSpear, 판타지 커먼 ScriptedSpell, 마나3, effectId fire_spear, Magic30. 살아 있는 아군·적 유닛/건물/마스터를 지정하여 같은 전장의 열 앞·뒤2칸에 즉시 광역 피해. 빈 칸·봉인·적 은신 직접 지정 불가, collateral은 광역 규칙. 매 Lv.1–13 피해+1, Lv.13 43+현재 주문력. 드래프트·보상 On. [규칙·편집 경로](fire_spear_presentation.md)
 - 메테오: Meteor, 사용자 확정 판타지 유니크 ScriptedSpell, 마나 7, effectId meteor, damage 40/Magic, 대상 지정 없음. 즉시 상대 전장의 현재 유닛·마스터·건물에 각 1회 마법 피해. Lv.1-13 매 레벨 기본 피해 +1(Lv.13: 53), 현재 아군 주문력을 대상마다 한 번 더한 뒤 마법 방어·보호 적용; 건물 배수 없음. 모든 직접 피해 후 사망·부활·연쇄 처리. 드래프트·보상 포함. 사용자 CardArtwork/Meteor.png 보존, 네이티브 API로 카드/카탈로그와 새 VFX/음원을 등록한다. [규칙·편집 경로](meteor_presentation.md)
 - 지진: Earthquake, 중립 언커먼 ScriptedSpell, 골드 3, effectId earthquake, damage 10/Physical, 대상 지정 없음. 즉시 상대 전장 전체(유닛·마스터·건물)에 물리 피해; 건물은 강화된 기본 피해를 3배로 만든 뒤 물리 방어 적용. Lv.1-13 매 레벨 피해 +1, Lv.13 유닛/마스터 23·건물 69(방어 전). 드래프트·보상 포함. 사용자 CardArtwork/Earthquake.png와 `.meta`를 보존하고 native API로 카드/카탈로그를 등록한다. [규칙·편집 경로](earthquake_presentation.md)
-- 뉴클리어: Nuclear, 과학문명 레전더리 마법, 전력 10. 즉시 상대 전장 전체(마스터·유닛·건물)에 고정 피해 100, 강화 가능·매 레벨 즉시 피해 +1(Lv.13: 113). 사용 당시 상대 전장에 있는 유닛(마스터 포함)에 영구 낙진 +1중첩, 건물은 낙진 중첩·피해 제외. 양쪽 턴 시작마다 중첩당 고정 피해 10(강화로 변하지 않음). 사용자 이미지와 카드 자산 등록, 드래프트/보상 포함. [세부 규칙](nuclear_fallout.md)
+- 뉴클리어: Nuclear, 과학문명 레전더리 마법, 전력 13. 즉시 상대 전장 전체(마스터·유닛·건물)에 고정 피해 100, 강화 가능·매 레벨 즉시 피해 +1(Lv.13: 113). 사용 당시 상대 전장에 있는 유닛(마스터 포함)에 영구 낙진 +1중첩, 건물은 낙진 중첩·피해 제외. 양쪽 턴 시작마다 중첩당 고정 피해 10(강화로 변하지 않음). 사용자 이미지와 카드 자산 등록, 드래프트/보상 포함. [세부 규칙](nuclear_fallout.md)
 - 은신: `hasHiding: true`; 은신에서 시작한 일반 공격의 전체 연타·관통은 최종 피해 2배 치명타. 피해 종류와 관계없이 실제 HP가 줄면 은신 해제, 피해가 0이면 유지. 반격 치명타 없음. 확률형 치명타 카드는 아직 없으며 문구만으로 발동하지 않는다.
 - 관통: `hasPiercing: true`, `specialEffectText`에 `관통` 또는 `Piercing`; 일반공격의 각 타격 후 같은 열 반대 행에 별도 피해; 쉴더 이전 적용
 - 더블/트리플 어택: `hitsPerAttack: 2` 또는 `3`, `specialEffectText`에 `Double Attack` 또는 `Triple Attack`
@@ -365,15 +365,15 @@ Assets/Project333/Resources/Project333/Data/cards.json
 | cardId | 카드 이름 | 종류 | 강화 가능 여부 | 기준 |
 | --- | --- | --- | --- | --- |
 | A-111 | A-111 | Unit | 강화 가능 | 유닛 |
-| A-212 | A-212 | Unit | 강화 가능 | Lv.1~12 HP +1, Lv.13 ATK +1; Lv.13 ATK/HP 7/34; 드래프트·보상 On |
+| A-212 | A-212 | Unit | 강화 가능 | Lv.1~12 HP +1, Lv.13 ATK +1; Lv.13 ATK/HP 7/42; 드래프트·보상 On |
 | A-301 | A-301 | Unit | 강화 가능 | 3·6·9·13레벨 ATK +1, 나머지 레벨 HP +1, 드래프트·보상 On |
 | TrapReturn | 트랩: 리턴 | TrapSpell | 강화 불가 | 설치 무료·발동 골드4·반환/공격 취소 불변, 드래프트 On·사용자 확정 비강화 보상 On |
 | TrapMirrorField | 트랩-미러 필드 | TrapSpell | 강화 불가 | 설치 무료·발동 마나 2(골드 대체), 공격자 현재 ATK 반사·공격 취소 불변, 드래프트 On·보상 Off |
 | MagicAmplificationCircle | 마법 증폭진 | ScriptedSpell | 강화 불가 | 판타지 커먼, 마나 1, 내 턴 종료까지 주문력 +10, 중첩 가능, 드래프트·보상 Off |
-| FireSpear | 파이어스피어 | ScriptedSpell | 강화 가능 | 판타지 커먼·마나3, 매 레벨 Magic15+레벨(Lv.13 28)+현재 주문력. 선택한 대상 전장의 앞·뒤2칸; 드래프트·보상 On |
+| FireSpear | 파이어스피어 | ScriptedSpell | 강화 가능 | 판타지 커먼·마나3, 매 레벨 Magic30+레벨(Lv.13 43)+현재 주문력. 선택한 대상 전장의 앞·뒤2칸; 드래프트·보상 On |
 | Meteor | 메테오 | ScriptedSpell | 강화 가능 | 사용자 확정 판타지 유니크, 마나 7. 매 레벨 기본 마법 피해 +1(40+레벨), Lv.13 53에 현재 아군 주문력 추가. 비용 고정, 건물 배수 없음, 드래프트·보상 On |
 | Earthquake | 지진 | ScriptedSpell | 강화 가능 | 중립 언커먼, 골드 3. 매 레벨 기본 물리 피해 +1(10+레벨), 건물에는 강화 뒤 3배를 방어 전에 적용. Lv.13 유닛/마스터 23·건물 69. 드래프트·보상 On |
-| Nuclear | 뉴클리어 | ScriptedSpell | 강화 가능 | 전력 10, 즉시 적 전장 전체 고정 피해 100 + 레벨(Lv.13: 113); 사용 당시 상대 전장에 있는 유닛(마스터 포함)에만 영구 낙진 +1중첩, 건물은 낙진 제외. 중첩당 10은 강화 불변. 과학문명 레전더리, 드래프트·보상 On |
+| Nuclear | 뉴클리어 | ScriptedSpell | 강화 가능 | 전력 13, 즉시 적 전장 전체 고정 피해 100 + 레벨(Lv.13: 113); 사용 당시 상대 전장에 있는 유닛(마스터 포함)에만 영구 낙진 +1중첩, 건물은 낙진 제외. 중첩당 10은 강화 불변. 과학문명 레전더리, 드래프트·보상 On |
 | PlasmaShield | 플라즈마 쉴드 | ScriptedSpell | 강화 불가 | 부여 방어력 +10 고정. 드래프트 On·랜덤 카드 보상/카드팩 Off |
 | ManaShield | 마나쉴드 | ScriptedSpell | 강화 불가 | 부여 방어력 +10 고정. 드래프트 On·랜덤 카드 보상/카드팩 Off |
 | BiochemicalBomb | 생화학폭탄 | ScriptedSpell | 강화 가능 | 카드 레벨당 4회 지속 고정 피해 +1 (기본 25), 방어력·주문력 미적용, 드래프트·보상 On |
@@ -501,6 +501,8 @@ UI 크기와 스탯 텍스트의 글꼴/위치도 덮어쓰지 않는다. 원본
 공통 기본 위치는 이미지 왼쪽 아래를 (0,0), 오른쪽 위를 (1,1)로 보았을 때
 공격력/마법 피해량 (0.09, 0.055), HP (0.92, 0.055)이다.
 마법 피해량은 공격력과 같은 건틀릿/지팡이 위치를 사용하며, 피해 마법에는 HP를 표시하지 않는다.
+
+2026-10-20 대환단 표시 보완: 피해가 없는 대환단도 이 왼쪽 아래 위치에 공격력 증가 효과수치를 표시한다. 공통 `CardStatDisplay.TryCreate`에서 `EffectAmount`와 `DaehwandanCardRules.GetAttackBonus`를 사용하며 Lv.0 30·Lv.1 31·Lv.13 43, 주문력 미적용·HP 숨김이다. 손패·멀리건·덱 빌딩·보유 카드 상세·카드 미리보기에서 같은 표시 경로를 공유한다. `TryGetSpellDamage`는 대환단을 피해 마법으로 분류하지 않는다.
 
 공통 계산은 `HandCardStatOverlayLayout`에 있다. Unity Image의 피벗과
 실제 종횡비 유지 영역을 따르고, 이미지의 좌표를 텍스트 부모의 좌표로 변환한다.

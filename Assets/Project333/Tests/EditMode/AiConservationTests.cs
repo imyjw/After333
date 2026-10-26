@@ -50,6 +50,46 @@ namespace Project333.Tests.EditMode
             return planner.GetNextCommand(state);
         }
 
+        [TestCase(AttackType.Melee, 100, false, -120d)]
+        [TestCase(AttackType.Ranged, 100, false, 0d)]
+        [TestCase(AttackType.Melee, 5, false, -80d)]
+        [TestCase(AttackType.Ranged, 5, false, -80d)]
+        [TestCase(AttackType.Melee, 5, true, -8d)]
+        [TestCase(AttackType.Ranged, 5, true, -8d)]
+        public void ProducerAttackReserveDependsOnMeleeTypeOnlyWithoutAKill(
+            AttackType attackType, int targetHp, bool targetProducer, double expected)
+        {
+            var before = State();
+            var producer = Unit(before, PlayerId.AI, 0, 10, 60, producer: true, type: attackType);
+            var target = Unit(before, PlayerId.Player, 0, 0, targetHp, producer: targetProducer);
+            var copyType = typeof(AiDecisionService).Assembly.GetType(
+                "Project333.Runtime.Application.Services.AiBattleStateCopy", true);
+            var after = (BattleState)copyType.GetMethod("Create").Invoke(null, new object[] { before, false });
+            var command = new AttackCommand(producer.Position, target.Position);
+            new AttackService().Attack(after, PlayerId.AI, producer.Position, target.Position);
+            var evaluatorType = typeof(AiDecisionService).Assembly.GetType(
+                "Project333.Runtime.Application.Services.AiPositionEvaluator", true);
+            var evaluator = Activator.CreateInstance(evaluatorType, true);
+            var score = (double)evaluatorType.GetMethod("EvaluateProducerAttack")
+                .Invoke(evaluator, new object[] { before, after, command });
+            Assert.That(score, Is.EqualTo(expected));
+            Assert.That(target.CurrentHp, Is.EqualTo(targetHp), "Scoring must not mutate the live input.");
+        }
+
+        [Test]
+        public void RangedProducer_UsesNonlethalAttackAgainstMaster()
+        {
+            var state = State();
+            var producer = Unit(state, PlayerId.AI, 0, 10, 60, producer: true, type: AttackType.Ranged);
+            state.Player.Master.CurrentHp = 62;
+            var command = Decide(state) as AttackCommand;
+            Assert.That(command, Is.Not.Null);
+            Assert.That(command.AttackerCoord, Is.EqualTo(producer.Position));
+            Assert.That(command.TargetCoord, Is.EqualTo(state.Player.Master.Position));
+            Assert.That(state.Player.Master.CurrentHp, Is.EqualTo(62));
+            Assert.That(producer.RemainingAttacksThisTurn, Is.EqualTo(1));
+        }
+
         [TestCase(2, 100, false)] // Harmless chip damage.
         [TestCase(2, 5, false)]   // Low-value kill.
         [TestCase(10, 100, false)] // High attack, but not killable.

@@ -83,7 +83,7 @@ namespace Project333.Runtime.Presentation.Draft
         [SerializeField] private int _titleReferenceFontSize = 42;
         [SerializeField] private int _statusReferenceFontSize = 22;
         [SerializeField] private int _deckTitleReferenceFontSize = 26;
-        [SerializeField] private int _deckListReferenceFontSize = 16;
+        [SerializeField] private int _deckListReferenceFontSize = 32;
         [Header("Option Layout")]
         [SerializeField] private float _optionSpacing = 50f;
         [SerializeField] private float _optionAreaLeftPadding = 24f;
@@ -221,7 +221,10 @@ namespace Project333.Runtime.Presentation.Draft
                 EnsureOptionStatTexts(option);
                 RefreshOptionStatLayout(option);
             }
+            EnsureDeckListScrollView();
             RefreshResponsiveOptionLayout(force: true);
+            // Show the three authored card slots without creating a live draft.
+            SetVisible(true);
         }
 #endif
 
@@ -1035,7 +1038,7 @@ namespace Project333.Runtime.Presentation.Draft
             contentRect.SetParent(scrollRectTransform, false);
             ConfigureTopAnchoredRect(contentRect, 1f);
 
-            listText = CreateText("DeckListText", contentRect, 16, FontStyle.Normal, TextAnchor.UpperLeft);
+            listText = CreateText("DeckListText", contentRect, 32, FontStyle.Normal, TextAnchor.UpperLeft);
             listText.color = _bodyColor;
             listText.horizontalOverflow = HorizontalWrapMode.Wrap;
             listText.verticalOverflow = VerticalWrapMode.Overflow;

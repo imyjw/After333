@@ -1,5 +1,7 @@
 # Rewarded Ads
 
+**2026-10-20 운영 기록 갱신:** 서울 Lightsail + Caddy + PostgreSQL18로 이전했고 공개 주소는 `https://api.after333.com`, 운영DB는 `project333_live`다. 사용자 전환 결과에서 migration24개/latest`0024_elf_elder_card_id`를 확인했다. 아래 과거 날짜의 노트북/Tunnel·DB버전·미배포 문구는 당시 기록이다. 현재 실행·백업 절차는 [Lightsail 운영](lightsail_operations.md), 확인 범위와 남은 시험은 [현재 상태](current_project_status.md)를 우선한다. 오늘 원격 재확인을 수행하지 않았다.
+
 ## Goal
 
 The Shop scene can show an opt-in rewarded video. A successfully verified completion grants exactly `1` account ticket.
@@ -89,7 +91,7 @@ powershell -ExecutionPolicy Bypass `
   -LevelPlayPrivateKey '<S2S_PRIVATE_KEY>'
 ```
 
-Cloudflare Tunnel launcher example for `https://api.after333.com`:
+Legacy Windows/Cloudflare Tunnel launcher example (before the Lightsail cutover):
 
 ```powershell
 powershell -ExecutionPolicy Bypass `

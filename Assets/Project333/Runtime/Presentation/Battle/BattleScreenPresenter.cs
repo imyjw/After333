@@ -1,3 +1,4 @@
+using Project333.Runtime.Presentation.Settings;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -17,6 +18,9 @@ namespace Project333.Runtime.Presentation.Battle
 {
     public sealed class BattleScreenPresenter : MonoBehaviour
     {
+        [SerializeField, HideInInspector] private int _editableUiVersion;
+        public int EditableUiVersion => _editableUiVersion;
+
         private const string DefaultBackgroundResourcePath = "Project333/BattleScene/BattleBackground";
         private const string RuntimeBackgroundCanvasName = "BattleSceneBackgroundCanvas";
 
@@ -51,6 +55,12 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField, Range(0f, 1f)] private float _cardDrawVolume = 1f;
         [SerializeField, Min(0f)] private float _cardDrawRepeatInterval = 0.1f;
 
+        [Header("Unit Movement Sound")]
+        [SerializeField] private AudioClip _unitMoveAudioClip;
+        [SerializeField, Range(0f, 1f)] private float _unitMoveVolume = 0.5f;
+        private bool _unitMoveClipLoadAttempted;
+
+
         [SerializeField] private GameObject[] _draftHiddenUiObjects = Array.Empty<GameObject>();
         [SerializeField] private SummaryChangedEvent _onSummaryChanged = new SummaryChangedEvent();
         [TextArea(8, 20)]
@@ -72,7 +82,7 @@ namespace Project333.Runtime.Presentation.Battle
         public BattleMulliganOverlayPresenter TutorialMulligan => _mulliganOverlayPresenter;
         public RectTransform TutorialEndTurnRect => _endTurnButton != null ? _endTurnButton.transform as RectTransform : null;
         public void ResetTutorialPractice()
-        { _mulliganOverlayPresenter?.ResetTutorialSession(); }
+        { _mulliganOverlayPresenter?.ResetTutorialSession(); _handPresenter?.CancelTemporaryReplicateExpiry(); _handPresenter?.CancelSpellCardUses(); _handPresenter?.CancelCardDraws(); }
 
         public bool IsMulliganPresentationActive =>
             _mulliganOverlayPresenter != null && _mulliganOverlayPresenter.IsSessionActive;
@@ -160,6 +170,7 @@ namespace Project333.Runtime.Presentation.Battle
                 return;
             }
 
+            _mulliganOverlayPresenter?.EnsureCardCapacity(5);
             ApplyEndTurnButtonVisual();
             EnsureOpponentHandPresenter(allowCreationInEditMode: true);
             _opponentHandPresenter?.EnsureEditableCardBackSlots();
@@ -209,6 +220,7 @@ namespace Project333.Runtime.Presentation.Battle
             _debugSummary = BattleStateSummaryFormatter.Format(battleState);
             _boardPresenter?.Present(battleState);
             if (_handPresenter != null) _handPresenter.PreviewBattleState = battleState;
+            _handPresenter?.ConfigureDeckDrawSource(_playerDeckPresenter, _mulliganOverlayPresenter);
             _handPresenter?.Present(battleState?.Player.Hand,
                 battleState == null ? 0 : Project333.Runtime.Application.Services.SpellPowerRules.GetTotal(battleState, PlayerId.Player));
             _opponentHandPresenter?.Present(battleState?.AI.Hand);
@@ -219,6 +231,24 @@ namespace Project333.Runtime.Presentation.Battle
             _mulliganOverlayPresenter?.ConfigureDrawSource(_playerDeckPresenter?.DrawSourceRect, _playerDeckPresenter?.DrawCardBackSprite);
             _mulliganOverlayPresenter?.Present(battleState);
             _onSummaryChanged.Invoke(_debugSummary);
+        }
+
+        public void QueueCardDrawAnimations(int count) => _handPresenter?.QueueCardDraws(count);
+
+        public void QueueTemporaryReplicateExpiry() => _handPresenter?.QueueTemporaryReplicateExpiry();
+        public void CancelTemporaryReplicateExpiry() => _handPresenter?.CancelTemporaryReplicateExpiry();
+
+        public void PlayUnitMoveSound()
+        {
+            if (!UnityEngine.Application.isPlaying || !isActiveAndEnabled || _unitMoveVolume <= 0f) return;
+            if (_unitMoveAudioClip == null && !_unitMoveClipLoadAttempted)
+            {
+                _unitMoveClipLoadAttempted = true;
+                _unitMoveAudioClip = Resources.Load<AudioClip>("Project333/Audio/Common/UnitMove");
+            }
+            if (_unitMoveAudioClip == null) return;
+            EnsureSoundEffectAudioSource();
+            if (_soundEffectAudioSource != null) After333SoundEffects.PlayOneShot(_soundEffectAudioSource, _unitMoveAudioClip, _unitMoveVolume);
         }
 
         public void QueueCardDrawSounds(int drawCount)
@@ -246,7 +276,7 @@ namespace Project333.Runtime.Presentation.Battle
             while (_queuedCardDrawSoundCount > 0)
             {
                 _queuedCardDrawSoundCount--;
-                _soundEffectAudioSource.PlayOneShot(_cardDrawAudioClip, _cardDrawVolume);
+                After333SoundEffects.PlayOneShot(_soundEffectAudioSource, _cardDrawAudioClip, _cardDrawVolume);
 
                 if (_queuedCardDrawSoundCount > 0 && _cardDrawRepeatInterval > 0f)
                 {

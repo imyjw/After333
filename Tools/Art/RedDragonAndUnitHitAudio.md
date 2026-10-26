@@ -26,8 +26,8 @@ The generator writes WAVs, not Unity YAML. Import through Unity's AudioImporter 
 - RedDragon breath VFX emits FireBreath once at the attack's breath start; no RedDragon-specific hurt or death sound is added.
 - `TileTextView.PlayBeAttackedAnimation` emits the same cached UnitHit for every damaged unit/building/master. Battle presentation calls it only for `TookDamage`, before the death animation if the damage is lethal. It covers direct attacks, counters and spell/effect impact sequences using that shared path.
 - A damage presentation can aggregate multiple damage events into one reaction per occupant. Hits on the same frame share one audible cue to prevent coherent waveform stacking in AoE; hits on later frames still play separately. Tile disable/rebind/combat reset releases the shared cue owner, and SubsystemRegistration clears static state even with domain reload disabled. This does not change combat rules.
-- WaterCannonImpact, CrossSlashImpact, DragonHurt and GwangmaHurt are no longer played. Existing audio source files remain preserved as old authored assets.
-- Existing BlueDragon/Gwangma death sounds stay distinct from damage impact sounds. `PlayDeathAnimation` does not emit UnitHit, so destruction without damage is silent for the hit sound.
+- WaterCannonImpact, CrossSlashImpact and GwangmaHurt are no longer played. Those source files remain preserved as old authored assets. DragonHurt and DragonDeath were removed from resources and the BlueDragon generator at the user's request on 2026-10-23; the remaining death playback call was also removed.
+- Gwangma death audio stays distinct from damage impact sounds; BlueDragon has no dedicated death sound. `PlayDeathAnimation` does not emit UnitHit, so destruction without damage is silent for the hit sound.
 - Existing global volume remains `After333AudioSettings -> AudioListener.volume`. Sources retain listener volume/pause behavior, reuse one AudioSource per tile and stop on disable/rebind.
 
 ## Verification

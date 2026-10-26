@@ -1,5 +1,7 @@
 # After333 Google Login Setup
 
+**2026-10-20 운영 기록 갱신:** 서울 Lightsail + Caddy + PostgreSQL18로 이전했고 공개 주소는 `https://api.after333.com`, 운영DB는 `project333_live`다. 사용자 전환 결과에서 migration24개/latest`0024_elf_elder_card_id`를 확인했다. 아래 과거 날짜의 노트북/Tunnel·DB버전·미배포 문구는 당시 기록이다. 현재 실행·백업 절차는 [Lightsail 운영](lightsail_operations.md), 확인 범위와 남은 시험은 [현재 상태](current_project_status.md)를 우선한다. 오늘 원격 재확인을 수행하지 않았다.
+
 ## Current public authentication boundary (2026-10-01)
 
 Current routes support Game ID registration/login, Google login, saved-session refresh and device logout. Guest creation/resume and public account-link endpoints are not exposed. Legacy link helper methods and serialized button fields are implementation history, not a supported setup path. The start-scene settings menu provides confirmed logout and the mandatory login gate.
@@ -34,9 +36,9 @@ Both platforms then:
 
 The raw Google authorization code, PKCE verifier, client secret, and ID token are never written to PostgreSQL or audit logs. Email is profile data only and is never used as the account key.
 
-## What Is Still Required Externally
+## OAuth Prerequisites for a New Environment (existing production setup completed)
 
-The code cannot complete a real Google login until Google Cloud OAuth clients exist. The remaining external work is:
+A new environment requires the following OAuth setup. Production setup was transferred during the Lightsail migration; Android production login and Windows Unity Editor Play login were subsequently confirmed. Do not recreate existing clients merely because these setup instructions remain here:
 
 1. Create or select a Google Cloud project for After333.
 2. Configure the OAuth consent screen and test users.
@@ -197,3 +199,16 @@ If Android reports a provider-configuration error, first check package name, sig
 ## Current Test Boundary
 
 Server verification, Windows token acquisition, Android Credential Manager integration, Unity platform selection, the no-configuration path, and the invalid-token path are implemented. A successful Android live login still requires real Google Cloud clients and a physical-device smoke test.
+
+## Windows 버튼이 ‘Google 로그인 준비 중’인 경우 — 2026-10-19 해결 기록
+
+Unity Editor Play에서 Inspector의 기본 서버URL과 실제 저장된 접속URL이 달랐다. 실제 `ServerHttpUrlInput`에는 `https://api-staging.after333.com`이 남아 있었다. 기존 Server Endpoint UI에서 `https://api.after333.com`을 입력·Apply한 뒤 Google 버튼이 활성화되고 실제 로그인에 성공했다. 운영 readiness의 acceptedClientIds2개/DesktopCodeExchange=true를 먼저 확인했으며 서버 비밀키·DB·OAuth 클라이언트를 재생성하지 않았다. Standalone Windows exe의 성공으로 확대하지 않는다.
+
+
+## Forced-logout Google readiness recovery (2026-10-22 source fix)
+
+The user reported that another-device login correctly logged out an Android PvP participant, but the returned login gate left Google disabled as `Google 로그인 준비 중`. A delayed loopback reproduction confirms the lifecycle race: GameStart OnEnable begins `/server/status`, then the session-replacement callback cancels credential restore and that same public status request before it can populate the per-scene Google configuration cache.
+
+GameStart now performs an independent cancellable public availability GET when forced logout leaves that cache empty. It preserves the replacement message and visible login gate, and enables `Google로 로그인` only after platform, client ID and server configuration checks succeed. It never refreshes credentials or starts automatic Google sign-in. The request is deduplicated, canceled on disable/server-address change, and cannot apply a canceled or different-endpoint response. Existing known readiness needs no extra request; tutorial mode sends nothing.
+
+Isolated Unity6000.3.12f1: the pre-fix race fails1/1; final EditMode76/76 and PlayMode1/1 pass. Actual Awake/OnEnable, the installed session guard, native generated login gate, exact label/interactability, replacement notice and confirmation input release were checked using only memory credentials and synthetic loopback HTTP. No real Google provider, phone build/install, live server or DB was used. This client-only fix requires the user's updated client build/install; it adds no server change or DB migration. Evidence: session visualization `GoogleLoginAfterReplacement_20261022`.
