@@ -1,8 +1,8 @@
 # After333 게임 문서 안내
 
-2026-10-24 공통 진입점: [AGENTS.md](../AGENTS.md) · [PROGRESS.md](../PROGRESS.md) · [두 에이전트 협업](agent_collaboration.md). 현재 구현과 운영 확인을 구분해 읽고, 아래 날짜별 기록은 당시 증거로 보존한다.
+2026-10-26 공통 진입점: [AGENTS.md](../AGENTS.md) · [PROGRESS.md](../PROGRESS.md) · [두 에이전트 협업](agent_collaboration.md). 현재 구현과 운영 확인을 구분해 읽고, 아래 날짜별 기록은 당시 증거로 보존한다.
 
-최신 대조: **2026-10-20 KST**. [현재 프로젝트 상태](current_project_status.md)에서 게임 규칙·소스 구현·실제 운영 이전/시험·백업·남은 확인을 구분한다. [전체 문서 대조 기록](documentation_audit_2026-10-20.md)에 갱신/유지 범위를 기록했다. 사용자 결정과 전투 규칙 → 게임 개요 → 드래프트 → 메타의 우선순위를 유지한다.
+최근 인계 갱신: **2026-10-26 KST**. [10-24 이후 개발 인계](antigravity_handoff.md)에서 현재 동작·수정 위치·검증/배포 구분과 새 에이전트의 시작 순서를 확인한다. 아래 전체 대조 이력은 **2026-10-20 KST**다. [현재 프로젝트 상태](current_project_status.md)에서 게임 규칙·소스 구현·실제 운영 이전/시험·백업·남은 확인을 구분한다. [전체 문서 대조 기록](documentation_audit_2026-10-20.md)에 갱신/유지 범위를 기록했다. 사용자 결정과 전투 규칙 → 게임 개요 → 드래프트 → 메타의 우선순위를 유지한다.
 
 ## 현재 기준
 
@@ -19,7 +19,7 @@
 | 골드 던전 | 티켓 3개로 시작한 런당 최대 3회·자정 초기화 없음, 승리 계정 골드 10, 런 승패에 영향 없음 |
 | 시작 손패·턴 자원 | 멀리건5장, 시작 골드3/4 선배정, 첫 턴 추가 기본 골드 없음·이후+3, 기본 드로우1 |
 | 튜토리얼 | 실제 게임 UI를 재사용하는 로컬6단계, 필수 실습 완료 후 진행 |
-| 운영 | 서울 Lightsail+Caddy+PostgreSQL18, 운영DB project333_live·migration24/latest0024 |
+| 운영 | 서울 Lightsail+Caddy+PostgreSQL18, 운영DB project333_live. 소스 최신0025; 명시적 운영0024 출력은 과거 기록이며 현재 release/migration 재확인 필요 |
 | 재접속 | 일반 전투·골드 던전 모두 서버가 연결 종료를 감지한 뒤 70초 유예 |
 
 최근 변경에는 오크 전사·오크 광전사 ATK 20, 비공개 트랩 5종, 스턴·빙결, 마나 대포의 공격 비용, 오크 족장 오라, 현재 골드에 따른 개방 방주 공격력, 보호막 2종과 전체 전장/열 마법 연출이 포함된다. 자세한 값과 조건은 아래 전용 문서를 따른다.
@@ -37,6 +37,10 @@
 | AI 평가·방어 배치·덱 구성 | [AI 판단](pve_ai.md), [AI 덱](pve_ai_decks.md) |
 | 원거리 마스터 보호 트랩 | [아이언 돔](iron_dome.md) |
 | 뉴클리어 낙진 | [낙진 규칙](nuclear_fallout.md) |
+
+## 최근 개발을 이어받을 때
+
+[Antigravity 인계](antigravity_handoff.md)에서 상대 카드 공개·덱 글자·개별 승패 음량·튜토리얼 이전·임시 복제·공통 스펠/트랩·덱 편집 보존·드로우/캐시·반격 복귀·턴 만료 전달을 한 번에 확인한다. 조절/검사 상세는 [손패 스펠](hand_spell_use_presentation.md), [드로우/캐시](hand_draw_presentation.md), [반격 Idle](counterattack_presentation.md), [턴 만료 서버](turn_timeout_handoff.md)에 있다.
 
 ## 화면·애니메이션·음향
 
@@ -67,7 +71,7 @@
 
 - [현재 상태](current_project_status.md), [Lightsail 운영 명령·백업](lightsail_operations.md)
 - [서버 안내](../Server/Project333.PvpServer/README.md), [계정 저장 설계](account_persistence_db_design.md), [PostgreSQL 구현](postgresql_db_implementation_plan.md)
-- [한 계정의 단일 로그인](single_device_login.md): 2026-10-21 소스·0025 추가, 최신 로그인 우선·기존 전투 재접속; 운영 DB는 마지막 확인 0024이며 새 기능 미배포
+- [한 계정의 단일 로그인](single_device_login.md): 2026-10-21 소스·0025 추가, 최신 로그인 우선·기존 전투 재접속; 운영0024 출력은 이전 당시 기록. 사용자 로그인 교체 관측과 소스0025를 구분하고 현재 운영 적용 여부는 재확인
 - [구매·강화 재시도](account_operation_retries.md), [선물함](gift_inbox.md), [광고 보상](rewarded_ads.md)
 - [빌드 식별](client_build_identity.md), [모바일 자격 증명 보관](mobile_secure_credential_storage.md), [Google 인증](google_auth_setup.md)
 - [배포 준비](deployment_readiness_checklist.md), [전투 흐름 점검](battle_flow_stabilization_checklist.md), [비공개 테스트 안내](public_pvp_tester_quickstart_ko.md), [스모크 체크리스트](public_pvp_smoke_test_checklist.md)
@@ -78,4 +82,4 @@
 
 `docs/archive/`, 날짜가 붙은 감사·부하·회귀·보고서 문서, 각 기능 문서의 날짜별 검증 절은 당시 구현과 확인 범위를 보존한 기록이다. 과거 카드 수·수치·60초 재접속·초기 애니메이션 프레임 수가 남아 있어도 현재 규칙으로 적용하지 않는다. 현재 규칙은 해당 문서의 최신 상태 절과 원본 데이터/코드를 함께 확인한다. 과거 실패·수정·PASS 결과를 새로 실행한 결과처럼 바꾸지 않는다.
 
-이번 문서 동기화는 문서만 수정했다. 게임 코드·카드 자산·씬·키·DB·예약 작업은 변경하지 않았고 앱 빌드·설치/운영 재시작도 하지 않았다. 대조 목록과 근거·남은 범위는 [문서 점검 기록](documentation_audit_2026-10-20.md)을 따른다. 10월1일 증거는 당시 기록으로 보존한다.
+10-26 최근 인계 및10-20 전체 대조는 모두 문서 작업이다. 이번 인계는 [최근 개발 문서](antigravity_handoff.md),10-20 대조의 범위는 아래 기록을 따른다. 게임 코드·카드 자산·씬·키·DB·예약 작업은 변경하지 않았고 앱 빌드·설치/운영 재시작도 하지 않았다. 대조 목록과 근거·남은 범위는 [문서 점검 기록](documentation_audit_2026-10-20.md)을 따른다. 10월1일 증거는 당시 기록으로 보존한다.

@@ -1,8 +1,8 @@
 # After333
 
-공통 개발 규칙: [AGENTS.md](AGENTS.md) · 최신 진행/검증/배포 구분: [PROGRESS.md](PROGRESS.md) · [Codex·Antigravity 협업 안내](docs/agent_collaboration.md)
+공통 개발 규칙: [AGENTS.md](AGENTS.md) · 최신 진행/검증/배포 구분: [PROGRESS.md](PROGRESS.md) · [Codex·Antigravity 협업 안내](docs/agent_collaboration.md) · [10-24 이후 개발 인계](docs/antigravity_handoff.md)
 
-최신 문서 대조: **2026-10-20**. 현재 카드 정의60종·네이티브/덱 빌딩54종·실제 랜덤 보상41종·강화 가능44종. 튜토리얼6단계와 시작 손패5장이 구현되어 있습니다. 운영 서버는 서울 AWS Lightsail + Caddy + PostgreSQL18이며 공개 주소는 `https://api.after333.com`입니다. 운영 전환 확인 범위·백업·남은 시험은 [현재 상태](docs/current_project_status.md), 실행 명령은 [Lightsail 운영](docs/lightsail_operations.md)을 따릅니다.
+최근 개발 인계 갱신: **2026-10-26**. 전체 규칙/운영 이력의10-20 대조와 이후 소스·검증 기록을 구분합니다. 현재 카드 정의60종·네이티브/덱 빌딩54종·실제 랜덤 보상41종·강화 가능44종. 튜토리얼6단계와 시작 손패5장이 구현되어 있습니다. 운영 서버는 서울 AWS Lightsail + Caddy + PostgreSQL18이며 공개 주소는 `https://api.after333.com`입니다. 운영 전환 확인 범위·백업·남은 시험은 [날짜별 운영·백업 상태](docs/current_project_status.md), 실행 명령은 [Lightsail 운영](docs/lightsail_operations.md)을 따릅니다.
 <img width="2340" height="1080" alt="Screenshot_20260906_181227_After333" src="https://github.com/user-attachments/assets/0b078a7a-a5c8-4163-936d-75f36ec6d053" />
 
 **덱 빌딩의 선택과 타일 배치의 전략을 결합한 턴제 카드 게임**

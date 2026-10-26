@@ -24,7 +24,7 @@
 
 - 사용자가 첨부한 `승리.mp3`·`패배.mp3`를 내용 변경 없이 각각 `Assets/Project333/Resources/Project333/Audio/BattleOutcomes/Victory.mp3`, `Defeat.mp3`로 가져왔다. 원본과 SHA256이 일치하며 원래 채널 수를 유지한다. 짧은 효과음용 Decompress On Load·preload·PCM 가져오기를 사용한다.
 - `BattleOutcomeBannerView.Show()`의 기존 중복 결과 방지 검사 뒤, 애니메이션을 시작하는 `ApplyAnimation(0f)` 직후 해당 소리를 재생한다. 마지막 공격/사망 표시가 끝날 때까지 기다리는 기존 `BattleOutcomeTextView` 흐름을 따른다. 같은 결과의 LateUpdate/온라인 최종 상태 재수신으로 반복 재생하지 않는다.
-- 승리와 패배가 각각 전용 2D AudioSource 하나씩을 재사용한다(최대2개). `After333SoundEffects.RegisterSource()`로 효과음 볼륨에 연결한 뒤 해당 clip을 Play한다. 마스터는 기존 AudioListener를 따르고 배경음악 볼륨은 영향을 주지 않는다. 개별 기준 볼륨은 `_victorySoundVolume` / `_defeatSoundVolume`으로 분리되어 있고 초기값은 둘 다1이다. 배너가 숨겨지거나 비활성화되면 남은 소리를 멈춘다.
+- 승리와 패배가 각각 전용 2D AudioSource 하나씩을 재사용한다(최대2개). `After333SoundEffects.RegisterSource()`로 효과음 볼륨에 연결한 뒤 해당 clip을 Play한다. 마스터는 기존 AudioListener를 따르고 배경음악 볼륨은 영향을 주지 않는다. 개별 기준 볼륨은 `_victorySoundVolume` / `_defeatSoundVolume`으로 분리되어 있고2026-10-26 현재 코드 초기값은 승리0.65·패배1이다(분리 구현 당시에는 둘 다1). 배너가 숨겨지거나 비활성화되면 남은 소리를 멈춘다.
 - 무승부·잘못된 결과에는 두 효과음을 재생하지 않는다. 다시 진행 중인 전투로 돌아가 Hide된 뒤 새로 승패 연출이 시작되면 새 결과 소리를 재생한다. 표시 상태를 관찰할 뿐 승패 판정/저장/보상은 변경하지 않는다.
 - 가져온 승리 길이 약 2.116초, 패배 약 0.784초로 둘 다 기존 최소 표시 3.2초보다 짧다. 자동 복귀 지연을 바꾸지 않았다.
 - 독립 Unity6000.3.12f1 검사 **12/12 통과**: 새 음원 가져오기2·실제 Play 재생1, 기존 배너/복귀 타이밍4·승패 formatter5. 실제 clip 매핑, 결과 반복 시 재시작 방지, 하나의 소스 재사용, 배너 숨김/비활성화/무승부에서 정지, 마스터·효과음 볼륨 적용 및 시간 배율0에서 시작을 확인했다. 활성 소스/음원은 검증 복사본과 SHA256이 일치한다.
@@ -44,7 +44,7 @@ The shared editor coordinator now prepares the current saved UI before Play, pre
 
 ## 승리·패배 볼륨을 따로 수정하기 (2026-10-24 후속)
 
-`Assets/Project333/Runtime/Presentation/Battle/BattleOutcomeBannerView.cs` 상단에서 각각 수정한다. 아래는 **승리50%, 패배100% 예시**이며 실제 초기값은 둘 다1이다.
+`Assets/Project333/Runtime/Presentation/Battle/BattleOutcomeBannerView.cs` 상단에서 각각 수정한다. 아래는 **승리50%, 패배100% 예시**이며 현재 소스 초기값은 승리0.65·패배1이다(2026-10-26 정적 대조).
 
 ```csharp
 [SerializeField, Range(0f, 1f)] private float _victorySoundVolume = 0.5f;

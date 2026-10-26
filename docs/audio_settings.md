@@ -40,4 +40,4 @@
 
 ## 승리·패배 효과음별 기본 볼륨
 
-`BattleOutcomeBannerView.cs`의 `_victorySoundVolume`과 `_defeatSoundVolume`으로 따로 조절한다(각각 기본1). 승리만 줄일 때는 전자만 수정한다. 실제 출력은 해당 기준 볼륨 × 공통 효과음 볼륨 × 마스터 볼륨이다. 승리/패배 전용 소스는 각 최대1개씩 재사용하며 공통 설정을 따른다. 코드 수정 후 Play 재시작 또는 사용자 앱 재빌드가 필요하다. [예시·검증](battle_outcome_presentation.md#승리패배-볼륨을-따로-수정하기-2026-10-24-후속).
+`BattleOutcomeBannerView.cs`의 `_victorySoundVolume`과 `_defeatSoundVolume`으로 따로 조절한다(2026-10-26 현재 코드 초기값: 승리0.65·패배1; 분리 구현 당시에는 각각1). 승리만 줄일 때는 전자만 수정한다. 실제 출력은 해당 기준 볼륨 × 공통 효과음 볼륨 × 마스터 볼륨이다. 승리/패배 전용 소스는 각 최대1개씩 재사용하며 공통 설정을 따른다. 코드 수정 후 Play 재시작 또는 사용자 앱 재빌드가 필요하다. [예시·검증](battle_outcome_presentation.md#승리패배-볼륨을-따로-수정하기-2026-10-24-후속).

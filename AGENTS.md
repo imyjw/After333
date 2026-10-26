@@ -1,13 +1,13 @@
 # After333 — 공통 에이전트 작업 규칙
 
-갱신: 2026-10-24. Codex와 Google Antigravity가 함께 읽는 기준이다. 이 파일은 UTF-8 **24,000 bytes 이하**로 유지한다. 현재 작업 상태는 [PROGRESS.md](PROGRESS.md), 긴 검증 이력은 [docs/codex_handoff.md](docs/codex_handoff.md)에 기록한다.
+갱신: 2026-10-26. Codex와 Google Antigravity가 함께 읽는 기준이다. 이 파일은 UTF-8 **24,000 bytes 이하**로 유지한다. 현재 작업 상태는 [PROGRESS.md](PROGRESS.md), 긴 검증 이력은 [docs/codex_handoff.md](docs/codex_handoff.md)에 기록한다. 10-24 이후 변경의 최종 동작·수정 위치·반영 상태는 [최근 인계](docs/antigravity_handoff.md)에서 먼저 확인한다.
 
 ## 1. 시작점과 문서 우선순위
 
 - 활성 프로젝트는 `C:/Project_333`. `Documents/New project`는 이전 프로토타입이므로 수정하지 않는다. 별도 worktree에서는 그 checkout 루트를 사용한다.
 - 제품 이름은 **After333**. 내부 `Project333` namespace/assembly/resource 경로, `PROJECT333_*` 환경변수, DB 이름, CLI 옵션, PlayerPrefs 키는 브랜드 변경을 이유로 바꾸지 않는다.
 - 사용자 최신 결정이 우선한다. 문서 규칙 우선순위: `docs/battle_rules.md` → `docs/game_design.md` → `docs/draft_rules.md` → `docs/meta_rules.md`. 코드와 충돌하면 불일치를 보고하고 확인된 결정을 적용한다. 오래된 숫자를 조용히 복원하지 않는다.
-- 작업 전 이 파일, `PROGRESS.md`, `docs/conversation_decisions.md`의 **작업 선호와 보류 사항**을 읽고 아래의 관련 문서만 선택한다. 이전 작업 재개 시 handoff의 최신 관련 항목을 확인한다. `docs/archive/`와 날짜별 기록은 역사 자료이며 현재 규칙을 덮어쓰지 않는다.
+- 작업 전 이 파일, `PROGRESS.md`, `docs/conversation_decisions.md`의 **작업 선호와 보류 사항**을 읽고 아래의 관련 문서만 선택한다. 새 에이전트는 `docs/antigravity_handoff.md`로 최근 작업을 파악하고, 이전 작업 재개 시 handoff의 최신 관련 항목을 선택해 확인한다. `docs/archive/`와 날짜별 기록은 역사 자료이며 현재 규칙을 덮어쓰지 않는다.
 
 | 작업 | 먼저 읽을 문서 (`docs/` 아래) |
 |---|---|
