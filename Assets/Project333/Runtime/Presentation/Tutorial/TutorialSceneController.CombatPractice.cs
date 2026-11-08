@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Project333.Runtime.Application.Tutorial;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Board;
@@ -40,6 +40,7 @@ namespace Project333.Runtime.Presentation.Tutorial
         private void OnCombatPreviewReleased(TileView tile)
         {
             if (tile == null || !CanPractice || _session.CurrentStep.RequiredAction != TutorialAction.PreviewOccupant) return;
+            if (tile.OwnerId != PlayerId.Player || tile.CurrentOccupant?.CardId != "SkeletonArcher") return;
             _lastCombatPreview = tile.GetComponent<TileTextView>();
             _practiceBattle.TutorialOccupantPreviewReleased(tile);
         }
@@ -103,7 +104,7 @@ namespace Project333.Runtime.Presentation.Tutorial
             switch (action)
             {
                 case TutorialAction.AttemptBlockedAttack:
-                    CombatPair(TutorialResourceBattle.GoblinTile, TutorialResourceBattle.MasterTile); _combatActionHint.text = "고블린\n→\n마스터"; return;
+                    CombatPair(TutorialResourceBattle.GoblinTile, TutorialResourceBattle.MasterTile); _combatActionHint.text = "고블린 →\n마스터"; return;
                 case TutorialAction.SummonArcherAndEndTurn:
                     if (_practiceBattle.CurrentBattleState.PlayerBoard.IsEmpty(TutorialCombatBattle.ArcherTile))
                     { CombatHand("SkeletonArcher"); AssignPracticeHighlight(1, PracticeTile(TutorialCombatBattle.ArcherTile)); _combatActionHint.text = "아처\n소환"; }
@@ -111,24 +112,22 @@ namespace Project333.Runtime.Presentation.Tutorial
                     return;
                 case TutorialAction.RangedMasterAttack:
                 case TutorialAction.FinishPracticeBattle:
-                    CombatPair(TutorialCombatBattle.FindPlayerArcher(_practiceBattle.CurrentBattleState), TutorialResourceBattle.MasterTile); _combatActionHint.text = "아처\n→\n마스터"; return;
+                    CombatPair(TutorialCombatBattle.FindPlayerArcher(_practiceBattle.CurrentBattleState), TutorialResourceBattle.MasterTile); _combatActionHint.text = "아처 →\n마스터"; return;
                 case TutorialAction.MeleeCounterattack:
-                    CombatPair(TutorialResourceBattle.GoblinTile, TutorialCombatBattle.EnemyGoblinTile); _combatActionHint.text = "고블린\n→\n고블린"; return;
+                    CombatPair(TutorialResourceBattle.GoblinTile, TutorialCombatBattle.EnemyGoblinTile); _combatActionHint.text = "고블린 →\n고블린"; return;
                 case TutorialAction.EndTurnForGolem:
                     AssignPracticeHighlight(0, _practiceBattle.TutorialScreen.TutorialEndTurnRect); _combatActionHint.text = "턴 종료"; return;
                 case TutorialAction.AttackGolem:
                     CombatPair(TutorialCombatBattle.ArcherTile, TutorialCombatBattle.GolemTile); _combatActionHint.text = "아처\n→\n골렘"; return;
                 case TutorialAction.CastPracticeFireball:
-                    CombatHand("firebolt"); AssignPracticeHighlight(1, PracticeTile(TutorialResourceBattle.MasterTile, PlayerId.AI)); _combatActionHint.text = "파이어볼\n→\n마스터"; return;
+                    CombatHand("firebolt"); AssignPracticeHighlight(1, PracticeTile(TutorialResourceBattle.MasterTile, PlayerId.AI)); _combatActionHint.text = "파이어볼 →\n마스터"; return;
                 case TutorialAction.PreviewOccupant:
-                    var index = 0;
-                    foreach (var tile in board.PlayerTileViews) if (tile?.IsOccupied == true) AssignPracticeHighlight(index++, PracticeTile(tile.Coord));
-                    foreach (var tile in board.AITileViews) if (tile?.IsOccupied == true) AssignPracticeHighlight(index++, PracticeTile(tile.Coord, PlayerId.AI));
+                    AssignPracticeHighlight(0, PracticeTile(TutorialCombatBattle.ArcherTile));
                     _combatActionHint.text = "꾹 누른 뒤\n손 떼기"; return;
                 case TutorialAction.MovePracticeUnit:
                     CombatPair(TutorialCombatBattle.ArcherTile, TutorialCombatBattle.MovedArcherTile, PlayerId.Player); _combatActionHint.text = "아처\n이동"; return;
                 case TutorialAction.SwapPracticeUnits:
-                    CombatPair(TutorialCombatBattle.MovedArcherTile, TutorialResourceBattle.MasterTile, PlayerId.Player); _combatActionHint.text = "마스터\n↔\n아처"; return;
+                    CombatPair(TutorialCombatBattle.MovedArcherTile, TutorialResourceBattle.MasterTile, PlayerId.Player); _combatActionHint.text = "마스터 ↔\n아처"; return;
                 case TutorialAction.AttemptBuildingMove:
                     CombatPair(TutorialResourceBattle.PondTile, TutorialCombatBattle.BuildingMoveTile, PlayerId.Player); _combatActionHint.text = "건물\n이동 시도"; return;
             }
@@ -158,7 +157,7 @@ namespace Project333.Runtime.Presentation.Tutorial
                     CombatHand("firebolt"); break;
                 case TutorialCue.PreviewStatuses:
                 case TutorialCue.PreviewInfluences:
-                    CombatPreview(_lastCombatPreview != null ? _lastCombatPreview : CombatTileView(TutorialResourceBattle.PondTile), tooltips: true); break;
+                    CombatPreview(_lastCombatPreview != null ? _lastCombatPreview : CombatTileView(TutorialCombatBattle.ArcherTile), tooltips: true); break;
                 case TutorialCue.VictorySetup:
                 case TutorialCue.PracticeVictory:
                     AssignPracticeHighlight(0, PracticeTile(TutorialResourceBattle.MasterTile, PlayerId.AI)); break;

@@ -68,14 +68,15 @@ namespace Project333.Runtime.Application.Services
             try
             {
                 if (_turn != battleState.TurnNumber) { _turn = battleState.TurnNumber; _decisions = 0; _turnSearchMilliseconds = 0; _visited.Clear(); }
-                if (++_decisions >= 64 || _turnSearchMilliseconds >= 500) return new EndTurnCommand();
+                if (++_decisions >= 64) return new EndTurnCommand();
                 var observation = AiBattleStateCopy.Create(battleState, true);
-                _visited.Add(AiBattleStateCopy.PositionKey(observation));
                 var root = new Node { States = new[] { observation, observation }, Depth = 0,
                     MasterExposureHp = observation.AI.Master.CurrentHp };
+                if (_turnSearchMilliseconds >= 500) return RequiredHazardEscape(root, watch) ?? new EndTurnCommand();
+                _visited.Add(AiBattleStateCopy.PositionKey(observation));
                 var end = new AiAction(-1, new EndTurnCommand());
                 var best = Expand(root, end, watch);
-                if (best == null) return new EndTurnCommand();
+                if (best == null) return RequiredHazardEscape(root, watch) ?? new EndTurnCommand();
                 var frontier = new List<Node> { root };
                 for (var depth = 1; depth <= _options.MaxDepth && frontier.Count > 0; depth++)
                 {
@@ -115,7 +116,8 @@ namespace Project333.Runtime.Application.Services
                     }
                     frontier = DiverseBeam(next);
                 }
-                return best.First ?? new EndTurnCommand();
+                var chosen = best.First ?? new EndTurnCommand();
+                return chosen is EndTurnCommand ? RequiredHazardEscape(root, watch) ?? chosen : chosen;
             }
             finally
             {
@@ -125,6 +127,30 @@ namespace Project333.Runtime.Application.Services
                     LastElapsedMilliseconds >= _options.MaxMilliseconds;
             }
         }
+
+        // User policy (2026-10-26): before ending the turn, a movable non-master AI unit inside a
+        // tile hazard moves to a safe empty tile. Shared simulation must confirm a real survival gain,
+        // so invincible/sealed or unaffected units are not moved for nothing. Each escape removes one
+        // unit from the hazard, so this bounded check runs even after the search budget is spent.
+        private IBattleCommand? RequiredHazardEscape(Node root, Stopwatch watch)
+        {
+            var moves = AiMovementPolicy.RequiredHazardEscapes(root.States[0]);
+            if (moves.Count == 0) return null;
+            Node? best = null;
+            _ignoreBudget = true;
+            try
+            {
+                foreach (var move in moves)
+                {
+                    var node = Expand(root, new AiAction(96, move), watch);
+                    if (node != null && (best == null || IsPreferred(node, best))) best = node;
+                }
+            }
+            finally { _ignoreBudget = false; }
+            return best?.First;
+        }
+
+        private bool _ignoreBudget;
 
         private Node? Expand(Node parent, AiAction action, Stopwatch watch)
         {
@@ -302,8 +328,8 @@ namespace Project333.Runtime.Application.Services
             public int Hp;
         }
 
-        private bool HasBudget(Stopwatch watch) => LastSimulationCount < _options.MaxSimulations &&
-            watch.Elapsed.TotalMilliseconds < _options.MaxMilliseconds;
+        private bool HasBudget(Stopwatch watch) => _ignoreBudget || (LastSimulationCount < _options.MaxSimulations &&
+            watch.Elapsed.TotalMilliseconds < _options.MaxMilliseconds);
 
         private List<Node> DiverseBeam(List<Node> sorted)
         {

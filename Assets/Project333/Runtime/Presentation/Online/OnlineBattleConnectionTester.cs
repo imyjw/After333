@@ -2021,6 +2021,7 @@ namespace Project333.Runtime.Presentation.Online
                     var incomingEntry = incomingEntries[i];
                     if (incomingEntry == null ||
                         incomingEntry.EntryType == BattleCombatLogEntryType.Unknown ||
+                        incomingEntry.EntryType == BattleCombatLogEntryType.UpgradeApplied ||
                         incomingEntry.Sequence <= _latestCombatLogSequence)
                     {
                         continue;
@@ -2065,6 +2066,9 @@ namespace Project333.Runtime.Presentation.Online
                 TargetRemoved = entry.TargetRemoved,
                 SourceDamagePrevented = entry.SourceDamagePrevented,
                 TargetDamagePrevented = entry.TargetDamagePrevented,
+                SourcePreview = ProjectCardPreviewToLocalPerspective(entry.SourcePreview, entry.SourceOwnerId),
+                TargetPreview = ProjectCardPreviewToLocalPerspective(entry.TargetPreview, entry.TargetOwnerId),
+                TargetPreviews = ProjectCardPreviewsToLocalPerspective(entry.TargetPreviews),
                 HasCounterattack = entry.HasCounterattack,
                 IsDraw = entry.IsDraw,
                 Amount = entry.Amount,
@@ -2076,6 +2080,31 @@ namespace Project333.Runtime.Presentation.Online
                 ValueCause = entry.ValueCause,
                 ResourceType = entry.ResourceType
             };
+        }
+
+        private BattleCombatLogCardSnapshotDto ProjectCardPreviewToLocalPerspective(
+            BattleCombatLogCardSnapshotDto preview,
+            PlayerId fallbackOwnerId)
+        {
+            if (preview == null) return null;
+            var copy = preview.Clone();
+            copy.OwnerId = ToLocalOwnerId(fallbackOwnerId);
+            return copy;
+        }
+
+        private List<BattleCombatLogCardSnapshotDto> ProjectCardPreviewsToLocalPerspective(
+            IReadOnlyList<BattleCombatLogCardSnapshotDto> previews)
+        {
+            var projected = new List<BattleCombatLogCardSnapshotDto>();
+            if (previews == null) return projected;
+            for (var i = 0; i < previews.Count; i++)
+            {
+                if (previews[i] == null) continue;
+                var copy = previews[i].Clone();
+                copy.OwnerId = ToLocalOwnerId(previews[i].OwnerId);
+                projected.Add(copy);
+            }
+            return projected;
         }
 
         private static TileCoordDto CloneCoord(TileCoordDto coord)
@@ -2204,25 +2233,23 @@ namespace Project333.Runtime.Presentation.Online
                     ? view.ServerUnixTimeMilliseconds
                     : localUtcNowMilliseconds;
             var remainingMilliseconds = view.TurnTimerDeadlineUnixTimeMilliseconds - estimatedServerNowMilliseconds;
-            var maxDurationMilliseconds = Math.Max(1, view.TurnTimerDurationSeconds) * 1000L;
-
-            if (remainingMilliseconds < 0)
+            if (remainingMilliseconds <= 0)
             {
                 return 0;
             }
 
-            if (remainingMilliseconds <= maxDurationMilliseconds + 1000L)
-            {
-                return Math.Min(remainingMilliseconds, maxDurationMilliseconds);
-            }
-
+            // The authoritative deadline includes AI/mulligan presentation credit. The nominal
+            // duration does not: capping to it makes the UI expire before the server ends the turn.
             if (view.ServerUnixTimeMilliseconds > 0)
             {
-                var serverRelativeRemaining = view.TurnTimerDeadlineUnixTimeMilliseconds - view.ServerUnixTimeMilliseconds;
-                return Math.Max(0, Math.Min(serverRelativeRemaining, maxDurationMilliseconds));
+                var serverRelativeRemaining = Math.Max(0,
+                    view.TurnTimerDeadlineUnixTimeMilliseconds - view.ServerUnixTimeMilliseconds);
+                // Retain the backward-clock guard, bounded by this snapshot rather than the base duration.
+                if (remainingMilliseconds > serverRelativeRemaining + 1000L)
+                    return serverRelativeRemaining;
             }
 
-            return maxDurationMilliseconds;
+            return remainingMilliseconds;
         }
 
         private static string FormatFirstGoblin(BattleStateViewDto view)

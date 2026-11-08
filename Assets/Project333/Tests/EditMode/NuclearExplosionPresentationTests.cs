@@ -257,6 +257,59 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
+        public void FireboltDestroyingOwnNuclearPowerPlantTargetsOnlyThePlantForFireboltAnimation()
+        {
+            using (var fixture = new Fixture(false))
+            {
+                var state = fixture.State;
+                state.RestoreRuntimeState(state.TurnNumber, PlayerId.Player, PhaseType.Main);
+                var plantCoord = new TileCoord(0, 0);
+                var plant = new BuildingState("plant-1", "NuclearPowerPlant", PlayerId.Player, plantCoord, false, 0, 70)
+                {
+                    CurrentHp = 1
+                };
+                state.PlayerBoard.Place(plantCoord, plant);
+                state.AIBoard.Place(new TileCoord(1, 0), new UnitState("enemy-1", "Goblin", PlayerId.AI, new TileCoord(1, 0), AttackType.Melee, 2, 40, true, false, 0));
+                var before = Capture(state);
+                state.Player.Hand.Add("firebolt");
+                state.Player.Resources.Add(new ResourceSet(10, 0, 0, 10));
+                fixture.Gateway.ExecuteCommand(PlayerId.Player, new CastDamageSpellCommand("firebolt", PlayerId.Player, plantCoord));
+
+                var local = typeof(BattleBootstrapper).GetMethod("BuildImpactAnimationRequest", Static).Invoke(null,
+                    new object[] { before, Capture(state), state.ValuePopupEvents.ToArray(), "firebolt", PlayerId.Player });
+                var cast = new BattleEventDto
+                {
+                    EventType = BattleEventType.SpellCast,
+                    CardId = "firebolt",
+                    SourceOwnerId = PlayerId.Player,
+                    TargetOwnerId = PlayerId.Player,
+                    TargetCoord = new TileCoordDto { Column = plantCoord.Column, Row = plantCoord.Row }
+                };
+                var onlineEvents = new List<BattleEventDto>
+                {
+                    cast,
+                    new BattleEventDto { EventType = BattleEventType.DamageApplied, ValueCause = BattleValueChangeCause.Spell, TargetOwnerId = PlayerId.Player, TargetCoord = new TileCoordDto { Column = 0, Row = 0 }, Amount = 1, HpBefore = 1, HpAfter = 0 },
+                    new BattleEventDto { EventType = BattleEventType.DamageApplied, ValueCause = BattleValueChangeCause.NuclearPowerPlant, TargetOwnerId = PlayerId.Player, TargetCoord = new TileCoordDto { Column = 2, Row = 1 }, Amount = 30, HpBefore = 333, HpAfter = 303 },
+                    new BattleEventDto { EventType = BattleEventType.DamageApplied, ValueCause = BattleValueChangeCause.NuclearPowerPlant, TargetOwnerId = PlayerId.AI, TargetCoord = new TileCoordDto { Column = 1, Row = 0 }, Amount = 30, HpBefore = 40, HpAfter = 10 },
+                    new BattleEventDto { EventType = BattleEventType.DamageApplied, ValueCause = BattleValueChangeCause.NuclearPowerPlant, TargetOwnerId = PlayerId.AI, TargetCoord = new TileCoordDto { Column = 2, Row = 1 }, Amount = 30, HpBefore = 333, HpAfter = 303 },
+                    new BattleEventDto { EventType = BattleEventType.OccupantRemoved, TargetOwnerId = PlayerId.Player, TargetCoord = new TileCoordDto { Column = 0, Row = 0 } }
+                };
+                var online = fixture.OnlineRequest(cast, onlineEvents);
+
+                foreach (var request in new[] { local, online })
+                {
+                    var spellTargets = ((IEnumerable)Property(request, "SpellEffectTargets")).Cast<object>().ToList();
+                    Assert.That(spellTargets.Count, Is.EqualTo(1), "Firebolt sprite effect must target only the NuclearPowerPlant tile, not chain-explosion victims.");
+                    Assert.That(Property(spellTargets[0], "OwnerId"), Is.EqualTo(PlayerId.Player));
+                    Assert.That(Property(spellTargets[0], "Coord"), Is.EqualTo(plantCoord));
+
+                    var impacts = ((IEnumerable)Property(request, "Impacts")).Cast<object>().ToList();
+                    Assert.That(impacts.Count, Is.EqualTo(4), "All occupants hit by the plant chain explosion still play hurt/death reactions.");
+                }
+            }
+        }
+
+        [Test]
         public void InvalidLayoutCannotExposeBlankOverlayOrStartSound()
         {
             using (var fixture = new Fixture(false))

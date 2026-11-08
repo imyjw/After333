@@ -29,10 +29,10 @@ namespace Project333.Tests.EditMode
             var database = Database();
             var validation = CardDatabaseValidator.ValidateJson(json);
             Assert.That(validation.IsValid, Is.True, string.Join(Environment.NewLine, validation.Errors));
-            Assert.That(database.Cards.Count, Is.EqualTo(60));
-            Assert.That(database.Cards.Select(card => card.Id).Distinct().Count(), Is.EqualTo(60));
+            Assert.That(database.Cards.Count, Is.EqualTo(61));
+            Assert.That(database.Cards.Select(card => card.Id).Distinct().Count(), Is.EqualTo(61));
             var definitions = database.ToDefinitions();
-            Assert.That(definitions.Count, Is.EqualTo(60));
+            Assert.That(definitions.Count, Is.EqualTo(61));
             Assert.That(definitions.Count(definition => definition.HasTrap), Is.EqualTo(5));
             Assert.That(definitions.Where(definition => definition.CardId != TrapReturnCardRules.CardId && definition.CardId != TrapMirrorFieldCardRules.CardId && definition.CardId != ExplosiveReactiveArmourCardRules.CardId && definition.CardId != IronDomeCardRules.CardId && definition.CardId != SummonTrapCardRules.CardId)
                 .All(definition => !definition.HasTrap), Is.True);

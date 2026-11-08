@@ -83,17 +83,28 @@ namespace Project333.Runtime.Application.Services
             OccupantState explicitlyDestroyed,
             IEnumerable<OccupantState> explicitlyDestroyedGroup = null)
         {
-            var pendingExplosions = new Queue<NuclearExplosionSource>();
+            var pendingEffects = new Queue<LegacySource>();
             var queuedSources = new HashSet<OccupantState>();
-            QueueNuclearExplosion(explicitlyDestroyed, pendingExplosions, queuedSources);
+            QueueLegacyEffect(explicitlyDestroyed, pendingEffects, queuedSources);
             if (explicitlyDestroyedGroup != null)
-                foreach (var occupant in explicitlyDestroyedGroup) QueueNuclearExplosion(occupant, pendingExplosions, queuedSources);
-            CollectAndRemoveDefeatedOccupants(battleState, pendingExplosions, queuedSources);
+                foreach (var occupant in explicitlyDestroyedGroup) QueueLegacyEffect(occupant, pendingEffects, queuedSources);
+            CollectAndRemoveDefeatedOccupants(battleState, pendingEffects, queuedSources);
 
-            while (pendingExplosions.Count > 0)
+            while (pendingEffects.Count > 0)
             {
-                ApplyNuclearExplosion(battleState, pendingExplosions.Dequeue());
-                CollectAndRemoveDefeatedOccupants(battleState, pendingExplosions, queuedSources);
+                var source = pendingEffects.Dequeue();
+                if (source.Kind == LegacyEffectKind.DrawCards)
+                {
+                    // Resolve the whole death-effect batch before deciding simultaneous
+                    // master defeat, including fatigue caused by multiple legacies.
+                    BattleDrawService.DrawCards(battleState.GetPlayer(source.OwnerId), battleState,
+                        source.Amount, source.CardId, resolveMasterDefeat: false);
+                }
+                else if (source.Kind == LegacyEffectKind.GlobalPhysicalDamage)
+                {
+                    ApplyNuclearExplosion(battleState, source);
+                }
+                CollectAndRemoveDefeatedOccupants(battleState, pendingEffects, queuedSources);
             }
 
             BattleOutcomeResolver.ResolveMasterDefeat(battleState);
@@ -101,11 +112,11 @@ namespace Project333.Runtime.Application.Services
 
         private static void CollectAndRemoveDefeatedOccupants(
             BattleState battleState,
-            Queue<NuclearExplosionSource> pendingExplosions,
+            Queue<LegacySource> pendingEffects,
             ISet<OccupantState> queuedSources)
         {
             // Losing a chieftain's HP aura can defeat a previously scanned unit, including
-            // another chieftain. Settle the whole removal group before queued explosions.
+            // another chieftain. Settle the whole removal group before queued Legacy effects.
             var removedAny = true;
             while (removedAny)
             {
@@ -135,7 +146,7 @@ namespace Project333.Runtime.Application.Services
 
                             board.Remove(coord);
                             removedAny = true;
-                            QueueNuclearExplosion(occupant, pendingExplosions, queuedSources);
+                            QueueLegacyEffect(occupant, pendingEffects, queuedSources);
                         }
                     }
                 }
@@ -156,22 +167,28 @@ namespace Project333.Runtime.Application.Services
         // so current HP and board membership must not be part of this predicate.
         public static bool HasActiveDestructionEffect(OccupantState occupant)
         {
-            return occupant != null && !occupant.EffectsSuppressed &&
-                string.Equals(occupant.CardId, NuclearPowerPlantRules.CardId, StringComparison.Ordinal);
+            return HasActiveLegacyEffect(occupant) &&
+                LegacyRules.GetEffectKind(occupant.CardId) == LegacyEffectKind.GlobalPhysicalDamage;
         }
 
-        private static void QueueNuclearExplosion(
+        public static bool HasActiveLegacyEffect(OccupantState occupant)
+        {
+            return occupant != null && occupant.Kind != OccupantKind.Master &&
+                occupant.HasLegacy && !occupant.EffectsSuppressed;
+        }
+
+        private static void QueueLegacyEffect(
             OccupantState occupant,
-            Queue<NuclearExplosionSource> pendingExplosions,
+            Queue<LegacySource> pendingEffects,
             ISet<OccupantState> queuedSources)
         {
-            if (!HasActiveDestructionEffect(occupant) ||
+            if (!HasActiveLegacyEffect(occupant) ||
                 !queuedSources.Add(occupant))
             {
                 return;
             }
 
-            pendingExplosions.Enqueue(new NuclearExplosionSource(
+            pendingEffects.Enqueue(new LegacySource(
                 occupant.OwnerId,
                 occupant.RuntimeId,
                 occupant.CardId));
@@ -179,7 +196,7 @@ namespace Project333.Runtime.Application.Services
 
         private static void ApplyNuclearExplosion(
             BattleState battleState,
-            NuclearExplosionSource source)
+            LegacySource source)
         {
             foreach (var ownerId in BoardOrder)
             {
@@ -194,7 +211,7 @@ namespace Project333.Runtime.Application.Services
 
                     var actualDamage = DamageResolutionRules.ApplyEffectDamage(
                         target,
-                        NuclearPowerPlantRules.DestructionDamage,
+                        source.Amount,
                         DamageType.Physical);
                     BattleValuePopupRecorder.RecordDamage(
                         battleState,
@@ -209,9 +226,9 @@ namespace Project333.Runtime.Application.Services
             }
         }
 
-        private readonly struct NuclearExplosionSource
+        private readonly struct LegacySource
         {
-            public NuclearExplosionSource(
+            public LegacySource(
                 PlayerId ownerId,
                 string runtimeId,
                 string cardId)
@@ -219,6 +236,8 @@ namespace Project333.Runtime.Application.Services
                 OwnerId = ownerId;
                 RuntimeId = runtimeId ?? string.Empty;
                 CardId = cardId ?? string.Empty;
+                Kind = LegacyRules.GetEffectKind(CardId);
+                Amount = LegacyRules.GetAmount(CardId);
             }
 
             public PlayerId OwnerId { get; }
@@ -226,6 +245,8 @@ namespace Project333.Runtime.Application.Services
             public string RuntimeId { get; }
 
             public string CardId { get; }
+            public LegacyEffectKind Kind { get; }
+            public int Amount { get; }
         }
     }
 }

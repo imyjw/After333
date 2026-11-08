@@ -417,6 +417,49 @@ namespace Project333.Tests.EditMode
             }
             yield return new ExitPlayMode();
         }
+        [UnityTest]
+        public IEnumerator AcceptedVisualDrag_OnlyRestingCardsShrink_AndReturnReexpandsThem()
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            yield return new EnterPlayMode();
+            using (var harness = new HandHarness(3))
+            {
+                var slot = harness.Slots[1];
+                var hand = harness.Root.AddComponent<HandPresenter>();
+                hand.enabled = false;
+                Set(hand, "_handCardViews", new[] { harness.Slots[0].View, slot.View, harness.Slots[2].View });
+                Set(hand, "_runtimeHandRoot", (RectTransform)slot.Rect.parent);
+                hand.SetExpanded(true);
+                foreach (var item in harness.Slots) item.Text.SetHandInteractionOwner(hand);
+                var input = harness.Root.AddComponent<BattlePlayerInputController>();
+                input.enabled = false;
+                Set(input, "_handPresenter", hand);
+                input.RebindViews();
+                harness.Begin(slot);
+                Assert.That(hand.IsExpanded, Is.False);
+                Invoke(hand, "ApplyCurvedLayout");
+                yield return new WaitForSecondsRealtime(0.08f);
+                Assert.That(harness.Slots[0].Rect.localScale.x, Is.LessThan(0.51f));
+                Assert.That(slot.Rect.localScale.x, Is.EqualTo(Get<float>(slot.Text, "_runtimeDragAbsoluteScale")).Within(0.015f), "Keep the existing configured drag scale; compact hand scaling must not multiply it.");
+                Assert.That(Get<bool>(slot.Text, "_isRuntimeDragActive"), Is.True);
+                harness.Pointer.position += new Vector2(0, 200);
+                slot.Relay.OnDrag(harness.Pointer);
+                // Use the same x that was initially pressed, so this is a hand return.
+                harness.Pointer.position -= new Vector2(0, 200);
+                slot.Relay.OnDrag(harness.Pointer);
+                Assert.That(hand.IsExpanded, Is.True);
+                Invoke(hand, "ApplyCurvedLayout");
+                yield return new WaitForSecondsRealtime(0.08f);
+                Assert.That(harness.Slots[0].Rect.localScale.x, Is.GreaterThan(0.9f));
+                Assert.That(Get<bool>(slot.Text, "_isRuntimeDragActive"), Is.True);
+                slot.Relay.OnEndDrag(harness.Pointer);
+                Assert.That(hand.IsExpanded, Is.True);
+                Assert.That(Get<bool>(slot.Text, "_isRuntimeDragActive"), Is.False);
+                Assert.That(input.SelectedCardId, Is.Empty);
+            }
+            yield return new ExitPlayMode();
+        }
+
         private static T Get<T>(object target, string field) =>
             (T)target.GetType().GetField(field, Hidden).GetValue(target);
         private static void Set(object target, string field, object value) =>

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.IO;
 using System.Linq;
@@ -46,52 +47,54 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void NativeAtlasHasEightChronologicalFullCellsAndUniqueStableSpriteIdentities()
+        public void NativeAtlasHasAuthoredSingleRowFullCellsAndUniqueSpriteIdentities()
         {
             var importer=AssetImporter.GetAtPath(AtlasPath) as TextureImporter;Assert.That(importer,Is.Not.Null);
             Assert.That(importer.textureType,Is.EqualTo(TextureImporterType.Sprite));Assert.That(importer.spriteImportMode,Is.EqualTo(SpriteImportMode.Multiple));
-            Assert.That(importer.filterMode,Is.EqualTo(FilterMode.Point));Assert.That(importer.mipmapEnabled,Is.False);Assert.That(importer.isReadable,Is.True);
-            Assert.That(importer.alphaSource,Is.EqualTo(TextureImporterAlphaSource.FromInput));Assert.That(importer.alphaIsTransparency,Is.True);
+            Assert.That(importer.filterMode,Is.EqualTo(FilterMode.Point));Assert.That(importer.mipmapEnabled,Is.False);
             Assert.That(importer.textureCompression,Is.EqualTo(TextureImporterCompression.Uncompressed));Assert.That(importer.npotScale,Is.EqualTo(TextureImporterNPOTScale.None));
-            var frames=Resources.LoadAll<Sprite>(FramesKey).OrderBy(sprite=>sprite.name,StringComparer.Ordinal).ToArray();Assert.That(frames.Length,Is.EqualTo(8));
-            var atlas=AssetDatabase.LoadAssetAtPath<Texture2D>(AtlasPath);Assert.That(atlas.width,Is.EqualTo(2048));Assert.That(atlas.height,Is.EqualTo(1024));
-            var fileIds=new long[8];var atlasGuid=AssetDatabase.AssetPathToGUID(AtlasPath);
+            var frames=Resources.LoadAll<Sprite>(FramesKey).OrderBy(sprite=>sprite.name,StringComparer.Ordinal).ToArray();
+            Assert.That(frames.Length,Is.EqualTo(8));
+            var atlas=AssetDatabase.LoadAssetAtPath<Texture2D>(AtlasPath);Assert.That(atlas.width,Is.EqualTo(8*512));Assert.That(atlas.height,Is.EqualTo(512));
+            var ids=new List<long>();var expectedGuid=AssetDatabase.AssetPathToGUID(AtlasPath);
             for(int i=0;i<8;i++)
             {
-                Assert.That(frames[i].name,Is.EqualTo("Formation_"+i));Assert.That(frames[i].rect,Is.EqualTo(new Rect(i%4*512,(1-i/4)*512,512,512)));
-                Assert.That(frames[i].pivot,Is.EqualTo(new Vector2(256,256)));Assert.That(frames[i].pixelsPerUnit,Is.EqualTo(100));Assert.That(frames[i].vertices.Length,Is.EqualTo(4));
+                Assert.That(frames[i].name,Is.EqualTo("Formation_"+i));Assert.That(frames[i].rect,Is.EqualTo(new Rect(i*512,0,512,512)));
+                Assert.That(frames[i].pivot,Is.EqualTo(new Vector2(256,256)));Assert.That(frames[i].vertices.Length,Is.EqualTo(4));
                 Assert.That(AssetDatabase.TryGetGUIDAndLocalFileIdentifier(frames[i],out string guid,out long id),Is.True);
-                Assert.That(guid,Is.EqualTo(atlasGuid));Assert.That(id,Is.Not.Zero);fileIds[i]=id;
+                Assert.That(guid,Is.EqualTo(expectedGuid));Assert.That(id,Is.Not.Zero);ids.Add(id);
             }
-            Assert.That(fileIds.Distinct().Count(),Is.EqualTo(8));
+            Assert.That(ids.Distinct().Count(),Is.EqualTo(8));
         }
 
         [Test]
-        public void EveryFrameHasTransparentBackgroundAndCompleteArtworkInsideTheSafeMargin()
+        public void AuthoredFramesKeepTheirTransparencyWithoutAddingMarginsOrRepainting()
         {
-            var image=ReadPng(AtlasPath);Assert.That(image.width,Is.EqualTo(2048));Assert.That(image.height,Is.EqualTo(1024));
+            var image=ReadPng(AtlasPath);Assert.That(image.width,Is.EqualTo(8*512));Assert.That(image.height,Is.EqualTo(512));
             for(int frame=0;frame<8;frame++)
             {
-                int visible=0,transparent=0;for(int y=0;y<512;y++)for(int x=0;x<512;x++)
+                int visible=0,transparent=0;
+                for(int y=0;y<512;y++)for(int x=0;x<512;x++)
                 {
-                    var alpha=image.pixels[((1-frame/4)*512+y)*2048+frame%4*512+x].a;
-                    if(alpha==0)transparent++;else if(alpha>=16)visible++; // Preserve generated faint alpha; count meaningful visible artwork.
-                    if(x<16||y<16||x>495||y>495)Assert.That(alpha,Is.Zero,"Whole frame"+frame+" keeps16px transparent margin.");
+                    var alpha=image.pixels[y*image.width+frame*512+x].a;
+                    if(alpha==0)transparent++;else visible++;
                 }
-                Assert.That(visible,Is.GreaterThan(64),"The formation frame contains meaningful dome artwork.");Assert.That(transparent,Is.GreaterThan(512*512/2),"No opaque background is introduced.");
+                Assert.That(visible,Is.GreaterThan(64));Assert.That(transparent,Is.GreaterThan(64));
             }
         }
 
         [Test]
-        public void CardPortraitIsOneWholeNative512ImageWithStableResourceLookup()
+        public void CardPortraitIsOneWholeAuthoredImageWithStableResourceLookup()
         {
             var portrait=Resources.Load<Sprite>("Project333/CardArtwork/PlasmaShield");Assert.That(portrait,Is.Not.Null);
             var importer=AssetImporter.GetAtPath(PortraitPath) as TextureImporter;Assert.That(importer.spriteImportMode,Is.EqualTo(SpriteImportMode.Single));
             Assert.That(importer.isReadable,Is.False);Assert.That(importer.filterMode,Is.EqualTo(FilterMode.Point));Assert.That(importer.mipmapEnabled,Is.False);
             Assert.That(importer.textureCompression,Is.EqualTo(TextureImporterCompression.Uncompressed));
-            Assert.That(portrait.rect,Is.EqualTo(new Rect(0,0,512,512)));Assert.That(portrait.pivot,Is.EqualTo(new Vector2(256,256)));Assert.That(portrait.vertices.Length,Is.EqualTo(4));
-            Assert.That(AssetDatabase.LoadAllAssetsAtPath(PortraitPath).OfType<Sprite>().Count(),Is.EqualTo(1),"A whole8-frame sheet cannot become a card portrait.");
-            var cardImage=ReadPng(PortraitPath);var atlas=ReadPng(AtlasPath);Assert.That(cardImage.width,Is.EqualTo(512));Assert.That(cardImage.height,Is.EqualTo(512));
+            var authored=ReadPng(PortraitPath);
+            Assert.That(portrait.rect,Is.EqualTo(new Rect(0,0,authored.width,authored.height)));
+            Assert.That(portrait.pivot,Is.EqualTo(new Vector2(authored.width*.5f,authored.height*.5f)));Assert.That(portrait.vertices.Length,Is.EqualTo(4));
+            Assert.That(AssetDatabase.LoadAllAssetsAtPath(PortraitPath).OfType<Sprite>().Count(),Is.EqualTo(1),"The existing full card artwork remains a single sprite.");
+            var cardImage=ReadPng(PortraitPath);var atlas=ReadPng(AtlasPath);Assert.That(cardImage.width,Is.EqualTo(authored.width));Assert.That(cardImage.height,Is.EqualTo(authored.height));
             Assert.That(cardImage.pixels.Count(pixel=>pixel.a>=16),Is.GreaterThan(1000),"Supplied whole user portrait remains visible; it is independent of the VFX atlas.");
         }
 

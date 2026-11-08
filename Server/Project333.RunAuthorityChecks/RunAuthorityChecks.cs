@@ -27,6 +27,7 @@ if (args.SequenceEqual(new[] { "--reconnect-only" }))
     return;
 }
 if (args.SequenceEqual(new[] { "--turn-input-only" })) { TurnInputChecks.Run(Console.WriteLine); return; }
+if (args.SequenceEqual(new[] { "--ai-fallback-timers-only" })) { await AiFallbackTimerChecks.Run(Console.WriteLine, ct); return; }
 var connectionString = Environment.GetEnvironmentVariable("PROJECT333_DB_CONNECTION") ?? "";
 var expectedDataPath = Environment.GetEnvironmentVariable("AFTER333_AUTHORITY_TEST_DATA") ?? "";
 var cs = new NpgsqlConnectionStringBuilder(connectionString);

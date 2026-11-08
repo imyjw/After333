@@ -98,28 +98,105 @@ public sealed partial class BattleSession
                 StringComparison.Ordinal)));
     }
 
-    private void AppendTrapCombatLogs(IReadOnlyList<BattleEventDto> events)
+    private void AppendTrapCombatLogs(
+        IReadOnlyList<BattleEventDto> events,
+        ServerBattleSnapshot? beforeSnapshot)
     {
         foreach (var trapEvent in events.Where(candidate =>
                      candidate?.EventType == BattleEventType.TrapInstalled ||
                      candidate?.EventType == BattleEventType.TrapTriggered))
         {
             bool triggered = trapEvent.EventType == BattleEventType.TrapTriggered;
+            var sourceOwnerId = ToRuntimePlayerId(trapEvent.SourceOwnerId);
             var entry = new BattleCombatLogEntryDto
             {
                 EntryType = triggered ? BattleCombatLogEntryType.TrapTriggered : BattleCombatLogEntryType.TrapInstalled,
-                SourceOwnerId = ToRuntimePlayerId(trapEvent.SourceOwnerId),
+                SourceOwnerId = sourceOwnerId,
                 SourceCardId = triggered ? trapEvent.SourceCardId : string.Empty,
                 Amount = trapEvent.TrapCount
             };
             if (triggered)
             {
-                entry.TargetOwnerId = ToRuntimePlayerId(trapEvent.TargetOwnerId);
+                var targetOwnerId = ToRuntimePlayerId(trapEvent.TargetOwnerId);
+                entry.TargetOwnerId = targetOwnerId;
                 entry.TargetCardId = trapEvent.TargetCardId;
                 if (trapEvent.TargetCoord != null) entry.TargetCoord = CloneTileCoord(trapEvent.TargetCoord)!;
+                entry.SourcePreview = BattleCombatLogCardSnapshotDto.CreateSpellCard(
+                    trapEvent.SourceCardId ?? string.Empty,
+                    sourceOwnerId,
+                    trapEvent.SourceRuntimeId ?? string.Empty);
+                var targetPreview = CreateTrapTargetPreview(trapEvent, events, beforeSnapshot, targetOwnerId);
+                if (targetPreview != null)
+                {
+                    entry.TargetPreview = targetPreview;
+                    entry.TargetPreviews = new List<BattleCombatLogCardSnapshotDto> { targetPreview.Clone() };
+                }
             }
             AppendCombatLogRecord(entry);
         }
+    }
+
+    private BattleCombatLogCardSnapshotDto? CreateTrapTargetPreview(
+        BattleEventDto trapEvent,
+        IReadOnlyList<BattleEventDto> events,
+        ServerBattleSnapshot? beforeSnapshot,
+        PlayerId targetOwnerId)
+    {
+        var targetRuntimeId = trapEvent.TargetRuntimeId ?? string.Empty;
+        var target = beforeSnapshot?.FindByRuntimeId(targetRuntimeId) ??
+                     (trapEvent.TargetCoord != null
+                         ? beforeSnapshot?.FindByCoord(targetOwnerId, ToRuntimeCoord(trapEvent.TargetCoord))
+                         : null);
+        var preview = target?.Preview?.Clone();
+        if (preview == null && !string.IsNullOrWhiteSpace(trapEvent.TargetCardId))
+        {
+            preview = CreateFallbackOccupantPreview(trapEvent.TargetCardId, targetOwnerId, targetRuntimeId);
+        }
+        if (preview == null) return null;
+        preview.OwnerId = targetOwnerId;
+
+        var trapDamageEvents = events
+            .Where(candidate => candidate?.EventType == BattleEventType.DamageApplied &&
+                                !string.IsNullOrWhiteSpace(targetRuntimeId) &&
+                                string.Equals(candidate.TargetRuntimeId, targetRuntimeId, StringComparison.Ordinal) &&
+                                (string.Equals(candidate.SourceCardId, trapEvent.SourceCardId, StringComparison.Ordinal) ||
+                                 candidate.ValueCause == BattleValueChangeCause.Spell))
+            .ToList();
+        if (trapDamageEvents.Count > 0 && trapDamageEvents[0]!.HpBefore > 0)
+        {
+            preview.Hp = trapDamageEvents[0]!.HpBefore;
+        }
+        var state = _battleFlowController?.CurrentBattleState;
+        if (string.Equals(trapEvent.SourceCardId, Project333.Runtime.Infrastructure.Data.SummonTrapCardRules.CardId, StringComparison.Ordinal) &&
+            state?.LastSummonedOccupant != null &&
+            string.Equals(state.LastSummonedOccupant.RuntimeId, targetRuntimeId, StringComparison.Ordinal) &&
+            state.LastSummonedAttack > 0)
+        {
+            preview.Attack = state.LastSummonedAttack;
+        }
+
+        if (string.Equals(trapEvent.SourceCardId, Project333.Runtime.Infrastructure.Data.TrapReturnCardRules.CardId, StringComparison.Ordinal))
+        {
+            return preview.WithOutcome(0, false);
+        }
+
+        var remaining = state?.GetBoard(targetOwnerId)
+            .EnumerateOccupants()
+            .FirstOrDefault(candidate => string.Equals(candidate.RuntimeId, targetRuntimeId, StringComparison.Ordinal));
+        var isRevivalPending = remaining?.IsDemonKingRevivalPending == true;
+
+        if (string.Equals(trapEvent.SourceCardId, Project333.Runtime.Infrastructure.Data.ExplosiveReactiveArmourCardRules.CardId, StringComparison.Ordinal) ||
+            string.Equals(trapEvent.SourceCardId, Project333.Runtime.Infrastructure.Data.IronDomeCardRules.CardId, StringComparison.Ordinal))
+        {
+            var destroyed = !isRevivalPending &&
+                            (remaining == null || !remaining.IsAlive || IsRemoved(events, targetRuntimeId));
+            return preview.WithOutcome(0, destroyed);
+        }
+
+        var damageTaken = trapDamageEvents.Sum(candidate => Math.Max(0, candidate!.Amount));
+        var died = !isRevivalPending &&
+                   (trapDamageEvents.Any(candidate => candidate!.HpAfter <= 0) || IsRemoved(events, targetRuntimeId));
+        return preview.WithOutcome(damageTaken, died);
     }
 
     private static IReadOnlyList<BattleSessionArmedTrapSnapshot> CreateArmedTrapSnapshots(BattleState state)

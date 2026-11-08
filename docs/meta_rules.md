@@ -81,7 +81,7 @@ Still deferred:
 - The Master card is never included in random card rewards.
 - If an eligible rarity has no rewardable card, the roll is normalized across the remaining eligible rarities.
 
-현재 카드 현황(2026-10-08): JSON/domain 정의 60종, 드래프트 On 54종, 강화 가능 44종이다. `includeInRewards`의 적용값은 On 43종/Off 17종이며, 천라지망·초소형 발전기는 플래그 On이어도 강화 불가 정책으로 제외되어 실제 랜덤 보상 대상은 41종이다. 대환단은 강화 가능으로 변경되어 보상·카드팩 풀에 포함된다. 트랩: 리턴의 비강화 보상 예외는 포함하고 미러 필드·반응 장갑·아이언 돔은 제외한다. Unity 네이티브 카탈로그는 트랩 5종을 포함한 54종으로 공유 정의 60종과 별도로 집계한다. [카드 목록](card_catalog.md).
+현재 카드 현황(2026-10-28): JSON/domain 정의 61종, 드래프트 On 55종, 강화 가능 44종이다. `includeInRewards`의 적용값은 On 43종/Off 18종이며, 천라지망·초소형 발전기는 플래그 On이어도 강화 불가 정책으로 제외되어 실제 랜덤 보상 대상은 41종이다. 대환단은 강화 가능으로 변경되어 보상·카드팩 풀에 포함된다. 트랩: 리턴의 비강화 보상 예외는 포함하고 미러 필드·반응 장갑·아이언 돔은 제외한다. Unity 네이티브 카탈로그는 트랩 5종을 포함한 55종으로 공유 정의 61종과 별도로 집계한다. [카드 목록](card_catalog.md).
 
 > TBD: The final reward formula is not fixed yet.
 
@@ -263,3 +263,6 @@ Card-pack contents, price and probabilities are confirmed above. Additional pack
 > TBD: Additional normal-run interim rewards beyond the separate, implemented Gold Dungeon reward
 
 - 2026-10-08 대환단(Daehwandan) 변경: 강화 가능, Lv.1–13 매 레벨 효과수치 +1. Lv.0 30, Lv.13 43만큼 사용 즉시 내 마스터 공격력 증가. 이후 기 생산 삭제. 비용 기5·무림·레전더리·대상 선택 없음은 유지하며 보상/카드팩 포함.
+
+
+2026-10-28 욕망의 단지는 덱빌딩On·강화불가·랜덤보상Off이므로 런 보상과 상점 카드팩의 실제 대상41종은 늘리지 않는다. [카드 정의](jar_of_greed.md).

@@ -1,8 +1,8 @@
-# Card Authoring Checklist
+﻿# Card Authoring Checklist
 
 이 문서는 새 카드 1장을 추가하거나 기존 카드를 수정할 때 따르는 표준 작업 순서다.
 
-현재 구현된 전체 카드와 아직 기획에만 남아 있는 카드는 `docs/card_catalog.md`에서 확인한다. 2026-10-20 현재 카드 데이터·네이티브 자산·강화·보상 코드를 대조한 기준으로 JSON/domain 정의 60종, 드래프트 On 54종, Unity 네이티브 카드 54종이다. 강화 가능 44종, includeInRewards 적용값 On 43종과 서버 실제 보상 41종은 별도로 집계한다.
+현재 구현된 전체 카드와 아직 기획에만 남아 있는 카드는 `docs/card_catalog.md`에서 확인한다. 2026-10-28 욕망의 단지 추가 후 JSON/domain 정의 61종, 드래프트 On 55종, Unity 네이티브 카드 55종이다. 강화 가능 44종, includeInRewards 적용값 On 43종과 서버 실제 보상 41종은 별도로 집계한다.
 
 핵심 원칙:
 
@@ -31,7 +31,9 @@
 - 로봇 공장: `Building`, `sciencePowerUpkeep: 1`; `races에 Robot 포함 && includeInDraft`인 유닛 중 하나를 서버가 동일 확률로 생성
 - 액티브: `specialEffectText`를 `액티브: 효과 내용` 형식으로 작성한다. 기본 사용 시점은 자신의 턴이며, 상대 턴 발동은 카드 설명에 명시한 경우에만 허용한다. 예외 카드에는 별도 조건과 검증을 구현한다. 문구만으로 동작하지 않으므로 ActiveEffectService에 해당 CardId의 조건·비용·처리를 구현하고 명령·UI·서버·AI·재접속을 검증한다. [상세 규칙](active_effects.md)
 - 발전소: `Building`, CardId `PowerPlant`; 소환한 턴부터 내 행동 턴에 타일의 액티브 버튼으로 발전소마다 1회 골드 1을 소모해 전력 2 획득. 턴 시작 자동 교환 없음.
-- 원자력 발전소: `Building`, CardId `NuclearPowerPlant`; 턴 시작 전력 +3은 `turnStartResourceGain`, 파괴 시 양쪽 전장 물리 피해 30은 `OccupantDestructionService`에서 처리
+- 유산: 실제 사망/파괴 시 발동. 현재 `LegacyRules`의 CardId별 등록(종류/수치), JSON/native의 effectText·specialEffectText, 공통 파괴 큐·미리보기·검사를 함께 수정한다. 문구만 적어서 부여하지 않는다. 현재 언데드3종은 강화와 관계없이1드로우, 원전은 전체 물리30이다. CardId/망각 상태에서 도출하므로 새 영속/온라인 플래그는 없으며 새 효과 종류는 파괴 큐에 명시적으로 구현한다. [규칙](battle_rules.md#유산-legacy--2026-10-29)
+- 원자력 발전소: `Building`, CardId `NuclearPowerPlant`; 턴 시작 전력 +3은 `turnStartResourceGain`, 유산으로 파괴 시 양쪽 전장 물리 피해 30은 `OccupantDestructionService`에서 처리
+- 욕망의 단지: `JarOfGreed`, 중립 레어 ScriptedSpell, 골드1, `effectId: "jar_of_greed"`, `effectAmount: 2`. 사용 즉시 공통 드로우2장, 덱빌딩On·보상Off·강화불가. 허공 드래그/공통 푸른 조각 연출 자동 적용. [정의·검증](jar_of_greed.md)
 - 보조배터리: `definitionType: "ScriptedSpell"`, `effectId: "power_bank"`; 골드 3 지불 후 즉시 전력 +6
 - 마정석: `definitionType: "ScriptedSpell"`, `effectId: "mana_stone"`; 골드 2 지불 후 즉시 마나 +3
 - 마정석 꾸러미: `definitionType: "ScriptedSpell"`, `effectId: "mana_stone_bundle"`; 골드 5 지불 후 즉시 마나 +9
@@ -407,7 +409,7 @@ Assets/Project333/Resources/Project333/Data/cards.json
 | Microreactor | 초소형 발전기 | PersistentResourceSpell | 강화 불가능 | 드래프트 On. includeInRewards 생략 기본값 On이나 서버 실제 보상 Off |
 | PowerBank | 보조배터리 | ScriptedSpell | 강화 불가능 | 즉시 자원 획득 마법, 드래프트 On·보상 Off |
 | PowerPlant | 발전소 | Building | 강화 가능 | 매 레벨 HP +1, 드래프트·보상 On |
-| NuclearPowerPlant | 원자력 발전소 | Building | 강화 가능 | 매 레벨 HP +1, 파괴 시 양쪽 전장 물리 피해 30, 드래프트·보상 On |
+| NuclearPowerPlant | 원자력 발전소 | Building | 강화 가능 | 매 레벨 HP +1, 유산: 양쪽 전장 물리 피해 30, 드래프트·보상 On |
 | RobotFusion | 로봇 합체 | ScriptedSpell | 강화 불가능 | 이미지 준비 전 드래프트·보상 제외 |
 | RobotFactory | 로봇 공장 | Building | 강화 가능 | 매 레벨 HP +1, 이미지 준비 전 드래프트·보상 제외 |
 | GaebangBranch | 개방 분타 | Building | 강화 가능 | 매 레벨 HP +1, 드래프트·보상 On |
@@ -633,3 +635,10 @@ dotnet build C:\Project_333\Server\Project333.PvpServer\Project333.PvpServer.csp
 - `Validate cards.json`가 통과한다.
 - EditMode 테스트가 통과한다.
 - 서버 빌드가 통과한다.
+
+
+2026-10-28: 새 대상 없는 ScriptedSpell은 `SpellCardUseRules.IsUntargeted` 공통 분류로 허공 사용과 스펠 사용 연출을 함께 적용한다. 연출용 카드별 허용 목록을 추가하지 않는다. 대상 지정/재료 선택이 필요한 새 효과는 분류와 실제 공유 판정을 함께 확장한다.
+
+### 파이어월 즉시 피해 규칙 — 2026-10-29
+
+`Firewall` 비용은 마나4, 피해15(기존 수치 유지), 강화 매 레벨+1이다. `triggerCount: 2`는 **사용 즉시 피해를 제외한** 이후 전역 턴 시작2회를 뜻한다. 시전과 지속 발동 모두 `FirewallEffectService`의 같은 마법 피해/현재 주문력/방어·파괴 처리를 사용한다. JSON과 네이티브 카드의 효과·특수효과 문구는 `5*1타일을 선택한다. 즉시 및 다음 2턴 시작 시, 선택한 타일에 마법 데미지를 입힌다.`로 통일한다. 사용자 아트의 인쇄된 문구와 자동 UI 숫자는 별개다.

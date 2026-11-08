@@ -1,12 +1,17 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using Project333.Runtime.Application.Commands;
 using Project333.Runtime.Application.Tutorial;
 using Project333.Runtime.Application.Gateways;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Infrastructure.Data;
+using Project333.Runtime.Presentation.Battle;
+using Project333.Runtime.Presentation.Tutorial;
 using UnityEditor;
+using UnityEngine;
+using UnityEngine.UI;
 
 namespace Project333.Tests.EditMode
 {
@@ -95,6 +100,185 @@ namespace Project333.Tests.EditMode
             Assert.That(s.CurrentStep.Cue,Is.EqualTo(TutorialCue.ShopIntro));Assert.That(s.IsComplete,Is.False);
             Assert.That(actions,Is.EqualTo(new[]{TutorialAction.AttemptBlockedAttack,TutorialAction.SummonArcherAndEndTurn,TutorialAction.RangedMasterAttack,TutorialAction.MeleeCounterattack,TutorialAction.EndTurnForGolem,TutorialAction.AttackGolem,TutorialAction.CastPracticeFireball,TutorialAction.PreviewOccupant,TutorialAction.MovePracticeUnit,TutorialAction.SwapPracticeUnits,TutorialAction.AttemptBuildingMove,TutorialAction.FinishPracticeBattle}));
             Assert.That(s.SelectChapter(5),Is.True);Assert.That(s.CurrentStep.Cue,Is.EqualTo(TutorialCue.CombatReady));Assert.That(s.IsComplete,Is.False);
+        }
+
+        [Test]
+        public void AttemptBuildingMoveShowsCommandErrorToastAndCompletesPracticeAction()
+        {
+            var catalog = AssetDatabase.LoadAssetAtPath<CardDefinitionCatalogAsset>(
+                "Assets/Project333/ScriptableObjects/StarterTen/StarterTenCardCatalog.asset");
+            Assert.That(catalog, Is.Not.Null);
+
+            var host = new GameObject("TutorialCombatToastTestHost");
+            TutorialRuntimeIsolation.RequestEntry();
+            try
+            {
+                var bootstrapper = host.AddComponent<BattleBootstrapper>();
+                typeof(BattleBootstrapper)
+                    .GetField("_cardCatalogAsset", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .SetValue(bootstrapper, catalog);
+
+                var session = new TutorialSession();
+                Assert.That(session.SelectChapter(5), Is.True);
+                while (session.CurrentStep.RequiredAction != TutorialAction.AttemptBuildingMove)
+                {
+                    if (!session.WaitingForAction)
+                    {
+                        Assert.That(session.TryAdvance(), Is.True);
+                        continue;
+                    }
+
+                    Assert.That(session.PerformAction(session.CurrentStep.RequiredAction), Is.True);
+                }
+
+                TutorialAction? completedAction = null;
+                bootstrapper.ConfigureTutorialChapterFour(
+                    session,
+                    () => true,
+                    action => completedAction = action,
+                    () => { });
+
+                var moved = bootstrapper.TryMovePlayerOccupant(
+                    TutorialResourceBattle.PondTile,
+                    TutorialCombatBattle.BuildingMoveTile,
+                    out var message);
+
+                Assert.That(moved, Is.False);
+                Assert.That(message, Is.EqualTo("이 유닛은 이동 불가능합니다."));
+                Assert.That(completedAction, Is.EqualTo(TutorialAction.AttemptBuildingMove));
+
+                var toastText = (Text)typeof(BattleBootstrapper)
+                    .GetField("_onlineErrorToastText", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .GetValue(bootstrapper);
+                var toastGroup = (CanvasGroup)typeof(BattleBootstrapper)
+                    .GetField("_onlineErrorToastCanvasGroup", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .GetValue(bootstrapper);
+
+                Assert.That(toastText, Is.Not.Null);
+                Assert.That(toastText.text, Is.EqualTo("이 유닛은 이동 불가능합니다."));
+                Assert.That(toastGroup, Is.Not.Null);
+                Assert.That(toastGroup.gameObject.activeSelf, Is.True);
+            }
+            finally
+            {
+                TutorialRuntimeIsolation.CancelEntry();
+                var toastCanvas = GameObject.Find("OnlineBattleToastCanvas");
+                if (toastCanvas != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(toastCanvas);
+                }
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
+        public void PreviewOccupantRequiresPlayerSkeletonArcherAndIgnoresOtherOccupants()
+        {
+            var catalog = AssetDatabase.LoadAssetAtPath<CardDefinitionCatalogAsset>(
+                "Assets/Project333/ScriptableObjects/StarterTen/StarterTenCardCatalog.asset");
+            Assert.That(catalog, Is.Not.Null);
+
+            var host = new GameObject("TutorialPreviewArcherTestHost");
+            TutorialRuntimeIsolation.RequestEntry();
+            try
+            {
+                var bootstrapper = host.AddComponent<BattleBootstrapper>();
+                typeof(BattleBootstrapper)
+                    .GetField("_cardCatalogAsset", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .SetValue(bootstrapper, catalog);
+
+                var session = new TutorialSession();
+                Assert.That(session.SelectChapter(5), Is.True);
+                while (session.CurrentStep.RequiredAction != TutorialAction.PreviewOccupant)
+                {
+                    if (!session.WaitingForAction)
+                    {
+                        Assert.That(session.TryAdvance(), Is.True);
+                        continue;
+                    }
+
+                    Assert.That(session.PerformAction(session.CurrentStep.RequiredAction), Is.True);
+                }
+
+                Assert.That(session.CurrentStep.Dialogue,
+                    Is.EqualTo("소환물을 꾹 누르면 카드와 현재 상태를 자세히 볼 수 있네. 소환된 우리 스켈레톤 아처를 길게 눌러보게."));
+
+                TutorialAction? completedAction = null;
+                bootstrapper.ConfigureTutorialChapterFour(
+                    session,
+                    () => true,
+                    action => completedAction = action,
+                    () => { });
+
+                var gateway = (IBattleGateway)typeof(BattleBootstrapper)
+                    .GetField("_battleGateway", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .GetValue(bootstrapper);
+                gateway.ExecuteCommand(PlayerId.Player, new PlayUnitCardCommand("SkeletonArcher", TutorialCombatBattle.ArcherTile));
+
+                var pondTile = host.AddComponent<TileView>();
+                pondTile.Configure(PlayerId.Player, TutorialResourceBattle.PondTile.Column, TutorialResourceBattle.PondTile.Row);
+                pondTile.Present(bootstrapper.CurrentBattleState.PlayerBoard.GetOccupant(TutorialResourceBattle.PondTile));
+                bootstrapper.TutorialOccupantPreviewReleased(pondTile);
+                Assert.That(completedAction, Is.Null);
+
+                var aiArcherTile = new GameObject("AiArcherTile").AddComponent<TileView>();
+                aiArcherTile.transform.SetParent(host.transform, false);
+                aiArcherTile.Configure(PlayerId.AI, TutorialResourceBattle.OpponentArcherTile.Column, TutorialResourceBattle.OpponentArcherTile.Row);
+                aiArcherTile.Present(bootstrapper.CurrentBattleState.AIBoard.GetOccupant(TutorialResourceBattle.OpponentArcherTile));
+                bootstrapper.TutorialOccupantPreviewReleased(aiArcherTile);
+                Assert.That(completedAction, Is.Null);
+
+                var playerArcherTile = new GameObject("PlayerArcherTile").AddComponent<TileView>();
+                playerArcherTile.transform.SetParent(host.transform, false);
+                playerArcherTile.Configure(PlayerId.Player, TutorialCombatBattle.ArcherTile.Column, TutorialCombatBattle.ArcherTile.Row);
+                playerArcherTile.Present(bootstrapper.CurrentBattleState.PlayerBoard.GetOccupant(TutorialCombatBattle.ArcherTile));
+                bootstrapper.TutorialOccupantPreviewReleased(playerArcherTile);
+                Assert.That(completedAction, Is.EqualTo(TutorialAction.PreviewOccupant));
+
+                var controllerHost = new GameObject("TutorialSceneControllerHost");
+                try
+                {
+                    var controller = controllerHost.AddComponent<TutorialSceneController>();
+                    controller.Initialize();
+                    typeof(TutorialSceneController)
+                        .GetField("_practiceBattle", BindingFlags.Instance | BindingFlags.NonPublic)!
+                        .SetValue(controller, bootstrapper);
+                    var panel = controllerHost.GetComponentsInChildren<RectTransform>(true)
+                        .First(x => x.name == "DialoguePanel");
+                    var refreshLayout = typeof(TutorialSceneController)
+                        .GetMethod("RefreshBattlePracticeDialogueLayout", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+                    Assert.That(controller.Session.SelectChapter(5), Is.True);
+                    while (controller.Session.CurrentStep.Cue != TutorialCue.PracticeVictory)
+                    {
+                        if (!controller.Session.WaitingForAction)
+                        {
+                            Assert.That(controller.Session.TryAdvance(), Is.True);
+                            continue;
+                        }
+                        Assert.That(controller.Session.PerformAction(controller.Session.CurrentStep.RequiredAction), Is.True);
+                    }
+
+                    refreshLayout.Invoke(controller, new object[] { panel });
+                    Assert.That(panel.anchorMin.y, Is.EqualTo(0.018f).Within(0.001f));
+                    Assert.That(panel.anchorMax.y, Is.EqualTo(0.19f).Within(0.001f));
+
+                    Assert.That(controller.Session.TryAdvance(), Is.True);
+                    Assert.That(controller.Session.CurrentStep.Cue, Is.EqualTo(TutorialCue.PracticeVictoryIsolation));
+                    refreshLayout.Invoke(controller, new object[] { panel });
+                    Assert.That(panel.anchorMin.y, Is.EqualTo(0.018f).Within(0.001f));
+                    Assert.That(panel.anchorMax.y, Is.EqualTo(0.19f).Within(0.001f));
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(controllerHost);
+                }
+            }
+            finally
+            {
+                TutorialRuntimeIsolation.CancelEntry();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
         }
     }
 }

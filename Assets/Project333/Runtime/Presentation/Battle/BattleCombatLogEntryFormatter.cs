@@ -48,8 +48,7 @@ namespace Project333.Runtime.Presentation.Battle
                            $"{FormatCoord(entry.TargetCoord)}에 건설";
 
                 case BattleCombatLogEntryType.UpgradeApplied:
-                    return $"강화 적용: {FormatPossessiveOwner(entry.SourceOwnerId)} {sourceName}에 " +
-                           $"ATK +{Math.Max(0, entry.AttackBonus)}, HP +{Math.Max(0, entry.HpBonus)} 부여";
+                    return string.Empty;
 
                 case BattleCombatLogEntryType.OccupantMoved:
                     return $"{FormatPossessiveOwner(entry.SourceOwnerId)} {AppendSubjectParticle(sourceName)} " +

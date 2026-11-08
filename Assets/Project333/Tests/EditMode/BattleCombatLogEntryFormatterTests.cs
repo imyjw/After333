@@ -502,6 +502,21 @@ namespace Project333.Tests.EditMode
             Assert.That(entry.Sequence, Is.EqualTo(12));
         }
 
+        [Test]
+        public void Format_UpgradeApplied_ReturnsEmptyString()
+        {
+            var entry = new BattleCombatLogEntryDto
+            {
+                EntryType = BattleCombatLogEntryType.UpgradeApplied,
+                SourceOwnerId = PlayerId.Player,
+                SourceCardId = "GoldMiner",
+                AttackBonus = 0,
+                HpBonus = 1
+            };
+
+            Assert.That(BattleCombatLogEntryFormatter.Format(entry, ResolveCardName), Is.Empty);
+        }
+
         private static string ResolveCardName(string cardId)
         {
             return cardId switch

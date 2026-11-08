@@ -41,3 +41,13 @@
 ## 승리·패배 효과음별 기본 볼륨
 
 `BattleOutcomeBannerView.cs`의 `_victorySoundVolume`과 `_defeatSoundVolume`으로 따로 조절한다(2026-10-26 현재 코드 초기값: 승리0.65·패배1; 분리 구현 당시에는 각각1). 승리만 줄일 때는 전자만 수정한다. 실제 출력은 해당 기준 볼륨 × 공통 효과음 볼륨 × 마스터 볼륨이다. 승리/패배 전용 소스는 각 최대1개씩 재사용하며 공통 설정을 따른다. 코드 수정 후 Play 재시작 또는 사용자 앱 재빌드가 필요하다. [예시·검증](battle_outcome_presentation.md#승리패배-볼륨을-따로-수정하기-2026-10-24-후속).
+
+
+## 런 보상 상자 개봉 효과음 (2026-10-28)
+
+`RunRewardRevealView.TryBeginOpening()`이 실제 개봉 상태로 전환될 때 임시 음원 `Assets/Project333/Resources/Project333/Audio/UI/GoldSound.mp3`를 한 번 재생한다. 연속 클릭, 수령 결과 대기/표시 갱신, 열 수 없는 상태에서는 추가 재생하지 않는다. 오류 뒤 정상 재시도로 개봉 애니메이션이 다시 시작되면 소리도 다시 재생한다.
+
+- 나중에 교체: 새 음원을 Resources 아래에 넣고 `RunRewardRevealView.cs` 상단 `OpeningSoundResourcePath`를 새 경로로 수정한다. `Resources/` 뒤부터 확장자를 제외해 적는다. 예: `Project333/Audio/UI/ChestOpen`. 기존 GoldSound 파일을 교체하면 이를 사용하는 골드 버튼 소리도 바뀌므로, 상자 전용 소리만 교체할 때는 새 파일과 이 경로를 사용한다.
+- 개별 음량은 `OpeningSoundVolume = .3f`(30%)로 설정했다. 실제 출력은 개별 음량 × 효과음 설정 × 마스터 설정이다. 배경음악 설정과 분리되며 기존 공통 `After333SoundEffects` 경로를 사용한다.
+- 상자 뷰가 소스 하나와 음원 참조를 재사용하고 비활성화/파괴 시 소스도 같은 수명을 따른다. 음원이 없으면 보상 흐름은 계속 진행한다. 씬을 수동으로 연결할 필요는 없다.
+- 검증: 변경한 실제 C# 파일을 기존 Unity6000.3.12f1 엔진/UI/런타임 DLL 참조로 별도 컴파일, 오류0·경고0. Resources 파일/메타 존재와 단일 개봉 진입 경로를 정적 확인했다. Unity Play 모드 및 실기기 청취·APK 빌드/설치는 수행하지 않았다. 증거: 세션 `RewardChestAudio_20261028/compile.log`, `verification.json`. 서버 재배포·DB 변경 없이 사용자 클라이언트 재빌드로 반영한다.

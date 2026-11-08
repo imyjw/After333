@@ -105,7 +105,7 @@ namespace Project333.Tests.EditMode
         }
 
         [UnityTest]
-        public IEnumerator RealNativeUnitAndBuildingShapesKeepARoundTransparentSphereWithOneScale()
+        public IEnumerator FixedSizeIsIdenticalAcrossNativeBodiesAndBodyScaleChanges()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,NewSceneMode.Single);yield return new EnterPlayMode();
             using(var f=new Fixture())
@@ -114,8 +114,8 @@ namespace Project333.Tests.EditMode
             {
                 var tile=f.Tile(owner,1,0);
                 if(tile.GetComponent<TileTextView>()==null)f.MakeTarget(owner,1,0);
-                var occupant=cardId=="ManaPond"?(OccupantState)new BuildingState("shape-"+owner+cardId,cardId,owner,tile.Coord,false,0,100):
-                    new UnitState("shape-"+owner+cardId,cardId,owner,tile.Coord,AttackType.Ranged,1,100,true,false,0);
+                var occupant=cardId=="ManaPond"?(OccupantState)new BuildingState("fixed-"+owner+cardId,cardId,owner,tile.Coord,false,0,100):
+                    new UnitState("fixed-"+owner+cardId,cardId,owner,tile.Coord,AttackType.Ranged,1,100,true,false,0);
                 f.State.GetBoard(owner).Remove(tile.Coord);f.State.GetBoard(owner).Place(tile.Coord,occupant);tile.Present(occupant);
                 var view=tile.GetComponent<TileTextView>();view.SetTile(tile.Title,tile.Content,true);view.PlayIdleAnimation();
                 Invoke(view,"LateUpdate");yield return null;Invoke(view,"LateUpdate");
@@ -124,55 +124,35 @@ namespace Project333.Tests.EditMode
                 f.Cancel();using(var baseline=f.Pixels())
                 {
                     Assert.That(f.Play(owner,1,0),Is.EqualTo(ManaShieldVfx.DurationSeconds));
-                    f.SampleFlight(4f/12f+.001f);var size=f.Image.rectTransform.sizeDelta;
-                    AssertSphereEnclosesBody(f,body);
-                    using(var formed=f.Pixels("ManaShield-"+owner+"-"+cardId))
-                        Assert.That(f.DifferentPixels(formed,baseline),Is.GreaterThan(100));
+                    var anchor=view.GetVisualNormalizedWorldPosition(new Vector2(.5f,1f/32f));
                     for(var frame=0;frame<ManaShieldVfx.FrameCount;frame++)
                     {
-                        f.SampleFlight(frame/12f+.001f);
+                        f.SampleFlight(frame/ManaShieldVfx.FramesPerSecond+.001f);
                         Assert.That(f.Image.sprite.name,Is.EqualTo("Formation_"+frame));
-                        Assert.That(f.Image.rectTransform.sizeDelta,Is.EqualTo(size),"Every cell keeps the common source scale.");
-                        AssertSphereEnclosesBody(f,body);
+                        Assert.That(f.Image.rectTransform.sizeDelta,Is.EqualTo(Vector2.one*512f));
+                        Assert.That(f.Image.rectTransform.localScale,Is.EqualTo(Vector3.one));
+                        Assert.That(f.Image.rectTransform.pivot,Is.EqualTo(new Vector2(.5f,0f)));
+                        Assert.That(Vector3.Distance(f.Image.rectTransform.position,anchor),Is.LessThan(.02f));
                     }
-                    var bounds=(Rect)typeof(ManaShieldVfx).GetProperty("EffectBounds",Static).GetValue(null);
-                    Assert.That(f.Image.rectTransform.pivot,Is.EqualTo(bounds.center),"A shared center preserves the authored formation motion.");
                     var savedScale=body.rectTransform.localScale;
-                    body.rectTransform.localScale=Vector3.Scale(savedScale,new Vector3(1.3f,.7f,1));
-                    f.SampleFlight(.34f);AssertSphereEnclosesBody(f,body);body.rectTransform.localScale=savedScale;
-                    f.SampleFlight(.34f);
-                    Assert.That(f.Image.color.a,Is.EqualTo(.28f).Within(.001f));
-                    Assert.That(CentralMeanAlpha(f.Image.sprite)*f.Image.color.a,Is.LessThan(.3f),"The completed sphere keeps the body's colors visible.");
-                    var overlay=f.Image.GetComponentInParent<Canvas>();Assert.That(overlay.overrideSorting,Is.True);Assert.That(overlay.sortingOrder,Is.EqualTo(4908));
-                    Assert.That(f.Image.raycastTarget,Is.False);Assert.That(f.Image.GetComponentInParent<CanvasGroup>().blocksRaycasts,Is.False);
-                    Assert.That(f.Effect.GetComponents<AudioSource>(),Is.Empty);
-                    f.SampleFlight(ManaShieldVfx.FormationDurationSeconds+.10f);Assert.That(f.Image.color.a,Is.InRange(.02f,.11f));
+                    body.rectTransform.localScale=Vector3.Scale(savedScale,new Vector3(2f,.5f,1));
+                    f.SampleFlight(.25f);
+                    Assert.That(f.Image.rectTransform.sizeDelta,Is.EqualTo(Vector2.one*512f));
+                    Assert.That(Vector3.Distance(f.Image.rectTransform.position,view.GetVisualNormalizedWorldPosition(new Vector2(.5f,1f/32f))),Is.LessThan(.02f));
+                    body.rectTransform.localScale=savedScale;
+                    f.SampleFlight(.25f);
+                    using(var formed=f.Pixels("Fixed-"+owner+"-"+cardId))
+                        Assert.That(f.DifferentPixels(formed,baseline),Is.GreaterThan(100));
+                    Assert.That(f.Image.GetComponentInParent<Canvas>().sortingOrder,Is.EqualTo(4908));
+                    Assert.That(f.Image.raycastTarget,Is.False);
+                    Assert.That(f.Image.GetComponentInParent<CanvasGroup>().blocksRaycasts,Is.False);
                     f.SampleFlight(ManaShieldVfx.DurationSeconds+.001f);f.AssertHidden();
                 }
             }
             yield return new ExitPlayMode();
         }
 
-        private static void AssertSphereEnclosesBody(Fixture f,Image body)
-        {
-            var root=f.Image.rectTransform.parent as RectTransform;
-            var expected=IndependentBodyRect(body,root);
-            var center=(Vector2)root.InverseTransformPoint(f.Image.rectTransform.TransformPoint(Vector3.zero));
-            Assert.That(center.x,Is.EqualTo(expected.center.x).Within(1.5f));
-            Assert.That(center.y,Is.EqualTo(expected.center.y).Within(1.5f));
-            var size=f.Image.rectTransform.sizeDelta;
-            Assert.That(size.x,Is.EqualTo(size.y).Within(.001f),"Wide/tall bodies cannot stretch the mana sphere.");
-            var pixels=f.Image.sprite.texture.GetPixels32();var peak=Resources.LoadAll<Sprite>(ManaShieldVfx.FramesResourcePath).Single(s=>s.name=="Formation_4");
-            var rect=peak.rect;var minX=512;var minY=512;var maxX=-1;var maxY=-1;
-            for(var y=0;y<512;y++)for(var x=0;x<512;x++)
-            {
-                if(pixels[(Mathf.RoundToInt(rect.y)+y)*peak.texture.width+Mathf.RoundToInt(rect.x)+x].a<160)continue;
-                minX=Mathf.Min(minX,x);minY=Mathf.Min(minY,y);maxX=Mathf.Max(maxX,x);maxY=Mathf.Max(maxY,y);
-            }
-            var radius=Mathf.Min(maxX-minX+1,maxY-minY+1)/512f*size.x*.5f;
-            foreach(var corner in new[]{expected.min,expected.max,new Vector2(expected.xMin,expected.yMax),new Vector2(expected.xMax,expected.yMin)})
-                Assert.That(Vector2.Distance(corner,center),Is.LessThanOrEqualTo(radius+1.5f),"Actual peak-circle alpha encloses both body axes.");
-        }
+
         private static float CentralMeanAlpha(Sprite sprite)
         {
             var r=sprite.rect;var pixels=sprite.texture.GetPixels32();double sum=0;var count=0;
@@ -324,30 +304,7 @@ namespace Project333.Tests.EditMode
             SourceOwnerId=caster,TargetOwnerId=owner,TargetCoord=TileCoordDto.FromDomain(new TileCoord(col,row)),TargetRuntimeId=id};
         private static bool IsHurt(TileTextView view)
         {var animator=(Animator)Get(view,"_occupantVisualAnimator");return animator!=null&&animator.runtimeAnimatorController!=null&&animator.GetCurrentAnimatorStateInfo(0).IsName("BeAttacked");}
-        private static Rect IndependentBodyRect(Image body,RectTransform overlay)
-        {
-            var source=new Texture2D(2,2,TextureFormat.RGBA32,false);
-            try
-            {
-                Assert.That(source.LoadImage(File.ReadAllBytes(AssetDatabase.GetAssetPath(body.sprite))),Is.True);
-                var rect=body.sprite.rect;var sx=(float)source.width/body.sprite.texture.width;var sy=(float)source.height/body.sprite.texture.height;
-                var x0=Mathf.FloorToInt(rect.xMin*sx);var y0=Mathf.FloorToInt(rect.yMin*sy);
-                var x1=Mathf.CeilToInt(rect.xMax*sx);var y1=Mathf.CeilToInt(rect.yMax*sy);var pixels=source.GetPixels32();
-                var minX=x1;var minY=y1;var maxX=x0-1;var maxY=y0-1;
-                for(var y=y0;y<y1;y++)for(var x=x0;x<x1;x++)if(pixels[y*source.width+x].a>=16)
-                {minX=Mathf.Min(minX,x);minY=Mathf.Min(minY,y);maxX=Mathf.Max(maxX,x);maxY=Mathf.Max(maxY,y);}
-                Assert.That(maxX,Is.GreaterThanOrEqualTo(minX));
-                var norm=Rect.MinMaxRect((float)(minX-x0)/(x1-x0),(float)(minY-y0)/(y1-y0),(float)(maxX+1-x0)/(x1-x0),(float)(maxY+1-y0)/(y1-y0));
-                var draw=body.GetPixelAdjustedRect();var spriteSize=body.sprite.rect.size;
-                if(body.preserveAspect){var size=spriteSize*Mathf.Min(draw.width/spriteSize.x,draw.height/spriteSize.y);draw=new Rect(draw.center-size*.5f,size);}
-                var a=draw.min+Vector2.Scale(norm.min,draw.size);var b=draw.min+Vector2.Scale(norm.max,draw.size);
-                var corners=new[]{new Vector2(a.x,a.y),new Vector2(a.x,b.y),new Vector2(b.x,b.y),new Vector2(b.x,a.y)};
-                var minimum=new Vector2(float.PositiveInfinity,float.PositiveInfinity);var maximum=new Vector2(float.NegativeInfinity,float.NegativeInfinity);
-                foreach(var corner in corners){var p=(Vector2)overlay.InverseTransformPoint(body.rectTransform.TransformPoint(corner));minimum=Vector2.Min(minimum,p);maximum=Vector2.Max(maximum,p);}
-                return Rect.MinMaxRect(minimum.x,minimum.y,maximum.x,maximum.y);
-            }
-            finally{Object.DestroyImmediate(source);}
-        }
+
 
 
         private sealed class CapturedPixels : IDisposable
@@ -459,7 +416,7 @@ namespace Project333.Tests.EditMode
                 try
                 {
                     RenderTexture.active=_render;texture.ReadPixels(new Rect(0,0,_render.width,_render.height),0,0);texture.Apply();
-                    if(name!=null){var path=Path.GetFullPath(Path.Combine(UnityEngine.Application.dataPath,"../Captures/ManaShield_20261001/"+name+".png"));Directory.CreateDirectory(Path.GetDirectoryName(path));File.WriteAllBytes(path,texture.EncodeToPNG());}
+                    if(name!=null){var path=Path.GetFullPath(Path.Combine(UnityEngine.Application.dataPath,"../Captures/FixedShields_20261029/ManaShield/"+name+".png"));Directory.CreateDirectory(Path.GetDirectoryName(path));File.WriteAllBytes(path,texture.EncodeToPNG());}
                     return new CapturedPixels(texture);
                 }
                 finally{RenderTexture.active=old;}

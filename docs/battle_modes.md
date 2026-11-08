@@ -105,3 +105,33 @@
 ## 운영 DB 마이그레이션 적용 (2026-10-09)
 
 사용자 요청으로 12:57 KST 운영 `project333` DB에 `0023_ai_challenge_run_usage`를 적용했다. 현재 총 23개/latest 0023이며 부분 인덱스 `ai_challenge_run_usage_idx(account_id, run_id) WHERE refunded_at IS NULL`의 valid/ready 상태를 확인했다. 적용 직전 보호된 로컬 경로에 전체 백업을 저장하고 아카이브 전체 읽기를 검증했다. 마이그레이션 이력을 제외한 기존 33개 테이블의 행 수와 전체 행 해시가 적용 전후 일치했고, 도전 기록 25건을 그대로 유지했다. 이번 작업은 DB 적용만 완료했으며 런당 3회 규칙의 서버 배포와 클라이언트 빌드·설치는 아직 별도 작업이다.
+
+
+## AI 매칭 타이머 세션 교체 경쟁 수정 (2026-10-29)
+
+사용자 보고: 일반 PvP에서20초가 지나도 AI 매칭 없이 대기 UI가 계속 표시되는 경우가 간헐적으로 발생. 당시 운영 서버 로그·방ID가 없어 그 사례의 원인을 단정하지 않으며, 이번에는 동일한 무한 대기를 만드는 서버 타이머 경로를 재현·수정했다.
+
+- 기존 Program의 타이머 중복 방지 키는 `MatchId` 문자열이었다. 연결 정리 중 메모리의 빈 방이 제거된 뒤 같은 DB 방ID로 새 `BattleSession`이 만들어지면, 아직20초를 기다리는 옛 방의 키가 새 타이머 등록을 거부했다. 옛 타이머는 자기 방의 연결0개를 보고 끝나므로 새 대기자는 AI 전환 검사 없이 남을 수 있었다. 기존 구조의 `TryAdd` 충돌과 실제 SessionManager를 통한 같은ID 방 교체로 재현했다.
+- 같은 세션에서도 타이머의 마지막 연결 수 검사와 키 제거 사이에 새 접속이 오면 등록이 무시될 수 있었다. 정상 종료 후에는 재등록을 확인하지 않았고 예외일 때만 재시도했다.
+- `PvpAiFallbackScheduler`가 실제 `BattleSession` 객체별로 소유권을 관리한다. 정리 후 연결을 다시 확인해 대기자가 있으면 재등록하며, 동시에 등록하려는 요청은 하나만 허용한다. 옛 방 타이머의 정리가 새 방의 타이머를 삭제하지 않는다.
+- 일시 DB/처리 오류나 사람 입장 예약 대기는1초 간격으로 재검사한다. 예외마다 최초20초 지연을 반복하지 않는다. DB의 실제 연결별/요청별 최소 대기시간 검사와 사람 예약 우선권은 그대로이므로 새 접속이 이전 접속의 대기시간을 상속해20초 전에 AI로 전환되지 않는다.
+- 전투 시작 확정·Connected/BattleStarted/StateView 발송·스냅샷/AI 턴/턴 제한 시작은 Program의 기존 콜백에 유지했다. 매칭 취소, 런/보상, 골드 던전, 재접속70초, DB스키마 및 Unity UI는 변경하지 않았다.
+
+### 검증·반영
+
+- .NET8 서버 Release 컴파일 오류0, 기존 nullable 등 경고101. 별도 경로에만 산출물을 만들었고 서버 프로세스는 시작하지 않았다.
+- `RunAuthorityChecks --ai-fallback-timers-only`: **6개 그룹 통과**. 실제 같은ID 방 제거/재생성·구 구조 충돌 재현, 동시200회+처리 중200회 중복 등록, 일시 오류 후1초 재시도, 처리 중 연결 교체, 종료 취소·재등록 방지, 빈 방/AI 방 제외, 같은ID 교체100회 반복을 포함한다. 수동 제어하는 Task 지연으로20초 벽시계 대기나 타이밍 운에 의존하지 않는다.
+- 기존 `--reconnect-only`: **10개 그룹 통과**.70초 유예·원래 계정/좌석·동시 접속72회·AI 재접속 중복 방지·송신 직렬화24회·종료/시간 초과·같은ID 새 방의 지연 정리 보호를 확인했다.
+- 두 검사는 DB 연결·실제 서버/계정·실사용자 로그 없이 실행했다. SQL 서비스 경로는 변경하지 않았으며 새 임시DB/실제 HTTP·WSS 종단간 매칭/Unity·실기기·운영 재현 검사를 이번에 수행했다고 확대하지 않는다.
+- 증거: 세션 `AiMatchmakingTimer_20261029`의 baseline.json, before/Program.cs, server-build.log, checks-build.log, timer-checks.log, reconnect-checks.log, verification.json.
+
+운영 반영에는 **Lightsail 서버 재배포·재시작**이 필요하다. 이번 변경 때문에 DB 마이그레이션이나 클라이언트 재빌드는 필요하지 않다. 현재는 소스/오프라인 검증 완료이며 운영 배포는 수행하지 않았다. 배포 뒤에도 재현되면 해당 매칭 시각·방ID의 타이머/DB/연결 종료 로그로 다른 원인(예약 대기·메시지 전달·연결 중단)을 구분한다.
+
+개발용 검사(운영 서버·DB 시작 없음):
+
+```powershell
+dotnet build .\Server\Project333.PvpServer\Project333.PvpServer.csproj -c Release -o .\TempBuild\AiFallbackServer
+dotnet build .\Server\Project333.RunAuthorityChecks\RunAuthorityChecks.csproj -c Release -p:ServerOutput=C:\Project_333\TempBuild\AiFallbackServer -o .\TempBuild\AiFallbackChecks
+dotnet .\TempBuild\AiFallbackChecks\RunAuthorityChecks.dll --ai-fallback-timers-only
+dotnet .\TempBuild\AiFallbackChecks\RunAuthorityChecks.dll --reconnect-only
+```

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -127,7 +127,7 @@ namespace Project333.Tests.EditMode
                     {
                         var request = fixture.OnlineRequest(source,new[]{source});
                         AssertTargets(request,owner,row);
-                        Assert.That(((IList)Property(request,"Impacts")).Count,Is.Zero,"A successful wall cue is not damage.");
+                        Assert.That(((IList)Property(request,"Impacts")).Count,Is.Zero,"A cue-only packet contains no damage entries.");
                         Assert.That(((IList)Property(request,"ValuePopupEvents")).Count,Is.Zero);
                         Assert.That(fixture.Estimate(request),Is.EqualTo(FirewallVfx.DurationSeconds+.1f).Within(.001f));
                     }
@@ -139,15 +139,24 @@ namespace Project333.Tests.EditMode
 
         [TestCase(PlayerId.Player,PlayerId.Player)] [TestCase(PlayerId.Player,PlayerId.AI)]
         [TestCase(PlayerId.AI,PlayerId.Player)] [TestCase(PlayerId.AI,PlayerId.AI)]
-        public void RealCastHasNoImmediateDamageAndTwoGlobalTurnStartsMatchOnlineWithFreshPopupOwnership(PlayerId caster,PlayerId owner)
+        public void RealCastDealsImmediateDamageAndKeepsTwoGlobalTurnStartsWithFreshPopupOwnership(PlayerId caster,PlayerId owner)
         {
             using (var fixture = new Fixture(false))
             {
                 var state=fixture.State;var target=state.GetPlayer(owner).Master;var row=target.Position.Row;
                 state.RestoreRuntimeState(1,caster,PhaseType.Main);
-                state.GetPlayer(caster).Hand.Add("Firewall");state.GetPlayer(caster).Resources.Add(new ResourceSet(0,0,3,0));
+                state.GetPlayer(caster).Hand.Add("Firewall");state.GetPlayer(caster).Resources.Add(new ResourceSet(4,0,0,0));
                 fixture.Gateway.ExecuteCommand(caster,new CastScriptedSpellCommand("Firewall",owner,new TileCoord(2,row)));
-                Assert.That(target.CurrentHp,Is.EqualTo(333));Assert.That(state.ValuePopupEvents,Is.Empty);
+                Assert.That(target.CurrentHp,Is.EqualTo(318));
+                Assert.That(state.ValuePopupEvents.Single().Amount,Is.EqualTo(15));
+                Assert.That(state.PersistentEffects.Single().RemainingTriggers,Is.EqualTo(2));
+                Assert.That(state.AreaSpellEffectEvents,Is.Empty,"Cast uses the SpellCast cue, not a duplicate area cue.");
+                var cast=Cast(caster,owner,row);
+                var castRequest=fixture.OnlineRequest(cast,new[]{cast,Damage(state.ValuePopupEvents.Single())});
+                AssertTargets(castRequest,owner,row);
+                Assert.That((bool)Property(castRequest,"GuardAreaRuntimeIds"),Is.True);
+                Assert.That(((IList)Property(castRequest,"ValuePopupEvents")).Count,Is.EqualTo(1));
+                Assert.That(((IList)Property(castRequest,"Impacts")).Count,Is.EqualTo(1));
                 for(var tick=0;tick<3;tick++)
                 {
                     // Deliberately preserve the preceding turn's popup cache.
@@ -167,7 +176,7 @@ namespace Project333.Tests.EditMode
                     var online=fixture.OnlineRequest(wire,new[]{wire,Damage(popups.Single())});
                     AssertTargets(online,owner,row);
                     Assert.That(((IList)Property(online,"ValuePopupEvents")).Cast<BattleValuePopupEvent>().Sum(p=>p.Amount),Is.EqualTo(popups.Sum(p=>p.Amount)));
-                    Assert.That(area.ValuePopupEventIndex,Is.EqualTo(tick));
+                    Assert.That(area.ValuePopupEventIndex,Is.EqualTo(tick+1));
                 }
                 // Snapshotting an unresolved turn with the same old transient list is not a new trigger.
                 state.SetPhase(PhaseType.TurnStart);var stale=Capture(state);
@@ -277,9 +286,9 @@ namespace Project333.Tests.EditMode
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,NewSceneMode.Single);yield return new EnterPlayMode();
             using(var fixture=new Fixture())
             {
-                fixture.State.Player.Hand.Add("Firewall");fixture.State.Player.Resources.Add(new ResourceSet(0,0,3,0));
+                fixture.State.Player.Hand.Add("Firewall");fixture.State.Player.Resources.Add(new ResourceSet(4,0,0,0));
                 Assert.That(fixture.Bootstrapper.TryUsePlayerCardOnTile("Firewall",PlayerId.Player,new TileCoord(4,1),out _),Is.True);
-                fixture.AssertGeometry(PlayerId.Player,1);Assert.That(fixture.State.Player.Master.CurrentHp,Is.EqualTo(333));
+                fixture.AssertGeometry(PlayerId.Player,1);Assert.That(fixture.State.Player.Master.CurrentHp,Is.EqualTo(318));
                 Assert.That(fixture.Bootstrapper.TryUsePlayerCardOnTile("Firewall",PlayerId.AI,new TileCoord(0,0),out _),Is.False);
                 Assert.That(fixture.State.PersistentEffects.Count,Is.EqualTo(1));
                 fixture.Bootstrapper.CancelCombatPresentation();fixture.AssertHidden();
@@ -294,7 +303,7 @@ namespace Project333.Tests.EditMode
         }
 
         [UnityTest]
-        public IEnumerator LocalAiConfirmedFirewallCommandUsesItsActualTargetAndNoImmediateDamage()
+        public IEnumerator LocalAiConfirmedFirewallCommandUsesItsActualTargetAndImmediateDamage()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,NewSceneMode.Single);yield return new EnterPlayMode();
             using(var fixture=new Fixture())
@@ -302,7 +311,7 @@ namespace Project333.Tests.EditMode
                 var state=fixture.State;state.RestoreRuntimeState(1,PlayerId.AI,PhaseType.Main);
                 foreach(var card in state.AI.Hand.Cards.ToArray())state.AI.Hand.Remove(card.CardId,card.RuntimeId);
                 state.AI.Hand.Add("Firewall");
-                state.AI.Resources.Add(new ResourceSet(0,0,3,0));
+                state.AI.Resources.Add(new ResourceSet(4,0,0,0));
                 foreach(var column in new[]{0,1,3,4})
                 {
                     var position=new TileCoord(column,0);
@@ -321,7 +330,9 @@ namespace Project333.Tests.EditMode
                 var timeout=Time.unscaledTime+2;
                 while(!fixture.IsPlaying&&Time.unscaledTime<timeout)yield return null;
                 Assert.That(fixture.IsPlaying,Is.True);fixture.AssertGeometry(command.TargetOwnerId,command.TargetCoord.Row);
-                Assert.That(state.ValuePopupEvents,Is.Empty);Assert.That(state.Player.Master.CurrentHp,Is.EqualTo(333));
+                Assert.That(state.ValuePopupEvents.Count,Is.EqualTo(4));
+                Assert.That(state.ValuePopupEvents.All(e=>e.Amount==15 && e.Cause==BattleValueChangeCause.Firewall),Is.True);
+                Assert.That(state.Player.Master.CurrentHp,Is.EqualTo(333));
                 fixture.Bootstrapper.CancelCombatPresentation();fixture.Bootstrapper.StopAllCoroutines();fixture.AssertHidden();
             }
             yield return new ExitPlayMode();

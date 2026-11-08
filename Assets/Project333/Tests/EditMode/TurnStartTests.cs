@@ -1,9 +1,12 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using Project333.Runtime.Application.Services;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Board;
 using Project333.Runtime.Domain.Cards;
+using Project333.Runtime.Domain.Effects;
+using Project333.Runtime.Domain.Resources;
 
 namespace Project333.Tests.EditMode
 {
@@ -297,6 +300,202 @@ namespace Project333.Tests.EditMode
             Assert.That(state.Player.FailedDrawCount, Is.EqualTo(1));
             Assert.That(state.ValuePopupEvents, Has.Count.EqualTo(1));
         }
+
+        [TestCase(PlayerId.Player, "fallout")]
+        [TestCase(PlayerId.AI, "fallout")]
+        [TestCase(PlayerId.Player, "firewall")]
+        [TestCase(PlayerId.AI, "firewall")]
+        [TestCase(PlayerId.Player, "biochemical_bomb")]
+        [TestCase(PlayerId.AI, "biochemical_bomb")]
+        [TestCase(PlayerId.Player, "timed_bomb")]
+        [TestCase(PlayerId.AI, "timed_bomb")]
+        [TestCase(PlayerId.Player, "cheonra_jimang")]
+        [TestCase(PlayerId.AI, "cheonra_jimang")]
+        public void ResolveTurnStart_KilledProducerNeitherGeneratesResourcesNorPaysUpkeep(PlayerId owner, string hazard)
+        {
+            var state = CreateLaterTurn(owner);
+            var producer = new UnitState("producer", "producer", owner, new TileCoord(0, 0),
+                AttackType.Melee, 3, 5, true, true, sciencePowerUpkeep: 9,
+                turnStartResourceGain: new ResourceSet(7, 0, 8, 0));
+            state.GetBoard(owner).Place(producer.Position, producer);
+            var player = state.GetPlayer(owner);
+            player.Resources.Add(new ResourceSet(0, 0, 5, 0));
+            if (hazard == "fallout") producer.RestoreFallout(1, 0);
+            else AddStartEffect(state, hazard, hazard == "cheonra_jimang" ? owner : state.GetOpponent(owner).Id,
+                target: producer, damage: 10);
+
+            new TurnStartService().ResolveTurnStart(state);
+
+            Assert.That(state.GetBoard(owner).GetOccupant(producer.Position), Is.Null);
+            Assert.That(player.Resources.Mana, Is.Zero);
+            Assert.That(player.Resources.Power, Is.EqualTo(5));
+            Assert.That(player.Resources.Gold, Is.EqualTo(6));
+            Assert.That(state.ResourceChangeEvents.Any(e => e.SourceCardId == producer.CardId), Is.False);
+            Assert.That(state.Phase, Is.EqualTo(PhaseType.Main));
+        }
+
+        [TestCase(PlayerId.Player)]
+        [TestCase(PlayerId.AI)]
+        public void ResolveTurnStart_RefreshAndBaseGoldPrecedeLethalDestructionChain(PlayerId owner)
+        {
+            var state = CreateLaterTurn(owner);
+            var ready = new UnitState("ready", "ready", owner, new TileCoord(0, 0),
+                AttackType.Melee, 3, 100, true, false, 0, maxAttacksPerTurn: 2);
+            ready.HasSummoningSickness = true;
+            ready.RemainingAttacksThisTurn = 0;
+            state.GetBoard(owner).Place(ready.Position, ready);
+            var enemy = state.GetOpponent(owner).Id;
+            var plant = new BuildingState("plant", NuclearPowerPlantRules.CardId, enemy,
+                new TileCoord(0, 0), false, 0, 30);
+            state.GetBoard(enemy).Place(plant.Position, plant);
+            AddStartEffect(state, "cheonra_jimang", owner, target: plant);
+            state.GetPlayer(owner).Master.CurrentHp = 1;
+            var deckBefore = state.GetPlayer(owner).Deck.Count;
+
+            new TurnStartService().ResolveTurnStart(state);
+
+            Assert.That(state.IsEnded, Is.True);
+            Assert.That(ready.HasSummoningSickness, Is.False);
+            Assert.That(ready.RemainingAttacksThisTurn, Is.EqualTo(2));
+            Assert.That(state.GetPlayer(owner).Resources.Gold, Is.EqualTo(6));
+            Assert.That(state.GetPlayer(owner).Deck.Count, Is.EqualTo(deckBefore));
+            Assert.That(state.Phase, Is.EqualTo(PhaseType.Ended));
+        }
+
+        [Test]
+        public void ResolveTurnStart_DirectDestructionPrecedesEarlierCastLethalBomb()
+        {
+            var state = CreateLaterTurn(PlayerId.Player);
+            var victim = new UnitState("victim", "victim", PlayerId.AI, new TileCoord(0, 0),
+                AttackType.Melee, 3, 50, true, false, 0);
+            state.AIBoard.Place(victim.Position, victim);
+            AddStartEffect(state, TimedBombRules.EffectId, PlayerId.Player, damage: 5);
+            var destruction = AddStartEffect(state, "cheonra_jimang", PlayerId.Player, target: victim);
+            state.AI.Master.CurrentHp = 1;
+
+            new TurnStartService().ResolveTurnStart(state);
+
+            Assert.That(destruction.IsExpired, Is.True);
+            Assert.That(state.AIBoard.GetOccupant(victim.Position), Is.Null);
+            Assert.That(state.IsEnded, Is.True);
+            Assert.That(state.ResourceChangeEvents, Is.Empty);
+            Assert.That(state.CardDrawEvents, Is.Empty);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ResolveTurnStart_FalloutThenBombThenTileHazardsInCastOrder(bool reverse)
+        {
+            var state = CreateLaterTurn(PlayerId.Player);
+            var order = reverse
+                ? new[] { "firewall", TimedBombRules.EffectId, BiochemicalBombRules.EffectId }
+                : new[] { TimedBombRules.EffectId, BiochemicalBombRules.EffectId, "firewall" };
+            foreach (var id in order) AddStartEffect(state, id, PlayerId.AI, damage: 1, row: 1);
+            state.Player.Master.RestoreFallout(1, 0);
+
+            new TurnStartService().ResolveTurnStart(state);
+
+            var masterPackets = state.ValuePopupEvents.Where(e => e.RuntimeId == state.Player.Master.RuntimeId).ToArray();
+            Assert.That(masterPackets.Select(e => e.SourceCardId),
+                Is.EqualTo(new[] { NuclearRules.CardId, TimedBombRules.EffectId }
+                    .Concat(order.Where(id => id != TimedBombRules.EffectId))));
+            Assert.That(state.Player.Master.CurrentHp, Is.EqualTo(320));
+            Assert.That(state.TimedBombCountdownEvents, Has.Count.EqualTo(1));
+            Assert.That(state.TimedBombCountdownEvents[0].EffectIndex,
+                Is.EqualTo(System.Array.IndexOf(order, TimedBombRules.EffectId)));
+        }
+
+        [Test]
+        public void ResolveTurnStart_ProductionThenPersistentGrantThenPowerAndGoldPayment()
+        {
+            var state = CreateLaterTurn(PlayerId.Player);
+            var producer = new BuildingState("producer", "producer", PlayerId.Player, new TileCoord(0, 0),
+                false, 0, 50, turnStartResourceGain: new ResourceSet(0, 0, 1, 0));
+            var consumer = new UnitState("consumer", "consumer", PlayerId.Player, new TileCoord(0, 1),
+                AttackType.Melee, 3, 50, true, true, 3);
+            state.PlayerBoard.Place(producer.Position, producer);
+            state.PlayerBoard.Place(consumer.Position, consumer);
+            var grant = new PersistentEffectState("grant", PlayerId.Player, "grant", 1, "last grant",
+                new ResourceSet(0, 0, 1, 0), ownerTurnStartsRemaining: 1);
+            state.PersistentEffects.Add(grant);
+
+            new TurnStartService().ResolveTurnStart(state);
+
+            Assert.That(state.ResourceChangeEvents.Select(e => e.SourceCardId),
+                Is.EqualTo(new[] { "producer", "grant", "consumer" }));
+            Assert.That(grant.IsExpired, Is.True);
+            Assert.That(state.Player.Resources.Power, Is.Zero);
+            Assert.That(state.Player.Resources.Gold, Is.EqualTo(5));
+            Assert.That(consumer.IsDrained, Is.False);
+        }
+
+        [TestCase(PlayerId.Player)]
+        [TestCase(PlayerId.AI)]
+        public void ResolveTurnStart_DestructionChainVictimsDoNotProduce(PlayerId owner)
+        {
+            var state = CreateLaterTurn(owner);
+            var plant = new BuildingState("plant", NuclearPowerPlantRules.CardId, owner,
+                new TileCoord(0, 0), false, 0, 5, turnStartResourceGain: new ResourceSet(0, 0, 3, 0));
+            var producer = new UnitState("chain-producer", "chain-producer", owner, new TileCoord(0, 1),
+                AttackType.Melee, 3, 5, true, false, 0, new ResourceSet(7, 0, 0, 0));
+            state.GetBoard(owner).Place(plant.Position, plant);
+            state.GetBoard(owner).Place(producer.Position, producer);
+            AddStartEffect(state, "firewall", state.GetOpponent(owner).Id, target: plant, damage: 10);
+
+            new TurnStartService().ResolveTurnStart(state);
+
+            Assert.That(state.GetBoard(owner).GetOccupant(plant.Position), Is.Null);
+            Assert.That(state.GetBoard(owner).GetOccupant(producer.Position), Is.Null);
+            Assert.That(state.GetPlayer(owner).Resources.Mana, Is.Zero);
+            Assert.That(state.GetPlayer(owner).Resources.Power, Is.Zero);
+            Assert.That(state.ResourceChangeEvents, Is.Empty);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ResolveTurnStart_SealReleaseAndRevivalFollowDrawAndStopOnLethalFatigue(bool lethal)
+        {
+            var state = CreateLaterTurn(PlayerId.Player);
+            EmptyDeck(state.Player.Deck);
+            state.Player.Master.CurrentHp = lethal ? 3 : 100;
+            var sealedUnit = new UnitState("sealed", "sealed", PlayerId.Player, new TileCoord(0, 0),
+                AttackType.Melee, 3, 50, true, false, 0, new ResourceSet(7, 0, 0, 0));
+            sealedUnit.EnterSealbound(1);
+            state.PlayerBoard.Place(sealedUnit.Position, sealedUnit);
+            var king = new UnitState("king", DemonKingRules.CardId, PlayerId.AI, new TileCoord(0, 0),
+                AttackType.Melee, 33, 33, true, false, 0);
+            state.AIBoard.Place(king.Position, king);
+            Assert.That(king.TryEnterDemonKingRevivalSeal(PlayerId.Player, 1), Is.True);
+            king.RestoreDemonKingRevivalState(true, 1, PlayerId.Player, 1, 0);
+
+            new TurnStartService().ResolveTurnStart(state);
+
+            Assert.That(state.Player.FailedDrawCount, Is.EqualTo(1));
+            Assert.That(state.Player.Resources.Mana, Is.Zero);
+            Assert.That(sealedUnit.IsSealbound, Is.EqualTo(lethal));
+            Assert.That(king.IsDemonKingRevivalPending, Is.EqualTo(lethal));
+            Assert.That(king.CurrentHp, Is.EqualTo(lethal ? 0 : 66));
+            Assert.That(state.Phase, Is.EqualTo(lethal ? PhaseType.Ended : PhaseType.Main));
+        }
+
+        private static BattleState CreateLaterTurn(PlayerId owner)
+        {
+            var state = CreateBattleState(owner);
+            state.RestoreRuntimeState(3, owner, PhaseType.TurnStart);
+            return state;
+        }
+
+        private static PersistentEffectState AddStartEffect(BattleState state, string id, PlayerId owner,
+            OccupantState target = null, int damage = 0, int row = 0)
+        {
+            var effect = new PersistentEffectState(id, owner, id, 1, "one trigger", new ResourceSet(),
+                targetRuntimeId: target?.RuntimeId, targetRow: target?.Position.Row ?? row,
+                remainingTriggers: 1, effectDamage: damage, effectDamageType: DamageType.Fixed,
+                targetStartColumn: 0);
+            state.PersistentEffects.Add(effect);
+            return effect;
+        }
+
         private static BattleState CreateBattleState(PlayerId firstPlayerId)
         {
             var setupService = new BattleSetupService();

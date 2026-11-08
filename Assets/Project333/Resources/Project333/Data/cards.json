@@ -314,9 +314,9 @@
       "includeInRewards": true,
       "affiliation": "Fantasy",
       "chargeTileFootprint": "None",
-      "cost": { "mana": 3 },
-      "effectText": "다음 2턴 시작 시, 선택한 5X1 타일에 마법 데미지를 입힌다.",
-      "specialEffectText": "2턴 지속",
+      "cost": { "mana": 4 },
+      "effectText": "5*1타일을 선택한다. 즉시 및 다음 2턴 시작 시, 선택한 타일에 마법 데미지를 입힌다.",
+      "specialEffectText": "5*1타일을 선택한다. 즉시 및 다음 2턴 시작 시, 선택한 타일에 마법 데미지를 입힌다.",
       "damageType": "Magic",
       "damage": 15,
       "effectId": "firewall",
@@ -406,6 +406,8 @@
       "affiliation": "Fantasy",
       "chargeTileFootprint": "OneByOne",
       "cost": { "mana": 1 },
+      "effectText": "유산: 카드를 1장 드로우한다.",
+      "specialEffectText": "유산: 카드를 1장 드로우한다.",
       "attackType": "Melee",
       "damageType": "Physical",
       "attack": 10,
@@ -429,8 +431,8 @@
       "cost": {
         "mana": 1
       },
-      "effectText": "",
-      "specialEffectText": "",
+      "effectText": "유산: 카드를 1장 드로우한다.",
+      "specialEffectText": "유산: 카드를 1장 드로우한다.",
       "attackType": "Ranged",
       "damageType": "Physical",
       "attack": 10,
@@ -450,6 +452,8 @@
       "affiliation": "Fantasy",
       "chargeTileFootprint": "OneByOne",
       "cost": { "mana": 1 },
+      "effectText": "유산: 카드를 1장 드로우한다.",
+      "specialEffectText": "유산: 카드를 1장 드로우한다.",
       "attackType": "Melee",
       "damageType": "Physical",
       "attack": 20,
@@ -652,7 +656,8 @@
       "affiliation": "ScienceCivilization",
       "chargeTileFootprint": "OneByOne",
       "cost": { "power": 5 },
-      "effectText": "내 턴 시작 시 전력 +3. 파괴될 때 양쪽 전장 전체에 30 물리 데미지.",
+      "effectText": "내 턴 시작 시 전력 +3. 유산: 전장 전체에 30의 물리 데미지를 입힌다.",
+      "specialEffectText": "유산: 전장 전체에 30의 물리 데미지를 입힌다.",
       "damageType": "None",
       "attack": 0,
       "health": 30,
@@ -1122,6 +1127,25 @@
       "trapTrigger": "EnemyUnitSummoned",
       "trapEffect": "DamageSummonedUnitPhysical",
       "trapActivationCost": { "mana": 0, "qi": 0, "power": 0, "gold": 1 }
+    },
+    {
+      "id": "JarOfGreed",
+      "displayName": "욕망의 단지",
+      "definitionType": "ScriptedSpell",
+      "rarity": "Rare",
+      "affiliation": "Neutral",
+      "chargeTileFootprint": "None",
+      "cost": {
+        "gold": 1
+      },
+      "effectText": "사용 즉시 카드 2장 드로우",
+      "specialEffectText": "",
+      "includeInDraft": true,
+      "includeInRewards": false,
+      "effectId": "jar_of_greed",
+      "damage": 0,
+      "damageType": "None",
+      "effectAmount": 2
     }
   ]
 }

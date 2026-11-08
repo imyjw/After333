@@ -190,7 +190,7 @@ namespace Project333.Tests.EditMode
         public void AllCanonicalDefinitionsMatchEveryActualLevelAndFinalTotal()
         {
             var definitions = Definitions();
-            Assert.That(definitions.Count, Is.EqualTo(60));
+            Assert.That(definitions.Count, Is.EqualTo(61));
             Assert.That(definitions.Count(CardUpgradeRules.IsCardUpgradeable), Is.EqualTo(44));
             foreach (var definition in definitions)
                 AssertAgainstActualRules(definition);
@@ -201,7 +201,7 @@ namespace Project333.Tests.EditMode
         {
             var catalog = AssetDatabase.LoadAssetAtPath<CardDefinitionCatalogAsset>(CatalogPath);
             Assert.That(catalog, Is.Not.Null);
-            Assert.That(catalog.Cards.Count, Is.EqualTo(54));
+            Assert.That(catalog.Cards.Count, Is.EqualTo(55));
             var canonical = Definitions().ToDictionary(card => card.CardId, StringComparer.Ordinal);
             foreach (var asset in catalog.Cards)
             {

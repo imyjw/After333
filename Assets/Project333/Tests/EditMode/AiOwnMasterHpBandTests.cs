@@ -151,5 +151,77 @@ namespace Project333.Tests.EditMode
                 "The same projected damage is not credited twice; only the extra action cost changes.");
             Assert.That(state.AI.Master.CurrentHp, Is.EqualTo(333));
         }
+
+        [Test]
+        public void PositionValueWithHuanShuThreatUsesFrozenMasterExposureHp()
+        {
+            var state = State(323);
+            var chief = new UnitState("chief", GaebangChiefRules.CardId, PlayerId.Player, new TileCoord(1, 0),
+                AttackType.Melee, 10, 60, false, false, 0, null);
+            chief.HasSummoningSickness = false;
+            chief.RemainingAttacksThisTurn = 1;
+            chief.ApplyHuanShu();
+            state.PlayerBoard.Place(chief.Position, chief);
+            state.Player.Resources.Add(new ResourceSet(0, 0, 0, 15));
+
+            var before = Evaluate("EvaluateForPlanning", state, 323);
+            state.AI.Master.CurrentHp = 313;
+            Assert.That(Evaluate("EvaluateForPlanning", state, 323), Is.EqualTo(before).Within(0.000001));
+        }
+
+        [TestCase(12)]
+        [TestCase(15)]
+        public void MasterDoesNotSelfHarmAgainstArmoredDefenderToCrossHuanShuEmergencyThreshold(int playerGold)
+        {
+            var state = State(323);
+            state.PlayerBoard.Remove(new TileCoord(0, 0));
+
+            var shaolin = new UnitState("player-shaolin", "ShaolinFirstDisciple", PlayerId.Player, new TileCoord(2, 0),
+                AttackType.Melee, 10, 41, false, false, 0, null);
+            shaolin.HasSummoningSickness = false;
+            shaolin.RemainingAttacksThisTurn = 1;
+            shaolin.ApplyCombatStatBuff(PlasmaShieldRules.CardId, physicalDefenseBonus: 10);
+            shaolin.ApplyCombatStatBuff(PlasmaShieldRules.CardId, physicalDefenseBonus: 10);
+            state.PlayerBoard.Place(shaolin.Position, shaolin);
+
+            var chief = new UnitState("player-chief", GaebangChiefRules.CardId, PlayerId.Player, new TileCoord(0, 0),
+                AttackType.Melee, 10, 60, false, false, 0, null);
+            chief.HasSummoningSickness = false;
+            chief.RemainingAttacksThisTurn = 1;
+            chief.ApplyHuanShu();
+            state.PlayerBoard.Place(chief.Position, chief);
+            state.Player.Resources.Add(new ResourceSet(0, 0, 2, playerGold));
+
+            // Full 10-occupant AI board with AI Master exposed at (2, 0) and sub-20 attack units.
+            state.AIBoard.Move(state.AI.Master.Position, new TileCoord(2, 0));
+            PlaceAiOccupant(state, "npp-1", "NuclearPowerPlant", new TileCoord(0, 1), OccupantKind.Building, 0, 50, new ResourceSet(0, 0, 3, 0));
+            PlaceAiOccupant(state, "npp-2", "NuclearPowerPlant", new TileCoord(1, 1), OccupantKind.Building, 0, 50, new ResourceSet(0, 0, 3, 0));
+            PlaceAiOccupant(state, "pp-1", PowerPlantRules.CardId, new TileCoord(2, 1), OccupantKind.Building, 0, 40, new ResourceSet(0, 0, 1, 0));
+            PlaceAiOccupant(state, "pp-2", PowerPlantRules.CardId, new TileCoord(3, 1), OccupantKind.Building, 0, 40, new ResourceSet(0, 0, 1, 0));
+            PlaceAiOccupant(state, "ai-shaolin", "ShaolinFirstDisciple", new TileCoord(0, 0), OccupantKind.Unit, 10, 50, null);
+            PlaceAiOccupant(state, "ww-1", "Werewolf", new TileCoord(1, 0), OccupantKind.Unit, 4, 25, null);
+            PlaceAiOccupant(state, "ww-2", "Werewolf", new TileCoord(3, 0), OccupantKind.Unit, 4, 25, null);
+            PlaceAiOccupant(state, "goblin", "Goblin", new TileCoord(4, 0), OccupantKind.Unit, 6, 12, null);
+            PlaceAiOccupant(state, "cerberus", "Cerberus", new TileCoord(4, 1), OccupantKind.Unit, 4, 25, null);
+            state.AI.Resources.Add(new ResourceSet(0, 0, 31, 0));
+
+            var planner = Planner();
+            var root = Root(state);
+            var masterAttack = Expand(planner, root, new AttackCommand(state.AI.Master.Position, shaolin.Position));
+            var end = Expand(planner, root, new EndTurnCommand());
+            Assert.That(Field<double>(masterAttack, "Score") - Field<double>(end, "Score"), Is.EqualTo(-8.0).Within(0.000001));
+            Assert.That(planner.GetNextCommand(state), Is.TypeOf<EndTurnCommand>());
+        }
+
+        private static void PlaceAiOccupant(BattleState state, string runtimeId, string cardId, TileCoord coord,
+            OccupantKind kind, int attack, int hp, ResourceSet gain)
+        {
+            OccupantState occupant = kind == OccupantKind.Building
+                ? new BuildingState(runtimeId, cardId, PlayerId.AI, coord, false, attack, hp, gain)
+                : new UnitState(runtimeId, cardId, PlayerId.AI, coord, AttackType.Melee, attack, hp, false, false, 0, gain);
+            occupant.HasSummoningSickness = false;
+            occupant.RemainingAttacksThisTurn = kind == OccupantKind.Unit ? 1 : 0;
+            state.AIBoard.Place(coord, occupant);
+        }
     }
 }

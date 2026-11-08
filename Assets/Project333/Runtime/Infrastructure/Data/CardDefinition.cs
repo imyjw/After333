@@ -44,6 +44,8 @@ namespace Project333.Runtime.Infrastructure.Data
 
         public bool HasReplicate { get; }
 
+        public bool HasLegacy => LegacyRules.HasLegacy(CardId);
+
         public virtual bool HasTrap => false;
     }
 }

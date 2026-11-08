@@ -22,9 +22,8 @@ MonoBehaviour:
     _gold: 0
   _affiliation: 2
   _chargeTileFootprint: 1
-  _effectText: "\uD30C\uAD34\uB420 \uB54C \uC591\uCABD \uC804\uC7A5 \uC804\uCCB4\uC5D0
-    30 \uBB3C\uB9AC \uB370\uBBF8\uC9C0."
-  _specialEffectText: "\uC804\uB825+3"
+  _effectText: "\ub0b4 \ud134 \uc2dc\uc791 \uc2dc \uc804\ub825 +3. \uc720\uc0b0: \uc804\uc7a5 \uc804\uccb4\uc5d0 30\uc758 \ubb3c\ub9ac \ub370\ubbf8\uc9c0\ub97c \uc785\ud78c\ub2e4."
+  _specialEffectText: "\uc720\uc0b0: \uc804\uc7a5 \uc804\uccb4\uc5d0 30\uc758 \ubb3c\ub9ac \ub370\ubbf8\uc9c0\ub97c \uc785\ud78c\ub2e4."
   _hasReplicate: 0
   _boardSprite: {fileID: 4723107735738678597, guid: b6f87a07c9a0c1542be31ec7989b3a6b, type: 3}
   _boardAnimatorController: {fileID: 9100000, guid: 8ff1018efdbda5c4b8e4e37d46c0f8a3, type: 2}

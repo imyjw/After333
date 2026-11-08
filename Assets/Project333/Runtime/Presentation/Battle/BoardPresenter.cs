@@ -91,11 +91,11 @@ namespace Project333.Runtime.Presentation.Battle
 
             PresentBoard(
                 battleState == null ? null : battleState.PlayerBoard,
-                _playerTileViews);
+                _playerTileViews, battleState);
 
             PresentBoard(
                 battleState == null ? null : battleState.AIBoard,
-                _aiTileViews);
+                _aiTileViews, battleState);
 
             if (_biochemicalGasVfx == null && battleState != null && battleState.PersistentEffects.Count > 0)
                 _biochemicalGasVfx = gameObject.GetComponent<BiochemicalGasVfx>() ?? gameObject.AddComponent<BiochemicalGasVfx>();
@@ -217,7 +217,7 @@ namespace Project333.Runtime.Presentation.Battle
             }
         }
 
-        private static void PresentBoard(BoardState boardState, TileView[] tileViews)
+        private static void PresentBoard(BoardState boardState, TileView[] tileViews, BattleState battleState)
         {
             foreach (var tileView in tileViews)
             {
@@ -230,6 +230,7 @@ namespace Project333.Runtime.Presentation.Battle
                     ? null
                     : boardState.GetOccupant(tileView.Coord);
 
+                tileView.GetComponent<TileTextView>()?.SetAttackIndicatorBattle(battleState);
                 tileView.Present(occupant);
             }
         }

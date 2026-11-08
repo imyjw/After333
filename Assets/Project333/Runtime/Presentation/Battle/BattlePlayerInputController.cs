@@ -59,6 +59,12 @@ namespace Project333.Runtime.Presentation.Battle
         private Vector2 _dragStartScreenPosition;
         private Vector2 _dragCurrentScreenPosition;
         private TileView _dragHoveredTileView;
+        private bool _handWasExpandedBeforeDrag;
+        private bool _dragHasLeftHand;
+        private bool _dragReturnedToHand;
+        private bool _isSubmittingHandCardDrop;
+        private bool _hasDragReturnHorizontalBounds;
+        private Vector2 _dragReturnHorizontalBounds;
         private bool _isTrackingBackgroundDeselectPointer;
         private int _backgroundDeselectPointerId;
         private Vector2 _backgroundDeselectPointerStartPosition;
@@ -576,6 +582,12 @@ namespace Project333.Runtime.Presentation.Battle
             _dragStartScreenPosition = screenPosition;
             _dragCurrentScreenPosition = screenPosition;
             _dragHoveredTileView = null;
+            _handWasExpandedBeforeDrag = _handPresenter != null && _handPresenter.IsExpanded;
+            _dragHasLeftHand = false;
+            _dragReturnedToHand = false;
+            _hasDragReturnHorizontalBounds = _handPresenter != null &&
+                _handPresenter.TryGetDragReturnHorizontalBounds(out _dragReturnHorizontalBounds);
+            _handPresenter?.SetExpanded(false);
             _interactionStatus = BuildDragMessage(handCardView.CardId);
         }
 
@@ -592,6 +604,29 @@ namespace Project333.Runtime.Presentation.Battle
 
             _dragCurrentScreenPosition = screenPosition;
             _dragHoveredTileView = ResolveLegalDragHoverTile(screenPosition);
+            UpdateDraggedHandExpansion(screenPosition);
+        }
+
+        private void UpdateDraggedHandExpansion(Vector2 screenPosition)
+        {
+            if (!_handWasExpandedBeforeDrag || _handPresenter == null) return;
+            var travelUp = screenPosition.y - _dragStartScreenPosition.y;
+            var withinHandWidth = !_hasDragReturnHorizontalBounds ||
+                (screenPosition.x >= _dragReturnHorizontalBounds.x && screenPosition.x <= _dragReturnHorizontalBounds.y);
+            var leaveDistance = Mathf.Max(1f, _selfCastDragReleaseThreshold);
+            if (travelUp >= leaveDistance || !withinHandWidth)
+            {
+                _dragHasLeftHand = true;
+                _dragReturnedToHand = false;
+                _handPresenter.SetExpanded(false);
+            }
+            else if (_dragHasLeftHand && travelUp <= leaveDistance * 0.5f)
+            {
+                // Separate return/leave thresholds prevent flicker near the boundary.
+                _dragReturnedToHand = true;
+                _handPresenter.SetExpanded(true);
+            }
+            if (_dragReturnedToHand) _dragHoveredTileView = null;
         }
 
         private void HandleHandCardDragCancelled(HandCardView handCardView)
@@ -616,9 +651,19 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             _dragCurrentScreenPosition = screenPosition;
+            var restoreExpandedHand = _handWasExpandedBeforeDrag;
+            var usedCard = false;
+            _isSubmittingHandCardDrop = true;
 
             try
             {
+                UpdateDraggedHandExpansion(screenPosition);
+                if (_dragReturnedToHand)
+                {
+                    ClearCardSelection();
+                    _interactionStatus = string.Empty;
+                    return;
+                }
                 var cardId = _draggedCardId;
                 var battleState = _battleBootstrapper?.CurrentBattleState;
                 var hoveredTileView = ResolveLegalDragHoverTile(screenPosition);
@@ -627,7 +672,7 @@ namespace Project333.Runtime.Presentation.Battle
                 if (hoveredTileView != null && CanCardUseOnTile(battleState, cardId, hoveredTileView))
                 {
                     var resolvedTargetCoord = ResolveCardTargetCoord(cardId, hoveredTileView);
-                    _battleBootstrapper.TryUsePlayerCardOnTile(
+                    usedCard = _battleBootstrapper.TryUsePlayerCardOnTile(
                         cardId,
                         _draggedHandCardRuntimeId,
                         hoveredTileView.OwnerId,
@@ -643,7 +688,7 @@ namespace Project333.Runtime.Presentation.Battle
                     var beganRobotFusion = IsRobotFusionCard(battleState, cardId);
                     if (beganRobotFusion)
                     {
-                        _battleBootstrapper.TryBeginPlayerRobotFusion(
+                        usedCard = _battleBootstrapper.TryBeginPlayerRobotFusion(
                             cardId,
                             _draggedHandCardRuntimeId,
                             out var message);
@@ -651,7 +696,7 @@ namespace Project333.Runtime.Presentation.Battle
                     }
                     else
                     {
-                        _battleBootstrapper.TryCastPlayerPersistentSpell(
+                        usedCard = _battleBootstrapper.TryCastPlayerPersistentSpell(
                             cardId,
                             _draggedHandCardRuntimeId,
                             out var message);
@@ -674,7 +719,12 @@ namespace Project333.Runtime.Presentation.Battle
             }
             finally
             {
+                _isSubmittingHandCardDrop = false;
+                // A successful synchronous refresh may already cancel/rebind the
+                // source view. Keep the original expansion intent in this scope.
+                _handWasExpandedBeforeDrag = false;
                 ClearHandCardDragState();
+                if (restoreExpandedHand) _handPresenter?.SetExpanded(!usedCard);
             }
         }
 
@@ -759,7 +809,15 @@ namespace Project333.Runtime.Presentation.Battle
                 RefreshActiveEffectButton();
         }
 
-        private void OnDisable() => HideActiveEffectButton();
+        private void OnDisable()
+        {
+            HideActiveEffectButton();
+            if (_isDraggingCard)
+            {
+                ClearCardSelection();
+                ClearHandCardDragState();
+            }
+        }
 
         private void HandleTileClicked(TileView tileView)
         {
@@ -957,7 +1015,7 @@ namespace Project333.Runtime.Presentation.Battle
             var wasMoved = _battleBootstrapper.TryMovePlayerOccupant(fromCoord, tileView.Coord, out var moveMessage);
             _interactionStatus = moveMessage;
 
-            if (wasMoved)
+            if (wasMoved || !CanOccupantAct(battleState?.PlayerBoard?.GetOccupant(fromCoord)))
             {
                 ClearUnitSelection();
             }
@@ -1240,6 +1298,13 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void ClearHandCardDragState()
         {
+            if (_handWasExpandedBeforeDrag && !_isSubmittingHandCardDrop)
+                _handPresenter?.SetExpanded(true);
+            _handWasExpandedBeforeDrag = false;
+            _dragHasLeftHand = false;
+            _dragReturnedToHand = false;
+            _hasDragReturnHorizontalBounds = false;
+            _dragReturnHorizontalBounds = Vector2.zero;
             _isDraggingCard = false;
             _draggedCardId = string.Empty;
             _draggedHandCardRuntimeId = string.Empty;
@@ -1526,27 +1591,9 @@ namespace Project333.Runtime.Presentation.Battle
                 return false;
             }
 
-            if (definition.HasTrap) return true;
-            if (definition is DamageSpellCardDefinition)
-            {
-                return false;
-            }
-
-            if (definition is ScriptedSpellCardDefinition scriptedSpellDefinition &&
-                (string.Equals(scriptedSpellDefinition.EffectId, "cheonra_jimang", StringComparison.Ordinal) ||
-                 string.Equals(scriptedSpellDefinition.EffectId, "firewall", StringComparison.Ordinal) ||
-                 string.Equals(scriptedSpellDefinition.EffectId, FireSpearRules.EffectId, StringComparison.Ordinal) ||
-                 string.Equals(scriptedSpellDefinition.EffectId, PlasmaShieldRules.EffectId, StringComparison.Ordinal) ||
-                 string.Equals(scriptedSpellDefinition.EffectId, ManaShieldRules.EffectId, StringComparison.Ordinal) ||
-                 string.Equals(scriptedSpellDefinition.EffectId, BiochemicalBombRules.EffectId, StringComparison.Ordinal) ||
-                 string.Equals(scriptedSpellDefinition.EffectId, GuRules.EffectId, StringComparison.Ordinal) ||
-                 string.Equals(scriptedSpellDefinition.EffectId, HuanShuRules.EffectId, StringComparison.Ordinal)))
-            {
-                return false;
-            }
-
-            return definition is PersistentResourceSpellCardDefinition ||
-                   definition is ScriptedSpellCardDefinition;
+            // Robot fusion starts a separate material-selection flow. Every other targetless
+            // spell shares classification with the cast path and its automatic blue-shard VFX.
+            return SpellCardUseRules.IsUntargeted(definition) || IsRobotFusionDefinition(definition);
         }
 
         private bool CanDragCardInCurrentState(BattleState battleState, string cardId)

@@ -145,6 +145,8 @@ namespace Project333.Runtime.Domain.Cards
         public bool HasEndure { get; protected set; }
         public bool HasShielder { get; protected set; }
         public bool HasLifeSteal { get; protected set; }
+
+        public bool HasLegacy => !IsErasure && LegacyRules.HasLegacy(CardId);
         public DamageType DamageType { get; protected set; }
         public int OriginalPhysicalDefense { get; private set; }
         public int OriginalMagicDefense { get; private set; }

@@ -1,6 +1,6 @@
 # 손패 스펠 공통 사용 연출
 
-2026-10-24 사용자 요청. 대환단·마정석·보조배터리처럼 별도 타일을 지정하지 않고 위로 드래그하는 마법은 카드마다 다른 효과 대신 같은 푸른 조각 연출을 사용한다. 기존 전체 전장 마법·지속 자원 마법도 `TryCastPlayerPersistentSpell` 경로를 사용하면 함께 적용된다. 2026-10-25부터 트랩 5종도 위로 드래그해 설치하고 같은 연출을 사용한다. 타일 지정 마법·유닛/건물 소환·로봇 합체 재료 선택은 이 경로에 포함되지 않는다.
+2026-10-24 사용자 요청. 대환단·마정석·보조배터리처럼 별도 타일을 지정하지 않고 위로 드래그하는 마법은 카드마다 다른 효과 대신 같은 푸른 조각 연출을 사용한다. 기존 전체 전장 마법·지속 자원 마법도 `TryCastPlayerPersistentSpell` 경로를 사용하면 함께 적용된다. 2026-10-28에는 입력/시전 양쪽이 `SpellCardUseRules.IsUntargeted`를 공유하도록 통합했다. 새 대상 없는 ScriptedSpell은 별도 연출 허용 목록 없이 자동으로 같은 경로를 사용한다. 2026-10-25부터 트랩 5종도 위로 드래그해 설치하고 같은 연출을 사용한다. 타일 지정 마법·유닛/건물 소환·로봇 합체 재료 선택은 이 경로에 포함되지 않는다.
 
 - 사용한 카드 그림이 잠깐 푸르게 반짝인 뒤 작은 푸른 조각으로 분해되어 바깥쪽·위쪽으로 흩어진다. 청백색 반짝임을 더하고 **0.145초**에 종료한다. 카드별 색·모양 구분이나 새 효과음은 추가하지 않는다.
 - 실제 사용 요청 직전 그림의 스프라이트·UV·색·실제 종횡비 영역·위치·회전·배율·Canvas 순서를 저장한다. 응답을 기다리는 동안 놓은 위치에 정지된 시각 사본을 유지하고, 원래 RuntimeId의 손패 그림·입력은 숨겨 손패로 돌아가지 않게 한다. 드래그 위치와 슬롯 재사용/정렬을 분리하며 요청이 실패하면 정상 표시·입력으로 복구한다.
@@ -14,7 +14,8 @@
 - `Assets/Project333/Runtime/Presentation/Hand/SpellCardUseVfx.cs`: `Duration`, 조각16×22, 이동·회전·크기·청색/반짝임 색. 이미지 별도 제작이나 머티리얼 추가, 런타임 텍스처 읽기 없이 UI 메시를 사용한다. 카드 조각352개, 반짝임88개(각 최대3 quad)로 제한한다.
 - `HandPresenter.SpellCardUse.cs`: RuntimeId별 캡처·즉시 확정 재생·원본 표시 억제·중복 방지·정리.
 - `HandCardTextView.SpellCardUse.cs`: 실제 손패 슬롯의 원본 그림/입력 억제와 복구. 카드가 다른 슬롯으로 옮겨지면 같은 RuntimeId를 따라간다.
-- `BattleBootstrapper.cs`: 대상 없는 마법의 요청/로컬 성공과 온라인 자기 `SpellCast`/일반 `TrapInstalled` 연결.
+- `BattleBootstrapper.cs`: 대상 없는 마법의 요청/로컬 성공과 온라인 자기 `SpellCast`/일반 `TrapInstalled` 연결. 대상 소환물의 능력치 증가 연출은 `BattleScreenPresenter`가 확정 상태를 표시할 때 별도로 감지한다.
+- `Assets/Project333/Runtime/Presentation/Battle/OccupantStatIncreaseVfx.cs`: 공격력 빨강/최대 체력 초록/동시 증가 노랑의 소환물 공통 연출. [상세](stat_increase_presentation.md).
 - `OnlineBattleConnectionTester.cs`: 서버 거절 시 미확정 캡처 정리.
 
 ## 검증
@@ -26,3 +27,21 @@
 2026-10-25 후속 수정: 재생시간0.29→0.145초로 추가2배속. 지연 손패 갱신을 재현한 수정 전 검사1개 실패 → 수정 후 새/기존25/25 통과(스펠7, 임시 복제8, 드래그10; 스펠 실 Play 검사6개). 지진 카드로 손패를 갱신하지 않고 확정만 전달해 즉시 재생·고정 위치·원본 숨김·종료 후 미복귀·늦은 갱신 시 미재생·슬롯 재사용을 검사하고, 응답 대기가 연출 시간보다 길어도 정지 사본 유지·거절 시 해당 카드만 복원됨을 확인했다. 별도 실제 전장 지진 연출/실서버/실기기 검사는 수행하지 않았다.
 
 2026-10-25 트랩 입력 확장: 격리 Unity에서 스펠10·임시 복제8·드래그10·상대 공개9, 총 **37/37 통과**. 트랩 5종의 실제 위로 드래그·무료 설치·RuntimeId 제거·놓은 위치 연출, 짧은 드래그 취소·동일 트랩 중복 거절, 양쪽 좌석의 일반 설치 응답/상대 설치/일반 마법 대기 분리를 확인했다. 살아 있는 마스터 조건·발동 비용·서버 비밀 필터링은 유지한다. 실제 기기·실서버 통신은 별도다.
+
+2026-10-26 현재: 아래 대환단 전용 연출은 [공통 능력치 증가 연출](stat_increase_presentation.md)로 확장했다. 기존 형태·0.62초는 유지하며 대환단은 빨강, 최대 체력 증가는 초록, 동시 증가는 노랑이다. 소환물의 실제 상태 증가로 재생하므로 대환단 전용 이벤트 호출은 제거했다. 관련68/68 및3색 렌더 통과.
+
+아래는 공통화 전 대환단 전용 구현·13개 검증의 당시 기록이다. 이전 파일명은 현재 공통 파일로 변경되었다.
+
+2026-10-26 대환단(`Daehwandan`) 마스터 공격력 강화 연출 추가 당시:
+- 기존 손패 푸른 조각 분해(`0.145초`, `SpellCardUseVfx`)는 그대로 유지하면서, 대환단 사용이 성공한 시점에만 시전자 마스터에게 **0.62초** 동안 **붉은색** 무림 기(氣) 공격력 강화 이펙트(`DaehwandanMasterVfx`)를 1회 재생한다.
+- **1단계 (`0.00~0.66` 정규화 진행률)**: 마스터 실제 몸체(`StatusSpriteBoundsAsset`의 `unit:Assets/Unit/Master`) 발밑에서 작은 원형(타원) 기 파동 2겹이 바깥으로 퍼지며 사라진다.
+- **2단계 (`0.14~1.00` 정규화 진행률)**: 이어서 몸 좌우 외곽을 따라 기운 줄기와 작은 기 입자가 짧게 솟아오르고 자연스럽게 사라진다.
+- 마스터 스프라이트 중심부를 가리지 않도록 좌우 외곽을 따라 배치하고, 반투명 알파 상한(`MaximumRippleAlpha = 0.50`, `MaximumRisingQiAlpha = 0.44`)과 정렬 순서(`OverlaySortingOrder = 260 < OccupantStatBar sortingOrder = 4950`)로 마스터 이미지와 스탯창을 가리지 않는다.
+- 로컬 플레이어(`TryCastPlayerPersistentSpell`), 로컬 AI(`RunAiTurnSequence`), 온라인 투영 `BattleEventType.SpellCast`(`PlayOnlineBattleEventAnimations`) 3개 확정 경로에만 연결해 플레이어와 상대방 마스터 모두 동일하게 적용하며, 드래그 취소·자원 부족 거절·빈 스냅샷에는 재생하지 않는다.
+- 비차단(`unscaledTime`) 오버레이로 동작해 `IsBusy`나 온라인 이벤트 대기 시간에 지연을 추가하지 않고, 재생 중 마스터가 다른 타일로 이동하면 `RuntimeId`를 따라 새 타일로 이동한다.
+- 격리 Unity 6000.3.12f1에서 AI 행동 뒤 중복 `RefreshPresenter()` 호출 제거 및 테스트 캡처 출력 경로(`Application.dataPath` 기준 `../Captures/Daehwandan_20261026`) 정리 후 `DaehwandanPresentationTests` 3개 + `SpellCardUsePresentationTests` 10개, 총 **13/13 통과** 및 단계별 렌더링 이미지(`TempBuild/DaehwandanVfx_20261026/daehwandan-vfx-proof.png`, `daehwandan-vfx-preview.gif`)를 확인했다.
+
+
+## 2026-10-28 욕망의 단지·공통 분류
+
+욕망의 단지도 허공 드래그 확정 시 공통 연출을 재생한다. 일반 카드별 양의 허용 목록을 제거하고 대상 필요 여부를 공통 분류로 통합했다. 타일 지정 효과와 로봇 합체의 별도 입력을 유지하며, 새 효과의 실제 서버 판정 구현은 여전히 필요하다. `SpellCardUsePresentationTests.RealLocalSelfCastsShareOneEffectWithoutMovingFollowingCards`에 JarOfGreed를 추가했다. 이번에는 런타임·생성기/해당 테스트 소스 별도 컴파일 및 공유 코드18검사만 완료했다. Unity 초기 로드 정체로 Play 모드 연출 실행은 미완료이며 과거10/13개 통과 기록을 이번 카드의 실행 결과로 확대하지 않는다. [카드·한계](jar_of_greed.md).

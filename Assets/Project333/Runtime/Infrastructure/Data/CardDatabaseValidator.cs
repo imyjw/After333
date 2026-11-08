@@ -32,6 +32,7 @@ namespace Project333.Runtime.Infrastructure.Data
             ManaShieldRules.EffectId,
             MagicAmplificationCircleRules.EffectId,
             PowerBankRules.EffectId,
+            JarOfGreedRules.EffectId,
             ManaStoneRules.EffectId,
             ManaStoneBundleRules.EffectId,
             GuRules.EffectId,
@@ -381,6 +382,14 @@ namespace Project333.Runtime.Infrastructure.Data
                 ValidatePowerPlant(card, result);
             }
 
+            if (LegacyRules.HasLegacy(card.Id))
+            {
+                var expected = LegacyRules.GetEffectKind(card.Id) == LegacyEffectKind.DrawCards
+                    ? LegacyRules.DrawDescription : LegacyRules.ExplosionDescription;
+                if (card.SpecialEffectText != expected || string.IsNullOrEmpty(card.EffectText) || !card.EffectText.Contains(expected))
+                    result.AddError(card.Id + " must describe its registered Legacy effect.");
+            }
+
             if (string.Equals(card.Id, NuclearPowerPlantRules.CardId, StringComparison.Ordinal))
             {
                 ValidateNuclearPowerPlant(card, result);
@@ -394,6 +403,21 @@ namespace Project333.Runtime.Infrastructure.Data
             if (string.Equals(card.Id, BiochemicalBombRules.CardId, StringComparison.Ordinal))
             {
                 ValidateBiochemicalBomb(card, result);
+            }
+
+            if (string.Equals(card.Id, JarOfGreedRules.CardId, StringComparison.Ordinal) ||
+                string.Equals(card.EffectId, JarOfGreedRules.EffectId, StringComparison.Ordinal))
+            {
+                if (card.Id != JarOfGreedRules.CardId || card.DisplayName != JarOfGreedRules.DisplayName ||
+                    card.DefinitionType != JsonCardDefinitionKind.ScriptedSpell || card.Rarity != CardRarity.Rare ||
+                    card.Affiliation != CardAffiliation.Neutral || card.ChargeTileFootprint != ChargeTileFootprint.None ||
+                    card.EffectId != JarOfGreedRules.EffectId || card.EffectText != JarOfGreedRules.EffectDescription ||
+                    card.Cost == null || card.Cost.Gold != JarOfGreedRules.GoldCost ||
+                    card.Cost.Mana != 0 || card.Cost.Qi != 0 || card.Cost.Power != 0 ||
+                    card.EffectAmount != JarOfGreedRules.DrawCount || card.Damage != 0 ||
+                    card.DamageType != DamageType.None || card.TriggerCount != 0 ||
+                    card.HasReplicate || card.HasTrap || !card.IncludeInDraft || card.IncludeInRewards)
+                    result.AddError("JarOfGreed must be a non-upgradeable draft-included/reward-excluded Rare Neutral spell costing 1 Gold and drawing 2 cards.");
             }
 
             if (string.Equals(card.Id, PowerBankRules.CardId, StringComparison.Ordinal))
@@ -748,14 +772,14 @@ namespace Project333.Runtime.Infrastructure.Data
             if (card.Races == null || card.Races.Length != 1 || card.Races[0] != UnitRace.Undead)
                 result.AddError("SkeletonArcher must have exactly the Undead race.");
             var gain = card.TurnStartResourceGain;
-            if (!string.IsNullOrWhiteSpace(card.EffectText) || !string.IsNullOrWhiteSpace(card.EffectId) ||
-                !string.IsNullOrWhiteSpace(card.SpecialEffectText) || card.HasBerserker || card.HasEndure ||
+            if (card.EffectText != LegacyRules.DrawDescription || !string.IsNullOrWhiteSpace(card.EffectId) ||
+                card.SpecialEffectText != LegacyRules.DrawDescription || card.HasBerserker || card.HasEndure ||
                 card.HasShielder || card.HasLifeSteal || card.HasRush || card.CanAttackOnSummon || card.HasReplicate ||
                 card.HasHiding || card.HasFlying || card.HasPiercing || card.IsScience || card.SciencePowerUpkeep != 0 ||
                 card.MaxAttacksPerTurn != 1 || card.HitsPerAttack != 1 || card.SealboundOwnerTurnStarts != 0 ||
                 card.SpellPower != 0 || card.InvincibleDuration != InvincibleDurationType.None || card.InvincibleOwnerTurns != 0 ||
                 gain == null || gain.Mana != 0 || gain.Qi != 0 || gain.Power != 0 || gain.Gold != 0)
-                result.AddError("SkeletonArcher must have one ordinary attack, no card effects or innate traits, and no resource production or upkeep.");
+                result.AddError("SkeletonArcher must have draw-one Legacy, one ordinary attack, no other innate traits, and no resource production or upkeep.");
         }
 
         private static void ValidateOrcChieftain(JsonCardDefinitionRecord card, CardDatabaseValidationResult result)
@@ -1388,7 +1412,7 @@ namespace Project333.Runtime.Infrastructure.Data
                 !card.EffectText.Contains("턴 시작") ||
                 !card.EffectText.Contains("전력") ||
                 !card.EffectText.Contains(NuclearPowerPlantRules.TurnStartPowerGain.ToString()) ||
-                !card.EffectText.Contains("파괴") ||
+                !card.EffectText.Contains("유산") ||
                 !card.EffectText.Contains(NuclearPowerPlantRules.DestructionDamage.ToString()) ||
                 !card.EffectText.Contains("물리"))
             {
@@ -1633,6 +1657,11 @@ namespace Project333.Runtime.Infrastructure.Data
 
             if (string.Equals(card.EffectId, "firewall", StringComparison.Ordinal))
             {
+                if (card.Id == FirewallRules.CardId && (card.Cost == null || card.Cost.Mana != FirewallRules.ManaCost ||
+                    card.Cost.Gold != 0 || card.Cost.Power != 0 || card.Cost.Qi != 0 ||
+                    card.TriggerCount != 2 || card.DamageType != DamageType.Magic ||
+                    card.EffectText != FirewallRules.EffectDescription))
+                    result.AddError("Firewall must cost 4 mana, deal immediate Magic damage plus two turn-start hits, and use the current description.");
                 if (card.Damage <= 0)
                 {
                     result.AddError($"Firewall card '{id}' must have damage greater than 0.");

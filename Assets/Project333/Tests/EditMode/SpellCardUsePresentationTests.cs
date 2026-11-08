@@ -138,7 +138,7 @@ namespace Project333.Tests.EditMode
                 var gateway=TutorialResourceBattle.Create(provider);
                 gateway.ApplyMulligan(PlayerId.Player,new[]{"firebolt"},new TutorialResourceBattle.MulliganDeck()); gateway.ResolveTurnStart();
                 Set(f.Boot,"_battleGateway",gateway); Set(f.Boot,"_cardDefinitionProvider",provider);
-                foreach (var id in new[]{"Daehwandan","ManaStone","PowerBank"})
+                foreach (var id in new[]{"Daehwandan","ManaStone","PowerBank","JarOfGreed"})
                 {
                     var state=gateway.CurrentBattleState;
                     foreach(var old in state.Player.Hand.CardIds.ToArray()) state.Player.Hand.Remove(old);
@@ -376,6 +376,96 @@ namespace Project333.Tests.EditMode
                     f.Boot.CancelCombatPresentation(); yield return null;
                     Assert.That(f.All(),Is.Empty);
                 }
+            }
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator ReturnToHandCancelsSpell_AndRetriedAirDropUsesItWithCompactHand()
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            yield return new EnterPlayMode();
+            using (var f = new Fixture())
+            {
+                var provider = AssetDatabase.LoadAssetAtPath<CardDefinitionCatalogAsset>("Assets/Project333/ScriptableObjects/StarterTen/StarterTenCardCatalog.asset").CreateProvider();
+                var gateway = TutorialResourceBattle.Create(provider);
+                gateway.ApplyMulligan(PlayerId.Player, new[] { "firebolt" }, new TutorialResourceBattle.MulliganDeck());
+                gateway.ResolveTurnStart();
+                var state = gateway.CurrentBattleState;
+                foreach (var old in state.Player.Hand.CardIds.ToArray()) state.Player.Hand.Remove(old);
+                state.Player.Hand.Add("TrapReturn", "drag-return", false);
+                Set(f.Boot, "_battleGateway", gateway);
+                Set(f.Boot, "_cardDefinitionProvider", provider);
+                var input = f.Driver.AddComponent<BattlePlayerInputController>();
+                Set(input, "_battleBootstrapper", f.Boot);
+                Set(input, "_handPresenter", f.Hand);
+                f.Screen.Present(state);
+                f.Hand.SetExpanded(true);
+                yield return null;
+                var card = f.Hand.HandCardViews[0];
+                var start = RectTransformUtility.WorldToScreenPoint(null, card.GetComponent<HandCardTextView>().TutorialArtwork.transform.position);
+                Call(input, "HandleHandCardDragStarted", card, start);
+                Assert.That(f.Hand.IsExpanded, Is.False);
+                Call(input, "HandleHandCardDragged", card, start + new Vector2(0, 250));
+                Call(input, "HandleHandCardDragged", card, start + new Vector2(0, 30));
+                Assert.That(f.Hand.IsExpanded, Is.True);
+                Call(input, "HandleHandCardDragEnded", card, start + new Vector2(0, 30));
+                Assert.That(state.Player.Hand.Contains("TrapReturn", "drag-return"), Is.True);
+                Assert.That(state.ArmedTraps, Is.Empty);
+                Assert.That(f.All(), Is.Empty, "Cancelled cards must not disintegrate.");
+                Call(input, "HandleHandCardDragStarted", card, start);
+                Call(input, "HandleHandCardDragEnded", card, start + new Vector2(0, 250));
+                Assert.That(state.Player.Hand.Contains("TrapReturn", "drag-return"), Is.False);
+                Assert.That(f.Hand.IsExpanded, Is.False, "The synchronous removal/visual cancellation must not reopen the hand.");
+                Assert.That(state.ArmedTraps.Count, Is.EqualTo(1));
+                Assert.That(f.Active().Length, Is.EqualTo(1));
+            }
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator TargetedUnitDrop_SummonsOnChosenTileAndLeavesHandCompact()
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            yield return new EnterPlayMode();
+            using (var f = new Fixture())
+            {
+                var provider = AssetDatabase.LoadAssetAtPath<CardDefinitionCatalogAsset>("Assets/Project333/ScriptableObjects/StarterTen/StarterTenCardCatalog.asset").CreateProvider();
+                var gateway = TutorialResourceBattle.Create(provider);
+                gateway.ApplyMulligan(PlayerId.Player, new[] { "firebolt" }, new TutorialResourceBattle.MulliganDeck());
+                gateway.ResolveTurnStart();
+                var state = gateway.CurrentBattleState;
+                foreach (var old in state.Player.Hand.CardIds.ToArray()) state.Player.Hand.Remove(old);
+                state.Player.Hand.Add("Goblin", "targeted-drag", false);
+                Set(f.Boot, "_battleGateway", gateway);
+                Set(f.Boot, "_cardDefinitionProvider", provider);
+                var input = f.Driver.AddComponent<BattlePlayerInputController>();
+                Set(input, "_battleBootstrapper", f.Boot);
+                Set(input, "_handPresenter", f.Hand);
+                var board = f.Driver.AddComponent<BoardPresenter>();
+                var tileObj = new GameObject("DropTile", typeof(RectTransform), typeof(Image), typeof(TileView), typeof(TileTextView));
+                tileObj.transform.SetParent(f.Root.transform, false);
+                var tile = tileObj.GetComponent<TileView>();
+                tile.Configure(PlayerId.Player, 0, 0);
+                tileObj.GetComponent<RectTransform>().sizeDelta = new Vector2(120, 120);
+                tileObj.GetComponent<TileTextView>().enabled = false;
+                Set(tileObj.GetComponent<TileTextView>(), "_interactionSurfaceRoot", tileObj.GetComponent<RectTransform>());
+                Set(board, "_playerTileViews", new[] { tile });
+                Set(board, "_aiTileViews", Array.Empty<TileView>());
+                Set(input, "_boardPresenter", board);
+                f.Screen.Present(state);
+                f.Hand.SetExpanded(true);
+                yield return null;
+                var card = f.Hand.HandCardViews[0];
+                var start = RectTransformUtility.WorldToScreenPoint(null, card.GetComponent<HandCardTextView>().TutorialArtwork.transform.position);
+                var drop = RectTransformUtility.WorldToScreenPoint(null, tileObj.transform.position);
+                Call(input, "HandleHandCardDragStarted", card, start);
+                Call(input, "HandleHandCardDragged", card, drop);
+                Call(input, "HandleHandCardDragEnded", card, drop);
+                Assert.That(state.PlayerBoard.GetOccupant(new Project333.Runtime.Domain.Board.TileCoord(0, 0))?.CardId, Is.EqualTo("Goblin"));
+                Assert.That(state.Player.Hand.Contains("Goblin", "targeted-drag"), Is.False);
+                Assert.That(f.Hand.IsExpanded, Is.False);
+                Assert.That(f.All(), Is.Empty, "Unit summoning does not use the targetless-spell breakup.");
             }
             yield return new ExitPlayMode();
         }

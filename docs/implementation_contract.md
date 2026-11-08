@@ -1,4 +1,4 @@
-# Implementation contract reference
+﻿# Implementation contract reference
 
 2026-10-20 문서 동기화: 현재 기본값은 [전투 규칙](battle_rules.md)·[카드 목록](card_catalog.md), 운영 전환/백업은 [현재 상태](current_project_status.md)를 따른다. 아래 보존된 과거 whitelist·운영/미구현 표현으로 이미 구현된6단계 튜토리얼·카드팩·트랩·온라인 계정 기능을 되돌리지 않는다.
 
@@ -192,16 +192,20 @@ Online work must pass through a gateway boundary.
 
 ### Turn Structure
 
-Each turn follows this order:
+Confirmed 2026-10-26. Turn start uses this authoritative order:
 
-1. turn start
-2. gain base resources and active occupant resources
-3. resolve Fallout damage and destruction chains
-4. resolve Firewall and Biochemical Bomb turn-start damage/destruction together in cast order
-5. resolve power-upkeep payment for survivors, then active Robot Factory effects
-6. resolve the base draw
-7. main phase
-8. turn end
+1. Refresh the active occupants' attack readiness and remaining attack counts (Sealbound restrictions stay in force).
+2. Grant base Gold: no extra Gold on battle turns 1/2; +3 from turn 3 onward (opening balances stay 3/4).
+3. Resolve scheduled direct destruction such as Cheonra Jimang, including destruction chains.
+4. Resolve persistent turn-start damage: Fallout on both fields, then Timed Bomb countdown/detonation, then Firewall/Biochemical Bomb tile hazards. Bombs retain creation order; Firewall and Biochemical Bomb share cast order. Resolve destruction chains after each effect group.
+5. Surviving active occupants produce resources, then owned persistent spells grant resources and advance their owner-start duration.
+6. Charge surviving occupants' Power consumption and update Drained, preserving Power-first / Gold 1:1 substitution and fixed tile order.
+7. Resolve active Robot Factory card generation.
+8. Resolve the base draw (1 card) and any empty-deck damage.
+9. Resolve Demon King revival on both fields, then ordinary Sealbound owner-start countdown/release.
+10. Enter the actionable Main phase.
+
+If damage or a destruction chain ends the battle, stop immediately; no later production, payment, factory, draw, release or Main transition occurs. Base Gold and readiness have already resolved. A producer killed before step 5 produces nothing, and a dead occupant pays no Power or substitute Gold. The following Turn End remains separate from this start sequence.
 
 ### Resources
 
@@ -325,7 +329,7 @@ No separate global action-point system exists.
 ### Power Consumption (전력 소모)
 
 - The `전력 소모:n` special effect uses the existing `sciencePowerUpkeep > 0` numeric field on units/buildings. Pay n Power each owner turn start; Power-first and 1:1 Gold substitution remain confirmed rules. Preview tooltip `전력소모: n` always includes the explanatory `방전` side tooltip. Existing saved fields and gateway state are unchanged.
-- Power payment happens after resource gain and turn-start damage/destruction, including Fallout, Firewall/Biochemical Bomb and destruction chains, and before Robot Factory and the base draw. Dead occupants pay neither Power nor substitute Gold.
+- Power payment happens after direct destruction and turn-start damage (Fallout, Timed Bomb, Firewall/Biochemical Bomb and destruction chains), then survivor/persistent-spell resource gains, and before Robot Factory and the base draw. Dead occupants pay neither Power nor substitute Gold.
 - Payment is automatic in this fixed order:
   - `(0,0), (0,1), (1,0), (1,1), (2,0), (2,1), (3,0), (3,1), (4,0), (4,1)`
 - Empty tiles are skipped.
@@ -503,7 +507,7 @@ All current-slice implementations must preserve these locked scenarios:
 22. multi-hit normal attacks and eligible counterattacks use independent hit counts and apply defense separately per hit
 23. Shielder normal-attack/Piercing overflow does not repeat target mitigation; single-target spells retain their separate transfer order
 24. LifeSteal uses actual HP removed after defense
-25. Turn-start damage/destruction resolves before upkeep; only survivors pay. Robot Factory resolves after damage/destruction and upkeep, before the base draw
+25. Turn-start damage/destruction resolves before occupant production and upkeep; only survivors produce/pay. Base Gold and readiness resolve before destruction/damage. Persistent grants follow occupant production. Robot Factory resolves after damage/destruction and upkeep, before the base draw
 26. Robot Factory hides the generated card identity from the opponent
 27. Flying normal-attack targeting, front-row bypass, Shielder interaction, and suppression rules
 28. SpellPower on all Magic sources, damage-time recalculation, suppression, persistent triggers, and snapshot projection ignoring legacy captured values
@@ -554,3 +558,12 @@ The following are intentionally not fixed yet and must not be invented:
 - Do not invent hidden exceptions for unclear card interactions.
 - Prefer simple, testable implementations over speculative systems.
 - If a card or feature requires a rule that is not already locked, stop and ask.
+
+
+## Legacy death effects (2026-10-29)
+
+Registered summons trigger once on actual death/destruction through OccupantDestructionService, not board moves/returns/fusion removal. Zombie/SkeletonArcher/Skeleton draw1 for the current owner; NuclearPowerPlant keeps global Physical30 plus existing turn-start Power3. Suppression and duplicate removal remain enforced. Draw events use source CardId/owner and existing hand/deck/fatigue rules; fatigue winner resolution is deferred only within the death-effect batch so simultaneous lethal draws resolve fairly. Existing CardId/erasure state reconstruct HasLegacy in clones/projection/persistence. No added protocol fields, card IDs, upgrade growth or DB migration.
+
+### Firewall cast contract (2026-10-29)
+
+Canonical Firewall costs4Mana. The shared spell path applies Magic damage immediately to the five selected tiles and retains2 later global turn-start triggers (3hits total). Both paths use FirewallEffectService, current SpellPower and the existing damage/destruction rules. Only later hits consume triggers and record AreaSpellEffect events; immediate cast damage belongs to the existing SpellCast presentation group. Base damage15 and +1per upgrade level are unchanged.

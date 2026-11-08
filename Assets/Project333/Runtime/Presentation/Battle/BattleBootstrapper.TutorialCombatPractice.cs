@@ -15,7 +15,7 @@ namespace Project333.Runtime.Presentation.Battle
         private TutorialCombatLogRecorder _tutorialCombatLog;
         private void InitializeTutorialCombatLog()
         {
-            _tutorialCombatLog = new TutorialCombatLogRecorder(CurrentBattleState);
+            _tutorialCombatLog = new TutorialCombatLogRecorder(CurrentBattleState, _cardDefinitionProvider);
             AppendCombatLogText(BattleCombatLogEntryFormatter.Format(new Project333.Runtime.Application.Online.BattleCombatLogEntryDto
             { EntryType = Project333.Runtime.Application.Online.BattleCombatLogEntryType.BattleStarted, SourceOwnerId = PlayerId.Player }, ResolveCombatLogCardDisplayName));
             if (CurrentBattleState.Phase == PhaseType.Main)
@@ -27,7 +27,7 @@ namespace Project333.Runtime.Presentation.Battle
         {
             if (_tutorialCombatLog == null || CurrentBattleState == null) return;
             foreach (var entry in _tutorialCombatLog.Capture(CurrentBattleState))
-                AppendCombatLogText(BattleCombatLogEntryFormatter.Format(entry, ResolveCombatLogCardDisplayName));
+                AppendCombatLogText(BattleCombatLogEntryFormatter.Format(entry, ResolveCombatLogCardDisplayName), entry);
         }
         private void ResetTutorialCombatPractice()
         {
@@ -111,7 +111,8 @@ namespace Project333.Runtime.Presentation.Battle
         }
         public void TutorialOccupantPreviewReleased(TileView tile)
         {
-            if (tile?.CurrentOccupant != null && TutorialActionAllowed(TutorialAction.PreviewOccupant))
+            if (tile != null && tile.OwnerId == PlayerId.Player && tile.CurrentOccupant?.CardId == "SkeletonArcher" &&
+                TutorialActionAllowed(TutorialAction.PreviewOccupant))
                 _tutorialCompleted?.Invoke(TutorialAction.PreviewOccupant);
         }
         private void QueueTutorialCombatCompletion(TutorialAction action)

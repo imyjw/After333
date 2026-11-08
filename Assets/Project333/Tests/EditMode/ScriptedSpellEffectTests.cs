@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -156,7 +156,8 @@ namespace Project333.Tests.EditMode
             });
 
             battleState.Player.Hand.Add(ManaStoneBundleRules.CardId);
-            battleState.Player.Resources.Add(new ResourceSet(mana: 0, qi: 0, power: 0, gold: 2));
+            battleState.Player.Resources.Add(new ResourceSet(mana: 0, qi: 0, power: 0,
+                gold: ManaStoneBundleRules.GoldCost - battleState.Player.Resources.Gold));
 
             spellService.CastScriptedSpell(
                 battleState,
@@ -211,11 +212,13 @@ namespace Project333.Tests.EditMode
                 PlayerId.Player,
                 new TileCoord(0, 0));
 
+            battleState.StartNextTurn(PlayerId.AI);
+            turnStartService.ResolveTurnStart(battleState);
             battleState.StartNextTurn(PlayerId.Player);
             turnStartService.ResolveTurnStart(battleState);
 
             Assert.That(battleState.PlayerBoard.GetOccupant(new TileCoord(0, 0)), Is.Null);
-            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(startingGold + 1));
+            Assert.That(battleState.Player.Resources.Gold, Is.EqualTo(startingGold + 3));
             Assert.That(battleState.PersistentEffects[0].IsExpired, Is.True);
         }
 
@@ -271,7 +274,7 @@ namespace Project333.Tests.EditMode
             battleState.StartNextTurn(PlayerId.AI);
             new TurnStartService().ResolveTurnStart(battleState);
 
-            Assert.That(friendlyTarget.CurrentHp, Is.EqualTo(67));
+            Assert.That(friendlyTarget.CurrentHp, Is.EqualTo(34));
             Assert.That(battleState.PersistentEffects[0].RemainingTriggers, Is.EqualTo(1));
         }
 
@@ -283,7 +286,7 @@ namespace Project333.Tests.EditMode
             var originalTarget = CreateUnit(
                 runtimeId: "original-target",
                 position: new TileCoord(0, 0),
-                maxHp: 100,
+                maxHp: 200,
                 sciencePowerUpkeep: 1,
                 magicDefense: 3);
             var otherRowTarget = CreateUnit(
@@ -308,7 +311,7 @@ namespace Project333.Tests.EditMode
             new TurnStartService().ResolveTurnStart(battleState);
 
             Assert.That(originalTarget.IsDrained, Is.False, "The surviving unit pays upkeep after taking Firewall damage in its previous Drained state.");
-            Assert.That(originalTarget.CurrentHp, Is.EqualTo(1));
+            Assert.That(originalTarget.CurrentHp, Is.EqualTo(2));
             Assert.That(otherRowTarget.CurrentHp, Is.EqualTo(100));
             Assert.That(battleState.PersistentEffects[0].RemainingTriggers, Is.EqualTo(1));
             Assert.That(battleState.PersistentEffects[0].IsExpired, Is.False);
@@ -334,7 +337,7 @@ namespace Project333.Tests.EditMode
         {
             var battleState = CreateBattleState();
             var spellService = CreateSpellService(new CardDefinition[] { CreateFirewallDefinition() });
-            var target = CreateUnit("stack-target", new TileCoord(0, 0), maxHp: 100);
+            var target = CreateUnit("stack-target", new TileCoord(0, 0), maxHp: 200);
             battleState.AIBoard.Place(target.Position, target);
             battleState.Player.Hand.Add("Firewall");
             battleState.Player.Hand.Add("Firewall");
@@ -345,7 +348,7 @@ namespace Project333.Tests.EditMode
             battleState.StartNextTurn(PlayerId.AI);
             new TurnStartService().ResolveTurnStart(battleState);
 
-            Assert.That(target.CurrentHp, Is.EqualTo(34));
+            Assert.That(target.CurrentHp, Is.EqualTo(68));
             Assert.That(battleState.PersistentEffects.Count, Is.EqualTo(2));
             Assert.That(battleState.PersistentEffects[0].RemainingTriggers, Is.EqualTo(1));
             Assert.That(battleState.PersistentEffects[1].RemainingTriggers, Is.EqualTo(1));
@@ -526,7 +529,7 @@ namespace Project333.Tests.EditMode
 
         [TestCase(false)]
         [TestCase(true)]
-        public void TimedBombCountdown_ExcludesLaterFalloutAndAreaDamage(bool detonate)
+        public void TimedBombCountdown_ExcludesEarlierFalloutAndLaterAreaDamage(bool detonate)
         {
             var state = CreateBattleState();
             state.Player.Hand.Add(TimedBombRules.CardId);
@@ -548,13 +551,14 @@ namespace Project333.Tests.EditMode
             new TurnStartService().ResolveTurnStart(state);
             var bomb = state.TimedBombCountdownEvents.Single();
             var bombDamageCount = detonate ? 2 : 0;
-            Assert.That(bomb.ValuePopupEventIndex, Is.Zero);
-            Assert.That(bomb.ValuePopupEventEndIndex, Is.EqualTo(bombDamageCount),
+            Assert.That(bomb.ValuePopupEventIndex, Is.EqualTo(2));
+            Assert.That(bomb.ValuePopupEventEndIndex, Is.EqualTo(2 + bombDamageCount),
                 "Only the bomb and its destruction consequences belong to the bomb impact step.");
             Assert.That(state.ValuePopupEvents.Skip(bomb.ValuePopupEventIndex)
                 .Take(bomb.ValuePopupEventEndIndex - bomb.ValuePopupEventIndex)
                 .All(e => e.SourceCardId == TimedBombRules.CardId), Is.True);
-            Assert.That(state.ValuePopupEvents[bomb.ValuePopupEventEndIndex].SourceCardId, Is.EqualTo(NuclearRules.CardId));
+            Assert.That(state.ValuePopupEvents.Take(2).All(e => e.SourceCardId == NuclearRules.CardId), Is.True);
+            Assert.That(state.ValuePopupEvents[bomb.ValuePopupEventEndIndex].SourceCardId, Is.EqualTo("Firewall"));
             Assert.That(state.AreaSpellEffectEvents[0].ValuePopupEventIndex, Is.EqualTo(bombDamageCount + 2));
             Assert.That(state.AreaSpellEffectEvents[1].ValuePopupEventIndex, Is.EqualTo(bombDamageCount + 3));
             foreach (var area in state.AreaSpellEffectEvents)
@@ -750,6 +754,7 @@ namespace Project333.Tests.EditMode
                 PlayerId.AI,
                 new TileCoord(BiochemicalBombRules.LeftAreaStartColumn, 0));
 
+            battleState.ClearValuePopupEvents();
             battleState.StartNextTurn(PlayerId.AI);
             new TurnStartService().ResolveTurnStart(battleState);
 
@@ -836,7 +841,7 @@ namespace Project333.Tests.EditMode
         {
             var battleState = CreateBattleState();
             var spellService = CreateSpellService(new CardDefinition[] { CreateFirewallDefinition() });
-            battleState.AI.Master.CurrentHp = 33;
+            battleState.AI.Master.CurrentHp = 66;
             battleState.Player.Hand.Add("Firewall");
             battleState.Player.Resources.Add(new ResourceSet(mana: 3, qi: 0, power: 0, gold: 0));
 
@@ -858,7 +863,7 @@ namespace Project333.Tests.EditMode
         {
             var battleState = CreateBattleState();
             var spellService = CreateSpellService(new CardDefinition[] { CreateFirewallDefinition() });
-            battleState.Player.Master.CurrentHp = 33;
+            battleState.Player.Master.CurrentHp = 66;
             battleState.Player.Hand.Add("Firewall");
             battleState.Player.Resources.Add(new ResourceSet(mana: 3, qi: 0, power: 0, gold: 0));
 

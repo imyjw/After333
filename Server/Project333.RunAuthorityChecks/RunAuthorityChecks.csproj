@@ -13,6 +13,7 @@
     <Compile Include="PveReconnectChecks.cs" />
     <Compile Include="AiChallengeChecks.cs" />
     <Compile Include="AiFallbackChecks.cs" />
+    <Compile Include="AiFallbackTimerChecks.cs" />
     <Compile Include="PveReconnectConcurrencyChecks.cs" />
     <Compile Include="SavedDraftOfferChecks.cs" />
     <Compile Include="BattleParticipantChecks.cs" />

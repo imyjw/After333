@@ -335,8 +335,8 @@ namespace Project333.Runtime.Presentation.Settings
                 var iconObject = new GameObject("GearIcon", typeof(RectTransform), typeof(Image));
                 iconTransform = iconObject.GetComponent<RectTransform>();
                 iconTransform.SetParent(_gearButton.transform, false);
-                iconTransform.anchorMin = new Vector2(0.18f, 0.18f);
-                iconTransform.anchorMax = new Vector2(0.82f, 0.82f);
+                iconTransform.anchorMin = Vector2.zero;
+                iconTransform.anchorMax = Vector2.one;
                 iconTransform.offsetMin = Vector2.zero;
                 iconTransform.offsetMax = Vector2.zero;
                 _gearIcon = iconObject.GetComponent<Image>();

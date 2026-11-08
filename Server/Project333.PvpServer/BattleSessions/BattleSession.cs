@@ -41,6 +41,7 @@ public sealed partial class BattleSession
     private BattleFlowController? _battleFlowController;
     private ICardDefinitionProvider? _cardDefinitionProvider;
     private ICardUpgradeLevelProvider _cardDisplayUpgradeLevels = ZeroCardUpgradeLevelProvider.Instance;
+    private readonly List<BattleCardDrawEvent> _pendingCombatLogCardDrawEvents = new();
     private AiDecisionService? _aiDecisionService;
     private bool _aiPlanning;
     private Guid _resultId = Guid.NewGuid();
@@ -741,7 +742,9 @@ public sealed partial class BattleSession
             _combatLogRecords.Clear();
             foreach (var record in snapshot.CombatLogEntries ?? Array.Empty<BattleCombatLogEntryDto>())
             {
-                if (record == null || record.EntryType == BattleCombatLogEntryType.Unknown)
+                if (record == null ||
+                    record.EntryType == BattleCombatLogEntryType.Unknown ||
+                    record.EntryType == BattleCombatLogEntryType.UpgradeApplied)
                 {
                     continue;
                 }
@@ -2217,6 +2220,8 @@ public sealed partial class BattleSession
                 continue;
             }
 
+            // Drawn card IDs stay server-side for viewer-filtered combat logs; the shared event keeps only the source.
+            _pendingCombatLogCardDrawEvents.Add(cardDrawEvent);
             var ownerId = ToDtoPlayerId(cardDrawEvent.OwnerId);
             battleEvents.Add(new BattleEventDto
             {
@@ -3318,10 +3323,29 @@ public sealed partial class BattleSession
         BattleClientConnection connection)
     {
         var projected = CloneCombatLogEntry(record);
-        if (projected.EntryType == BattleCombatLogEntryType.CardGenerated &&
-            ToRuntimePlayerId(connection.AssignedSeatId) != projected.SourceOwnerId)
+        if (ToRuntimePlayerId(connection.AssignedSeatId) == projected.SourceOwnerId)
+        {
+            return projected;
+        }
+
+        // Generated/drawn cards are private hand information: send only card backs to the other seat.
+        if (projected.EntryType == BattleCombatLogEntryType.CardGenerated)
         {
             projected.TargetCardId = string.Empty;
+            var back = BattleCombatLogCardSnapshotDto.CreateCardBack(projected.SourceOwnerId);
+            projected.TargetPreview = back;
+            projected.TargetPreviews = new List<BattleCombatLogCardSnapshotDto> { back.Clone() };
+        }
+        else if (projected.EntryType == BattleCombatLogEntryType.CardDrawn)
+        {
+            projected.TargetCardId = string.Empty;
+            var count = projected.TargetPreviews != null && projected.TargetPreviews.Count > 0
+                ? projected.TargetPreviews.Count
+                : Math.Max(1, projected.Amount);
+            projected.TargetPreview = BattleCombatLogCardSnapshotDto.CreateCardBack(projected.SourceOwnerId);
+            projected.TargetPreviews = Enumerable.Range(0, count)
+                .Select(_ => BattleCombatLogCardSnapshotDto.CreateCardBack(projected.SourceOwnerId))
+                .ToList();
         }
 
         return projected;
@@ -3361,6 +3385,11 @@ public sealed partial class BattleSession
             TargetRemoved = record.TargetRemoved,
             SourceDamagePrevented = record.SourceDamagePrevented,
             TargetDamagePrevented = record.TargetDamagePrevented,
+            SourcePreview = record.SourcePreview?.Clone(),
+            TargetPreview = record.TargetPreview?.Clone(),
+            TargetPreviews = record.TargetPreviews == null
+                ? new List<BattleCombatLogCardSnapshotDto>()
+                : record.TargetPreviews.Where(t => t != null).Select(t => t.Clone()).ToList(),
             HasCounterattack = record.HasCounterattack,
             IsDraw = record.IsDraw,
             Amount = record.Amount,
@@ -3378,6 +3407,7 @@ public sealed partial class BattleSession
     {
         var source = _battleFlowController!.CurrentBattleState.GetBoard(actorId).GetOccupant(command.SourceCoord);
         var cardId = source?.CardId ?? string.Empty;
+        var sourcePreview = source != null ? BattleCombatLogCardSnapshotDto.Capture(source) : null;
         _battleFlowController.ExecuteCommand(actorId, command);
         // Record only successful activation, on both human and AI command paths.
         AppendCombatLogRecord(new BattleCombatLogEntryDto
@@ -3385,6 +3415,7 @@ public sealed partial class BattleSession
             EntryType = BattleCombatLogEntryType.ActiveEffectActivated,
             SourceOwnerId = actorId,
             SourceCardId = cardId,
+            SourcePreview = sourcePreview,
             SourceCoord = new Project333.Runtime.Application.Online.TileCoordDto
             {
                 Column = command.SourceCoord.Column,
@@ -3392,7 +3423,7 @@ public sealed partial class BattleSession
             }
         });
         // Active commands have no animation event, so the generic event-log path may return early.
-        AppendResourceChangeCombatLogs();
+        AppendResourceChangeCombatLogs(null, sourcePreview);
     }
 
     private void AppendCombatLogEntries(
@@ -3407,7 +3438,7 @@ public sealed partial class BattleSession
             return;
         }
 
-        AppendTrapCombatLogs(battleEvents);
+        AppendTrapCombatLogs(battleEvents, beforeSnapshot);
         var cardPlayedEvent = battleEvents.FirstOrDefault(candidate =>
             candidate?.EventType == BattleEventType.CardPlayed);
         if (cardPlayedEvent != null)
@@ -3455,7 +3486,7 @@ public sealed partial class BattleSession
         else if (spellEvent != null)
         {
             AppendSpellCombatLogs(spellEvent, battleEvents, beforeSnapshot);
-            AppendResourceChangeCombatLogs();
+            AppendResourceChangeCombatLogs(beforeSnapshot);
         }
 
         if (moveEvents.Count > 0)
@@ -3479,7 +3510,7 @@ public sealed partial class BattleSession
                 beforeSnapshot,
                 candidate => candidate.ValueCause == BattleValueChangeCause.BlueDragon ||
                              candidate.ValueCause == BattleValueChangeCause.RedDragon);
-            AppendCardDrawCombatLogs(battleEvents);
+            AppendCardDrawCombatLogs(beforeSnapshot);
         }
 
         if (turnStartedEvent != null)
@@ -3492,8 +3523,8 @@ public sealed partial class BattleSession
                 SourceOwnerId = turnOwnerId,
                 TurnNumber = turnNumber
             });
-            AppendResourceChangeCombatLogs();
-            AppendRobotFactoryGenerationCombatLogs();
+            AppendResourceChangeCombatLogs(beforeSnapshot);
+            AppendRobotFactoryGenerationCombatLogs(beforeSnapshot);
             AppendValueChangeCombatLogs(
                 battleEvents,
                 beforeSnapshot,
@@ -3521,8 +3552,9 @@ public sealed partial class BattleSession
                              candidate.ValueCause != BattleValueChangeCause.Counterattack);
         }
 
-        AppendResourceChangeCombatLogs(); // Also covers occupant active commands; already consumed entries are empty.
+        AppendResourceChangeCombatLogs(beforeSnapshot); // Also covers occupant active commands; already consumed entries are empty.
         AppendUnaccountedRemovalCombatLogs(battleEvents, beforeSnapshot);
+        AppendCardDrawCombatLogs(beforeSnapshot); // Legacy death draws can follow attacks, traps or turn-start damage.
         AppendStatusChangeCombatLogs(beforeSnapshot, afterSnapshot);
 
         var battleEndedEvent = battleEvents.LastOrDefault(candidate =>
@@ -3543,13 +3575,57 @@ public sealed partial class BattleSession
     {
         var ownerId = ToRuntimePlayerId(battleEvent.SourceOwnerId);
         var isBuilding = false;
+        CardDefinition? definition = null;
         try
         {
-            isBuilding = _cardDefinitionProvider?.GetRequired(battleEvent.CardId)?.CardType == CardType.Building;
+            definition = _cardDefinitionProvider?.GetRequired(battleEvent.CardId);
+            isBuilding = definition?.CardType == CardType.Building;
         }
         catch
         {
             isBuilding = false;
+        }
+
+        OccupantState? summonedOccupant = null;
+        if (battleEvent.TargetCoord != null)
+        {
+            var summonedCoord = new TileCoord(
+                battleEvent.TargetCoord.Column,
+                battleEvent.TargetCoord.Row);
+            summonedOccupant = _battleFlowController?.CurrentBattleState?
+                .GetBoard(ownerId)
+                .GetOccupant(summonedCoord);
+        }
+
+        var lastSummoned = _battleFlowController?.CurrentBattleState?.LastSummonedOccupant;
+        var previewOccupant = summonedOccupant;
+        if (previewOccupant == null && lastSummoned != null &&
+            lastSummoned.OwnerId == ownerId &&
+            string.Equals(lastSummoned.CardId, battleEvent.CardId, StringComparison.Ordinal))
+        {
+            previewOccupant = lastSummoned;
+        }
+
+        BattleCombatLogCardSnapshotDto? handPreview = null;
+        if (previewOccupant != null)
+        {
+            handPreview = BattleCombatLogCardSnapshotDto.CaptureOriginal(previewOccupant);
+        }
+        else if (definition is UnitCardDefinition unitDefinition)
+        {
+            handPreview = BattleCombatLogCardSnapshotDto.CreateHandCard(
+                unitDefinition.CardId,
+                unitDefinition.Attack + Math.Max(0, battleEvent.AttackBonus),
+                unitDefinition.Health + Math.Max(0, battleEvent.HpBonus),
+                battleEvent.RuntimeId ?? string.Empty);
+        }
+        else if (definition is BuildingCardDefinition buildingDefinition)
+        {
+            handPreview = BattleCombatLogCardSnapshotDto.CreateHandCard(
+                buildingDefinition.CardId,
+                buildingDefinition.Attack + Math.Max(0, battleEvent.AttackBonus),
+                buildingDefinition.Health + Math.Max(0, battleEvent.HpBonus),
+                battleEvent.RuntimeId ?? string.Empty);
         }
 
         AppendCombatLogRecord(new BattleCombatLogEntryDto
@@ -3559,17 +3635,12 @@ public sealed partial class BattleSession
                 : BattleCombatLogEntryType.UnitSummoned,
             SourceOwnerId = ownerId,
             SourceCardId = battleEvent.CardId ?? string.Empty,
+            SourcePreview = handPreview,
             TargetCoord = CloneTileCoord(battleEvent.TargetCoord)
         });
 
         if (battleEvent.TargetCoord != null)
         {
-            var summonedCoord = new TileCoord(
-                battleEvent.TargetCoord.Column,
-                battleEvent.TargetCoord.Row);
-            var summonedOccupant = _battleFlowController?.CurrentBattleState?
-                .GetBoard(ownerId)
-                .GetOccupant(summonedCoord);
             if (summonedOccupant?.IsSealbound == true)
             {
                 AppendCombatLogRecord(new BattleCombatLogEntryDto
@@ -3578,7 +3649,8 @@ public sealed partial class BattleSession
                     TargetOwnerId = ownerId,
                     TargetCardId = summonedOccupant.CardId,
                     TargetCoord = CloneTileCoord(battleEvent.TargetCoord),
-                    Amount = summonedOccupant.SealboundOwnerTurnStartsRemaining
+                    Amount = summonedOccupant.SealboundOwnerTurnStartsRemaining,
+                    TargetPreview = BattleCombatLogCardSnapshotDto.Capture(summonedOccupant)
                 });
             }
 
@@ -3589,27 +3661,14 @@ public sealed partial class BattleSession
                     EntryType = BattleCombatLogEntryType.HidingApplied,
                     TargetOwnerId = ownerId,
                     TargetCardId = summonedOccupant.CardId,
-                    TargetCoord = CloneTileCoord(battleEvent.TargetCoord)
+                    TargetCoord = CloneTileCoord(battleEvent.TargetCoord),
+                    TargetPreview = BattleCombatLogCardSnapshotDto.Capture(summonedOccupant)
                 });
             }
         }
-
-        if (battleEvent.AttackBonus <= 0 && battleEvent.HpBonus <= 0)
-        {
-            return;
-        }
-
-        AppendCombatLogRecord(new BattleCombatLogEntryDto
-        {
-            EntryType = BattleCombatLogEntryType.UpgradeApplied,
-            SourceOwnerId = ownerId,
-            SourceCardId = battleEvent.CardId ?? string.Empty,
-            AttackBonus = Math.Max(0, battleEvent.AttackBonus),
-            HpBonus = Math.Max(0, battleEvent.HpBonus)
-        });
     }
 
-    private void AppendRobotFactoryGenerationCombatLogs()
+    private void AppendRobotFactoryGenerationCombatLogs(ServerBattleSnapshot? beforeSnapshot)
     {
         var battleState = _battleFlowController?.CurrentBattleState;
         if (battleState == null || battleState.CardGenerationEvents.Count == 0)
@@ -3626,6 +3685,9 @@ public sealed partial class BattleSession
                 continue;
             }
 
+            var generatedPreview = CreateHandCardOrSpellPreview(
+                generationEvent.GeneratedCardId,
+                generationEvent.OwnerId);
             AppendCombatLogRecord(new BattleCombatLogEntryDto
             {
                 EntryType = BattleCombatLogEntryType.CardGenerated,
@@ -3638,38 +3700,148 @@ public sealed partial class BattleSession
                     Column = generationEvent.SourceCoord.Column,
                     Row = generationEvent.SourceCoord.Row
                 },
+                SourcePreview = CreateCardOrOccupantSourcePreview(
+                    generationEvent.OwnerId,
+                    generationEvent.SourceCardId,
+                    beforeSnapshot,
+                    generationEvent.SourceCoord),
+                // Opponent viewers receive a card back from ProjectCombatLogForViewer.
+                TargetPreview = generatedPreview,
+                TargetPreviews = new List<BattleCombatLogCardSnapshotDto> { generatedPreview.Clone() },
                 Amount = 1
             });
         }
     }
 
-    private void AppendCardDrawCombatLogs(IReadOnlyList<BattleEventDto> battleEvents)
+    private void AppendCardDrawCombatLogs(ServerBattleSnapshot? beforeSnapshot)
     {
-        var effectDrawGroups = battleEvents
-            .Where(candidate => candidate?.EventType == BattleEventType.CardDrawn &&
+        if (_pendingCombatLogCardDrawEvents.Count == 0)
+        {
+            return;
+        }
+
+        var drawEvents = _pendingCombatLogCardDrawEvents.ToList();
+        _pendingCombatLogCardDrawEvents.Clear();
+        var effectDrawGroups = drawEvents
+            .Where(candidate => candidate != null &&
                                 !string.IsNullOrWhiteSpace(candidate.SourceCardId))
             .GroupBy(candidate => new
             {
-                candidate!.SourceOwnerId,
+                candidate.OwnerId,
                 candidate.SourceCardId
             });
 
         foreach (var group in effectDrawGroups)
         {
-            var amount = group.Sum(candidate => Math.Max(0, candidate?.Amount ?? 0));
+            var amount = group.Count();
             if (amount <= 0)
             {
                 continue;
             }
 
+            // Stored with real drawn cards; ProjectCombatLogForViewer masks them for the opponent.
+            var drawnPreviews = group
+                .Where(candidate => !string.IsNullOrWhiteSpace(candidate.DrawnCardId))
+                .Select(candidate => CreateHandCardOrSpellPreview(candidate.DrawnCardId, group.Key.OwnerId))
+                .ToList();
             AppendCombatLogRecord(new BattleCombatLogEntryDto
             {
                 EntryType = BattleCombatLogEntryType.CardDrawn,
-                SourceOwnerId = ToRuntimePlayerId(group.Key.SourceOwnerId),
+                SourceOwnerId = group.Key.OwnerId,
+                TargetOwnerId = group.Key.OwnerId,
                 SourceCardId = group.Key.SourceCardId,
+                SourcePreview = CreateCardOrOccupantSourcePreview(
+                    group.Key.OwnerId,
+                    group.Key.SourceCardId,
+                    beforeSnapshot),
+                TargetPreview = drawnPreviews.FirstOrDefault()?.Clone(),
+                TargetPreviews = drawnPreviews,
                 Amount = amount
             });
         }
+    }
+
+    private BattleCombatLogCardSnapshotDto CreateHandCardOrSpellPreview(string cardId, PlayerId ownerId)
+    {
+        CardDefinition? definition = null;
+        try
+        {
+            definition = string.IsNullOrWhiteSpace(cardId)
+                ? null
+                : _cardDefinitionProvider?.GetRequired(cardId);
+        }
+        catch
+        {
+            definition = null;
+        }
+
+        var upgradeLevel = _cardDisplayUpgradeLevels?.GetUpgradeLevel(ownerId, cardId ?? string.Empty) ?? 0;
+        if (definition is UnitCardDefinition unit)
+        {
+            return BattleCombatLogCardSnapshotDto.CreateHandCard(
+                unit.CardId,
+                CardLevelStatRules.ApplyAttackBonus(unit.CardId, unit.Attack, upgradeLevel),
+                CardLevelStatRules.ApplyHpBonus(unit.CardId, unit.Health, upgradeLevel),
+                ownerId: ownerId);
+        }
+
+        if (definition is BuildingCardDefinition building)
+        {
+            return BattleCombatLogCardSnapshotDto.CreateHandCard(
+                building.CardId,
+                CardLevelStatRules.ApplyAttackBonus(building.CardId, building.Attack, upgradeLevel),
+                CardLevelStatRules.ApplyHpBonus(building.CardId, building.Health, upgradeLevel),
+                ownerId: ownerId);
+        }
+
+        return BattleCombatLogCardSnapshotDto.CreateSpellCard(cardId ?? string.Empty, ownerId);
+    }
+
+    private BattleCombatLogCardSnapshotDto? CreateCardOrOccupantSourcePreview(
+        PlayerId ownerId,
+        string sourceCardId,
+        ServerBattleSnapshot? beforeSnapshot,
+        TileCoord? sourceCoord = null)
+    {
+        if (string.IsNullOrWhiteSpace(sourceCardId))
+        {
+            return null;
+        }
+
+        ServerOccupantSnapshot? occupant = null;
+        if (sourceCoord.HasValue)
+        {
+            occupant = beforeSnapshot?.FindByCoord(ownerId, sourceCoord.Value);
+            if (occupant != null &&
+                !string.Equals(occupant.CardId, sourceCardId, StringComparison.Ordinal))
+            {
+                occupant = null;
+            }
+        }
+
+        occupant ??= beforeSnapshot?.Occupants.FirstOrDefault(candidate =>
+            candidate.OwnerId == ownerId &&
+            string.Equals(candidate.CardId, sourceCardId, StringComparison.Ordinal));
+        if (occupant?.Preview != null)
+        {
+            var preview = occupant.Preview.Clone();
+            preview.OwnerId = ownerId;
+            return preview;
+        }
+
+        // Occupants summoned in the same command are absent from the before snapshot.
+        var current = _battleFlowController?.CurrentBattleState?
+            .GetBoard(ownerId)
+            .EnumerateOccupants()
+            .FirstOrDefault(candidate => string.Equals(candidate.CardId, sourceCardId, StringComparison.Ordinal));
+        if (current != null)
+        {
+            var preview = BattleCombatLogCardSnapshotDto.Capture(current);
+            preview.OwnerId = ownerId;
+            return preview;
+        }
+
+        return CreateHandCardOrSpellPreview(sourceCardId, ownerId);
     }
 
     private void AppendMoveCombatLogs(IReadOnlyList<BattleEventDto> moveEvents)
@@ -3790,6 +3962,10 @@ public sealed partial class BattleSession
             TargetRemoved = IsRemoved(battleEvents, declaredTarget.RuntimeId),
             SourceDamagePrevented = counterHits.Count == 0,
             TargetDamagePrevented = targetHits.Count == 0,
+            SourcePreview = attacker.Preview?.WithOutcome(counterHits.Sum(hit => hit.Amount),
+                IsRemoved(battleEvents, attacker.RuntimeId) || counterHits.Any(hit => hit.HpAfter <= 0)),
+            TargetPreview = declaredTarget.Preview?.WithOutcome(targetHits.Sum(hit => hit.Amount),
+                IsRemoved(battleEvents, declaredTarget.RuntimeId) || targetHits.Any(hit => hit.HpAfter <= 0)),
             HasCounterattack = counterHits.Count > 0,
             AttackType = attacker.AttackType,
             DamageType = attacker.DamageType
@@ -3832,54 +4008,83 @@ public sealed partial class BattleSession
         ServerBattleSnapshot beforeSnapshot)
     {
         var ownerId = ToRuntimePlayerId(spellEvent.SourceOwnerId);
-        
+        var targetOwnerId = ToRuntimePlayerId(spellEvent.TargetOwnerId);
+        var spellCardId = spellEvent.CardId ?? string.Empty;
+
         var isShieldSpell =
-            spellEvent.CardId == PlasmaShieldRules.CardId ||
-            spellEvent.CardId == ManaShieldRules.CardId;
+            spellCardId == PlasmaShieldRules.CardId ||
+            spellCardId == ManaShieldRules.CardId;
 
         var shieldTarget = isShieldSpell && spellEvent.TargetCoord != null
             ? beforeSnapshot?.FindByCoord(
-                ToRuntimePlayerId(spellEvent.TargetOwnerId),
+                targetOwnerId,
                 ToRuntimeCoord(spellEvent.TargetCoord))
             : null;
-        
+
+        var spellSourcePreview = BattleCombatLogCardSnapshotDto.CreateSpellCard(
+            spellCardId,
+            ownerId,
+            spellEvent.RuntimeId ?? string.Empty);
+        var spellTargets = BuildSpellTargetPreviews(
+            spellEvent,
+            battleEvents,
+            beforeSnapshot,
+            ownerId,
+            targetOwnerId);
+
         AppendCombatLogRecord(new BattleCombatLogEntryDto
         {
             EntryType = BattleCombatLogEntryType.SpellCast,
             SourceOwnerId = ownerId,
-            TargetOwnerId = ToRuntimePlayerId(spellEvent.TargetOwnerId),
-            SourceCardId = spellEvent.CardId ?? string.Empty,
+            TargetOwnerId = spellTargets.Count > 0 ? spellTargets[0].OwnerId : targetOwnerId,
+            SourceCardId = spellCardId,
             TargetCardId = shieldTarget?.CardId ?? string.Empty,
-            TargetCoord = CloneTileCoord(spellEvent.TargetCoord)
+            TargetCoord = CloneTileCoord(spellEvent.TargetCoord),
+            SourcePreview = spellSourcePreview,
+            TargetPreview = spellTargets.Count > 0 ? spellTargets[0].Clone() : null,
+            TargetPreviews = spellTargets.Select(t => t.Clone()).ToList()
         });
 
-        if (string.Equals(spellEvent.CardId, DaehwandanCardRules.CardId, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(spellCardId, DaehwandanCardRules.CardId, StringComparison.OrdinalIgnoreCase))
         {
             var master = _battleFlowController!.CurrentBattleState.GetPlayer(ownerId).Master;
             var beforeMaster = beforeSnapshot?.FindByRuntimeId(master.RuntimeId);
+            var masterPreview = spellTargets.Count > 0 ? spellTargets[0].Clone() : beforeMaster?.Preview?.Clone();
+            if (masterPreview != null) masterPreview.OwnerId = ownerId;
             AppendCombatLogRecord(new BattleCombatLogEntryDto
             {
                 EntryType = BattleCombatLogEntryType.AttackBuffApplied,
                 SourceOwnerId = ownerId,
                 TargetOwnerId = ownerId,
-                SourceCardId = spellEvent.CardId,
+                SourceCardId = spellCardId,
                 TargetCardId = "Master",
-                AttackBonus = Math.Max(0, master.BaseAttack - (beforeMaster?.BaseAttack ?? master.BaseAttack))
+                AttackBonus = Math.Max(0, master.BaseAttack - (beforeMaster?.BaseAttack ?? master.BaseAttack)),
+                SourcePreview = spellSourcePreview.Clone(),
+                TargetPreview = masterPreview,
+                TargetPreviews = masterPreview != null
+                    ? new List<BattleCombatLogCardSnapshotDto> { masterPreview.Clone() }
+                    : new List<BattleCombatLogCardSnapshotDto>()
             });
         }
-        else if (string.Equals(spellEvent.CardId, "CheonraJimang", StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(spellCardId, "CheonraJimang", StringComparison.OrdinalIgnoreCase))
         {
-            var targetOwnerId = ToRuntimePlayerId(spellEvent.TargetOwnerId);
             var target = beforeSnapshot?.FindByCoord(targetOwnerId, ToRuntimeCoord(spellEvent.TargetCoord));
             if (target != null)
             {
+                var targetPreview = spellTargets.Count > 0 ? spellTargets[0].Clone() : target.Preview?.Clone();
+                if (targetPreview != null) targetPreview.OwnerId = targetOwnerId;
                 AppendCombatLogRecord(new BattleCombatLogEntryDto
                 {
                     EntryType = BattleCombatLogEntryType.DestructionMarked,
                     SourceOwnerId = ownerId,
                     TargetOwnerId = targetOwnerId,
-                    SourceCardId = spellEvent.CardId,
-                    TargetCardId = target.CardId
+                    SourceCardId = spellCardId,
+                    TargetCardId = target.CardId,
+                    SourcePreview = spellSourcePreview.Clone(),
+                    TargetPreview = targetPreview,
+                    TargetPreviews = targetPreview != null
+                        ? new List<BattleCombatLogCardSnapshotDto> { targetPreview.Clone() }
+                        : new List<BattleCombatLogCardSnapshotDto>()
                 });
             }
         }
@@ -3887,7 +4092,84 @@ public sealed partial class BattleSession
         AppendValueChangeCombatLogs(
             battleEvents,
             beforeSnapshot,
-            candidate => candidate.ValueCause == BattleValueChangeCause.Spell);
+            candidate => candidate.ValueCause == BattleValueChangeCause.Spell ||
+                         candidate.ValueCause == BattleValueChangeCause.Firewall);
+    }
+
+    private List<BattleCombatLogCardSnapshotDto> BuildSpellTargetPreviews(
+        BattleEventDto spellEvent,
+        IReadOnlyList<BattleEventDto> battleEvents,
+        ServerBattleSnapshot? beforeSnapshot,
+        PlayerId casterOwnerId,
+        PlayerId targetOwnerId)
+    {
+        var spellCardId = spellEvent.CardId ?? string.Empty;
+        var targets = new List<BattleCombatLogCardSnapshotDto>();
+
+        if (string.Equals(spellCardId, DaehwandanCardRules.CardId, StringComparison.OrdinalIgnoreCase))
+        {
+            var master = _battleFlowController?.CurrentBattleState?.GetPlayer(casterOwnerId).Master;
+            var beforeMaster = (master != null ? beforeSnapshot?.FindByRuntimeId(master.RuntimeId) : null) ??
+                               beforeSnapshot?.Occupants.FirstOrDefault(o => o.OwnerId == casterOwnerId && o.Kind == OccupantKind.Master);
+            var preview = beforeMaster?.Preview?.Clone() ??
+                          (master != null ? BattleCombatLogCardSnapshotDto.Capture(master) : null);
+            if (preview != null)
+            {
+                preview.OwnerId = casterOwnerId;
+                targets.Add(preview.WithOutcome(0, false));
+            }
+            return targets;
+        }
+
+        var spellImpactEvents = battleEvents
+            .Where(candidate => candidate != null &&
+                                (candidate.EventType == BattleEventType.DamageApplied ||
+                                 candidate.EventType == BattleEventType.HealingApplied ||
+                                 candidate.EventType == BattleEventType.InvinciblePrevented) &&
+                                (candidate.ValueCause == BattleValueChangeCause.Spell ||
+                                 candidate.ValueCause == BattleValueChangeCause.Firewall))
+            .ToList();
+        if (spellImpactEvents.Count > 0)
+        {
+            return BuildBatchTargetPreviews(spellImpactEvents, battleEvents, beforeSnapshot);
+        }
+
+        if (string.Equals(spellCardId, BiochemicalBombRules.CardId, StringComparison.OrdinalIgnoreCase))
+        {
+            return targets;
+        }
+
+        if (spellEvent.TargetCoord != null &&
+            string.Equals(spellCardId, FirewallRules.CardId, StringComparison.OrdinalIgnoreCase))
+        {
+            var row = spellEvent.TargetCoord.Row;
+            if (beforeSnapshot != null)
+            {
+                foreach (var occupant in beforeSnapshot.Occupants
+                             .Where(o => o.OwnerId == targetOwnerId && o.Coord.Row == row && !o.IsSealbound)
+                             .OrderBy(o => o.Coord.Column))
+                {
+                    if (occupant.Preview == null) continue;
+                    var copy = occupant.Preview.Clone();
+                    copy.OwnerId = targetOwnerId;
+                    targets.Add(copy.WithOutcome(0, false));
+                }
+            }
+            return targets;
+        }
+
+        if (spellEvent.TargetCoord != null)
+        {
+            var target = beforeSnapshot?.FindByCoord(targetOwnerId, ToRuntimeCoord(spellEvent.TargetCoord));
+            if (target?.Preview != null)
+            {
+                var copy = target.Preview.Clone();
+                copy.OwnerId = targetOwnerId;
+                targets.Add(copy.WithOutcome(0, false));
+            }
+        }
+
+        return targets;
     }
 
     private void AppendValueChangeCombatLogs(
@@ -3895,20 +4177,49 @@ public sealed partial class BattleSession
         ServerBattleSnapshot? beforeSnapshot,
         Func<BattleEventDto, bool> predicate)
     {
-        foreach (var battleEvent in battleEvents)
+        var matchingEvents = battleEvents
+            .Where(candidate => candidate != null &&
+                                predicate(candidate) &&
+                                (candidate.EventType == BattleEventType.DamageApplied ||
+                                 candidate.EventType == BattleEventType.HealingApplied) &&
+                                candidate.Amount > 0 &&
+                                candidate.ValueCause != BattleValueChangeCause.NormalAttack &&
+                                candidate.ValueCause != BattleValueChangeCause.Counterattack)
+            .ToList();
+        if (matchingEvents.Count == 0)
         {
-            if (battleEvent == null || !predicate(battleEvent))
-            {
-                continue;
-            }
+            return;
+        }
 
-            if (battleEvent.EventType == BattleEventType.DamageApplied)
+        foreach (var group in matchingEvents.GroupBy(candidate => new
+                 {
+                     candidate!.EventType,
+                     candidate.ValueCause,
+                     SourceOwnerId = ToRuntimePlayerId(candidate.SourceOwnerId),
+                     SourceCardId = candidate.SourceCardId ?? string.Empty,
+                     SourceRuntimeId = candidate.SourceRuntimeId ?? string.Empty
+                 }))
+        {
+            var groupEvents = group.Where(e => e != null).Select(e => e!).ToList();
+            var batchTargets = BuildBatchTargetPreviews(groupEvents, battleEvents, beforeSnapshot);
+            var sourcePreview = CreateEffectSourcePreview(
+                group.Key.SourceOwnerId,
+                group.Key.SourceCardId,
+                group.Key.SourceRuntimeId,
+                group.Key.ValueCause,
+                beforeSnapshot,
+                groupEvents[0]);
+
+            foreach (var battleEvent in groupEvents)
             {
-                AppendDamageCombatLog(battleEvent, beforeSnapshot, battleEvents);
-            }
-            else if (battleEvent.EventType == BattleEventType.HealingApplied)
-            {
-                AppendHealingCombatLog(battleEvent, beforeSnapshot);
+                if (battleEvent.EventType == BattleEventType.DamageApplied)
+                {
+                    AppendDamageCombatLog(battleEvent, beforeSnapshot, battleEvents, sourcePreview, batchTargets);
+                }
+                else if (battleEvent.EventType == BattleEventType.HealingApplied)
+                {
+                    AppendHealingCombatLog(battleEvent, beforeSnapshot, battleEvents, sourcePreview, batchTargets);
+                }
             }
         }
     }
@@ -3927,7 +4238,9 @@ public sealed partial class BattleSession
     private void AppendDamageCombatLog(
         BattleEventDto battleEvent,
         ServerBattleSnapshot? beforeSnapshot,
-        IReadOnlyList<BattleEventDto> allEvents)
+        IReadOnlyList<BattleEventDto> allEvents,
+        BattleCombatLogCardSnapshotDto? sourcePreview = null,
+        IReadOnlyList<BattleCombatLogCardSnapshotDto>? batchTargetPreviews = null)
     {
         if (battleEvent.Amount <= 0 ||
             battleEvent.ValueCause == BattleValueChangeCause.NormalAttack ||
@@ -3936,19 +4249,29 @@ public sealed partial class BattleSession
             return;
         }
 
+        var sourceOwnerId = ToRuntimePlayerId(battleEvent.SourceOwnerId);
         var targetOwnerId = ToRuntimePlayerId(battleEvent.TargetOwnerId);
         var target = beforeSnapshot?.FindByRuntimeId(battleEvent.TargetRuntimeId);
         var targetCardId = target?.CardId ?? battleEvent.TargetCardId;
-        var killed = battleEvent.HpAfter <= 0 || IsRemoved(allEvents, battleEvent.TargetRuntimeId);
-        var remaining = _battleFlowController?.CurrentBattleState?.GetBoard(targetOwnerId)
-            .EnumerateOccupants().FirstOrDefault(candidate => candidate.RuntimeId == battleEvent.TargetRuntimeId);
-        if (remaining?.IsDemonKingRevivalPending == true &&
-            WasSummonTrapTriggered(allEvents, battleEvent.TargetRuntimeId)) killed = false;
+        var killed = IsKilledByEffectDamage(battleEvent, allEvents, targetOwnerId);
+        var singleTargetPreview = BuildSingleEventTargetPreview(battleEvent, allEvents, beforeSnapshot);
+        var resolvedSourcePreview = sourcePreview?.Clone() ?? CreateEffectSourcePreview(
+            sourceOwnerId,
+            battleEvent.SourceCardId ?? string.Empty,
+            battleEvent.SourceRuntimeId,
+            battleEvent.ValueCause,
+            beforeSnapshot,
+            battleEvent);
+        var resolvedTargetPreviews = batchTargetPreviews != null && batchTargetPreviews.Count > 0
+            ? batchTargetPreviews.Select(t => t.Clone()).ToList()
+            : singleTargetPreview != null
+                ? new List<BattleCombatLogCardSnapshotDto> { singleTargetPreview.Clone() }
+                : new List<BattleCombatLogCardSnapshotDto>();
 
         AppendCombatLogRecord(new BattleCombatLogEntryDto
         {
             EntryType = BattleCombatLogEntryType.Damage,
-            SourceOwnerId = ToRuntimePlayerId(battleEvent.SourceOwnerId),
+            SourceOwnerId = sourceOwnerId,
             TargetOwnerId = targetOwnerId,
             SourceCardId = battleEvent.SourceCardId ?? string.Empty,
             TargetCardId = targetCardId ?? string.Empty,
@@ -3960,23 +4283,46 @@ public sealed partial class BattleSession
                 Math.Max(0, battleEvent.HpBefore),
                 Math.Max(0, battleEvent.HpAfter)
             },
-            TargetRemoved = killed
+            TargetRemoved = killed,
+            SourcePreview = resolvedSourcePreview,
+            TargetPreview = singleTargetPreview,
+            TargetPreviews = resolvedTargetPreviews
         });
     }
 
-    private void AppendHealingCombatLog(BattleEventDto battleEvent, ServerBattleSnapshot? beforeSnapshot)
+    private void AppendHealingCombatLog(
+        BattleEventDto battleEvent,
+        ServerBattleSnapshot? beforeSnapshot,
+        IReadOnlyList<BattleEventDto> allEvents,
+        BattleCombatLogCardSnapshotDto? sourcePreview = null,
+        IReadOnlyList<BattleCombatLogCardSnapshotDto>? batchTargetPreviews = null)
     {
         if (battleEvent.Amount <= 0)
         {
             return;
         }
 
+        var sourceOwnerId = ToRuntimePlayerId(battleEvent.SourceOwnerId);
         var targetOwnerId = ToRuntimePlayerId(battleEvent.TargetOwnerId);
         var target = beforeSnapshot?.FindByRuntimeId(battleEvent.TargetRuntimeId);
+        var singleTargetPreview = BuildSingleEventTargetPreview(battleEvent, allEvents, beforeSnapshot);
+        var resolvedSourcePreview = sourcePreview?.Clone() ?? CreateEffectSourcePreview(
+            sourceOwnerId,
+            battleEvent.SourceCardId ?? string.Empty,
+            battleEvent.SourceRuntimeId,
+            battleEvent.ValueCause,
+            beforeSnapshot,
+            battleEvent);
+        var resolvedTargetPreviews = batchTargetPreviews != null && batchTargetPreviews.Count > 0
+            ? batchTargetPreviews.Select(t => t.Clone()).ToList()
+            : singleTargetPreview != null
+                ? new List<BattleCombatLogCardSnapshotDto> { singleTargetPreview.Clone() }
+                : new List<BattleCombatLogCardSnapshotDto>();
+
         AppendCombatLogRecord(new BattleCombatLogEntryDto
         {
             EntryType = BattleCombatLogEntryType.Healing,
-            SourceOwnerId = ToRuntimePlayerId(battleEvent.SourceOwnerId),
+            SourceOwnerId = sourceOwnerId,
             TargetOwnerId = targetOwnerId,
             SourceCardId = battleEvent.SourceCardId ?? string.Empty,
             TargetCardId = target?.CardId ?? battleEvent.TargetCardId ?? string.Empty,
@@ -3986,11 +4332,233 @@ public sealed partial class BattleSession
             {
                 Math.Max(0, battleEvent.HpBefore),
                 Math.Max(0, battleEvent.HpAfter)
-            }
+            },
+            SourcePreview = resolvedSourcePreview,
+            TargetPreview = singleTargetPreview,
+            TargetPreviews = resolvedTargetPreviews
         });
     }
 
-    private void AppendResourceChangeCombatLogs()
+    private bool IsKilledByEffectDamage(
+        BattleEventDto battleEvent,
+        IReadOnlyList<BattleEventDto> allEvents,
+        PlayerId targetOwnerId)
+    {
+        var killed = battleEvent.HpAfter <= 0 || IsRemoved(allEvents, battleEvent.TargetRuntimeId);
+        var remaining = _battleFlowController?.CurrentBattleState?.GetBoard(targetOwnerId)
+            .EnumerateOccupants().FirstOrDefault(candidate => candidate.RuntimeId == battleEvent.TargetRuntimeId);
+        if (remaining?.IsDemonKingRevivalPending == true &&
+            (WasSummonTrapTriggered(allEvents, battleEvent.TargetRuntimeId) ||
+             WasReflectedByTrap(allEvents, battleEvent.TargetRuntimeId) ||
+             battleEvent.ValueCause == BattleValueChangeCause.Spell))
+        {
+            killed = false;
+        }
+        return killed;
+    }
+
+    private List<BattleCombatLogCardSnapshotDto> BuildBatchTargetPreviews(
+        IReadOnlyList<BattleEventDto> groupEvents,
+        IReadOnlyList<BattleEventDto> allEvents,
+        ServerBattleSnapshot? beforeSnapshot)
+    {
+        var previews = new List<BattleCombatLogCardSnapshotDto>();
+        var indexByTargetKey = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        foreach (var ev in groupEvents)
+        {
+            if (ev == null) continue;
+            var targetOwnerId = ToRuntimePlayerId(ev.TargetOwnerId);
+            var key = !string.IsNullOrWhiteSpace(ev.TargetRuntimeId)
+                ? ev.TargetRuntimeId!
+                : $"{targetOwnerId}:{ev.TargetCoord?.Column ?? -1},{ev.TargetCoord?.Row ?? -1}:{ev.TargetCardId}";
+
+            if (!indexByTargetKey.TryGetValue(key, out var existingIndex))
+            {
+                var single = BuildSingleEventTargetPreview(ev, allEvents, beforeSnapshot);
+                if (single == null) continue;
+                indexByTargetKey[key] = previews.Count;
+                previews.Add(single);
+            }
+            else
+            {
+                var existing = previews[existingIndex];
+                if (ev.EventType == BattleEventType.HealingApplied)
+                {
+                    existing.HealAmount += Math.Max(0, ev.Amount);
+                }
+                else if (ev.EventType == BattleEventType.DamageApplied)
+                {
+                    existing.DamageTaken += Math.Max(0, ev.Amount);
+                    if (IsKilledByEffectDamage(ev, allEvents, targetOwnerId))
+                    {
+                        existing.Died = true;
+                    }
+                }
+            }
+        }
+
+        return previews;
+    }
+
+    private BattleCombatLogCardSnapshotDto? BuildSingleEventTargetPreview(
+        BattleEventDto battleEvent,
+        IReadOnlyList<BattleEventDto> allEvents,
+        ServerBattleSnapshot? beforeSnapshot)
+    {
+        var targetOwnerId = ToRuntimePlayerId(battleEvent.TargetOwnerId);
+        var target = beforeSnapshot?.FindByRuntimeId(battleEvent.TargetRuntimeId ?? string.Empty) ??
+                     (battleEvent.TargetCoord != null
+                         ? beforeSnapshot?.FindByCoord(targetOwnerId, ToRuntimeCoord(battleEvent.TargetCoord))
+                         : null);
+        var preview = target?.Preview?.Clone();
+        if (preview == null && !string.IsNullOrWhiteSpace(battleEvent.TargetCardId))
+        {
+            preview = CreateFallbackOccupantPreview(
+                battleEvent.TargetCardId!,
+                targetOwnerId,
+                battleEvent.TargetRuntimeId ?? string.Empty,
+                battleEvent.HpBefore);
+        }
+        if (preview == null) return null;
+        preview.OwnerId = targetOwnerId;
+        if (battleEvent.HpBefore > 0)
+        {
+            preview.Hp = battleEvent.HpBefore;
+        }
+        var state = _battleFlowController?.CurrentBattleState;
+        if (WasSummonTrapTriggered(allEvents, battleEvent.TargetRuntimeId ?? string.Empty) &&
+            state?.LastSummonedOccupant != null &&
+            string.Equals(state.LastSummonedOccupant.RuntimeId, battleEvent.TargetRuntimeId, StringComparison.Ordinal) &&
+            state.LastSummonedAttack > 0)
+        {
+            preview.Attack = state.LastSummonedAttack;
+        }
+
+        if (battleEvent.EventType == BattleEventType.HealingApplied)
+        {
+            return preview.WithHealOutcome(Math.Max(0, battleEvent.Amount));
+        }
+
+        if (battleEvent.EventType == BattleEventType.InvinciblePrevented)
+        {
+            return preview.WithOutcome(0, false);
+        }
+
+        var killed = IsKilledByEffectDamage(battleEvent, allEvents, targetOwnerId);
+        return preview.WithOutcome(Math.Max(0, battleEvent.Amount), killed);
+    }
+
+    private BattleCombatLogCardSnapshotDto CreateEffectSourcePreview(
+        PlayerId sourceOwnerId,
+        string sourceCardId,
+        string? sourceRuntimeId,
+        BattleValueChangeCause cause,
+        ServerBattleSnapshot? beforeSnapshot,
+        BattleEventDto? sampleEvent = null)
+    {
+        if (!string.IsNullOrWhiteSpace(sourceRuntimeId))
+        {
+            var byRuntime = beforeSnapshot?.FindByRuntimeId(sourceRuntimeId!);
+            if (byRuntime?.Preview != null)
+            {
+                var copy = byRuntime.Preview.Clone();
+                copy.OwnerId = byRuntime.OwnerId;
+                if (cause == BattleValueChangeCause.LifeSteal &&
+                    sampleEvent != null &&
+                    string.Equals(sampleEvent.TargetRuntimeId, sourceRuntimeId, StringComparison.Ordinal) &&
+                    sampleEvent.HpBefore > 0)
+                {
+                    copy.Hp = sampleEvent.HpBefore;
+                }
+                return copy;
+            }
+        }
+
+        if (cause == BattleValueChangeCause.DeckExhaustion ||
+            string.Equals(sourceCardId, "Master", StringComparison.OrdinalIgnoreCase))
+        {
+            var master = beforeSnapshot?.Occupants.FirstOrDefault(o =>
+                o.OwnerId == sourceOwnerId && o.Kind == OccupantKind.Master);
+            if (master?.Preview != null)
+            {
+                var copy = master.Preview.Clone();
+                copy.OwnerId = sourceOwnerId;
+                if (sampleEvent != null && sampleEvent.HpBefore > 0 &&
+                    string.Equals(sampleEvent.TargetRuntimeId, master.RuntimeId, StringComparison.Ordinal))
+                {
+                    copy.Hp = sampleEvent.HpBefore;
+                }
+                return copy;
+            }
+            return BattleCombatLogCardSnapshotDto.CreateHandCard("Master", 3, 333, ownerId: sourceOwnerId);
+        }
+
+        if (cause == BattleValueChangeCause.BlueDragon ||
+            cause == BattleValueChangeCause.RedDragon ||
+            cause == BattleValueChangeCause.NuclearPowerPlant ||
+            cause == BattleValueChangeCause.Piercing ||
+            cause == BattleValueChangeCause.LifeSteal)
+        {
+            var occupant = beforeSnapshot?.Occupants.FirstOrDefault(o =>
+                o.OwnerId == sourceOwnerId &&
+                string.Equals(o.CardId, sourceCardId, StringComparison.Ordinal));
+            if (occupant?.Preview != null)
+            {
+                var copy = occupant.Preview.Clone();
+                copy.OwnerId = sourceOwnerId;
+                return copy;
+            }
+            var fallback = CreateFallbackOccupantPreview(sourceCardId, sourceOwnerId, sourceRuntimeId ?? string.Empty);
+            if (fallback != null) return fallback;
+        }
+
+        return BattleCombatLogCardSnapshotDto.CreateSpellCard(
+            sourceCardId,
+            sourceOwnerId,
+            sourceRuntimeId ?? string.Empty);
+    }
+
+    private BattleCombatLogCardSnapshotDto? CreateFallbackOccupantPreview(
+        string cardId,
+        PlayerId ownerId,
+        string runtimeId = "",
+        int fallbackHp = 0)
+    {
+        if (string.Equals(cardId, "Master", StringComparison.OrdinalIgnoreCase))
+        {
+            var masterPreview = BattleCombatLogCardSnapshotDto.CreateHandCard("Master", 3, 333, runtimeId, ownerId);
+            if (fallbackHp > 0) masterPreview.Hp = fallbackHp;
+            return masterPreview;
+        }
+
+        try
+        {
+            var definition = _cardDefinitionProvider?.GetRequired(cardId);
+            if (definition is UnitCardDefinition unit)
+            {
+                var p = BattleCombatLogCardSnapshotDto.CreateHandCard(unit.CardId, unit.Attack, unit.Health, runtimeId, ownerId);
+                if (fallbackHp > 0) p.Hp = fallbackHp;
+                return p;
+            }
+            if (definition is BuildingCardDefinition building)
+            {
+                var p = BattleCombatLogCardSnapshotDto.CreateHandCard(building.CardId, building.Attack, building.Health, runtimeId, ownerId);
+                if (fallbackHp > 0) p.Hp = fallbackHp;
+                return p;
+            }
+        }
+        catch
+        {
+            // Ignore missing definition and fall back below.
+        }
+
+        return null;
+    }
+
+    private void AppendResourceChangeCombatLogs(
+        ServerBattleSnapshot? beforeSnapshot = null,
+        BattleCombatLogCardSnapshotDto? knownSourcePreview = null)
     {
         var battleState = _battleFlowController?.CurrentBattleState;
         if (battleState == null || battleState.ResourceChangeEvents.Count == 0)
@@ -4007,16 +4575,25 @@ public sealed partial class BattleSession
                 continue;
             }
 
+            var sourcePreview = knownSourcePreview != null &&
+                                string.Equals(knownSourcePreview.CardId, resourceChangeEvent.SourceCardId, StringComparison.Ordinal)
+                ? knownSourcePreview.Clone()
+                : CreateCardOrOccupantSourcePreview(
+                    resourceChangeEvent.OwnerId,
+                    resourceChangeEvent.SourceCardId,
+                    beforeSnapshot);
             AppendResourceSetCombatLogs(
                 BattleCombatLogEntryType.ResourceSpent,
                 resourceChangeEvent.OwnerId,
                 resourceChangeEvent.SourceCardId,
-                resourceChangeEvent.Spent);
+                resourceChangeEvent.Spent,
+                sourcePreview);
             AppendResourceSetCombatLogs(
                 BattleCombatLogEntryType.ResourceGained,
                 resourceChangeEvent.OwnerId,
                 resourceChangeEvent.SourceCardId,
-                resourceChangeEvent.Gained);
+                resourceChangeEvent.Gained,
+                sourcePreview);
         }
     }
 
@@ -4024,12 +4601,13 @@ public sealed partial class BattleSession
         BattleCombatLogEntryType entryType,
         PlayerId ownerId,
         string sourceCardId,
-        ResourceSet resources)
+        ResourceSet resources,
+        BattleCombatLogCardSnapshotDto? sourcePreview)
     {
-        AppendResourceCombatLog(entryType, ownerId, sourceCardId, BattleCombatLogResourceType.Mana, resources?.Mana ?? 0);
-        AppendResourceCombatLog(entryType, ownerId, sourceCardId, BattleCombatLogResourceType.Qi, resources?.Qi ?? 0);
-        AppendResourceCombatLog(entryType, ownerId, sourceCardId, BattleCombatLogResourceType.Power, resources?.Power ?? 0);
-        AppendResourceCombatLog(entryType, ownerId, sourceCardId, BattleCombatLogResourceType.Gold, resources?.Gold ?? 0);
+        AppendResourceCombatLog(entryType, ownerId, sourceCardId, BattleCombatLogResourceType.Mana, resources?.Mana ?? 0, sourcePreview);
+        AppendResourceCombatLog(entryType, ownerId, sourceCardId, BattleCombatLogResourceType.Qi, resources?.Qi ?? 0, sourcePreview);
+        AppendResourceCombatLog(entryType, ownerId, sourceCardId, BattleCombatLogResourceType.Power, resources?.Power ?? 0, sourcePreview);
+        AppendResourceCombatLog(entryType, ownerId, sourceCardId, BattleCombatLogResourceType.Gold, resources?.Gold ?? 0, sourcePreview);
     }
 
     private void AppendResourceCombatLog(
@@ -4037,7 +4615,8 @@ public sealed partial class BattleSession
         PlayerId ownerId,
         string sourceCardId,
         BattleCombatLogResourceType resourceType,
-        int amount)
+        int amount,
+        BattleCombatLogCardSnapshotDto? sourcePreview)
     {
         if (amount <= 0)
         {
@@ -4049,6 +4628,7 @@ public sealed partial class BattleSession
             EntryType = entryType,
             SourceOwnerId = ownerId,
             SourceCardId = sourceCardId ?? string.Empty,
+            SourcePreview = sourcePreview?.Clone(),
             Amount = amount,
             ResourceType = resourceType
         });
@@ -4083,18 +4663,29 @@ public sealed partial class BattleSession
                 continue;
             }
 
-            var isCheonraJimang = beforeSnapshot?.PersistentEffects.Any(effect =>
+            var cheonraEffect = beforeSnapshot?.PersistentEffects.FirstOrDefault(effect =>
                 effect != null && !effect.IsExpired &&
                 string.Equals(effect.EffectId, CheonraJimangEffectId, StringComparison.Ordinal) &&
-                string.Equals(effect.TargetRuntimeId, removed.RuntimeId, StringComparison.Ordinal)) == true;
+                string.Equals(effect.TargetRuntimeId, removed.RuntimeId, StringComparison.Ordinal));
+            var isCheonraJimang = cheonraEffect != null;
+            var removedPreview = removed.Preview?.WithOutcome(0, true);
+            if (removedPreview != null) removedPreview.OwnerId = removed.OwnerId;
             AppendCombatLogRecord(new BattleCombatLogEntryDto
             {
                 EntryType = isCheonraJimang
                     ? BattleCombatLogEntryType.DestroyedByMark
                     : BattleCombatLogEntryType.OccupantRemoved,
+                SourceOwnerId = cheonraEffect?.OwnerId ?? removed.OwnerId,
                 SourceCardId = isCheonraJimang ? "CheonraJimang" : string.Empty,
                 TargetOwnerId = removed.OwnerId,
-                TargetCardId = removed.CardId
+                TargetCardId = removed.CardId,
+                SourcePreview = isCheonraJimang
+                    ? BattleCombatLogCardSnapshotDto.CreateSpellCard("CheonraJimang", cheonraEffect!.OwnerId)
+                    : null,
+                TargetPreview = isCheonraJimang ? removedPreview : null,
+                TargetPreviews = isCheonraJimang && removedPreview != null
+                    ? new List<BattleCombatLogCardSnapshotDto> { removedPreview.Clone() }
+                    : new List<BattleCombatLogCardSnapshotDto>()
             });
         }
     }
@@ -4157,7 +4748,8 @@ public sealed partial class BattleSession
             EntryType = afterRemaining > 0 ? appliedType : clearedType,
             TargetOwnerId = occupant.OwnerId,
             TargetCardId = occupant.CardId,
-            Amount = afterRemaining
+            Amount = afterRemaining,
+            TargetPreview = occupant.Preview?.Clone()
         });
     }
 
@@ -4187,7 +4779,8 @@ public sealed partial class BattleSession
                         ? BattleCombatLogEntryType.DrainedApplied
                         : BattleCombatLogEntryType.DrainedCleared,
                     TargetOwnerId = before.OwnerId,
-                    TargetCardId = before.CardId
+                    TargetCardId = before.CardId,
+                    TargetPreview = after.Preview?.Clone()
                 });
             }
 
@@ -4199,7 +4792,8 @@ public sealed partial class BattleSession
                         ? BattleCombatLogEntryType.ErasureApplied
                         : BattleCombatLogEntryType.ErasureCleared,
                     TargetOwnerId = before.OwnerId,
-                    TargetCardId = before.CardId
+                    TargetCardId = before.CardId,
+                    TargetPreview = after.Preview?.Clone()
                 });
             }
 
@@ -4240,7 +4834,8 @@ public sealed partial class BattleSession
                         : BattleCombatLogEntryType.SealboundReleased,
                     TargetOwnerId = before.OwnerId,
                     TargetCardId = before.CardId,
-                    Amount = after.SealboundOwnerTurnStartsRemaining
+                    Amount = after.SealboundOwnerTurnStartsRemaining,
+                    TargetPreview = after.Preview?.Clone()
                 });
             }
 
@@ -4252,7 +4847,8 @@ public sealed partial class BattleSession
                         ? BattleCombatLogEntryType.HidingApplied
                         : BattleCombatLogEntryType.HidingRevealed,
                     TargetOwnerId = before.OwnerId,
-                    TargetCardId = before.CardId
+                    TargetCardId = before.CardId,
+                    TargetPreview = after.Preview?.Clone()
                 });
             }
 
@@ -4263,7 +4859,8 @@ public sealed partial class BattleSession
                     EntryType = BattleCombatLogEntryType.HuanShuApplied,
                     TargetOwnerId = after.OwnerId,
                     TargetCardId = after.CardId,
-                    Amount = after.HuanShuOwnerTurnsRemaining
+                    Amount = after.HuanShuOwnerTurnsRemaining,
+                    TargetPreview = after.Preview?.Clone()
                 });
             }
             else if (before.HuanShuOwnerTurnsRemaining > 0 && after.HuanShuOwnerTurnsRemaining <= 0)
@@ -4272,7 +4869,8 @@ public sealed partial class BattleSession
                 {
                     EntryType = BattleCombatLogEntryType.HuanShuCleared,
                     TargetOwnerId = after.OwnerId,
-                    TargetCardId = after.CardId
+                    TargetCardId = after.CardId,
+                    TargetPreview = after.Preview?.Clone()
                 });
             }
         }
@@ -4436,7 +5034,7 @@ public sealed partial class BattleSession
 
     private static ServerOccupantSnapshot CreatePresentationOccupantSnapshot(OccupantState occupant)
     {
-            return new ServerOccupantSnapshot(
+            var snapshot = new ServerOccupantSnapshot(
                 occupant.RuntimeId,
                 occupant.CardId,
                 occupant.OwnerId,
@@ -4460,6 +5058,8 @@ public sealed partial class BattleSession
                 occupant.DemonKingRevivalCount,
                 occupant.StunTurnEndsRemaining,
                 occupant.FreezeTurnEndsRemaining);
+            snapshot.Preview = BattleCombatLogCardSnapshotDto.Capture(occupant);
+            return snapshot;
     }
 
     private sealed class ServerBattleSnapshot
@@ -4551,6 +5151,8 @@ public sealed partial class BattleSession
             StunTurnEndsRemaining = stunTurnEndsRemaining;
             FreezeTurnEndsRemaining = freezeTurnEndsRemaining;
         }
+
+        public BattleCombatLogCardSnapshotDto? Preview { get; set; }
 
         public string RuntimeId { get; }
 

@@ -17,7 +17,8 @@ namespace Project333.Runtime.Application.Services
             PlayerState playerState,
             BattleState battleState,
             int drawCount,
-            string sourceCardId)
+            string sourceCardId,
+            bool resolveMasterDefeat = true)
         {
             if (playerState == null)
             {
@@ -38,7 +39,7 @@ namespace Project333.Runtime.Application.Services
             {
                 if (!playerState.Deck.TryDraw(out var cardId))
                 {
-                    ApplyFailedDrawDamage(playerState, battleState);
+                    ApplyFailedDrawDamage(playerState, battleState, resolveMasterDefeat);
                     continue;
                 }
 
@@ -48,11 +49,11 @@ namespace Project333.Runtime.Application.Services
                 }
 
                 playerState.Hand.Add(cardId);
-                battleState.RecordCardDraw(playerState.Id, sourceCardId);
+                battleState.RecordCardDraw(playerState.Id, sourceCardId, cardId);
             }
         }
 
-        private static void ApplyFailedDrawDamage(PlayerState playerState, BattleState battleState)
+        private static void ApplyFailedDrawDamage(PlayerState playerState, BattleState battleState, bool resolveMasterDefeat)
         {
             var failedDrawCount = playerState.IncrementFailedDrawCount();
             var damage = failedDrawCount * FailedDrawDamageStep;
@@ -71,7 +72,7 @@ namespace Project333.Runtime.Application.Services
                 playerState.Master.RuntimeId,
                 playerState.Master.CardId);
 
-            if (playerState.Master.CurrentHp <= 0)
+            if (resolveMasterDefeat && playerState.Master.CurrentHp <= 0)
             {
                 battleState.EndBattle(battleState.GetOpponent(playerState.Id).Id);
             }

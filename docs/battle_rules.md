@@ -1,6 +1,6 @@
-# Battle Rules
+﻿# Battle Rules
 
-2026-10-20 문서 대조: 현재 카드 기본값·비용은 [카드 목록](card_catalog.md)을 따르며 상단 기5·개방 분타 기2·마정석 꾸러미 골드6·파이어스피어30·파이어월15·뉴클리어 전력13을 반영했다. 시작 손패5장, 첫 턴 전 배정 골드3/4, 이후 기본 골드+3·드로우1 및 기존 판정 순서는 유지한다.
+2026-10-20 문서 대조: 현재 카드 기본값·비용은 [카드 목록](card_catalog.md)을 따르며 상단 기5·개방 분타 기2·마정석 꾸러미 골드6·파이어스피어30·파이어월15·뉴클리어 전력13을 반영했다. 시작 손패5장, 첫 턴 전 배정 골드3/4, 이후 기본 골드+3·드로우1을 유지한다. 턴 시작 판정 순서는 아래 2026-10-26 확정 Turn Structure를 따른다.
 
 ## Document Purpose
 
@@ -142,17 +142,20 @@ Example field:
 
 ## Turn Structure
 
-Each turn follows this sequence:
+Confirmed 2026-10-26: each turn start follows this sequence (shared by local/tutorial and online authoritative resolution):
 
-1. Resolve early scripted turn-start effects, including Timed Bomb countdown/detonation
-2. Gain base resources and active occupant resources
-3. Resolve Fallout damage and its destruction chains
-4. Resolve Firewall and Biochemical Bomb turn-start effects together in cast order, including destruction chains
-5. Resolve power-upkeep payment for surviving occupants, then active Robot Factory effects
-6. Resolve the base draw
-7. Resolve Sealbound countdown/release
-8. Main phase (including optional occupant active effects)
-9. Turn end
+1. Refresh the active occupants' attack readiness and remaining attack counts (Sealbound restrictions stay in force).
+2. Grant base Gold: no extra Gold on battle turns 1/2; +3 from turn 3 onward (opening balances stay 3/4).
+3. Resolve scheduled direct destruction such as Cheonra Jimang, including destruction chains.
+4. Resolve persistent turn-start damage: Fallout on both fields, then Timed Bomb countdown/detonation, then Firewall/Biochemical Bomb tile hazards. Bombs retain creation order; Firewall and Biochemical Bomb share cast order. Resolve destruction chains after each effect group.
+5. Surviving active occupants produce resources, then owned persistent spells grant resources and advance their owner-start duration.
+6. Charge surviving occupants' Power consumption and update Drained, preserving Power-first / Gold 1:1 substitution and fixed tile order.
+7. Resolve active Robot Factory card generation.
+8. Resolve the base draw (1 card) and any empty-deck damage.
+9. Resolve Demon King revival on both fields, then ordinary Sealbound owner-start countdown/release.
+10. Enter the actionable Main phase.
+
+If damage or a destruction chain ends the battle, stop immediately; no later production, payment, factory, draw, release or Main transition occurs. Base Gold and readiness have already resolved. A producer killed before step 5 produces nothing, and a dead occupant pays no Power or substitute Gold. The following Turn End remains separate from this start sequence.
 
 ### Turn-end input lock (2026-09-28)
 
@@ -198,7 +201,7 @@ The base draw attempts one card on every own turn, including the opening turns. 
 ## Power Consumption (전력 소모)
 
 - `전력 소모:n` is an innate special effect for units or buildings: on each owner turn start, automatically pay n Power. Its numeric implementation remains `sciencePowerUpkeep`; a positive value grants this effect and zero means none. Existing Power-first, 1:1 Gold substitution and all-or-nothing payment are preserved (user confirmed 2026-10-02).
-- Power payment happens after resource gain and all turn-start damage/destruction (including Fallout, Firewall, Biochemical Bomb and destruction chains), and before Robot Factory and the base draw. Dead occupants pay neither Power nor substitute Gold; only survivors are considered.
+- Power payment happens after all turn-start damage/destruction and the subsequent survivor/persistent-spell resource gains (including damage from Fallout, Timed Bomb, Firewall, Biochemical Bomb and destruction chains), and before Robot Factory and the base draw. Dead occupants pay neither Power nor substitute Gold; only survivors are considered.
 - Payment is attempted automatically in a fixed tile order.
 - The fixed order is:
 
@@ -591,21 +594,22 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 
 ### Firewall
 
-- Firewall is a persistent scripted spell with a base cost of `3 Mana` and base damage of `15 Magic`.
+- Firewall is a persistent scripted spell with a base cost of `4 Mana` and base damage of `15 Magic`.
 - The caster selects row `0` or row `1` on either player's field by targeting any tile in that row.
 - An entirely empty row on either field is still a legal target.
 - The selected row is fixed when the spell is cast. Units moving into or out of that row before a trigger are evaluated at trigger time.
-- Firewall does not deal damage immediately when cast.
+- Firewall deals damage immediately when cast (2026-10-29). This does not consume either of its two later turn-start triggers.
 - It triggers at the next two global turn starts: normally once at the opponent's next turn start and once at the caster's following turn start.
-- Each trigger occurs after base/occupant resource gains and Fallout, but before power-upkeep payment, Robot Factory, and the base draw. Resolve defeated occupants and destruction chains before charging survivors.
-- Each trigger adds the caster's current SpellPower to its stored base Magic damage and deals it to every current occupant in the selected row, including allied or enemy units, buildings, and the Master Unit.
+- Each trigger occurs after base Gold, direct destruction, Fallout and Timed Bomb, but before occupant/persistent-spell resource production, power-upkeep payment, Robot Factory, and the base draw. Resolve defeated occupants and destruction chains before charging survivors.
+- Each hit (including the immediate cast) adds the caster's current SpellPower to its stored base Magic damage and deals it to every current occupant in the selected row, including allied or enemy units, buildings, and the Master Unit.
 - If Firewall defeats its caster's Master, the opposing player wins.
 - Firewall is an area effect, so Shielder does not redirect it. Every occupant in the row resolves defense and drained multiplication independently.
 - All damage from one Firewall instance is applied before defeated units/buildings are removed and Master defeat is checked.
 - An empty-row trigger still consumes one of the two triggers.
 - Multiple Firewall effects may coexist and resolve independently in creation order.
-- The spell card goes to discard when cast; the separate persistent effect expires after its second trigger.
-- Presentation (2026-10-06): five independent upright flame walls stand on the five selected tiles, on either field including empty rows. Each sprite keeps its square aspect ratio and its own ground origin; do not rotate or stretch one strip across the row. Play once after a successful cast (no immediate damage) and once per actual next-two-global-turn-start trigger. Preserve gameplay damage/order; state restoration does not replay past cues. See [firewall presentation](firewall_presentation.md).
+- The spell card goes to discard when cast; the separate persistent effect expires after its second later trigger (three hits total including cast).
+- Current card tooltip: `5*1타일을 선택한다. 즉시 및 다음 2턴 시작 시, 선택한 타일에 마법 데미지를 입힌다.`
+- Presentation (2026-10-06): five independent upright flame walls stand on the five selected tiles, on either field including empty rows. Each sprite keeps its square aspect ratio and its own ground origin; do not rotate or stretch one strip across the row. Play once after a successful cast together with immediate damage/hurt/death and once per actual next-two-global-turn-start trigger. Preserve gameplay damage/order; state restoration does not replay past cues. See [firewall presentation](firewall_presentation.md).
 
 ### Biochemical Bomb
 
@@ -619,7 +623,7 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 - Physical and Magic Defense are ignored. Invincible, Endure, and the Drained damage multiplier still resolve independently for every target. Sealbound occupants take no damage.
 - Biochemical Bomb is an area effect, so Shielder does not redirect it and Hiding does not avoid it.
 - All damage from one Biochemical Bomb instance is applied before defeated units/buildings are removed and Master defeat is checked.
-- Firewall and Biochemical Bomb instances share one creation-order pass after Fallout and before power upkeep, Robot Factory, and the base draw, so mixed effects resolve in the order their cards were cast.
+- Firewall and Biochemical Bomb instances share one creation-order pass after Fallout and Timed Bomb, and before survivor resource production, power upkeep, Robot Factory, and the base draw, so mixed effects resolve in the order their cards were cast.
 - Multiple Biochemical Bomb effects may coexist. Each keeps its own fixed area, damage, and remaining trigger count.
 - Each upgrade level adds `+1` to every trigger's stored Fixed damage; for example, Lv.3 deals `28 Fixed`. Fixed damage does not receive SpellPower, whether present at cast time or gained later.
 - The spell card goes to discard when cast. Biochemical Bomb is enabled in draft offers and random card rewards.
@@ -628,7 +632,7 @@ For a drained recipient, both defenses are first treated as `0`, then the result
 
 - Timed Bomb is a Common Science Civilization scripted spell with cost `3 Power`, base damage `33 Physical`, and no board target.
 - It does not deal damage immediately. Casting it creates a separate persistent effect and sends the spell card to discard.
-- Every global turn start decreases its countdown once, regardless of whose turn begins.
+- Every global turn start decreases its countdown once, regardless of whose turn begins. This happens in the damage stage after direct destruction and Fallout, before Firewall/Biochemical Bomb, survivor resource production and upkeep.
 - If Player casts it and then ends the turn, the first countdown is the opponent's next turn start, the second is Player's following turn start, and it detonates at the opponent's next turn start.
 - On detonation it deals its stored Physical damage to every current occupant on the opposing field, including units, buildings, and the Master Unit.
 - Timed Bomb is an area effect, so Shielder does not redirect it and Hiding does not avoid it. Sealbound occupants remain untargetable and take no damage.
@@ -866,7 +870,7 @@ The matrix lists damage before mitigation; each hit uses the defenses and effect
 - A Sealbound occupant cannot be selected or affected by attacks, spells, area damage, healing, buffs, or debuffs, and it takes no damage while Sealbound.
 - A Sealbound occupant is excluded from Shielder, Robot Fusion material selection, Robot Factory searches, and equivalent occupant-search effects.
 - A Sealbound occupant does not participate in front-row blocking.
-- Sealbound countdown and release are the final operations of the owner's turn-start sequence, after resources, Fallout and Firewall/Biochemical Bomb damage/destruction, upkeep, Robot Factory, and base draw have resolved.
+- Sealbound countdown and release are the final operations of the owner's turn-start sequence, after direct destruction, Fallout/Timed Bomb/Firewall/Biochemical Bomb damage/destruction, survivor resources, upkeep, Robot Factory, and base draw have resolved. Demon King revival precedes ordinary Sealbound countdown/release within this final stage.
 - When the remaining counter reaches `0`, Sealbound ends. Because release occurs last, the released occupant does not contribute resources, pay upkeep, or activate turn-start effects during that same turn start.
 - Unless it has Rush, an occupant released from Sealbound has summoning sickness for the release turn and cannot attack until its owner's following turn. Rush removes only this release-turn attack restriction.
 - Sealbound is independent from Drained and Erasure. A Sealbound occupant is immune to Erasure: applying Erasure while it is Sealbound has no effect and does not remove attached effects. Drained and upkeep evaluation are suspended while Sealbound and resume during the next applicable upkeep step after release.
@@ -1083,7 +1087,7 @@ The matrix lists damage before mitigation; each hit uses the defenses and effect
 
 ### Nuclear and Fallout
 
-Updated 2026-10-08: Nuclear is a Legendary Science spell costing 13 Power. It immediately deals one Fixed packet of 100 + account upgrade level to every current occupant on the opponent board, including the Master. It does not destroy the entire field directly. All area packets resolve before defeated-occupant triggers/chains and Master outcome checks; standard Invincible, Endure, Sealbound and Drained rules apply, Shielder/Hiding do not avoid area damage, and defense/SpellPower do not apply. Nuclear is upgradeable, +1 immediate damage at every level through Lv.13 (113); draft/rewards are enabled following the user-provided card artwork registration. Each cast also permanently adds one Fallout stack only to Units already on the opponent board at cast time, including the Master. Later summons receive no inherited stacks; each later cast adds only one new stack to its own current eligible recipients. Buildings receive neither new Fallout stacks nor Fallout turn-start damage; the immediate hit still includes them. Fallout deals one Fixed packet of 10 times stacks at every global turn start, after resource gains and before area damage, upkeep, factory generation, and draw; Nuclear upgrades do not increase this tick. Erasure and ownership transfer do not remove acquired Fallout. Only acquired occupant stacks survive transfer/reconnect. The legacy board counter is retained for snapshot compatibility but has no ongoing effect. Sealbound prevents new stacks during the cast; release/revival/placement never inherit historical board stacks. See [complete rules](nuclear_fallout.md).
+Updated 2026-10-08: Nuclear is a Legendary Science spell costing 13 Power. It immediately deals one Fixed packet of 100 + account upgrade level to every current occupant on the opponent board, including the Master. It does not destroy the entire field directly. All area packets resolve before defeated-occupant triggers/chains and Master outcome checks; standard Invincible, Endure, Sealbound and Drained rules apply, Shielder/Hiding do not avoid area damage, and defense/SpellPower do not apply. Nuclear is upgradeable, +1 immediate damage at every level through Lv.13 (113); draft/rewards are enabled following the user-provided card artwork registration. Each cast also permanently adds one Fallout stack only to Units already on the opponent board at cast time, including the Master. Later summons receive no inherited stacks; each later cast adds only one new stack to its own current eligible recipients. Buildings receive neither new Fallout stacks nor Fallout turn-start damage; the immediate hit still includes them. Fallout deals one Fixed packet of 10 times stacks at every global turn start, after base Gold/direct destruction and before Timed Bomb, tile area damage, survivor resource production, upkeep, factory generation, and draw; Nuclear upgrades do not increase this tick. Erasure and ownership transfer do not remove acquired Fallout. Only acquired occupant stacks survive transfer/reconnect. The legacy board counter is retained for snapshot compatibility but has no ongoing effect. Sealbound prevents new stacks during the cast; release/revival/placement never inherit historical board stacks. See [complete rules](nuclear_fallout.md).
 
 ### Magic Amplification Circle
 
@@ -1168,3 +1172,19 @@ These unresolved rules do not make the implemented Nuclear/Fallout or Magic Ampl
 - 기본 효과수치 30, Lv.1–13 매 강화 +1: Lv.0 +30, Lv.13 +43. 비용은 기5이며 기존 골드 대체 지불을 유지한다.
 - 별도의 기 생산 지속 효과를 등록하지 않는다. 주문력이나 마법 피해 증폭은 공격력 증가량에 적용하지 않는다.
 - 기존 출처별 전투 공격력 버프를 사용하며 중첩·망각 제거·방전 등 억제·상태 저장 규칙은 그대로 따른다. 서버 전투 기록은 실제 적용한 공격력 증가량을 표시한다.
+
+
+### Jar Of Greed (2026-10-28)
+
+욕망의 단지(`JarOfGreed`)는 중립 레어 마법, 전투 골드1, 사용 즉시2장 드로우. 대상 타일 없이 자기 Main에 사용하며 선택한 손패 RuntimeId와 비용을 검증한 뒤 카드/비용을 소비하고 공통 드로우를 실행한다. 손패 초과 소멸·누적 덱 소진 피해·중간 전투 종료 시 중단을 유지한다. 덱 빌딩On(후속 사용자 수정), 랜덤 보상Off·강화불가. 허공 드래그 확정 때 공통 푸른 조각 연출을 재생한다. [전체 규칙·검증](jar_of_greed.md).
+
+
+## 유산 (Legacy) — 2026-10-29
+
+- 전장 타일에 소환된 소환물이 실제로 사망/파괴되어 제거될 때 그 시점 소유자의 유산을 한 번 발동한다. HP피해 사망, 직접 파괴, 턴 시작 파괴/지속피해와 연쇄 폭발 모두 공통 파괴 큐를 사용한다. 이동·자리교환·손패 반환·합체 재료 제거는 사망/파괴가 아니므로 발동하지 않는다.
+- 공통 툴팁: **사망/파괴 시 효과를 발동한다.**
+- 좀비(`Zombie`), 스켈레톤 아처(`SkeletonArcher`), 스켈레톤(`Skeleton`): **유산: 카드를 1장 드로우한다.** 강화 레벨과 관계없이1장이다. 덱에서 뽑는 실제 드로우이며 기존 손패10장 제한·초과 카드 소멸·누적 덱 소진 피해를 그대로 사용한다. 드로우 이벤트에 소유자·출처 CardId를 기록하므로 기존 서버 드로우 통지와 내 덱→손패 연출을 사용한다.
+- 원자력 발전소(`NuclearPowerPlant`): **유산: 전장 전체에 30의 물리 데미지를 입힌다.** 기존 양쪽 전장/마스터·방어력·봉인 보호·연쇄 폭발 판정은 유지한다. 턴 시작 전력+3과 HP강화는 그대로이며 폭발30은 강화로 증가하지 않는다.
+- 다른 공통 효과와 같이 망각·방전·봉인으로 억제된 상태에서는 발동하지 않는다. 스턴/빙결은 행동 제한이므로 그 자체로 유산을 억제하지 않는다. 불굴로 생존하거나 마왕의 부활 봉인에 들어가는 등 실제 제거가 일어나지 않으면 유산을 발동하지 않는다.
+- 같은 피해/파괴 묶음의 제거를 정리한 뒤 큐에 보관한 유산을 순서대로 해소하고 연쇄 사망을 수집한다. 같은 소환물을 중복 처리하지 않는다. 유산 드로우의 덱 소진 피해로 양쪽 마스터가 쓰러질 수 있으므로 해당 묶음의 모든 유산을 정리한 뒤 기존 최종HP/무승부 규칙으로 승패를 판정한다. 일반 드로우의 중간 사망 즉시 종료 동작은 유지한다.
+- 공용 `LegacyRules`가 현재4카드의 종류·수치를 등록한다. `CardDefinition.HasLegacy`/`OccupantState.HasLegacy`는 기존 CardId와 망각 상태에서 도출하고, `HasActiveLegacyEffect`가 실제 억제를 검사한다. 기존 상태 복제·서버 복원·시청자별 DTO는 같은 필드로 복구하므로 새 네트워크 플래그/DB열을 추가하지 않는다. 원전 폭발용 AI 우선순위 술어는 폭발에만 적용하며 드로우 유산을 폭발로 오인하지 않는다.

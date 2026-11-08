@@ -38,3 +38,12 @@
 - 상대 손패는 `OpponentCardBack_00`부터 있는 슬롯들의 **Image > Source Image**를 바꾼다. 여러 슬롯을 함께 선택해 같은 그림으로 바꿀 수 있다. 현재 숨겨진 슬롯도 포함한다. 손패 수에 따른 부채꼴 위치/회전/크기는 기존 OpponentHandPresenter가 계속 계산한다.
 - 이미지가 비어 있는 슬롯만 Presenter의 Card Back Sprite/Texture/Resource 기본값으로 채운다. 이미 지정된 슬롯은 이 기본값을 변경해도 덮어쓰지 않는다. 덱 수에 따른 층 표시·남은 카드 안내는 유지하며, 덱 클릭 영역은 옮긴 카드들의 실제 영역을 감싼다. 드로우/멀리건 시작 위치와 뒷면도 실제 덱 카드에서 읽는다.
 - 재현 검사에서 수정 전 내 덱·상대 덱·상대 손패3/3 실패 → 수정 후 관련 격리 Unity **41/41 통과**. 저장/재열기/실제 Play 진입/재활성화·숨겨진 슬롯·덱 수 변경·자동 손패 정렬·드로우 출발점·멀리건 회귀를 확인했다. 사용자 원본 씬을 재생성하거나 저장하지 않았으며 앱 빌드·실기기 확인은 별도다. 서버 재배포 불필요.
+
+## 소환물 스탯창 크기와 공격 잔여 점 (2026-10-28)
+
+Play 종료 후 Battle 씬 Hierarchy에서 `t:TileTextView`로 양쪽 타일20개를 선택하고 **Occupant Stats**의 `Occupant Stat Bar Size`, `Occupant Stat Font Size`, `Occupant Stat Icon Size`를 수정해 저장한다. 시작 예시150×34 / 24 / 20×20; 기존 씬 값은112×26 / 18 / 16×16이며 이번에 강제로 바꾸지 않았다. 자식 Text/RectTransform은 런타임에서 다시 계산하므로 TileTextView 설정을 바꾼다. **Attack Ready Indicator**에서 초록 점 크기·색·사용 여부를 조절한다. 내 메인 턴에 공격 횟수가 남은 공격 가능한 아군 소환물만 표시하며 마스터·공격 가능 건물 포함, 입력 비차단·스탯 Canvas 순서 유지. [자세한 편집 방법과 표시 조건](stat_bar_authoring.md).
+
+
+## 손패 장수별 간격 (2026-10-29)
+
+전투 씬 Hand Presenter의 `Curved Hand Layout > Spacing By Card Count`에서 Two Cards~Ten Cards를 각각 편집한다. 기본값250/225/200/175/150/125/100/75/50. 기존 Min/Max Spacing과 Hand Width Factor는 내 손패에서 사용하지 않는다. 화면 SafeArea를 가로로 넘을 때만 간격을 줄이고 기존 카드 크기·선택 확대·접힘은 유지한다. 새 설정은 authoring snapshot에 포함되므로 Play 전에 수정·저장한 값이 유지된다. 사용자 씬을 자동으로 다시 만들거나 저장하지 않았다. [설정과 검증](compact_battle_hand.md#장수별-손패-간격과-화면-초과-조절-2026-10-29).

@@ -71,6 +71,11 @@ Start-ScheduledTask -TaskName 'After333-Encrypted-DB-Backup'
 
 DB 일일 백업과 서버 외부 파일 수동 백업은 별개다.57개 파일의 기존 암호화 백업·웹 독립 다운로드 확인은 전체 호스트 복원이나 TLS/역할 비밀번호 백업을 뜻하지 않는다. 키를 덤프와 함께 공유하지 않고 PC 밖 보관을 유지한다. [MYBOX 상세](mybox_database_backup.md), [격리 복원 확인](postgres_restore_runbook.md).
 
+## 관리자 선물함 지급 (서버 골드·티켓)
+
+Lightsail 이전 이후에는 예전 Windows 로컬 `DeploymentSettings-20260909.clixml`(`project333` 로컬 DB) 대신, SSH 로컬 포트 포워딩(`127.0.0.1:15432 -> Lightsail 127.0.0.1:5432`)과 `ManageGifts.ps1 -UseEnvironmentDatabase` 옵션을 함께 사용해 운영 DB(`project333_live`)에 지급한다.
+`5432` 포트를 외부에 개방하지 않으며, 상세 명령어와 단계별 절차는 [관리자 선물함 문서](gift_inbox.md#lightsail-운영-dbproject333_live-선물-지급-절차--2026-10-31-갱신)를 따른다.
+
 ## 배포·장애·원복
 
 유효한 최신 백업과 릴리스·outbox를 보존한 후 변경한다. 서버 중단으로 미완료 전투는 무승패 취소하며, 이미 확정된 결과는 내구성 저널에서 멱등 반영된다. 예전 노트북 서버와 Lightsail이 각자 다른 DB로 동시에 쓰지 않도록 한다. 전환 뒤 새 데이터가 생긴 상태에서는 DNS만 옛 노트북으로 되돌리지 않는다. 최신DB와 outbox를 보존·검증해 역이관하는 별도 복구 절차가 필요하다. 오늘 이 절차를 실행한 것은 아니다.

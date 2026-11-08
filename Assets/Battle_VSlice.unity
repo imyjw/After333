@@ -592,18 +592,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -939,7 +942,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 1547268743}
+  m_Sprite: {fileID: 21300000, guid: 4c1809b3f575d7241a9b3ad124b014ee, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -974,7 +977,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 150, y: 200}
+  m_SizeDelta: {x: 120, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!21 &17324538
 Material:
@@ -1948,7 +1951,17 @@ MonoBehaviour:
   _handBandHeight: 440
   _handWidthFactor: 0.8
   _minSpacing: 50
-  _maxSpacing: 100
+  _maxSpacing: 250
+  _spacingByCardCount:
+    _twoCards: 225
+    _threeCards: 225
+    _fourCards: 200
+    _fiveCards: 175
+    _sixCards: 150
+    _sevenCards: 125
+    _eightCards: 100
+    _nineCards: 100
+    _tenCards: 100
   _maxRotationDegrees: 17
   _arcHeight: 0
   _edgeDrop: 0
@@ -1963,7 +1976,17 @@ MonoBehaviour:
     HandBandHeight: 440
     HandWidthFactor: 0.8
     MinSpacing: 50
-    MaxSpacing: 100
+    MaxSpacing: 250
+    SpacingByCardCount:
+      _twoCards: 225
+      _threeCards: 225
+      _fourCards: 200
+      _fiveCards: 175
+      _sixCards: 150
+      _sevenCards: 125
+      _eightCards: 100
+      _nineCards: 100
+      _tenCards: 100
     MaxRotationDegrees: 17
     ArcHeight: 0
     EdgeDrop: 0
@@ -2425,6 +2448,52 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 120
   m_TargetDisplay: 0
+--- !u!28 &59245154
+Texture2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Malgun Gothic
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 4
+  m_Width: 0
+  m_Height: 0
+  m_CompleteImageSize: 0
+  m_MipsStripped: 0
+  m_TextureFormat: 4
+  m_MipCount: 1
+  m_IsReadable: 1
+  m_IsPreProcessed: 0
+  m_IgnoreMipmapLimit: 0
+  m_MipmapLimitGroupName: 
+  m_StreamingMipmaps: 0
+  m_StreamingMipmapsPriority: 0
+  m_VTOnly: 0
+  m_AlphaIsTransparency: 0
+  m_ImageCount: 1
+  m_TextureDimension: 2
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 0
+    m_WrapV: 0
+    m_WrapW: 0
+  m_LightmapFormat: 0
+  m_ColorSpace: 0
+  m_PlatformBlob: 
+  image data: 0
+  _typelessdata: 
+  m_StreamData:
+    serializedVersion: 2
+    offset: 0
+    size: 0
+    path: 
 --- !u!1 &62375051
 GameObject:
   m_ObjectHideFlags: 0
@@ -3310,7 +3379,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 285, y: 0}
+  m_AnchoredPosition: {x: 8, y: -75}
   m_SizeDelta: {x: 90, y: 48}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!1 &109779102
@@ -3696,7 +3765,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 95, y: 0}
+  m_AnchoredPosition: {x: 8, y: 25}
   m_SizeDelta: {x: 90, y: 48}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!1 &125505000
@@ -4543,18 +4612,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -7021,18 +7093,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -7715,6 +7790,42 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 282416744}
   m_CullTransparentMesh: 1
+--- !u!1 &284805797
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 284805798}
+  m_Layer: 0
+  m_Name: Fill Area
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &284805798
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 284805797}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1693012043}
+  m_Father: {fileID: 1033892366}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0.35}
+  m_AnchorMax: {x: 1, y: 0.65}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: -28, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &286021695
 GameObject:
   m_ObjectHideFlags: 0
@@ -7750,7 +7861,7 @@ RectTransform:
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: -120, y: -32}
-  m_SizeDelta: {x: 360, y: 64}
+  m_SizeDelta: {x: 600, y: 64}
   m_Pivot: {x: 1, y: 1}
 --- !u!222 &286021697
 CanvasRenderer:
@@ -8081,6 +8192,52 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+--- !u!28 &293963648
+Texture2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: NoticeRounded
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 4
+  m_Width: 32
+  m_Height: 32
+  m_CompleteImageSize: 4096
+  m_MipsStripped: 0
+  m_TextureFormat: 4
+  m_MipCount: 1
+  m_IsReadable: 0
+  m_IsPreProcessed: 0
+  m_IgnoreMipmapLimit: 1
+  m_MipmapLimitGroupName: 
+  m_StreamingMipmaps: 0
+  m_StreamingMipmapsPriority: 0
+  m_VTOnly: 0
+  m_AlphaIsTransparency: 0
+  m_ImageCount: 1
+  m_TextureDimension: 2
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_LightmapFormat: 0
+  m_ColorSpace: 1
+  m_PlatformBlob: 
+  image data: 4096
+  _typelessdata: ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff41ffffff70ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff70ffffff41ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff70ffffffe1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1ffffff70ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff04ffffffb0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb0ffffff04ffffff00ffffff00ffffff00ffffff00ffffffb0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb0ffffff00ffffff00ffffff00ffffff70ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff70ffffff00ffffff00ffffffe1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1ffffff00ffffff41ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff41ffffff70ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff70ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff70ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff70ffffff41ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff41ffffff00ffffffe1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1ffffff00ffffff00ffffff70ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff70ffffff00ffffff00ffffff00ffffffb0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb0ffffff00ffffff00ffffff00ffffff00ffffff04ffffffb0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb0ffffff04ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff70ffffffe1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1ffffff70ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff41ffffff70ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff70ffffff41ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00
+  m_StreamData:
+    serializedVersion: 2
+    offset: 0
+    size: 0
+    path: 
 --- !u!1 &302288578
 GameObject:
   m_ObjectHideFlags: 0
@@ -8499,7 +8656,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 409027529}
+  m_Sprite: {fileID: 499190810}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -8910,7 +9067,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 1547268743}
+  m_Sprite: {fileID: 21300000, guid: 4c1809b3f575d7241a9b3ad124b014ee, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -8945,7 +9102,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 150, y: 200}
+  m_SizeDelta: {x: 120, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &345064726
 GameObject:
@@ -9050,6 +9207,39 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
+--- !u!128 &347981089
+Font:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Malgun Gothic
+  serializedVersion: 5
+  m_LineSpacing: 42.5625
+  m_DefaultMaterial: {fileID: 2025137709}
+  m_FontSize: 32
+  m_Texture: {fileID: 980991228}
+  m_AsciiStartOffset: 0
+  m_Tracking: 1
+  m_CharacterSpacing: 0
+  m_CharacterPadding: 1
+  m_ConvertCase: -2
+  m_CharacterRects: []
+  m_KerningValues: []
+  m_PixelScale: 0.1
+  m_FontData: 
+  m_Ascent: 34.828125
+  m_Descent: 0
+  m_DefaultStyle: 0
+  m_FontNames:
+  - Malgun Gothic
+  - Apple SD Gothic Neo
+  - Noto Sans CJK KR
+  - Noto Sans KR
+  m_FallbackFonts: []
+  m_FontRenderingMode: 0
+  m_UseLegacyBoundsCalculation: 0
+  m_ShouldRoundAdvanceValue: 1
 --- !u!1 &352719995
 GameObject:
   m_ObjectHideFlags: 0
@@ -10483,216 +10673,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 403218951}
   m_CullTransparentMesh: 1
---- !u!213 &409027529
-Sprite:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_Rect:
-    serializedVersion: 2
-    x: 0
-    y: 0
-    width: 32
-    height: 32
-  m_Offset: {x: 0, y: 0}
-  m_Border: {x: 10, y: 10, z: 10, w: 10}
-  m_PixelsToUnits: 100
-  m_Pivot: {x: 0.5, y: 0.5}
-  m_Extrude: 0
-  m_IsPolygon: 0
-  m_PackingTag: 
-  m_RenderDataKey:
-    00000000000000000000000000000000: 0
-  m_AtlasTags: []
-  m_SpriteAtlas: {fileID: 0}
-  m_RD:
-    serializedVersion: 3
-    texture: {fileID: 977377606}
-    alphaTexture: {fileID: 0}
-    secondaryTextures: []
-    m_SubMeshes:
-    - serializedVersion: 2
-      firstByte: 0
-      indexCount: 6
-      topology: 0
-      baseVertex: 0
-      firstVertex: 0
-      vertexCount: 4
-      localAABB:
-        m_Center: {x: 0, y: 0, z: 0}
-        m_Extent: {x: 0, y: 0, z: 0}
-    m_IndexBuffer: 000001000200020001000300
-    m_VertexData:
-      serializedVersion: 3
-      m_VertexCount: 4
-      m_Channels:
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 3
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 1
-        offset: 0
-        format: 0
-        dimension: 2
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      m_DataSize: 80
-      _typelessdata: 0ad723be0ad7233e000000000ad7233e0ad7233e000000000ad723be0ad723be000000000ad7233e0ad723be000000000000000000000000000000000000000000000000000000000000000000000000
-    m_Bindpose: []
-    textureRect:
-      serializedVersion: 2
-      x: 0
-      y: 0
-      width: 32
-      height: 32
-    textureRectOffset: {x: 0, y: 0}
-    atlasRectOffset: {x: -1, y: -1}
-    settingsRaw: 0
-    uvTransform: {x: 100, y: 16, z: 100, w: 16}
-    downscaleMultiplier: 1
-  m_AtlasRD:
-    serializedVersion: 3
-    texture: {fileID: 977377606}
-    alphaTexture: {fileID: 0}
-    secondaryTextures: []
-    m_SubMeshes:
-    - serializedVersion: 2
-      firstByte: 0
-      indexCount: 6
-      topology: 0
-      baseVertex: 0
-      firstVertex: 0
-      vertexCount: 4
-      localAABB:
-        m_Center: {x: 0, y: 0, z: 0}
-        m_Extent: {x: 0, y: 0, z: 0}
-    m_IndexBuffer: 000001000200020001000300
-    m_VertexData:
-      serializedVersion: 3
-      m_VertexCount: 4
-      m_Channels:
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 3
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 1
-        offset: 0
-        format: 0
-        dimension: 2
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      m_DataSize: 80
-      _typelessdata: 0ad723be0ad7233e000000000ad7233e0ad7233e000000000ad723be0ad723be000000000ad7233e0ad723be000000000000000000000000000000000000000000000000000000000000000000000000
-    m_Bindpose: []
-    textureRect:
-      serializedVersion: 2
-      x: 0
-      y: 0
-      width: 32
-      height: 32
-    textureRectOffset: {x: 0, y: 0}
-    atlasRectOffset: {x: -1, y: -1}
-    settingsRaw: 0
-    uvTransform: {x: 100, y: 16, z: 100, w: 16}
-    downscaleMultiplier: 1
-  m_PhysicsShape: []
-  m_Bones: []
-  m_ScriptableObjects: []
-  m_SpriteID: 
 --- !u!1 &409622018
 GameObject:
   m_ObjectHideFlags: 0
@@ -12085,7 +12065,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 409027529}
+  m_Sprite: {fileID: 499190810}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -12898,6 +12878,216 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 498352670}
   m_CullTransparentMesh: 1
+--- !u!213 &499190810
+Sprite:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_Rect:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 32
+    height: 32
+  m_Offset: {x: 0, y: 0}
+  m_Border: {x: 10, y: 10, z: 10, w: 10}
+  m_PixelsToUnits: 100
+  m_Pivot: {x: 0.5, y: 0.5}
+  m_Extrude: 0
+  m_IsPolygon: 0
+  m_PackingTag: 
+  m_RenderDataKey:
+    00000000000000000000000000000000: 0
+  m_AtlasTags: []
+  m_SpriteAtlas: {fileID: 0}
+  m_RD:
+    serializedVersion: 3
+    texture: {fileID: 293963648}
+    alphaTexture: {fileID: 0}
+    secondaryTextures: []
+    m_SubMeshes:
+    - serializedVersion: 2
+      firstByte: 0
+      indexCount: 6
+      topology: 0
+      baseVertex: 0
+      firstVertex: 0
+      vertexCount: 4
+      localAABB:
+        m_Center: {x: 0, y: 0, z: 0}
+        m_Extent: {x: 0, y: 0, z: 0}
+    m_IndexBuffer: 000001000200020001000300
+    m_VertexData:
+      serializedVersion: 3
+      m_VertexCount: 4
+      m_Channels:
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 3
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 1
+        offset: 0
+        format: 0
+        dimension: 2
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      m_DataSize: 80
+      _typelessdata: 0ad723be0ad7233e000000000ad7233e0ad7233e000000000ad723be0ad723be000000000ad7233e0ad723be000000000000000000000000000000000000000000000000000000000000000000000000
+    m_Bindpose: []
+    textureRect:
+      serializedVersion: 2
+      x: 0
+      y: 0
+      width: 32
+      height: 32
+    textureRectOffset: {x: 0, y: 0}
+    atlasRectOffset: {x: -1, y: -1}
+    settingsRaw: 0
+    uvTransform: {x: 100, y: 16, z: 100, w: 16}
+    downscaleMultiplier: 1
+  m_AtlasRD:
+    serializedVersion: 3
+    texture: {fileID: 293963648}
+    alphaTexture: {fileID: 0}
+    secondaryTextures: []
+    m_SubMeshes:
+    - serializedVersion: 2
+      firstByte: 0
+      indexCount: 6
+      topology: 0
+      baseVertex: 0
+      firstVertex: 0
+      vertexCount: 4
+      localAABB:
+        m_Center: {x: 0, y: 0, z: 0}
+        m_Extent: {x: 0, y: 0, z: 0}
+    m_IndexBuffer: 000001000200020001000300
+    m_VertexData:
+      serializedVersion: 3
+      m_VertexCount: 4
+      m_Channels:
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 3
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 1
+        offset: 0
+        format: 0
+        dimension: 2
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      - stream: 0
+        offset: 0
+        format: 0
+        dimension: 0
+      m_DataSize: 80
+      _typelessdata: 0ad723be0ad7233e000000000ad7233e0ad7233e000000000ad723be0ad723be000000000ad7233e0ad723be000000000000000000000000000000000000000000000000000000000000000000000000
+    m_Bindpose: []
+    textureRect:
+      serializedVersion: 2
+      x: 0
+      y: 0
+      width: 32
+      height: 32
+    textureRectOffset: {x: 0, y: 0}
+    atlasRectOffset: {x: -1, y: -1}
+    settingsRaw: 0
+    uvTransform: {x: 100, y: 16, z: 100, w: 16}
+    downscaleMultiplier: 1
+  m_PhysicsShape: []
+  m_Bones: []
+  m_ScriptableObjects: []
+  m_SpriteID: 
 --- !u!21 &501030616
 Material:
   serializedVersion: 8
@@ -13329,7 +13519,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 1547268743}
+  m_Sprite: {fileID: 21300000, guid: 4c1809b3f575d7241a9b3ad124b014ee, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -13364,7 +13554,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 150, y: 200}
+  m_SizeDelta: {x: 120, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &524099384
 GameObject:
@@ -13649,7 +13839,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 190, y: 0}
+  m_AnchoredPosition: {x: 8, y: -25}
   m_SizeDelta: {x: 90, y: 48}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!1 &553158200
@@ -14113,7 +14303,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 190, y: 0}
+  m_AnchoredPosition: {x: 8, y: -25}
   m_SizeDelta: {x: 90, y: 48}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!1 &589572309
@@ -14246,7 +14436,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 1547268743}
+  m_Sprite: {fileID: 21300000, guid: 4c1809b3f575d7241a9b3ad124b014ee, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -14281,7 +14471,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 150, y: 200}
+  m_SizeDelta: {x: 120, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &593711795
 GameObject:
@@ -15277,7 +15467,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 1547268743}
+  m_Sprite: {fileID: 21300000, guid: 4c1809b3f575d7241a9b3ad124b014ee, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -15312,7 +15502,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 150, y: 200}
+  m_SizeDelta: {x: 120, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &638111788
 GameObject:
@@ -15977,7 +16167,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 409027529}
+  m_Sprite: {fileID: 499190810}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -16622,7 +16812,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 1547268743}
+  m_Sprite: {fileID: 21300000, guid: 4c1809b3f575d7241a9b3ad124b014ee, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -16657,7 +16847,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 150, y: 200}
+  m_SizeDelta: {x: 120, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!213 &679466944
 Sprite:
@@ -17500,7 +17690,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 1547268743}
+  m_Sprite: {fileID: 21300000, guid: 4c1809b3f575d7241a9b3ad124b014ee, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -17535,7 +17725,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 150, y: 200}
+  m_SizeDelta: {x: 120, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &720055096
 GameObject:
@@ -19933,18 +20123,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -20429,6 +20622,7 @@ MonoBehaviour:
   _scrollRect: {fileID: 0}
   _contentBottomPadding: 12
   _fallbackText: "\uC804\uD22C \uAE30\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4."
+  _battleBootstrapper: {fileID: 0}
 --- !u!4 &829115348
 Transform:
   m_ObjectHideFlags: 0
@@ -20595,8 +20789,8 @@ MonoBehaviour:
   _masterVolumeValueText: {fileID: 329102572}
   _musicVolumeSlider: {fileID: 1382447030}
   _musicVolumeValueText: {fileID: 857351110}
-  _effectsVolumeSlider: {fileID: 0}
-  _effectsVolumeValueText: {fileID: 0}
+  _effectsVolumeSlider: {fileID: 1033892365}
+  _effectsVolumeValueText: {fileID: 904362421}
   _audioBackButton: {fileID: 1058393668}
   _confirmationPanel: {fileID: 211326352}
   _confirmationTitleText: {fileID: 237086041}
@@ -21294,12 +21488,15 @@ RectTransform:
   - {fileID: 1382447031}
   - {fileID: 857351112}
   - {fileID: 1058393671}
+  - {fileID: 1980658520}
+  - {fileID: 1033892366}
+  - {fileID: 904362423}
   m_Father: {fileID: 872518941}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 720, y: 560}
+  m_SizeDelta: {x: 720, y: 720}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &866132099
 MonoBehaviour:
@@ -21493,18 +21690,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -21698,6 +21898,42 @@ RectTransform:
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &876608692
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 876608693}
+  m_Layer: 0
+  m_Name: Handle Slide Area
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &876608693
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 876608692}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 983243103}
+  m_Father: {fileID: 1033892366}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: -30, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &883097475
 GameObject:
@@ -22106,6 +22342,85 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: Card 3
+--- !u!1 &904362420
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 904362423}
+  - component: {fileID: 904362422}
+  - component: {fileID: 904362421}
+  m_Layer: 0
+  m_Name: EffectsVolumeValueText
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &904362421
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 904362420}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_FontData:
+    m_Font: {fileID: 1368295091}
+    m_FontSize: 25
+    m_FontStyle: 1
+    m_BestFit: 0
+    m_MinSize: 10
+    m_MaxSize: 40
+    m_Alignment: 4
+    m_AlignByGeometry: 0
+    m_RichText: 1
+    m_HorizontalOverflow: 0
+    m_VerticalOverflow: 0
+    m_LineSpacing: 1
+  m_Text: 100%
+--- !u!222 &904362422
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 904362420}
+  m_CullTransparentMesh: 1
+--- !u!224 &904362423
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 904362420}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 866132098}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 1, y: 1}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: -64, y: -442}
+  m_SizeDelta: {x: 110, y: 48}
+  m_Pivot: {x: 1, y: 1}
 --- !u!1 &905365682
 GameObject:
   m_ObjectHideFlags: 0
@@ -22486,8 +22801,8 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 987540771}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.18, y: 0.18}
-  m_AnchorMax: {x: 0.82, y: 0.82}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -22982,7 +23297,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 8, y: 75}
   m_SizeDelta: {x: 90, y: 48}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!21 &937779777
@@ -23010,6 +23325,39 @@ Material:
     m_TexEnvs:
     - _MainTex:
         m_Texture: {fileID: 1111203584}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats: []
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
+--- !u!21 &940310100
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Malgun Gothic
+  m_Shader: {fileID: 10101, guid: 0000000000000000e000000000000000, type: 0}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 59245154}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
@@ -24378,52 +24726,6 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
---- !u!28 &977377606
-Texture2D:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: NoticeRounded
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 4
-  m_Width: 32
-  m_Height: 32
-  m_CompleteImageSize: 4096
-  m_MipsStripped: 0
-  m_TextureFormat: 4
-  m_MipCount: 1
-  m_IsReadable: 0
-  m_IsPreProcessed: 0
-  m_IgnoreMipmapLimit: 1
-  m_MipmapLimitGroupName: 
-  m_StreamingMipmaps: 0
-  m_StreamingMipmapsPriority: 0
-  m_VTOnly: 0
-  m_AlphaIsTransparency: 0
-  m_ImageCount: 1
-  m_TextureDimension: 2
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_LightmapFormat: 0
-  m_ColorSpace: 1
-  m_PlatformBlob: 
-  image data: 4096
-  _typelessdata: ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff41ffffff70ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff70ffffff41ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff70ffffffe1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1ffffff70ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff04ffffffb0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb0ffffff04ffffff00ffffff00ffffff00ffffff00ffffffb0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb0ffffff00ffffff00ffffff00ffffff70ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff70ffffff00ffffff00ffffffe1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1ffffff00ffffff41ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff41ffffff70ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff70ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff80ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ffffff70ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff70ffffff41ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff41ffffff00ffffffe1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1ffffff00ffffff00ffffff70ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff70ffffff00ffffff00ffffff00ffffffb0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb0ffffff00ffffff00ffffff00ffffff00ffffff04ffffffb0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb0ffffff04ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff70ffffffe1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1ffffff70ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00ffffff41ffffff70ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff80ffffff70ffffff41ffffff00ffffff00ffffff00ffffff00ffffff00ffffff00
-  m_StreamData:
-    serializedVersion: 2
-    offset: 0
-    size: 0
-    path: 
 --- !u!1 &978596451
 GameObject:
   m_ObjectHideFlags: 0
@@ -24594,6 +24896,127 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: 
+--- !u!28 &980991228
+Texture2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Malgun Gothic
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 4
+  m_Width: 0
+  m_Height: 0
+  m_CompleteImageSize: 0
+  m_MipsStripped: 0
+  m_TextureFormat: 4
+  m_MipCount: 1
+  m_IsReadable: 1
+  m_IsPreProcessed: 0
+  m_IgnoreMipmapLimit: 0
+  m_MipmapLimitGroupName: 
+  m_StreamingMipmaps: 0
+  m_StreamingMipmapsPriority: 0
+  m_VTOnly: 0
+  m_AlphaIsTransparency: 0
+  m_ImageCount: 1
+  m_TextureDimension: 2
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 0
+    m_WrapV: 0
+    m_WrapW: 0
+  m_LightmapFormat: 0
+  m_ColorSpace: 0
+  m_PlatformBlob: 
+  image data: 0
+  _typelessdata: 
+  m_StreamData:
+    serializedVersion: 2
+    offset: 0
+    size: 0
+    path: 
+--- !u!1 &983243102
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 983243103}
+  - component: {fileID: 983243104}
+  - component: {fileID: 983243105}
+  m_Layer: 0
+  m_Name: Handle
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &983243103
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 983243102}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 876608693}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 36, y: 36}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!222 &983243104
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 983243102}
+  m_CullTransparentMesh: 1
+--- !u!114 &983243105
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 983243102}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0.93, g: 0.78, b: 0.28, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 0}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
 --- !u!1 &983659183
 GameObject:
   m_ObjectHideFlags: 0
@@ -24839,7 +25262,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.025, g: 0.075, b: 0.1, a: 0.94}
+  m_Color: {r: 0.025, g: 0.075, b: 0.1, a: 0}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -25276,18 +25699,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -26078,6 +26504,96 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: 
+--- !u!1 &1033892364
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1033892366}
+  - component: {fileID: 1033892365}
+  m_Layer: 0
+  m_Name: EffectsVolumeSlider
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1033892365
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1033892364}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 67db9e8f0e2ae9c40bc1e2b64352a6b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Slider
+  m_Navigation:
+    m_Mode: 3
+    m_WrapAround: 0
+    m_SelectOnUp: {fileID: 0}
+    m_SelectOnDown: {fileID: 0}
+    m_SelectOnLeft: {fileID: 0}
+    m_SelectOnRight: {fileID: 0}
+  m_Transition: 1
+  m_Colors:
+    m_NormalColor: {r: 1, g: 1, b: 1, a: 1}
+    m_HighlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_PressedColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+    m_SelectedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_DisabledColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 0.5019608}
+    m_ColorMultiplier: 1
+    m_FadeDuration: 0.1
+  m_SpriteState:
+    m_HighlightedSprite: {fileID: 0}
+    m_PressedSprite: {fileID: 0}
+    m_SelectedSprite: {fileID: 0}
+    m_DisabledSprite: {fileID: 0}
+  m_AnimationTriggers:
+    m_NormalTrigger: Normal
+    m_HighlightedTrigger: Highlighted
+    m_PressedTrigger: Pressed
+    m_SelectedTrigger: Selected
+    m_DisabledTrigger: Disabled
+  m_Interactable: 1
+  m_TargetGraphic: {fileID: 983243105}
+  m_FillRect: {fileID: 1693012043}
+  m_HandleRect: {fileID: 983243103}
+  m_Direction: 0
+  m_MinValue: 0
+  m_MaxValue: 1
+  m_WholeNumbers: 0
+  m_Value: 0
+  m_OnValueChanged:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!224 &1033892366
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1033892364}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1403077067}
+  - {fileID: 284805798}
+  - {fileID: 876608693}
+  m_Father: {fileID: 866132098}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 1}
+  m_AnchorMax: {x: 0.5, y: 1}
+  m_AnchoredPosition: {x: 0, y: -510}
+  m_SizeDelta: {x: 576, y: 52}
+  m_Pivot: {x: 0.5, y: 1}
 --- !u!1 &1036081048
 GameObject:
   m_ObjectHideFlags: 0
@@ -26278,18 +26794,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -26520,7 +27039,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 1547268743}
+  m_Sprite: {fileID: 21300000, guid: 4c1809b3f575d7241a9b3ad124b014ee, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -26555,7 +27074,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 150, y: 200}
+  m_SizeDelta: {x: 120, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1046655228
 GameObject:
@@ -27333,18 +27852,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -30938,18 +31460,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -32041,18 +32566,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -34628,22 +35156,22 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 15
-  m_fontSizeBase: 15
+  m_fontSize: 18
+  m_fontSizeBase: 18
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
   m_HorizontalAlignment: 1
-  m_VerticalAlignment: 512
+  m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
-  m_paragraphSpacing: 0
+  m_paragraphSpacing: 5
   m_charWidthMaxAdj: 0
   m_TextWrappingMode: 1
   m_wordWrappingRatios: 0.4
@@ -34697,8 +35225,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 650, y: 400}
-  m_SizeDelta: {x: 400, y: 230}
+  m_AnchoredPosition: {x: 700, y: 300}
+  m_SizeDelta: {x: 1000, y: 177}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!1 &1360411142
 GameObject:
@@ -34938,6 +35466,39 @@ Material:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
+--- !u!128 &1368295091
+Font:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Malgun Gothic
+  serializedVersion: 5
+  m_LineSpacing: 42.5625
+  m_DefaultMaterial: {fileID: 940310100}
+  m_FontSize: 32
+  m_Texture: {fileID: 59245154}
+  m_AsciiStartOffset: 0
+  m_Tracking: 1
+  m_CharacterSpacing: 0
+  m_CharacterPadding: 1
+  m_ConvertCase: -2
+  m_CharacterRects: []
+  m_KerningValues: []
+  m_PixelScale: 0.1
+  m_FontData: 
+  m_Ascent: 34.828125
+  m_Descent: 0
+  m_DefaultStyle: 0
+  m_FontNames:
+  - Malgun Gothic
+  - Apple SD Gothic Neo
+  - Noto Sans CJK KR
+  - Noto Sans KR
+  m_FallbackFonts: []
+  m_FontRenderingMode: 0
+  m_UseLegacyBoundsCalculation: 0
+  m_ShouldRoundAdvanceValue: 1
 --- !u!1 &1374033073
 GameObject:
   m_ObjectHideFlags: 0
@@ -35614,6 +36175,81 @@ CanvasRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1401728220}
+  m_CullTransparentMesh: 1
+--- !u!1 &1403077066
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1403077067}
+  - component: {fileID: 1403077069}
+  - component: {fileID: 1403077068}
+  m_Layer: 0
+  m_Name: Background
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1403077067
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1403077066}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1033892366}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0.35}
+  m_AnchorMax: {x: 1, y: 0.65}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1403077068
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1403077066}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0.08, g: 0.12, b: 0.14, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 0}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1403077069
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1403077066}
   m_CullTransparentMesh: 1
 --- !u!1 &1405391586
 GameObject:
@@ -36621,7 +37257,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 1547268743}
+  m_Sprite: {fileID: 21300000, guid: 4c1809b3f575d7241a9b3ad124b014ee, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -36656,7 +37292,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 150, y: 200}
+  m_SizeDelta: {x: 120, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1445517712
 GameObject:
@@ -38203,18 +38839,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -38882,216 +39521,6 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
---- !u!213 &1547268743
-Sprite:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: OpponentCardBack_RuntimeSprite
-  m_Rect:
-    serializedVersion: 2
-    x: 0
-    y: 0
-    width: 1086
-    height: 1448
-  m_Offset: {x: 0, y: 0}
-  m_Border: {x: 0, y: 0, z: 0, w: 0}
-  m_PixelsToUnits: 100
-  m_Pivot: {x: 0.5, y: 0.5}
-  m_Extrude: 0
-  m_IsPolygon: 0
-  m_PackingTag: 
-  m_RenderDataKey:
-    00000000000000000000000000000000: 0
-  m_AtlasTags: []
-  m_SpriteAtlas: {fileID: 0}
-  m_RD:
-    serializedVersion: 3
-    texture: {fileID: 2800000, guid: d6b8e38d62cc43a9b8ba70da9c135b16, type: 3}
-    alphaTexture: {fileID: 0}
-    secondaryTextures: []
-    m_SubMeshes:
-    - serializedVersion: 2
-      firstByte: 0
-      indexCount: 6
-      topology: 0
-      baseVertex: 0
-      firstVertex: 0
-      vertexCount: 4
-      localAABB:
-        m_Center: {x: 0, y: 0, z: 0}
-        m_Extent: {x: 0, y: 0, z: 0}
-    m_IndexBuffer: 030000000100020001000000
-    m_VertexData:
-      serializedVersion: 3
-      m_VertexCount: 4
-      m_Channels:
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 3
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 1
-        offset: 0
-        format: 0
-        dimension: 2
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      m_DataSize: 80
-      _typelessdata: 8fc2adc014aee740000000008fc2ad4014aee7c0000000008fc2ad4014aee740000000008fc2adc014aee7c000000000000000000000803f0000803f000000000000803f0000803f0000000000000000
-    m_Bindpose: []
-    textureRect:
-      serializedVersion: 2
-      x: 0
-      y: 0
-      width: 1086
-      height: 1448
-    textureRectOffset: {x: 0, y: 0}
-    atlasRectOffset: {x: -1, y: -1}
-    settingsRaw: 64
-    uvTransform: {x: 100, y: 543, z: 100, w: 724}
-    downscaleMultiplier: 1
-  m_AtlasRD:
-    serializedVersion: 3
-    texture: {fileID: 2800000, guid: d6b8e38d62cc43a9b8ba70da9c135b16, type: 3}
-    alphaTexture: {fileID: 0}
-    secondaryTextures: []
-    m_SubMeshes:
-    - serializedVersion: 2
-      firstByte: 0
-      indexCount: 6
-      topology: 0
-      baseVertex: 0
-      firstVertex: 0
-      vertexCount: 4
-      localAABB:
-        m_Center: {x: 0, y: 0, z: 0}
-        m_Extent: {x: 0, y: 0, z: 0}
-    m_IndexBuffer: 030000000100020001000000
-    m_VertexData:
-      serializedVersion: 3
-      m_VertexCount: 4
-      m_Channels:
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 3
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 1
-        offset: 0
-        format: 0
-        dimension: 2
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      - stream: 0
-        offset: 0
-        format: 0
-        dimension: 0
-      m_DataSize: 80
-      _typelessdata: 8fc2adc014aee740000000008fc2ad4014aee7c0000000008fc2ad4014aee740000000008fc2adc014aee7c000000000000000000000803f0000803f000000000000803f0000803f0000000000000000
-    m_Bindpose: []
-    textureRect:
-      serializedVersion: 2
-      x: 0
-      y: 0
-      width: 1086
-      height: 1448
-    textureRectOffset: {x: 0, y: 0}
-    atlasRectOffset: {x: -1, y: -1}
-    settingsRaw: 64
-    uvTransform: {x: 100, y: 543, z: 100, w: 724}
-    downscaleMultiplier: 1
-  m_PhysicsShape: []
-  m_Bones: []
-  m_ScriptableObjects: []
-  m_SpriteID: 
 --- !u!1 &1548638202
 GameObject:
   m_ObjectHideFlags: 0
@@ -39920,18 +40349,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -41042,18 +41474,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -41209,18 +41644,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -41524,7 +41962,7 @@ RectTransform:
   m_GameObject: {fileID: 1650503004}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.3, y: 1.3, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 935128309}
@@ -41536,7 +41974,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 24, y: 24}
-  m_SizeDelta: {x: 375, y: 48}
+  m_SizeDelta: {x: 90, y: 200}
   m_Pivot: {x: 0, y: 0}
 --- !u!222 &1650503006
 CanvasRenderer:
@@ -42495,7 +42933,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 8, y: 75}
   m_SizeDelta: {x: 90, y: 48}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!1 &1681818235
@@ -42649,6 +43087,81 @@ CanvasRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1688346353}
+  m_CullTransparentMesh: 1
+--- !u!1 &1693012042
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1693012043}
+  - component: {fileID: 1693012045}
+  - component: {fileID: 1693012044}
+  m_Layer: 0
+  m_Name: Fill
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1693012043
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1693012042}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 284805798}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1693012044
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1693012042}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 0.02, g: 0.65, b: 0.72, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 0}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1693012045
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1693012042}
   m_CullTransparentMesh: 1
 --- !u!1 &1693965549
 GameObject:
@@ -43220,7 +43733,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 409027529}
+  m_Sprite: {fileID: 499190810}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -44424,18 +44937,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -44554,7 +45070,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 1547268743}
+  m_Sprite: {fileID: 21300000, guid: 4c1809b3f575d7241a9b3ad124b014ee, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -44589,7 +45105,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 150, y: 200}
+  m_SizeDelta: {x: 120, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1777146516
 GameObject:
@@ -45334,7 +45850,7 @@ RectTransform:
   m_GameObject: {fileID: 1803587250}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.3, y: 1.3, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1678082769}
@@ -45346,7 +45862,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 24, y: -24}
-  m_SizeDelta: {x: 375, y: 48}
+  m_SizeDelta: {x: 90, y: 200}
   m_Pivot: {x: 0, y: 1}
 --- !u!223 &1803587254
 Canvas:
@@ -46087,7 +46603,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 1547268743}
+  m_Sprite: {fileID: 21300000, guid: 4c1809b3f575d7241a9b3ad124b014ee, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -46122,7 +46638,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 150, y: 200}
+  m_SizeDelta: {x: 120, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1834997114
 GameObject:
@@ -47098,7 +47614,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 285, y: 0}
+  m_AnchoredPosition: {x: 8, y: -75}
   m_SizeDelta: {x: 90, y: 48}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!1 &1878873114
@@ -49567,7 +50083,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 1547268743}
+  m_Sprite: {fileID: 21300000, guid: 4c1809b3f575d7241a9b3ad124b014ee, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -49602,7 +50118,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 150, y: 200}
+  m_SizeDelta: {x: 120, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1969606988
 GameObject:
@@ -49878,6 +50394,85 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1972661437}
   m_CullTransparentMesh: 1
+--- !u!1 &1980658519
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1980658520}
+  - component: {fileID: 1980658522}
+  - component: {fileID: 1980658521}
+  m_Layer: 0
+  m_Name: EffectsVolumeLabel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1980658520
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1980658519}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 866132098}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 72, y: -442}
+  m_SizeDelta: {x: 300, y: 48}
+  m_Pivot: {x: 0, y: 1}
+--- !u!114 &1980658521
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1980658519}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_FontData:
+    m_Font: {fileID: 347981089}
+    m_FontSize: 26
+    m_FontStyle: 1
+    m_BestFit: 0
+    m_MinSize: 10
+    m_MaxSize: 40
+    m_Alignment: 3
+    m_AlignByGeometry: 0
+    m_RichText: 1
+    m_HorizontalOverflow: 0
+    m_VerticalOverflow: 0
+    m_LineSpacing: 1
+  m_Text: "\uD6A8\uACFC\uC74C \uBCFC\uB968"
+--- !u!222 &1980658522
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1980658519}
+  m_CullTransparentMesh: 1
 --- !u!1 &1981163767
 GameObject:
   m_ObjectHideFlags: 0
@@ -49957,18 +50552,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -50207,18 +50805,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -51337,7 +51938,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 95, y: 0}
+  m_AnchoredPosition: {x: 8, y: 25}
   m_SizeDelta: {x: 90, y: 48}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!1 &2006095434
@@ -51750,18 +52351,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -51842,6 +52446,39 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+--- !u!21 &2025137709
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Malgun Gothic
+  m_Shader: {fileID: 10101, guid: 0000000000000000e000000000000000, type: 0}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 980991228}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats: []
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!21 &2025578105
 Material:
   serializedVersion: 8
@@ -52808,18 +53445,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -56127,7 +56767,7 @@ MonoBehaviour:
   - {fileID: 590077077}
   - {fileID: 636873371}
   - {fileID: 717659032}
-  _cardSize: {x: 150, y: 200}
+  _cardSize: {x: 120, y: 160}
   _topPadding: -24
   _handBandHeight: 300
   _handWidthFactor: 0.66
@@ -56473,18 +57113,21 @@ MonoBehaviour:
   _overrideOccupantVisualSorting: 1
   _occupantVisualSortingOrder: 250
   _showOccupantStats: 1
-  _occupantStatBarSize: {x: 112, y: 26}
-  _occupantStatBarOffset: {x: 0, y: -64}
-  _occupantStatIconSize: {x: 16, y: 16}
-  _occupantStatFontSize: 18
+  _occupantStatBarSize: {x: 150, y: 26}
+  _occupantStatBarOffset: {x: 0, y: -58}
+  _occupantStatIconSize: {x: 22, y: 22}
+  _occupantStatFontSize: 27
   _occupantStatBarColor: {r: 0.08, g: 0.08, b: 0.1, a: 0.82}
   _occupantStatTextColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatIconColor: {r: 1, g: 1, b: 1, a: 1}
   _occupantStatErasureBarColor: {r: 0.18, g: 0.18, b: 0.2, a: 0.88}
   _occupantStatErasureTextColor: {r: 0.82, g: 0.82, b: 0.82, a: 1}
   _occupantStatErasureIconColor: {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  _showAttackReadyIndicator: 1
+  _attackReadyIndicatorSize: 10
+  _attackReadyIndicatorColor: {r: 0.2, g: 1, b: 0.32, a: 1}
   _showHuanShuStatusIcon: 1
-  _huanShuStatusIconSize: {x: 22, y: 22}
+  _huanShuStatusIconSize: {x: 30, y: 30}
   _huanShuStatusIconOffset: {x: 52, y: 22}
   _huanShuStatusIconColor: {r: 0.45, g: 0.12, b: 0.72, a: 0.96}
   _huanShuStatusGlyphColor: {r: 0.9, g: 0.72, b: 1, a: 1}
@@ -56838,7 +57481,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 1547268743}
+  m_Sprite: {fileID: 21300000, guid: 4c1809b3f575d7241a9b3ad124b014ee, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -56873,7 +57516,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 150, y: 200}
+  m_SizeDelta: {x: 120, y: 160}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!128 &2128463499
 Font:

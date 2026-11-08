@@ -283,6 +283,7 @@ namespace Project333.Runtime.Presentation.Battle
             if (_ironDomeMissileVfx != null) _ironDomeMissileVfx.Cancel();
             if (_reactiveArmourVfx != null) _reactiveArmourVfx.Cancel();
             if (_manaShieldVfx != null) _manaShieldVfx.Cancel();
+            _battleScreenPresenter?.CancelStatIncreasePresentation();
             _pendingOnlineSummonTrapImpacts = 0;
             _pendingOnlineSummonTrapGroups = 0;
             RestoreSummonTrapVisuals();
@@ -3386,6 +3387,7 @@ namespace Project333.Runtime.Presentation.Battle
             {
                 var activeLog = CombatLogFormatter.FormatCommand(PlayerId.Player, command,
                     CurrentBattleState, ResolveCombatLogCardDisplayName);
+                PrimeCombatLogAttack();
                 _battleGateway.ExecuteCommand(PlayerId.Player, command);
                 message = activeLog;
                 _lastInteractionStatus = message;
@@ -3433,6 +3435,7 @@ namespace Project333.Runtime.Presentation.Battle
             }
             catch (Exception ex)
             {
+                if (_tutorialBattleEntry) ShowCommandErrorToast(ex.Message);
                 TutorialMoveRejected(fromCoord, toCoord);
                 message = ex.Message;
                 _lastInteractionStatus = message;
@@ -3466,7 +3469,8 @@ namespace Project333.Runtime.Presentation.Battle
                 var attackCommand = new AttackCommand(attackerCoord, targetCoord);
                 if (!ShouldAnimateAttackSequences())
                 {
-                    _battleGateway.ExecuteCommand(PlayerId.Player, attackCommand);
+                    PrimeCombatLogAttack();
+                _battleGateway.ExecuteCommand(PlayerId.Player, attackCommand);
                     message = CurrentBattleState.LastAttackResolution?.WasCancelledByTrap == true
                         ? "트랩이 발동해 공격이 취소되었습니다." : $"Attacked from {attackerCoord} to {targetCoord}.";
                     _lastInteractionStatus = message;
@@ -3609,6 +3613,7 @@ namespace Project333.Runtime.Presentation.Battle
                         }
 
                         var beforeSummon = CaptureBattleSnapshot(CurrentBattleState);
+                        PrimeCombatLogAttack();
                         _battleGateway.ExecuteCommand(PlayerId.Player, playUnitCommand);
                         summonTrapImpact = BuildLocalSummonTrapImpact(beforeSummon);
                         break;
@@ -3631,6 +3636,7 @@ namespace Project333.Runtime.Presentation.Battle
                                 out message);
                         }
 
+                        PrimeCombatLogAttack();
                         _battleGateway.ExecuteCommand(PlayerId.Player, playBuildingCommand);
                         break;
 
@@ -3662,6 +3668,10 @@ namespace Project333.Runtime.Presentation.Battle
                             _battleGateway.ExecuteCommand(PlayerId.Player, castDamageCommand);
                             var afterSnapshot = CaptureBattleSnapshot(CurrentBattleState);
                             var impactRequest = BuildImpactAnimationRequest(beforeSnapshot, afterSnapshot, CloneValuePopupEvents(CurrentBattleState), cardId);
+                            if (impactRequest != null && impactRequest.SpellEffectTargets.Count == 0)
+                            {
+                                impactRequest.SpellEffectTargets.Add(new SpellEffectTarget(targetOwnerId, targetCoord));
+                            }
 
                             message = $"Cast '{cardId}' on {targetOwnerId} {targetCoord}.";
                             _lastInteractionStatus = message;
@@ -3714,7 +3724,7 @@ namespace Project333.Runtime.Presentation.Battle
                                 _battleGateway.ExecuteCommand(PlayerId.Player, castScriptedTargetCommand);
                                 if (beforeTargetedCast != null)
                                 {
-                                    IReadOnlyList<BattleValuePopupEvent> popups = scriptedSpellDefinition.EffectId == FireSpearRules.EffectId
+                                    IReadOnlyList<BattleValuePopupEvent> popups = (scriptedSpellDefinition.EffectId == FireSpearRules.EffectId || scriptedSpellDefinition.EffectId == FirewallSpellEffectId)
                                         ? CloneValuePopupEvents(CurrentBattleState) : Array.Empty<BattleValuePopupEvent>();
                                     var impactRequest = BuildImpactAnimationRequest(beforeTargetedCast, CaptureBattleSnapshot(CurrentBattleState),
                                         popups, cardId, PlayerId.Player);
@@ -3915,15 +3925,7 @@ namespace Project333.Runtime.Presentation.Battle
                     message = $"Cast persistent spell '{cardId}'.";
                 }
                 else if (definition is ScriptedSpellCardDefinition scriptedSpellDefinition &&
-                         (string.Equals(scriptedSpellDefinition.EffectId, "daehwandan", StringComparison.Ordinal) ||
-                          string.Equals(scriptedSpellDefinition.EffectId, TimedBombRules.EffectId, StringComparison.Ordinal) ||
-                          string.Equals(scriptedSpellDefinition.EffectId, NuclearRules.EffectId, StringComparison.Ordinal) ||
-                          string.Equals(scriptedSpellDefinition.EffectId, EarthquakeRules.EffectId, StringComparison.Ordinal) ||
-                          string.Equals(scriptedSpellDefinition.EffectId, MeteorRules.EffectId, StringComparison.Ordinal) ||
-                          string.Equals(scriptedSpellDefinition.EffectId, MagicAmplificationCircleRules.EffectId, StringComparison.Ordinal) ||
-                          string.Equals(scriptedSpellDefinition.EffectId, PowerBankRules.EffectId, StringComparison.Ordinal) ||
-                          string.Equals(scriptedSpellDefinition.EffectId, ManaStoneRules.EffectId, StringComparison.Ordinal) ||
-                          string.Equals(scriptedSpellDefinition.EffectId, ManaStoneBundleRules.EffectId, StringComparison.Ordinal)))
+                         SpellCardUseRules.IsUntargeted(scriptedSpellDefinition))
                 {
                     _battleScreenPresenter?.TutorialHand?.PrepareSpellCardUse(cardId, handCardRuntimeId);
                     var castScriptedCommand = new CastScriptedSpellCommand(
@@ -4095,6 +4097,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void RefreshPresenter()
         {
+            EnsureLocalCombatLogCapture();
             QueueLocalTrapReveals();
             QueueLocalCardDrawAnimations();
             _battleScreenPresenter?.Present(CurrentBattleState);
@@ -4311,6 +4314,7 @@ namespace Project333.Runtime.Presentation.Battle
         private void ClearCombatLog()
         {
             _combatLogEntries.Clear();
+            ResetCombatLogPreviews();
             _combatLogText = "전투 기록이 없습니다.";
             _onCombatLogChanged.Invoke(_combatLogText);
         }
@@ -4318,6 +4322,7 @@ namespace Project333.Runtime.Presentation.Battle
         private void ReplaceCombatLogEntries(IReadOnlyList<BattleCombatLogEntryDto> entries)
         {
             _combatLogEntries.Clear();
+            _combatLogPreviewEntries.Clear();
             if (entries != null)
             {
                 var firstIndex = Math.Max(0, entries.Count - MaxCombatLogEntries);
@@ -4329,6 +4334,7 @@ namespace Project333.Runtime.Presentation.Battle
                     if (!string.IsNullOrWhiteSpace(formattedEntry))
                     {
                         _combatLogEntries.Add(formattedEntry);
+                        _combatLogPreviewEntries.Add(entries[i]);
                     }
                 }
             }
@@ -4369,9 +4375,12 @@ namespace Project333.Runtime.Presentation.Battle
         private void AddCombatLogEntry(string entry)
         {
             if (_tutorialBattleEntry) { RecordTutorialCombatLog(); return; }
-            AppendCombatLogText(entry);
+            var attackRecord = CaptureLocalCombatLogAttack();
+            if (attackRecord != null && attackRecord.EntryType == BattleCombatLogEntryType.Attack)
+                entry = BattleCombatLogEntryFormatter.Format(attackRecord, ResolveCombatLogCardDisplayName);
+            AppendCombatLogText(entry, attackRecord);
         }
-        private void AppendCombatLogText(string entry)
+        private void AppendCombatLogText(string entry, BattleCombatLogEntryDto preview = null)
         {
             // Online PVE/PVP logs come from the authoritative server StateView.
             if (_sendPlayerActionsToOnlineGateway)
@@ -4385,9 +4394,11 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             _combatLogEntries.Add(entry);
+            _combatLogPreviewEntries.Add(preview);
             while (_combatLogEntries.Count > MaxCombatLogEntries)
             {
                 _combatLogEntries.RemoveAt(0);
+                _combatLogPreviewEntries.RemoveAt(0);
             }
 
             _combatLogText = string.Join(Environment.NewLine, _combatLogEntries);
@@ -4765,6 +4776,7 @@ namespace Project333.Runtime.Presentation.Battle
                         attackCommand.AttackerCoord,
                         PlayerId.Player,
                         shielderInfo);
+                    PrimeCombatLogAttack();
                     _battleGateway.ExecuteCommand(PlayerId.AI, attackCommand);
                     AddCombatLogEntry(CombatLogFormatter.FormatCommand(PlayerId.AI, attackCommand));
                     if (CurrentBattleState.LastAttackResolution?.WasCancelledByTrap == true)
@@ -4795,6 +4807,10 @@ namespace Project333.Runtime.Presentation.Battle
                     AddCombatLogEntry(CombatLogFormatter.FormatCommand(PlayerId.AI, castDamageSpellCommand));
                     var afterSnapshot = CaptureBattleSnapshot(CurrentBattleState);
                     var impactRequest = BuildImpactAnimationRequest(beforeSnapshot, afterSnapshot, CloneValuePopupEvents(CurrentBattleState), castDamageSpellCommand.CardId);
+                    if (impactRequest != null && impactRequest.SpellEffectTargets.Count == 0)
+                    {
+                        impactRequest.SpellEffectTargets.Add(new SpellEffectTarget(castDamageSpellCommand.TargetOwnerId, castDamageSpellCommand.TargetCoord));
+                    }
                     yield return PlayImpactAnimationSequence(impactRequest);
                     RefreshPresenter();
                     yield return PauseAfterLocalAiAction(command, actionPresentationStarted);
@@ -4814,7 +4830,6 @@ namespace Project333.Runtime.Presentation.Battle
                         CloneValuePopupEvents(CurrentBattleState), scriptedCommand.CardId, PlayerId.AI);
                     if (IsFirewallCard(scriptedCommand.CardId))
                     {
-                        impactRequest.ValuePopupEvents.Clear();
                         ConfigureFirewallCast(impactRequest, scriptedCommand.TargetOwnerId, scriptedCommand.TargetCoord);
                     }
                     if (IsFireSpearCard(scriptedCommand.CardId))
@@ -5124,7 +5139,7 @@ namespace Project333.Runtime.Presentation.Battle
                 SpellCasterOwnerId = sourceEvent?.EventType == BattleEventType.SpellCast
                     ? sourceEvent.SourceOwnerId : (PlayerId?)null,
                 GuardAreaRuntimeIds = sourceEvent?.EventType == BattleEventType.AreaSpellEffectTriggered ||
-                    sourceCardId == EarthquakeRules.CardId || sourceCardId == MeteorRules.CardId || sourceCardId == FireSpearRules.CardId || sourceCardId == TrapMirrorFieldCardRules.CardId || sourceCardId == SummonTrapCardRules.CardId || IsDirectDestructionTrapCard(sourceCardId),
+                    sourceCardId == EarthquakeRules.CardId || sourceCardId == MeteorRules.CardId || sourceCardId == FireSpearRules.CardId || IsFirewallCard(sourceCardId) || sourceCardId == TrapMirrorFieldCardRules.CardId || sourceCardId == SummonTrapCardRules.CardId || IsDirectDestructionTrapCard(sourceCardId),
             };
             request.ValuePopupEvents.AddRange(BuildOnlineValuePopupEvents(battleEvents));
             if (sourceCardId == SummonTrapCardRules.CardId && sourceEvent?.TargetCoord != null)
@@ -5156,6 +5171,15 @@ namespace Project333.Runtime.Presentation.Battle
             if (sourceEvent?.EventType == BattleEventType.TimedBombCountdown)
                 request.TimedBombCountdown = new TimedBombCountdownCue(sourceEvent.SourceOwnerId,
                     sourceEvent.EffectIndex, sourceEvent.RemainingTriggersBefore, sourceEvent.RemainingTriggersAfter);
+
+            if (sourceEvent?.EventType == BattleEventType.SpellCast &&
+                sourceEvent.TargetCoord != null &&
+                request.SpellEffectId == FireboltSpellEffectId)
+            {
+                request.SpellEffectTargets.Add(new SpellEffectTarget(
+                    sourceEvent.TargetOwnerId,
+                    sourceEvent.TargetCoord.ToDomain()));
+            }
 
             if (sourceEvent?.EventType == BattleEventType.AreaSpellEffectTriggered)
             {
@@ -6646,6 +6670,21 @@ namespace Project333.Runtime.Presentation.Battle
                 GuardAreaRuntimeIds = sourceCardId == EarthquakeRules.CardId || sourceCardId == MeteorRules.CardId || sourceCardId == FireSpearRules.CardId || sourceCardId == TrapMirrorFieldCardRules.CardId || sourceCardId == SummonTrapCardRules.CardId || IsDirectDestructionTrapCard(sourceCardId),
             };
             request.ValuePopupEvents.AddRange(valuePopupEvents ?? Array.Empty<BattleValuePopupEvent>());
+            if (request.SpellEffectId == FireboltSpellEffectId && valuePopupEvents != null)
+            {
+                foreach (var popup in valuePopupEvents)
+                {
+                    if (popup == null || popup.Cause != BattleValueChangeCause.Spell)
+                    {
+                        continue;
+                    }
+
+                    if (!request.SpellEffectTargets.Exists(t => t.OwnerId == popup.OwnerId && t.Coord == popup.Coord))
+                    {
+                        request.SpellEffectTargets.Add(new SpellEffectTarget(popup.OwnerId, popup.Coord));
+                    }
+                }
+            }
             foreach (var before in beforeSnapshot.Occupants)
             {
                 if (before == null)

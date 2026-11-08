@@ -78,7 +78,7 @@ namespace Project333.Runtime.Application.Services
             return valuableKill ? -8 : -80;
         }
 
-        private double HuanShuDisruptionValue(BattleState state, OccupantState unit)
+        private double HuanShuDisruptionValue(BattleState state, OccupantState unit, int ownMasterExposureHp)
         {
             if (!unit.IsAlive || unit.Attack <= 0) return 0;
             var attackPower = (double)unit.Attack * unit.EffectiveHitsPerAttack * Math.Min(2, unit.EffectiveMaxAttacksPerTurn);
@@ -94,7 +94,7 @@ namespace Project333.Runtime.Application.Services
             var damage = (double)DamageResolutionRules.ResolveIncomingDamage(master, raw, unit.DamageType,
                 DamageResolutionRules.ShouldHalveForFlying(unit, master), unit.IsHiding) *
                 unit.EffectiveHitsPerAttack * Math.Min(2, unit.EffectiveMaxAttacksPerTurn);
-            if (damage <= 0 || master.CurrentHp > damage * 2) return value;
+            if (damage <= 0 || ownMasterExposureHp > damage * 2) return value;
             var candidates = 0;
             foreach (var owner in new[] { PlayerId.Player, PlayerId.AI })
                 foreach (var target in state.GetBoard(owner).EnumerateOccupants())
@@ -102,7 +102,7 @@ namespace Project333.Runtime.Application.Services
                         (target.OwnerId == unit.OwnerId || !target.IsHiding)) candidates++;
             // Emergency utility is probabilistic: HuanShu never guarantees master protection.
             var diversionChance = candidates > 1 ? 1.0 - 1.0 / candidates : 0;
-            return value + 60 * diversionChance * Math.Min(1, damage / Math.Max(1, master.CurrentHp));
+            return value + 60 * diversionChance * Math.Min(1, damage / Math.Max(1, ownMasterExposureHp));
         }
         private double EvaluateCore(BattleState state, BattleState? projected, BoardState? futureAiBoard,
             int? ownMasterExposureHp = null)
@@ -224,7 +224,7 @@ namespace Project333.Runtime.Application.Services
                     if (unit.CardId == "PowerPlant") material += player.Resources.Gold > 0 ? 7 : 1;
                     if (unit.CardId == "Hero" || unit.CardId == "DemonKing") material += 18;
                 }
-                if (unit.IsUnderHuanShu) material -= Math.Min(Math.Max(0, material), HuanShuDisruptionValue(state, unit));
+                if (unit.IsUnderHuanShu) material -= Math.Min(Math.Max(0, material), HuanShuDisruptionValue(state, unit, ownMasterExposureHp));
                 if (unit.IsFalloutTarget && unit.FalloutStacks > 0 && !unit.IsSealbound && !unit.IsInvincible)
                     material -= Math.Min(material * 0.5, (double)unit.FalloutStacks * NuclearRules.FalloutDamage);
                 material += PlasmaShieldProtectionValue(state, unit);

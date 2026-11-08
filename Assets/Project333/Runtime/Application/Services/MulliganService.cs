@@ -123,7 +123,7 @@ namespace Project333.Runtime.Application.Services
                 }
 
                 playerState.Hand.Add(cardId);
-                battleState.RecordCardDraw(playerState.Id);
+                battleState.RecordCardDraw(playerState.Id, string.Empty, cardId);
             }
         }
     }

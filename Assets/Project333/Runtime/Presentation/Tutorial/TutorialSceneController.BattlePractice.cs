@@ -107,7 +107,9 @@ namespace Project333.Runtime.Presentation.Tutorial
         private void RefreshBattlePracticeDialogueLayout(RectTransform panel)
         {
             var mulligan = _practiceBattle.IsMulliganPresentationActive || _practiceBattle.CurrentBattleState?.Phase == PhaseType.Mulligan;
-            if (_session.Chapter == 5 && TileTextView.VisibleCardPreviewArtwork != null)
+            var stepCue = IsReviewingDialogue ? DisplayedDialogueStep.Cue : _session.CurrentStep.Cue;
+            if (_session.Chapter == 5 && (TileTextView.VisibleCardPreviewArtwork != null ||
+                stepCue == TutorialCue.PracticeVictory || stepCue == TutorialCue.PracticeVictoryIsolation))
             {
                 Place(panel, new Vector2(.24f,.018f), new Vector2(.77f,.19f));
                 Place(_guidePortrait.rectTransform, new Vector2(.155f,.008f), new Vector2(.235f,.18f));

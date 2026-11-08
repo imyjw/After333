@@ -82,7 +82,8 @@ namespace Project333.Runtime.Presentation.Battle
         public BattleMulliganOverlayPresenter TutorialMulligan => _mulliganOverlayPresenter;
         public RectTransform TutorialEndTurnRect => _endTurnButton != null ? _endTurnButton.transform as RectTransform : null;
         public void ResetTutorialPractice()
-        { _mulliganOverlayPresenter?.ResetTutorialSession(); _handPresenter?.CancelTemporaryReplicateExpiry(); _handPresenter?.CancelSpellCardUses(); _handPresenter?.CancelCardDraws(); }
+        {
+            CancelStatIncreasePresentation(); _mulliganOverlayPresenter?.ResetTutorialSession(); _handPresenter?.CancelTemporaryReplicateExpiry(); _handPresenter?.CancelSpellCardUses(); _handPresenter?.CancelCardDraws(); }
 
         public bool IsMulliganPresentationActive =>
             _mulliganOverlayPresenter != null && _mulliganOverlayPresenter.IsSessionActive;
@@ -215,10 +216,19 @@ namespace Project333.Runtime.Presentation.Battle
             _mulliganOverlayPresenter?.Bind(battleBootstrapper);
         }
 
+        private OccupantStatIncreaseVfx _statIncreaseVfx;
+
+        public void CancelStatIncreasePresentation() => _statIncreaseVfx?.Cancel();
+
         public void Present(BattleState battleState)
         {
             _debugSummary = BattleStateSummaryFormatter.Format(battleState);
             _boardPresenter?.Present(battleState);
+            if (UnityEngine.Application.isPlaying && isActiveAndEnabled)
+            {
+                if (_statIncreaseVfx == null) _statIncreaseVfx = gameObject.AddComponent<OccupantStatIncreaseVfx>();
+                _statIncreaseVfx.Observe(battleState, _boardPresenter);
+            }
             if (_handPresenter != null) _handPresenter.PreviewBattleState = battleState;
             _handPresenter?.ConfigureDeckDrawSource(_playerDeckPresenter, _mulliganOverlayPresenter);
             _handPresenter?.Present(battleState?.Player.Hand,

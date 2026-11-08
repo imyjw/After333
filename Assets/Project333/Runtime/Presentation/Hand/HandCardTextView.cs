@@ -126,6 +126,9 @@ namespace Project333.Runtime.Presentation.Hand
 
         public void SetHandInteractionOwner(HandPresenter hand) => _interactionHand = hand;
 
+        internal Vector2 RuntimeLayoutPivot => _runtimeCardRect != null
+            ? _runtimeCardRect.pivot : new Vector2(0.5f, 0.08f);
+
         private bool HasRuntimeVisual => _runtimeCardRect != null;
 
         private bool IsArtworkVisible => _artworkImage != null &&

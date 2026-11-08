@@ -35,8 +35,8 @@ namespace Project333.Tests.EditMode
             Assert.That(asset.Rarity, Is.EqualTo(record.Rarity).And.EqualTo(CardRarity.Common));
             Assert.That(asset.Affiliation, Is.EqualTo(record.Affiliation).And.EqualTo(CardAffiliation.Fantasy));
             Assert.That(asset.ChargeTileFootprint, Is.EqualTo(record.ChargeTileFootprint).And.EqualTo(ChargeTileFootprint.OneByOne));
-            Assert.That(asset.EffectText, Is.EqualTo(record.EffectText).And.Empty);
-            Assert.That(asset.SpecialEffectText, Is.EqualTo(record.SpecialEffectText).And.Empty);
+            Assert.That(asset.EffectText, Is.EqualTo(record.EffectText).And.EqualTo(LegacyRules.DrawDescription));
+            Assert.That(asset.SpecialEffectText, Is.EqualTo(record.SpecialEffectText).And.EqualTo(LegacyRules.DrawDescription));
             Assert.That(record.IncludeInDraft && record.IncludeInRewards, Is.True);
             Assert.That(unit.Cost.Mana, Is.EqualTo(1));
             Assert.That(unit.Cost.Qi + unit.Cost.Power + unit.Cost.Gold, Is.Zero);
@@ -60,21 +60,25 @@ namespace Project333.Tests.EditMode
         }
 
         [Test]
-        public void BoardVisualsReuseExistingSkeletonControllerAndIdleSprite()
+        public void BoardVisualsPreserveAuthoredControllerAndIdleSprite()
         {
-            var skeleton = AssetDatabase.LoadAssetAtPath<UnitCardDefinitionAsset>("Assets/Project333/ScriptableObjects/StarterTen/Cards/Skeleton.asset");
             var asset = Card();
-            Assert.That(skeleton, Is.Not.Null);
-            Assert.That(asset.BoardAnimatorController, Is.SameAs(skeleton.BoardAnimatorController));
-            Assert.That(asset.BoardSprite, Is.SameAs(skeleton.BoardSprite));
-            Assert.That(AssetDatabase.GetAssetPath(asset.BoardAnimatorController), Is.EqualTo("Assets/Unit/Skeleton/Skeleton.controller"));
-            Assert.That(AssetDatabase.AssetPathToGUID("Assets/Unit/Skeleton/Skeleton.controller"), Is.EqualTo("2adbb8448203ea1459b0685cb281620d"));
-            Assert.That(AssetDatabase.AssetPathToGUID("Assets/Project333/ScriptableObjects/StarterTen/Cards/Skeleton.asset"), Is.EqualTo("9bc09c501e1c4204f8b65053874b78a5"));
-            Assert.That(AssetDatabase.GetAssetPath(asset.BoardSprite), Is.EqualTo("Assets/Unit/Skeleton/Idle.png"));
-            Assert.That(asset.BoardSprite.name, Is.EqualTo("Idle_0"));
+            var dedicated = File.Exists("Assets/Unit/SkeletonArcher/SkeletonArcher.controller");
+            var controllerPath = dedicated ? "Assets/Unit/SkeletonArcher/SkeletonArcher.controller"
+                : "Assets/Unit/Skeleton/Skeleton.controller";
+            var idlePath = dedicated ? "Assets/Unit/SkeletonArcher/Idle.png" : "Assets/Unit/Skeleton/Idle.png";
+            var controller = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(controllerPath);
+            var idle = AssetDatabase.LoadAllAssetsAtPath(idlePath).OfType<Sprite>().Single(x => x.name == "Idle_0");
+            Assert.That(controller, Is.Not.Null);
+            Assert.That(idle, Is.Not.Null);
+            Assert.That(asset.BoardAnimatorController, Is.SameAs(controller));
+            Assert.That(asset.BoardSprite, Is.SameAs(idle));
+            Assert.That(AssetDatabase.GetAssetPath(asset.BoardAnimatorController), Is.EqualTo(controllerPath));
+            Assert.That(AssetDatabase.GetAssetPath(asset.BoardSprite), Is.EqualTo(idlePath));
             Assert.That(AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset.BoardSprite, out string guid, out long localId), Is.True);
-            Assert.That(guid, Is.EqualTo("4a66309e9fd706345ac0dad11991b903"));
-            Assert.That(localId, Is.EqualTo(4723107735738678597L));
+            Assert.That(guid, Is.EqualTo(AssetDatabase.AssetPathToGUID(idlePath)));
+            Assert.That(localId, Is.Not.Zero);
+            Assert.That(AssetDatabase.AssetPathToGUID("Assets/Project333/ScriptableObjects/StarterTen/Cards/Skeleton.asset"), Is.EqualTo("9bc09c501e1c4204f8b65053874b78a5"));
         }
 
         [Test]

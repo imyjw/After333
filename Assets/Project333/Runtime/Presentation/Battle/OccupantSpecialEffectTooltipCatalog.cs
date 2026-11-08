@@ -44,6 +44,7 @@ namespace Project333.Runtime.Presentation.Battle
             var entries = new List<OccupantSpecialEffectTooltip>();
             if (Project333.Runtime.Application.Services.ActiveEffectService.HasActiveEffect(occupant))
                 Add(entries, "액티브", "소환물의 액티브 버튼을 눌러 액티브 효과를 발동시킬 수 있다.");
+            if (occupant.HasLegacy) Add(entries, "유산", LegacyRules.TooltipDescription);
             var powerUpkeep = GetPowerUpkeep(occupant);
             if (powerUpkeep > 0)
             {
@@ -191,6 +192,9 @@ namespace Project333.Runtime.Presentation.Battle
             if (definition is ScriptedSpellCardDefinition spell &&
                 spell.CardId == NuclearRules.CardId && spell.EffectId == NuclearRules.EffectId)
                 Add(entries, "낙진", "양쪽 턴 시작마다 10의 고정 피해를 받는다.");
+            if (definition is ScriptedSpellCardDefinition firewall &&
+                firewall.CardId == FirewallRules.CardId && firewall.EffectId == FirewallRules.EffectId)
+                Add(entries, firewall.DisplayName, FirewallRules.EffectDescription);
             if (definition != null && definition.HasReplicate)
                 Add(entries, "복제", "사용 후 원래 카드의 임시 사본을 손패에 추가한다. 사본은 턴 종료 시 사라진다.");
             if (definition != null && definition.HasTrap)

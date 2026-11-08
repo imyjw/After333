@@ -23,9 +23,11 @@ namespace Project333.Runtime.Presentation.Hand
         [SerializeField] private Vector2 _cardSize = new Vector2(270f, 378f);
         [SerializeField] private float _bottomPadding = 18f;
         [SerializeField] private float _handBandHeight = 440f;
-        [SerializeField] [Range(0.45f, 1f)] private float _handWidthFactor = 0.8f;
-        [SerializeField] private float _minSpacing = 90f;
-        [SerializeField] private float _maxSpacing = 152f;
+        [SerializeField, HideInInspector] [Range(0.45f, 1f)] private float _handWidthFactor = 0.8f;
+        [SerializeField, HideInInspector] private float _minSpacing = 90f;
+        [SerializeField, HideInInspector] private float _maxSpacing = 152f;
+        [Tooltip("Horizontal center-to-center spacing for each hand count. Only screen overflow reduces it; card size is unchanged.")]
+        [SerializeField] private HandCardCountSpacing _spacingByCardCount = new HandCardCountSpacing();
         [SerializeField] private float _maxRotationDegrees = 17f;
         [SerializeField] private float _arcHeight = 96f;
         [SerializeField] private float _edgeDrop = 34f;
@@ -40,6 +42,8 @@ namespace Project333.Runtime.Presentation.Hand
         [SerializeField, HideInInspector] private HandLayoutSettings _authoringLayoutSnapshot;
 
         private readonly List<VisibleHandCard> _visibleHandCards = new List<VisibleHandCard>(MinimumHandSlotCount);
+
+        private readonly List<Vector2> _visibleHandPivots = new List<Vector2>(MinimumHandSlotCount);
 
         [SerializeField, HideInInspector] private Canvas _runtimeCanvas;
         [SerializeField, HideInInspector] private RectTransform _runtimeCanvasRect;
@@ -371,9 +375,35 @@ namespace Project333.Runtime.Presentation.Hand
             }
         }
 
+        // Capture once before the hand collapses; the return zone must not move
+        // with the compact/expanded animation under the dragged pointer.
+        internal bool TryGetDragReturnHorizontalBounds(out Vector2 bounds)
+        {
+            bounds = new Vector2(float.PositiveInfinity, float.NegativeInfinity);
+            var corners = new Vector3[4];
+            foreach (var card in _handCardViews)
+            {
+                if (card == null || !card.HasCard) continue;
+                var artwork = card.GetComponent<HandCardTextView>()?.TutorialArtwork;
+                if (artwork == null) continue;
+                var canvas = _runtimeCanvas != null ? _runtimeCanvas : artwork.GetComponentInParent<Canvas>();
+                var camera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+                    ? canvas.worldCamera : null;
+                artwork.rectTransform.GetWorldCorners(corners);
+                foreach (var corner in corners)
+                {
+                    var x = RectTransformUtility.WorldToScreenPoint(camera, corner).x;
+                    bounds.x = Mathf.Min(bounds.x, x);
+                    bounds.y = Mathf.Max(bounds.y, x);
+                }
+            }
+            return bounds.x <= bounds.y;
+        }
+
         private void ApplyCurvedLayout()
         {
             _visibleHandCards.Clear();
+            _visibleHandPivots.Clear();
 
             for (var i = 0; i < _handCardViews.Length; i++)
             {
@@ -396,6 +426,7 @@ namespace Project333.Runtime.Presentation.Hand
                 }
 
                 _visibleHandCards.Add(new VisibleHandCard(handCardView, textView));
+                _visibleHandPivots.Add(textView.RuntimeLayoutPivot);
             }
 
             if (_visibleHandCards.Count == 0)
@@ -403,19 +434,18 @@ namespace Project333.Runtime.Presentation.Hand
                 return;
             }
 
-            var availableWidth = ResolveAvailableWidth();
+            if (_spacingByCardCount == null) _spacingByCardCount = new HandCardCountSpacing();
+            var spacing = _spacingByCardCount.GetSpacing(_visibleHandCards.Count);
             var layouts = new HandCardFanLayout[_visibleHandCards.Count];
             var selectedVisibleIndex = -1;
 
             for (var i = 0; i < _visibleHandCards.Count; i++)
             {
                 var visibleHandCard = _visibleHandCards[i];
-                var layout = HandPresenterLayout.CalculateFanLayout(
+                var layout = HandPresenterLayout.CalculateFanLayoutWithSpacing(
                     _visibleHandCards.Count,
                     i,
-                    availableWidth,
-                    _minSpacing,
-                    _maxSpacing,
+                    spacing,
                     _maxRotationDegrees,
                     _arcHeight,
                     _edgeDrop,
@@ -434,6 +464,19 @@ namespace Project333.Runtime.Presentation.Hand
 
                 layouts[i] = HandPresenterLayout.ApplyExpansion(layout, IsExpanded ||
                     visibleHandCard.View.HighlightState == BattleHighlightState.MulliganSelected);
+            }
+
+            var fit = HandPresenterLayout.CalculateHorizontalFitFactor(
+                layouts, _cardSize, _visibleHandPivots, ResolveAvailableWidth());
+            if (fit < 1f)
+            {
+                for (var i = 0; i < layouts.Length; i++)
+                {
+                    var layout = layouts[i];
+                    layouts[i] = new HandCardFanLayout(
+                        new Vector2(layout.AnchoredPosition.x * fit, layout.AnchoredPosition.y),
+                        layout.RotationDegrees, layout.Scale, layout.NormalizedPosition);
+                }
             }
 
             var siblingOrder = HandPresenterLayout.GetSiblingOrderForFan(layouts, selectedVisibleIndex);
@@ -461,10 +504,10 @@ namespace Project333.Runtime.Presentation.Hand
         {
             if (_runtimeHandRoot != null && _runtimeHandRoot.rect.width > 0.1f)
             {
-                return _runtimeHandRoot.rect.width * _handWidthFactor;
+                return _runtimeHandRoot.rect.width;
             }
 
-            return Screen.width * _handWidthFactor;
+            return _runtimeCanvas != null ? Screen.safeArea.width / Mathf.Max(0.001f, _runtimeCanvas.scaleFactor) : Screen.safeArea.width;
         }
 
         private static HandCardView[] CollectDirectChildHandCardViews(Transform root)
@@ -524,6 +567,7 @@ namespace Project333.Runtime.Presentation.Hand
             public float HandWidthFactor;
             public float MinSpacing;
             public float MaxSpacing;
+            public HandCardCountSpacing SpacingByCardCount;
             public float MaxRotationDegrees;
             public float ArcHeight;
             public float EdgeDrop;
@@ -540,6 +584,7 @@ namespace Project333.Runtime.Presentation.Hand
                 HandWidthFactor = presenter._handWidthFactor;
                 MinSpacing = presenter._minSpacing;
                 MaxSpacing = presenter._maxSpacing;
+                SpacingByCardCount = presenter._spacingByCardCount?.Copy();
                 MaxRotationDegrees = presenter._maxRotationDegrees;
                 ArcHeight = presenter._arcHeight;
                 EdgeDrop = presenter._edgeDrop;
@@ -557,6 +602,9 @@ namespace Project333.Runtime.Presentation.Hand
                 presenter._handWidthFactor = HandWidthFactor;
                 presenter._minSpacing = MinSpacing;
                 presenter._maxSpacing = MaxSpacing;
+                // Older serialized snapshots predate the count settings. Retain
+                // the field initializer (or newly edited values) when absent.
+                if (SpacingByCardCount != null) presenter._spacingByCardCount = SpacingByCardCount.Copy();
                 presenter._maxRotationDegrees = MaxRotationDegrees;
                 presenter._arcHeight = ArcHeight;
                 presenter._edgeDrop = EdgeDrop;

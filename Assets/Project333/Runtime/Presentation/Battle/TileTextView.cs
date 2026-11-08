@@ -21,6 +21,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         private const string AutoVisualName = "OccupantVisual";
         private const string AutoStatBarName = "OccupantStatBar";
+        private const string AutoAttackReadyIndicatorName = "AttackReadyIndicator";
         private const string AutoHuanShuIconName = "HuanShuStatusIcon";
         private const string AutoSpellEffectName = "SpellEffectVisual";
         private const string AutoSpellEffectOverlayName = "SpellEffectOverlay";
@@ -60,6 +61,7 @@ namespace Project333.Runtime.Presentation.Battle
         private static RectTransform s_valuePopupOverlayRoot;
         private static Sprite s_cheonraJimangMarkSprite;
         private static Sprite s_heartIconSprite;
+        private static Sprite s_attackReadyIndicatorSprite;
         private static Sprite s_swordIconSprite;
         private static Sprite s_bowIconSprite;
         private static Sprite s_magicStaffIconSprite;
@@ -117,6 +119,11 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private Color _occupantStatErasureTextColor = new Color(0.82f, 0.82f, 0.82f, 1f);
         [FormerlySerializedAs("_occupantStatDisabledIconColor")]
         [SerializeField] private Color _occupantStatErasureIconColor = new Color(0.72f, 0.72f, 0.72f, 1f);
+        [Header("Attack Ready Indicator")]
+        [Tooltip("Show a green dot inside the right edge of allied stat bars while attacks remain on your turn.")]
+        [SerializeField] private bool _showAttackReadyIndicator = true;
+        [Min(2f)] [SerializeField] private float _attackReadyIndicatorSize = 8f;
+        [SerializeField] private Color _attackReadyIndicatorColor = new Color(0.2f, 1f, 0.32f, 1f);
         [Header("HuanShu Status Icon")]
         [SerializeField] private bool _showHuanShuStatusIcon = true;
         [SerializeField] private Vector2 _huanShuStatusIconSize = new Vector2(22f, 22f);
@@ -209,6 +216,8 @@ namespace Project333.Runtime.Presentation.Battle
         private TMP_Text _occupantStatHpText;
         private Image _occupantStatAttackTypeImage;
         private TMP_Text _occupantStatAttackText;
+        private Image _attackReadyIndicator;
+        private BattleState _attackIndicatorBattleState;
         private TMP_FontAsset _occupantStatFontOverride;
         private RectTransform _huanShuStatusIconRoot;
         private Image _huanShuStatusIconBackground;
@@ -237,6 +246,12 @@ namespace Project333.Runtime.Presentation.Battle
         private float _nextPreviewTooltipRefreshTime;
 
         public float LongPressPreviewHoldSeconds => Mathf.Max(0.05f, _longPressPreviewHoldSeconds);
+
+        // BoardPresenter supplies the same authoritative/projected snapshot used to bind the occupant.
+        public void SetAttackIndicatorBattle(BattleState battleState)
+        {
+            _attackIndicatorBattleState = battleState;
+        }
 
         public void ConfigureOccupantStatFont(TMP_FontAsset fontAsset)
         {
@@ -1186,6 +1201,7 @@ namespace Project333.Runtime.Presentation.Battle
                 ? _presentedHp : occupant.CurrentHp;
             _occupantStatHpText.text = Mathf.Max(0, hp).ToString();
             _occupantStatAttackText.text = Mathf.Max(0, occupant.Attack).ToString();
+            ApplyStatBarLayout(); // Measure the new values before restoring state-specific colors.
             if (_occupantStatBackgroundImage != null)
             {
                 _occupantStatBackgroundImage.color = barColor;
@@ -1195,8 +1211,16 @@ namespace Project333.Runtime.Presentation.Battle
             _occupantStatAttackTypeImage.color = attackIconColor;
             _occupantStatHpText.color = textColor;
             _occupantStatAttackText.color = textColor;
+            SetAttackReadyIndicatorActive(_showAttackReadyIndicator &&
+                OccupantAttackReadiness.ShouldShow(_attackIndicatorBattleState, occupant));
             SetHuanShuStatusIconActive(
                 _showHuanShuStatusIcon && occupant.IsUnderHuanShu);
+        }
+
+        private void SetAttackReadyIndicatorActive(bool isActive)
+        {
+            if (_attackReadyIndicator != null && _attackReadyIndicator.gameObject.activeSelf != isActive)
+                _attackReadyIndicator.gameObject.SetActive(isActive);
         }
 
         private void SetHuanShuStatusIconActive(bool isActive)
@@ -1266,6 +1290,7 @@ namespace Project333.Runtime.Presentation.Battle
 
         private void SetStatBarActive(bool isActive)
         {
+            if (!isActive) SetAttackReadyIndicatorActive(false);
             if (_occupantStatRoot == null)
             {
                 return;
@@ -2460,6 +2485,7 @@ namespace Project333.Runtime.Presentation.Battle
                     _occupantStatHpText = statRectTransform.Find("HpText")?.GetComponent<TMP_Text>();
                     _occupantStatAttackTypeImage = statRectTransform.Find("AttackTypeIcon")?.GetComponent<Image>();
                     _occupantStatAttackText = statRectTransform.Find("AttackText")?.GetComponent<TMP_Text>();
+                    _attackReadyIndicator = statRectTransform.Find(AutoAttackReadyIndicatorName)?.GetComponent<Image>();
                     var huanShuIcon = statRectTransform.Find(AutoHuanShuIconName) as RectTransform;
                     if (huanShuIcon != null)
                     {
@@ -2576,9 +2602,9 @@ namespace Project333.Runtime.Presentation.Battle
                 _occupantStatBackgroundImage.raycastTarget = false;
 
                 _occupantStatHeartImage = CreateStatImage("HeartIcon", _occupantStatRoot);
-                _occupantStatHpText = CreateStatText("HpText", _occupantStatRoot, TextAlignmentOptions.Left);
+                _occupantStatHpText = CreateStatText("HpText", _occupantStatRoot, TextAlignmentOptions.Center);
                 _occupantStatAttackTypeImage = CreateStatImage("AttackTypeIcon", _occupantStatRoot);
-                _occupantStatAttackText = CreateStatText("AttackText", _occupantStatRoot, TextAlignmentOptions.Left);
+                _occupantStatAttackText = CreateStatText("AttackText", _occupantStatRoot, TextAlignmentOptions.Center);
             }
 
             if (_occupantStatCanvas == null)
@@ -2599,8 +2625,25 @@ namespace Project333.Runtime.Presentation.Battle
                     : 0;
             _occupantStatCanvas.sortingOrder = 4950;
 
+            EnsureRuntimeAttackReadyIndicator();
             EnsureRuntimeHuanShuStatusIcon();
-            ApplyStatBarLayout();
+        }
+
+        private void EnsureRuntimeAttackReadyIndicator()
+        {
+            if (_attackReadyIndicator != null || _occupantStatRoot == null) return;
+            _attackReadyIndicator = CreateStatImage(AutoAttackReadyIndicatorName, _occupantStatRoot);
+            if (s_attackReadyIndicatorSprite == null)
+            {
+                s_attackReadyIndicatorSprite = CreateIconSprite("AttackReadyDot", new[]
+                {
+                    "...XXX...", ".XXXXXXX.", ".XXXXXXX.", "XXXXXXXXX", "XXXXXXXXX",
+                    "XXXXXXXXX", ".XXXXXXX.", ".XXXXXXX.", "...XXX..."
+                }, Color.white);
+            }
+            _attackReadyIndicator.sprite = s_attackReadyIndicatorSprite;
+            _attackReadyIndicator.preserveAspect = true;
+            _attackReadyIndicator.gameObject.SetActive(false);
         }
 
         private void EnsureRuntimeHuanShuStatusIcon()
@@ -3195,11 +3238,40 @@ namespace Project333.Runtime.Presentation.Battle
                 _occupantStatBackgroundImage.raycastTarget = false;
             }
 
-            var halfWidth = _occupantStatBarSize.x * 0.5f;
-            ApplyStatIconLayout(_occupantStatHeartImage, new Vector2(-halfWidth + 12f, 0f));
-            ApplyStatTextLayout(_occupantStatHpText, new Vector2(-halfWidth + 34f, 0f), new Vector2(34f, 22f));
-            ApplyStatIconLayout(_occupantStatAttackTypeImage, new Vector2(8f, 0f));
-            ApplyStatTextLayout(_occupantStatAttackText, new Vector2(30f, 0f), new Vector2(34f, 22f));
+            var dotSize = Mathf.Clamp(_attackReadyIndicatorSize, 2f, Mathf.Max(2f, _occupantStatBarSize.y - 4f));
+            // The dot keeps its own right-hand lane. Center the icon/value pairs in the rest.
+            // Reserve the lane while the dot is hidden too, so attacking never shifts the stats.
+            var indicatorLane = _showAttackReadyIndicator ? dotSize + 6f : 0f;
+            var availableWidth = Mathf.Max(1f, _occupantStatBarSize.x - indicatorLane - 8f);
+            var hpWidth = MeasureStatTextWidth(_occupantStatHpText);
+            var attackWidth = MeasureStatTextWidth(_occupantStatAttackText);
+            const float iconTextGap = 3f;
+            const float pairGap = 8f;
+            var groupWidth = _occupantStatIconSize.x * 2f + hpWidth + attackWidth + iconTextGap * 2f + pairGap;
+            var fitScale = Mathf.Min(1f, availableWidth / Mathf.Max(1f, groupWidth));
+            var cursor = -indicatorLane * 0.5f - groupWidth * fitScale * 0.5f;
+            var iconWidth = _occupantStatIconSize.x * fitScale;
+            var textHeight = Mathf.Max(22f, _occupantStatBarSize.y - 4f);
+            ApplyStatIconLayout(_occupantStatHeartImage, new Vector2(cursor + iconWidth * 0.5f, 0f), fitScale);
+            cursor += iconWidth + iconTextGap * fitScale;
+            ApplyStatTextLayout(_occupantStatHpText, new Vector2(cursor + hpWidth * fitScale * 0.5f, 0f),
+                new Vector2(hpWidth, textHeight), fitScale);
+            cursor += (hpWidth + pairGap) * fitScale;
+            ApplyStatIconLayout(_occupantStatAttackTypeImage, new Vector2(cursor + iconWidth * 0.5f, 0f), fitScale);
+            cursor += iconWidth + iconTextGap * fitScale;
+            ApplyStatTextLayout(_occupantStatAttackText, new Vector2(cursor + attackWidth * fitScale * 0.5f, 0f),
+                new Vector2(attackWidth, textHeight), fitScale);
+            if (_attackReadyIndicator != null)
+            {
+                var dot = _attackReadyIndicator.rectTransform;
+                dot.anchorMin = dot.anchorMax = new Vector2(1f, 0.5f);
+                dot.pivot = new Vector2(0.5f, 0.5f);
+                dot.anchoredPosition = new Vector2(-3f - dotSize * 0.5f, 0f);
+                dot.sizeDelta = new Vector2(dotSize, dotSize);
+                dot.localScale = Vector3.one;
+                _attackReadyIndicator.color = _attackReadyIndicatorColor;
+                _attackReadyIndicator.raycastTarget = false;
+            }
             ApplyOccupantStatFont(_occupantStatHpText);
             ApplyOccupantStatFont(_occupantStatAttackText);
             ApplyHuanShuStatusIconLayout();
@@ -3269,7 +3341,15 @@ namespace Project333.Runtime.Presentation.Battle
             image.raycastTarget = false;
         }
 
-        private void ApplyStatIconLayout(Image image, Vector2 anchoredPosition)
+        private float MeasureStatTextWidth(TMP_Text textComponent)
+        {
+            if (textComponent == null) return 0f;
+            ApplyOccupantStatFont(textComponent);
+            textComponent.fontSize = _occupantStatFontSize;
+            return Mathf.Max(1f, textComponent.preferredWidth);
+        }
+
+        private void ApplyStatIconLayout(Image image, Vector2 anchoredPosition, float scale)
         {
             if (image == null)
             {
@@ -3282,10 +3362,10 @@ namespace Project333.Runtime.Presentation.Battle
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.anchoredPosition = anchoredPosition;
             rect.sizeDelta = _occupantStatIconSize;
-            rect.localScale = Vector3.one;
+            rect.localScale = new Vector3(scale, scale, 1f);
         }
 
-        private void ApplyStatTextLayout(TMP_Text textComponent, Vector2 anchoredPosition, Vector2 size)
+        private void ApplyStatTextLayout(TMP_Text textComponent, Vector2 anchoredPosition, Vector2 size, float scale)
         {
             if (textComponent == null)
             {
@@ -3298,8 +3378,9 @@ namespace Project333.Runtime.Presentation.Battle
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.anchoredPosition = anchoredPosition;
             rect.sizeDelta = size;
-            rect.localScale = Vector3.one;
+            rect.localScale = new Vector3(scale, scale, 1f);
             textComponent.fontSize = _occupantStatFontSize;
+            textComponent.alignment = TextAlignmentOptions.Center;
         }
 
         private float GetOccupantFacingScaleX()
@@ -3404,13 +3485,19 @@ namespace Project333.Runtime.Presentation.Battle
                     "TileSwordIcon",
                     new[]
                     {
-                        "....X....",
+                        "...X.....",
+                        "...X.....",
+                        "...XX....",
+                        "...XX....",
                         "...XXX...",
                         "...XXX...",
                         "...XXX...",
                         "...XXX...",
                         "...XXX...",
-                        "XXXXXXXXX", 
+                        ".XXXXXXX.",
+                        ".XXXXXXX.",
+                        "...XXX...",
+                        "...XXX...",
                         "...XXX...",
                     },
                     Color.white);
@@ -3428,13 +3515,18 @@ namespace Project333.Runtime.Presentation.Battle
                     new[]
                     {
                         "..X......",
-                        "..XXX....",
-                        "..X..XX..",
-                        "..X....XX",
+                        "..XX.....",
+                        "..X.X....",
+                        "..X..X...",
+                        "..X...X..",
+                        "..X....X.",
                         "XXXXXXXXX",
-                        "..X..XX..",
-                        "..XXX....",
-                        "..X......",   
+                        "..X....X.",
+                        "..X...X..",
+                        "..X..X...",
+                        "..X.X....",
+                        "..XX.....",
+                        "..X......",
                     },
                     Color.white);
             }
@@ -3455,6 +3547,8 @@ namespace Project333.Runtime.Presentation.Battle
                         "...XXX...",
                         "....X....",
                         "...XXX...",
+                        "....X....",
+                        "....X....",
                         "....X....",
                         "....X....",
                         "...XXX...",

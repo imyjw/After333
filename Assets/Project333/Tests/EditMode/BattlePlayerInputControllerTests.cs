@@ -432,6 +432,75 @@ namespace Project333.Tests.EditMode
         private static bool PreservesHand(GameObject target) =>
             (bool)typeof(BattlePlayerInputController).GetMethod("IsHandExpansionPreservingTarget", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { target });
 
+        [Test]
+        public void HandDrag_CollapsesThenReopensOnReturnAndCanLeaveAgainWithoutFlicker()
+        {
+            var input = CreateControllerWithHand(out var card);
+            var hand = (HandPresenter)typeof(BattlePlayerInputController).GetField("_handPresenter", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(input);
+            var start = new Vector2(500, 120);
+            card.NotifyDragStarted(start);
+            Assert.That(hand.IsExpanded, Is.False);
+            Assert.That(input.SelectedCardId, Is.EqualTo(card.CardId));
+            card.NotifyDragged(start + new Vector2(0, 220));
+            Assert.That(hand.IsExpanded, Is.False);
+            card.NotifyDragged(start + new Vector2(0, 30));
+            Assert.That(hand.IsExpanded, Is.True);
+            card.NotifyDragged(start + new Vector2(0, 100));
+            Assert.That(hand.IsExpanded, Is.True, "Separate thresholds prevent flicker after returning.");
+            card.NotifyDragged(start + new Vector2(0, 220));
+            Assert.That(hand.IsExpanded, Is.False);
+            card.NotifyDragEnded(start);
+            Assert.That(hand.IsExpanded, Is.True);
+            Assert.That(input.SelectedCardId, Is.Empty);
+        }
+
+        [TestCase("cancel")]
+        [TestCase("clear")]
+        [TestCase("disable")]
+        public void InterruptedHandDrag_RestoresExpandedHand(string reason)
+        {
+            var input = CreateControllerWithHand(out var card);
+            var hand = (HandPresenter)typeof(BattlePlayerInputController).GetField("_handPresenter", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(input);
+            card.NotifyDragStarted(new Vector2(500, 100));
+            Assert.That(hand.IsExpanded, Is.False);
+            if (reason == "cancel") card.NotifyDragCancelled();
+            else if (reason == "clear") input.ClearSelection();
+            else InvokePrivateMethod(input, "OnDisable");
+            Assert.That(hand.IsExpanded, Is.True);
+            Assert.That(input.SelectedCardId, Is.Empty);
+            Assert.That((bool)typeof(BattlePlayerInputController).GetField("_isDraggingCard", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(input), Is.False);
+            card.NotifyDragEnded(new Vector2(500, 400));
+            Assert.That(hand.IsExpanded, Is.True, "Late release cannot collapse or submit the cancelled gesture.");
+        }
+
+        [Test]
+        public void CompactHand_FirstDragOnlyExpandsAndDoesNotStartCardUse()
+        {
+            var input = CreateControllerWithHand(out var card);
+            var hand = (HandPresenter)typeof(BattlePlayerInputController).GetField("_handPresenter", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(input);
+            hand.SetExpanded(false);
+            card.NotifyDragStarted(new Vector2(500, 100));
+            card.NotifyDragged(new Vector2(500, 400));
+            card.NotifyDragEnded(new Vector2(500, 400));
+            Assert.That(hand.IsExpanded, Is.True);
+            Assert.That(string.IsNullOrEmpty(input.SelectedCardId), Is.True);
+        }
+
+        [Test]
+        public void ReturningHandDrag_HonorsFrozenHorizontalBoundsInsteadOfExpandingOverSideTiles()
+        {
+            var input = CreateControllerWithHand(out var card);
+            var hand = (HandPresenter)typeof(BattlePlayerInputController).GetField("_handPresenter", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(input);
+            card.NotifyDragStarted(new Vector2(500, 100));
+            SetPrivateField(input, "_hasDragReturnHorizontalBounds", true);
+            SetPrivateField(input, "_dragReturnHorizontalBounds", new Vector2(300, 700));
+            card.NotifyDragged(new Vector2(800, 100));
+            Assert.That(hand.IsExpanded, Is.False, "A low side tile is outside the hand's horizontal range.");
+            card.NotifyDragged(new Vector2(500, 130));
+            Assert.That(hand.IsExpanded, Is.True);
+            card.NotifyDragCancelled();
+        }
+
         private static BattleFlowController CreateFlowControllerInMainPhase()
         {
             var battleFlowController = new BattleFlowController();

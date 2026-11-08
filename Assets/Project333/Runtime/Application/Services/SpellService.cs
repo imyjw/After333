@@ -437,6 +437,14 @@ namespace Project333.Runtime.Application.Services
                         handCardRuntimeId);
                     return;
 
+                case JarOfGreedRules.EffectId:
+                    if (hasTarget)
+                        throw new InvalidOperationException("Jar of Greed does not use a board target.");
+                    var drawCaster = battleState.GetPlayer(casterId);
+                    ConsumeSpellCard(drawCaster, cardId, definition.Cost, handCardRuntimeId);
+                    BattleDrawService.DrawCards(drawCaster, battleState, JarOfGreedRules.DrawCount, cardId);
+                    return;
+
                 case PowerBankRules.EffectId:
                     if (hasTarget)
                     {
@@ -837,19 +845,21 @@ namespace Project333.Runtime.Application.Services
 
             var upgradeLevel = _cardUpgradeLevelProvider.GetUpgradeLevel(casterId, definition.CardId);
             var effectDamage = CardLevelSpellRules.ApplyDamageBonus(definition.Damage, upgradeLevel);
-            battleState.PersistentEffects.Add(new PersistentEffectState(
+            var effect = new PersistentEffectState(
                 sourceCardId: cardId,
                 ownerId: casterId,
                 effectId: FirewallEffectId,
                 appliedTurn: battleState.TurnNumber,
-                endConditionText: "Triggers at the next two turn starts, then expires.",
+                endConditionText: "Deals damage immediately and at the next two turn starts, then expires.",
                 turnStartResourceGain: new ResourceSet(),
                 targetRow: targetCoord.Row,
                 remainingTriggers: definition.TriggerCount,
                 effectDamage: effectDamage,
                 effectDamageType: definition.DamageType,
                 targetsOwnerBoard: targetOwnerId == casterId,
-                capturedSpellPower: 0));
+                capturedSpellPower: 0);
+            battleState.PersistentEffects.Add(effect);
+            FirewallEffectService.Apply(battleState, effect, isTurnStart: false);
         }
 
         private void CastTimedBomb(

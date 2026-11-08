@@ -31,7 +31,7 @@ namespace Project333.Tests.EditMode
             Assert.That(record.Affiliation, Is.EqualTo(CardAffiliation.Fantasy));
             Assert.That(record.ChargeTileFootprint, Is.EqualTo(ChargeTileFootprint.OneByOne));
             Assert.That(record.IncludeInDraft && record.IncludeInRewards, Is.True);
-            Assert.That(record.EffectText, Is.Empty); Assert.That(record.SpecialEffectText, Is.Empty);
+            Assert.That(record.EffectText, Is.EqualTo(LegacyRules.DrawDescription)); Assert.That(record.SpecialEffectText, Is.EqualTo(LegacyRules.DrawDescription));
             Assert.That(definition.Cost.Mana, Is.EqualTo(1));
             Assert.That(definition.Cost.Qi + definition.Cost.Power + definition.Cost.Gold, Is.Zero);
             Assert.That(definition.Attack, Is.EqualTo(10)); Assert.That(definition.Health, Is.EqualTo(3));

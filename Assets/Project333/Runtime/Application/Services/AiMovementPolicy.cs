@@ -1,4 +1,5 @@
 #nullable enable
+using System.Collections.Generic;
 using Project333.Runtime.Application.Commands;
 using Project333.Runtime.Domain.Battle;
 using Project333.Runtime.Domain.Board;
@@ -57,6 +58,60 @@ namespace Project333.Runtime.Application.Services
             var original = staying.AIBoard.GetOccupant(move.From);
             return original == null || original.RuntimeId != unit.RuntimeId ||
                 !original.IsAlive || survivor.CurrentHp > original.CurrentHp;
+        }
+
+        // An active tile hazard that resolves against the AI board at the next turn start.
+        // Geometry only: actual damage, defenses and survival remain shared turn resolution.
+        internal static bool IsAiTileHazard(BattleState state, TileCoord coord)
+        {
+            foreach (var effect in state.PersistentEffects)
+            {
+                if (effect == null || effect.IsExpired || effect.RemainingTriggers <= 0) continue;
+                if (effect.EffectId == BiochemicalBombRules.EffectId && effect.OwnerId == PlayerId.Player &&
+                    (effect.TargetStartColumn == BiochemicalBombRules.LeftAreaStartColumn ||
+                     effect.TargetStartColumn == BiochemicalBombRules.RightAreaStartColumn) &&
+                    BiochemicalBombRules.ContainsColumn(effect.TargetStartColumn, coord.Column)) return true;
+                if (effect.EffectId == "firewall" &&
+                    (effect.TargetsOwnerBoard ? effect.OwnerId == PlayerId.AI : effect.OwnerId == PlayerId.Player) &&
+                    coord.Row == effect.TargetRow) return true;
+            }
+            return false;
+        }
+
+        internal static bool HasSafeEmptyTile(BattleState state)
+        {
+            for (var row = 0; row < BoardState.RowCount; row++)
+                for (var column = 0; column < BoardState.ColumnCount; column++)
+                {
+                    var coord = new TileCoord(column, row);
+                    if (state.AIBoard.GetOccupant(coord) == null && !IsAiTileHazard(state, coord)) return true;
+                }
+            return false;
+        }
+
+        // User policy (2026-10-26): while a safe empty tile exists, a movable non-master AI unit
+        // must not end the turn inside a tile hazard. The planner still verifies a real survival gain.
+        internal static List<MoveOccupantCommand> RequiredHazardEscapes(BattleState state)
+        {
+            var moves = new List<MoveOccupantCommand>();
+            if (!HasSafeEmptyTile(state)) return moves;
+            var safe = new List<TileCoord>();
+            for (var row = 0; row < BoardState.RowCount; row++)
+                for (var column = 0; column < BoardState.ColumnCount; column++)
+                {
+                    var coord = new TileCoord(column, row);
+                    if (state.AIBoard.GetOccupant(coord) == null && !IsAiTileHazard(state, coord)) safe.Add(coord);
+                }
+            for (var row = 0; row < BoardState.RowCount; row++)
+                for (var column = 0; column < BoardState.ColumnCount; column++)
+                {
+                    var from = new TileCoord(column, row);
+                    var unit = state.AIBoard.GetOccupant(from);
+                    if (unit == null || unit.Kind == OccupantKind.Master || !unit.IsAlive || !unit.CanMove ||
+                        unit.CannotMoveDueToState || !IsAiTileHazard(state, from)) continue;
+                    foreach (var to in safe) moves.Add(new MoveOccupantCommand(from, to));
+                }
+            return moves;
         }
 
         internal static double Score(BattleState state, MoveOccupantCommand move) =>

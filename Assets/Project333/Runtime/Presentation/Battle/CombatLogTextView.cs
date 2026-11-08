@@ -27,6 +27,23 @@ namespace Project333.Runtime.Presentation.Battle
         [SerializeField] private string _fallbackText = "전투 기록이 없습니다.";
 
         private Coroutine _scrollToBottomCoroutine;
+        [SerializeField] private BattleBootstrapper _battleBootstrapper;
+        private CombatLogHoldTarget _holdTarget;
+
+        public void BindHistorySource(BattleBootstrapper source) => _battleBootstrapper = source;
+
+        private void EnsureHoldTarget()
+        {
+            if (!UnityEngine.Application.isPlaying || _text == null) return;
+            if (_battleBootstrapper == null) _battleBootstrapper = FindFirstObjectByType<BattleBootstrapper>();
+            _holdTarget = _text.GetComponent<CombatLogHoldTarget>();
+            if (_holdTarget == null) _holdTarget = _text.gameObject.AddComponent<CombatLogHoldTarget>();
+            _holdTarget.Bind(_text, _battleBootstrapper);
+            _text.raycastTarget = true;
+        }
+
+        private void OnDisable() { if (_holdTarget != null) _holdTarget.CancelHold(); }
+        private void OnDestroy() { if (_holdTarget != null) _holdTarget.CancelHold(); }
 
         private void Awake()
         {
@@ -48,8 +65,29 @@ namespace Project333.Runtime.Presentation.Battle
             }
 
             ApplyKoreanFont();
-            _text.text = BattleRichTextStyler.StyleCombatLog(logText, _fallbackText);
-            QueueScrollToBottom();
+            EnsureHoldTarget();
+            var formatted = FormatInteractiveLog(logText);
+            if (_text.text == formatted) return;
+            var followBottom = string.IsNullOrEmpty(_text.text) || _scrollRect == null || _scrollRect.verticalNormalizedPosition <= .02f;
+            _text.text = formatted;
+            if (followBottom && (_holdTarget == null || !_holdTarget.IsHolding)) QueueScrollToBottom();
+        }
+
+        private string FormatInteractiveLog(string logText)
+        {
+            if (_battleBootstrapper == null || logText != _battleBootstrapper.CombatLogText)
+                return BattleRichTextStyler.StyleCombatLog(logText, _fallbackText);
+            var lines = logText.Split(new[] { "\r\n", "\n" }, System.StringSplitOptions.None);
+            var result = new System.Text.StringBuilder();
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (i > 0) result.AppendLine();
+                var styled = BattleRichTextStyler.StyleCombatLog(lines[i], _fallbackText);
+                if (_battleBootstrapper.TryGetCombatLogAttackPreview(i, out _))
+                    result.Append("<link=\"combat-").Append(i).Append("\">").Append(styled).Append("</link>");
+                else result.Append(styled);
+            }
+            return result.ToString();
         }
 
         [ContextMenu("Ensure Editable Combat Log Scroll Area")]

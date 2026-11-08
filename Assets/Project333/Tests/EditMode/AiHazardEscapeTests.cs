@@ -150,6 +150,61 @@ namespace Project333.Tests.EditMode
             Assert.That(state.Result.Winner, Is.EqualTo(PlayerId.AI));
         }
 
+        [TestCase(1)]
+        [TestCase(3)]
+        public void Berserker_IsSummonedOnSafeEmptyTileInsteadOfInsideBomb(int remainingTriggers)
+        {
+            var state = State();
+            Bomb(state, remainingTriggers: remainingTriggers);
+            state.AI.Hand.Add("Gwangma");
+            state.AI.Resources.Add(new ResourceSet(0, 8, 0, 0));
+            var command = RealCardPlanner().GetNextCommand(state) as PlayUnitCardCommand;
+            Assert.That(command, Is.Not.Null, "The Gwangma summon itself is still worth playing.");
+            Assert.That(command.CardId, Is.EqualTo("Gwangma"));
+            Assert.That(BiochemicalBombRules.ContainsColumn(BiochemicalBombRules.LeftAreaStartColumn, command.TargetCoord.Column),
+                Is.False, "A safe empty tile exists, so the hazard tile must not be used.");
+            Assert.That(command.TargetCoord, Is.EqualTo(new TileCoord(4, 0)));
+        }
+
+        [Test]
+        public void Berserker_MaySummonInsideBombWhenNoSafeEmptyTileExists()
+        {
+            var state = State();
+            Bomb(state, remainingTriggers: 1);
+            var safe = new TileCoord(4, 0);
+            state.AIBoard.Place(safe, new UnitState("ally", "ally", PlayerId.AI, safe, AttackType.Melee, 0, 25, false, false, 0));
+            state.AI.Hand.Add("Gwangma");
+            state.AI.Resources.Add(new ResourceSet(0, 8, 0, 0));
+            var command = RealCardPlanner().GetNextCommand(state) as PlayUnitCardCommand;
+            Assert.That(command, Is.Not.Null, "Without a safe tile the original value comparison still applies.");
+            Assert.That(command.TargetCoord.Column, Is.LessThan(4));
+        }
+
+        [TestCase(1, 1)]
+        [TestCase(1, 3)]
+        [TestCase(3, 1)]
+        [TestCase(3, 3)]
+        public void Berserker_InsideBombMovesToSafeEmptyTileBeforeEndingTurn(int remainingTriggers, int depth)
+        {
+            var state = State();
+            Bomb(state, remainingTriggers: remainingTriggers);
+            var gwangma = new UnitState("gwangma", "Gwangma", PlayerId.AI, new TileCoord(1, 0), AttackType.Melee,
+                30, 60, true, false, 0, hitsPerAttack: 2, hasBerserker: true);
+            gwangma.RemainingAttacksThisTurn = 0;
+            state.AIBoard.Place(gwangma.Position, gwangma);
+            var key = AiBattleStateCopy.PositionKey(state);
+            var planner = Planner(depth);
+            var move = planner.GetNextCommand(state) as MoveOccupantCommand;
+            Assert.That(AiBattleStateCopy.PositionKey(state), Is.EqualTo(key), "Planning mutated the battle.");
+            Assert.That(move, Is.Not.Null, "Berserker growth must not keep the unit inside the hazard.");
+            Assert.That(move.From, Is.EqualTo(gwangma.Position));
+            Assert.That(move.To, Is.EqualTo(new TileCoord(4, 0)));
+            new MoveService().Move(state, PlayerId.AI, move.From, move.To);
+            Assert.That(planner.GetNextCommand(state), Is.TypeOf<EndTurnCommand>(), "Do not shuffle after reaching safety.");
+            NextTurn(state);
+            Assert.That(gwangma.CurrentHp, Is.EqualTo(60));
+        }
+
         private static BattleState State()
         {
             var deck = Enumerable.Repeat("unseen", 20).ToArray();
@@ -174,10 +229,10 @@ namespace Project333.Tests.EditMode
         }
 
         private static PersistentEffectState Bomb(BattleState state, PlayerId owner = PlayerId.Player,
-            int startColumn = BiochemicalBombRules.LeftAreaStartColumn)
+            int startColumn = BiochemicalBombRules.LeftAreaStartColumn, int remainingTriggers = 4)
         {
             var effect = new PersistentEffectState(BiochemicalBombRules.CardId, owner, BiochemicalBombRules.EffectId,
-                state.TurnNumber, "After four global turn starts", new ResourceSet(), remainingTriggers: 4,
+                state.TurnNumber, "After four global turn starts", new ResourceSet(), remainingTriggers: remainingTriggers,
                 effectDamage: 25, effectDamageType: DamageType.Fixed, targetStartColumn: startColumn);
             state.PersistentEffects.Add(effect);
             return effect;
@@ -202,5 +257,14 @@ namespace Project333.Tests.EditMode
             new InMemoryCardDefinitionProvider(Array.Empty<CardDefinition>()), new TargetingService(),
             ZeroCardUpgradeLevelProvider.Instance, new AiSearchOptions
             { MaxDepth = depth, MaxMilliseconds = 10000, MaxSimulations = 4000 });
+
+        private static AiDecisionService RealCardPlanner()
+        {
+            var json = System.IO.File.ReadAllText(System.IO.Path.Combine(UnityEngine.Application.dataPath,
+                "Project333/Resources/Project333/Data/cards.json"));
+            return new AiDecisionService(JsonCardDefinitionDatabase.FromJson(json).CreateProvider(),
+                new TargetingService(), ZeroCardUpgradeLevelProvider.Instance,
+                new AiSearchOptions { MaxDepth = 3, MaxMilliseconds = 10000, MaxSimulations = 16000 });
+        }
     }
 }

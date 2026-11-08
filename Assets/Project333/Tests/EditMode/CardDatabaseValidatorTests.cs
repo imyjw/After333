@@ -1563,8 +1563,9 @@ namespace Project333.Tests.EditMode
             Assert.That(record.Affiliation, Is.EqualTo(CardAffiliation.Fantasy), cardId);
             Assert.That(record.IncludeInDraft, Is.True, cardId);
             Assert.That(record.IncludeInRewards, Is.True, cardId);
-            Assert.That(record.EffectText, Is.Empty, cardId);
-            Assert.That(record.SpecialEffectText, Is.Empty, cardId);
+            var expectedEffect = LegacyRules.HasLegacy(cardId) ? LegacyRules.DrawDescription : string.Empty;
+            Assert.That(record.EffectText, Is.EqualTo(expectedEffect), cardId);
+            Assert.That(record.SpecialEffectText, Is.EqualTo(expectedEffect), cardId);
         }
     }
 }

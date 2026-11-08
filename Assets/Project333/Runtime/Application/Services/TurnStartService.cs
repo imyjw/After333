@@ -70,23 +70,24 @@ namespace Project333.Runtime.Application.Services
             battleState.AreaSpellEffectEvents.RemoveAll(effect => effect.EffectId != EndTurnService.RedDragonFlamesEffectId);
             battleState.ClearTimedBombCountdownEvents();
 
-            ResolveScriptedTurnStartEffects(battleState);
-            if (battleState.IsEnded)
-            {
-                return;
-            }
-
             var activePlayer = battleState.GetPlayer(battleState.ActivePlayerId);
 
+            // Refresh readiness and grant base Gold even if a later start effect ends the battle.
             RefreshTurnStartState(battleState);
             GainBaseResources(battleState, activePlayer);
-            GainOccupantResources(battleState);
 
-            // Resolve damage and destruction chains before charging any surviving occupant.
+            // Direct destruction precedes persistent damage, regardless of their cast order.
+            ResolveDestructionEffects(battleState);
             if (!battleState.IsEnded)
             {
                 ResolveFallout(battleState);
-                if (!battleState.IsEnded) ResolveAreaDamageEffects(battleState);
+                if (!battleState.IsEnded) ResolvePersistentDamageEffects(battleState);
+            }
+
+            // Only survivors produce resources; grants still precede Power/Gold upkeep.
+            if (!battleState.IsEnded)
+            {
+                GainOccupantResources(battleState);
             }
 
             if (!battleState.IsEnded)
@@ -113,25 +114,18 @@ namespace Project333.Runtime.Application.Services
             }
         }
 
-        private static void ResolveScriptedTurnStartEffects(BattleState battleState)
+        private static void ResolveDestructionEffects(BattleState battleState)
         {
             var snapshot = new List<PersistentEffectState>(battleState.PersistentEffects);
-            for (var effectIndex = 0; effectIndex < snapshot.Count; effectIndex++)
+            foreach (var persistentEffect in snapshot)
             {
-                var persistentEffect = snapshot[effectIndex];
-                if (persistentEffect.IsExpired)
+                if (battleState.IsEnded)
                 {
-                    continue;
+                    return;
                 }
 
-                if (string.Equals(persistentEffect.EffectId, TimedBombRules.EffectId, StringComparison.Ordinal))
+                if (persistentEffect.IsExpired)
                 {
-                    ResolveTimedBomb(battleState, persistentEffect, effectIndex);
-                    if (battleState.IsEnded)
-                    {
-                        return;
-                    }
-
                     continue;
                 }
 
@@ -256,9 +250,26 @@ namespace Project333.Runtime.Application.Services
             OccupantDestructionService.ResolveDefeatedOccupants(battleState);
         }
 
-        private static void ResolveAreaDamageEffects(BattleState battleState)
+        private static void ResolvePersistentDamageEffects(BattleState battleState)
         {
             var effects = new List<PersistentEffectState>(battleState.PersistentEffects);
+            // Timers precede tile hazards, preserving their existing relative priority.
+            // Keep the original persistent-list index for the online countdown presentation.
+            for (var effectIndex = 0; effectIndex < effects.Count; effectIndex++)
+            {
+                if (battleState.IsEnded)
+                {
+                    return;
+                }
+
+                var effect = effects[effectIndex];
+                if (effect != null && !effect.IsExpired &&
+                    string.Equals(effect.EffectId, TimedBombRules.EffectId, StringComparison.Ordinal))
+                {
+                    ResolveTimedBomb(battleState, effect, effectIndex);
+                }
+            }
+
             foreach (var effect in effects)
             {
                 if (battleState.IsEnded)
@@ -284,57 +295,7 @@ namespace Project333.Runtime.Application.Services
 
         private static void ResolveFirewallEffect(BattleState battleState, PersistentEffectState effect)
         {
-            var targetPlayerId = effect.TargetsOwnerBoard
-                ? effect.OwnerId
-                : battleState.GetOpponent(effect.OwnerId).Id;
-            var targetBoard = battleState.GetBoard(targetPlayerId);
-            var resolvedEffectDamage = SpellPowerRules.ApplyCurrent(battleState, effect.OwnerId, effect.EffectDamage, effect.EffectDamageType);
-            var targets = new List<OccupantState>();
-            var targetCoords = new List<TileCoord>(BoardState.ColumnCount);
-            for (var column = 0; column < BoardState.ColumnCount; column++)
-            {
-                targetCoords.Add(new TileCoord(column, effect.TargetRow));
-            }
-
-            battleState.RecordAreaSpellEffect(new BattleAreaSpellEffectEvent(
-                FirewallEffectId,
-                effect.SourceCardId,
-                effect.OwnerId,
-                targetPlayerId,
-                targetCoords,
-                battleState.ValuePopupEvents.Count));
-
-            foreach (var occupant in targetBoard.EnumerateOccupants())
-            {
-                if (occupant.Position.Row == effect.TargetRow)
-                {
-                    targets.Add(occupant);
-                }
-            }
-
-            foreach (var target in targets)
-            {
-                if (target.IsSealbound)
-                {
-                    continue;
-                }
-
-                var actualDamage = DamageResolutionRules.ApplyEffectDamage(
-                    target,
-                    resolvedEffectDamage,
-                    effect.EffectDamageType);
-                BattleValuePopupRecorder.RecordDamage(
-                    battleState,
-                    target,
-                    actualDamage,
-                    BattleValueChangeCause.Firewall,
-                    effect.EffectDamageType,
-                    effect.OwnerId,
-                    sourceCardId: effect.SourceCardId);
-            }
-
-            effect.ResolveTrigger();
-            OccupantDestructionService.ResolveDefeatedOccupants(battleState);
+            FirewallEffectService.Apply(battleState, effect, isTurnStart: true);
         }
 
         private static void ResolveBiochemicalBombEffect(
@@ -474,7 +435,7 @@ namespace Project333.Runtime.Application.Services
 
             foreach (var occupant in activeBoard.EnumerateOccupants())
             {
-                if (occupant.EffectsSuppressed)
+                if (!occupant.IsAlive || occupant.EffectsSuppressed)
                 {
                     continue;
                 }

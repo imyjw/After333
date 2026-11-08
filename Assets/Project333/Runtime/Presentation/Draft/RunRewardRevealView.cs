@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Project333.Runtime.Presentation.Settings;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,6 +12,11 @@ namespace Project333.Runtime.Presentation.Draft
     public sealed class RunRewardRevealView : MonoBehaviour
     {
         private const float OpeningDuration = 1.15f;
+        // Temporary opening SFX: replace this Resources path when the final sound is ready.
+        private const string OpeningSoundResourcePath = "Project333/Audio/UI/GoldSound";
+        private const float OpeningSoundVolume = .3f;
+        private AudioSource _openingSoundSource;
+        private AudioClip _openingSoundClip;
         private static readonly Color Gold = new Color(1f, .78f, .32f);
         private Action _openRequested;
         private Action _confirmed;
@@ -94,7 +100,24 @@ namespace Project333.Runtime.Presentation.Draft
             _receipt = null;
             _chestButton.interactable = false;
             _hint.text = "보상 상자를 여는 중입니다";
+            PlayOpeningSound();
             return true;
+        }
+
+        private void PlayOpeningSound()
+        {
+            if (!UnityEngine.Application.isPlaying) return;
+            if (_openingSoundClip == null)
+                _openingSoundClip = Resources.Load<AudioClip>(OpeningSoundResourcePath);
+            if (_openingSoundClip == null) return;
+            if (_openingSoundSource == null)
+            {
+                _openingSoundSource = gameObject.AddComponent<AudioSource>();
+                _openingSoundSource.playOnAwake = false;
+                _openingSoundSource.loop = false;
+                _openingSoundSource.spatialBlend = 0f;
+            }
+            After333SoundEffects.PlayOneShot(_openingSoundSource, _openingSoundClip, OpeningSoundVolume);
         }
 
         public void SetReceipt(RunRewardDisplayContent receipt)

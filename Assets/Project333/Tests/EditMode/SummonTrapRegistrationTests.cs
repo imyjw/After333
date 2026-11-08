@@ -32,8 +32,8 @@ namespace Project333.Tests.EditMode
             var database = Database();
             var result = CardDatabaseValidator.Validate(database);
             Assert.That(result.IsValid, Is.True, string.Join(Environment.NewLine, result.Errors));
-            Assert.That(database.Cards.Count, Is.EqualTo(60));
-            Assert.That(database.Cards.Select(card => card.Id).Distinct().Count(), Is.EqualTo(60));
+            Assert.That(database.Cards.Count, Is.EqualTo(61));
+            Assert.That(database.Cards.Select(card => card.Id).Distinct().Count(), Is.EqualTo(61));
             Assert.That(database.Cards.Count(card => card.DefinitionType == JsonCardDefinitionKind.TrapSpell), Is.EqualTo(5));
             var record = Record(database);
             Assert.That(record.DisplayName, Is.EqualTo("트랩 - 서먼 트랩"));

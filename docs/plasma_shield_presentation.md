@@ -1,5 +1,7 @@
 # 플라즈마 쉴드 카드와 보호막 형성 연출
 
+**최신 연출: 2026-10-29 사용자 스프라이트와 고정 크기 적용.** 아래2026-10-01 몸체 크기 맞춤/옛 아틀라스 설명은 초기 구현 기록이며 현재 연출은 마지막 절을 따른다. 카드 규칙은 그대로다.
+
 2026-10-01. 사용자 지정 카드 규칙과 기존 영구 능력치 버프·대상 지정 규칙을 사용한다.
 
 `PlasmaShield` / 플라즈마 쉴드는 과학문명 커먼 즉시 마법이며 전력1을 소모한다. 부족한 전력은 기존 골드1 대체 규칙을 따른다. 내·상대 전장의 살아 있는 유닛(마스터 제외) 또는 건물 하나에 물리 방어력 +10을 부여한다. 빈 칸·마스터·사망·봉인·은신한 적은 대상이 아니다. 은신한 아군은 대상이며 이 비피해 버프는 은신을 해제하지 않는다.
@@ -48,3 +50,39 @@
 - 증거: TempBuild/PlasmaShield_20261001의 verification.json, unity-results.xml, unity-summary.json, CoreProofSummary.json, CoreChangedManifest.json, native-import.json, media-review.json, independent-review.json, pre-test-input-hashes.json, post-test-meta-hashes.json, final-input-hashes.json, capture-hashes.json 및 attempts.
 
 이번 변경은 소스·자산·문서이며 앱 빌드/설치와 운영 서버 배포/재시작은 하지 않았다. 온라인 반영에는 사용자의 클라이언트 재빌드와 서버 코드 업데이트가 필요하다.
+
+## 2026-10-29 — 사용자 스프라이트·고정 크기
+
+- 사용자가 첨부한 `PlasmaShiled.png`를 `Assets/Project333/Resources/Project333/SpellEffects/PlasmaShield/Formation.png`에 **바이트 변경 없이** 연결했다. 카드 그림(`CardArtwork/PlasmaShield.png`)은 이번 애니메이션 교체와 별개이며 변경하지 않았다.
+- 원본 시트는 **4096×512**, 왼쪽부터 **512×512 8프레임**이다. 원본 투명도·색·프레임 안 위치를 보존하며 다시 그리거나 여백을 넣거나 잘라내지 않았다. Unity의 Sprite Editor 데이터 제공자로 FullRect·Point·PPU100·mipmap off·NPOT None·무압축·최대4096 설정을 적용했다. 기존 텍스처 GUID와 유지되는 Formation_N의 spriteID를 보존하고 한 줄 프레임으로 재분할했다. .meta를 텍스트 편집하지 않고 분리 Unity에서 생성한 결과를 검증 후 반영했다.
+- `PlasmaShieldVfx.FixedFrameSize = 512f`로 **512×512 UI 단위 고정 크기**를 사용한다. 화면 해상도·Canvas 배율에 따른 표시 변환은 기존 UI와 동일하지만 소환물 크기/배율로 쉴드를 확대·축소하지 않는다. 나중에 크기를 바꾸려면 해당 상수를 수정한다.
+- 위치는 기존 512셀의 아래16px 발밑 기준점(`GetVisualNormalizedWorldPosition(.5, 1/32)`)을 따라간다. 원본 각 프레임은 공통 bottom-center pivot을 사용한다. 몸체의 alpha 경계·대각선/폭/높이 계산, 셀별 effectBounds/접지 보정을 제거했다. 대상 위치는 따라가되 쉴드 root는 독립 Canvas여서 소환물 스케일·좌우 반전을 상속하지 않는다.
+- 기존 성공 확정·대상 RuntimeId·숨김/사망/봉인·종료/disable 취소·busy/온라인 메시지 동기화와 sorting4908·입력 비차단을 유지한다. 피격·카드 사용·회복/피해·방어 버프 규칙은 변경하지 않았다. 추가 효과음이나 지속 보호막도 만들지 않았다.
+- 기존12fps와0.15초 fade를 유지한다. 총 길이는 **약0.817초**이며 source alpha와 기존 효과별 화면 opacity 정책을 유지한다.
+
+### 검증·반영
+
+두 쉴드 네이티브 자산/실제 연출4개 fixture **28/28 통과**, 실패/스킵0. 광마·블루드래곤·A-301·마나의 샘, 양쪽 소유자, 모든 프레임·고정크기·2배/0.5배 몸체 변경·발밑 고정·렌더 차이·로컬 시전·온라인 양쪽 좌석/정확한 대상·실패/재접속 미재생·취소/정리를 확인했다. Native6+6 및 presentation8+8이다.
+
+첫28개 중26통과/2실패는 카드 그림이 옛512픽셀이라는 기대값 때문이었다. 현재 사용자 카드 그림1086×1448을 바꾸지 않고 검사만 원본 치수의 전체 단일 Sprite 기준으로 갱신했다. 그 뒤256크기에서28/28 통과했으나 실제 렌더가 작아512크기로 올리고 발밑 기준점에 맞춘 최종 코드로 다시28/28 통과했다. 최종 소스·PNG·native meta·검사 해시는 실제 실행 사본과 일치한다.
+
+증거는 세션 `FixedShields_20261029`의 native-import.json/import.log, initial-tests.xml/log(26/28), small-size-tests.xml/log(256크기28/28), final-tests.xml/final-tests.log(512크기28/28), source-images.json, verification.json, before 스냅샷과16장 렌더다. 사용자 Editor/씬을 제어하거나 강제로 저장하지 않았다. 검증 사본은 기존 LevelPlay SDK 별도 assembly 제외 상태이며 광고 검증을 뜻하지 않는다.
+
+휴대폰 반영은 사용자 앱 재빌드·설치가 필요하다. 이번 변경 때문에 서버 재배포·DB 마이그레이션은 필요하지 않으며 이 작업에서 앱 빌드/설치·운영 서버/DB·커밋/push는 실행하지 않았다. 실기기 표시 크기/청취·라이브 네트워크는 별도 확인 범위다. 과거 Tools/Art의2026-10-01 아트 제작/등록 기록은 새 PNG의 근거가 아니며 이번에는 사용자 원본을 사용했다.
+
+
+## 위치 조절 안내 (2026-10-29)
+
+이번 요청에서 플라즈마 스프라이트/위치는 변경하지 않았다. 위치는 `Runtime/Presentation/Battle/PlasmaShieldVfx.cs`의 `UpdateLayout()`에서 결정한다.
+
+### 애니메이션 위치 직접 조절
+
+`ManaShieldVfx.cs`와 `PlasmaShieldVfx.cs`의 `UpdateLayout()` 안에서 `_image.rectTransform.anchoredPosition = ...` 한 줄을 아래로 바꾸면 된다. 각각 별도 파일이므로 효과별로 다른 값을 쓸 수 있다.
+
+```csharp
+var position = (Vector2)_root.InverseTransformPoint(
+    _view.GetVisualNormalizedWorldPosition(new Vector2(.5f, 1f / 32f)));
+_image.rectTransform.anchoredPosition = position + new Vector2(0f, 30f);
+```
+
+`new Vector2(가로, 세로)`는 기준점에서 더 이동할 거리다. X양수=오른쪽/음수=왼쪽, Y양수=위/음수=아래. 예시(0,30)는 위로30, (0,-20)는 아래로20, (15,0)는 오른쪽으로15. Canvas 기준 UI 단위이므로 실제 화면 픽셀 수는 해상도·Canvas 배율에 따라 달라진다. 원래 `.5f, 1f/32f`는 소환물의 발밑 기준점이므로 그대로 두고 뒤의 오프셋만 조절하면 된다. `FixedFrameSize`는 크기 설정이며 위치 설정이 아니다. Play 중 생성된 Image를 직접 옮겨도 다음 `UpdateLayout`이 위치를 덮어쓰므로 소스에서 수정한다. 이번 교체에서는 위치 코드/상수는 변경하지 않았으며 예시는 사용자 편집 방법이다.

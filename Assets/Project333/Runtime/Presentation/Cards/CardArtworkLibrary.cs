@@ -65,6 +65,10 @@ namespace Project333.Runtime.Presentation.Cards
             if (string.Equals(cardId, "SkeletonArcher", StringComparison.Ordinal))
                 return LoadArtworkAtPath($"{ResourceFolder}/Skeleton", cardId);
 
+            // Combat-log hidden cards prefer OpponentCardBack2 and fall back to the older back.
+            if (string.Equals(cardId, "OpponentCardBack2", StringComparison.Ordinal))
+                return LoadArtworkAtPath($"{ResourceFolder}/OpponentCardBack", cardId);
+
             // Use the canonical identifier; dedicated art wins.
             if (string.Equals(cardId, "ElfElder", StringComparison.Ordinal))
                 return LoadArtworkAtPath($"{ResourceFolder}/ElfLongbowScout", cardId);

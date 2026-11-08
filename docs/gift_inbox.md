@@ -13,7 +13,121 @@
 - 통신 오류가 난 수령 요청은 동일 선물 ID로 자동 재시도한다. 앱을 재실행하면 서버 목록을 다시 읽어 수령 완료/미수령/만료 상태를 표시한다.
 - 미수령 개수 배지, 개별 받기, 기간 만료 표시, 이전 목록 더 보기를 제공한다. 수령 완료 선물은 즉시 목록에서 사라지며 재조회·재실행 후에도 표시하지 않는다. 서버의 수령·거래 기록은 중복 지급 방지를 위해 유지한다. 이번 범위에는 카드·팩 첨부, 모두 받기, 발송 후 수정·회수는 포함하지 않는다.
 
-## 관리자 도구
+## Lightsail 운영 DB(`project333_live`) 선물 지급 절차 — 2026-10-31 갱신
+
+### 1. 이전 방식이 작동하지 않는 이유
+
+1. **기본 DB 설정 파일이 예전 노트북 로컬 DB를 가리킴**
+   - `ManageGifts.ps1`에 `-UseEnvironmentDatabase` 옵션을 주지 않으면 기본값으로 `%LOCALAPPDATA%\After333\Server\DeploymentSettings-20260909.clixml`을 읽어 **예전 로컬 PC의 PostgreSQL(`project333`)**에 접속한다.
+   - 현재 실제 운영 DB는 서울 AWS Lightsail 내부의 **`project333_live`(`localhost:5432`)**이므로, 예전 명령어를 그대로 실행하면 로컬 PC DB에만 선물이 들어가고 실제 운영 서버에는 반영되지 않는다.
+2. **루프백(`localhost` / `127.0.0.1`) 전용 보안 제약**
+   - `Server/Project333.GiftAdmin/Program.cs`는 보안상 `Host=localhost` 또는 `127.0.0.1` 루프백 주소만 허용한다.
+   - Lightsail PostgreSQL 18 역시 외부 인터넷에 `5432` 포트를 개방하지 않고 서버 내부 `127.0.0.1:5432`에서만 수신한다.
+
+---
+
+### 2. 현재 버전에서 선물함에 서버 골드·티켓을 지급하는 방법
+
+`ManageGifts.ps1`의 **`-UseEnvironmentDatabase`** 스위치와 **SSH 로컬 포트 포워딩(`127.0.0.1:15432 -> Lightsail 127.0.0.1:5432`)**을 함께 사용한다. 운영 서버(`after333.service`)를 중지할 필요는 없다.
+
+#### 1단계: PowerShell 창 1 — Lightsail SSH 포트 포워딩 열기
+
+Lightsail SSH 개인키로 Windows PC의 로컬 포트 `15432`를 Lightsail 내부 PostgreSQL(`127.0.0.1:5432`)에 연결한다.
+
+```powershell
+$key = "$env:USERPROFILE\Downloads\LightsailDefaultKey-ap-northeast-2.pem"
+ssh -i $key -L 15432:127.0.0.1:5432 ubuntu@api.after333.com
+```
+
+- 선물 발송이 끝날 때까지 **이 창(SSH 세션)을 닫지 않고 유지**한다.
+- 운영 DB 연결 문자열(`PROJECT333_DB_CONNECTION`)을 확인해야 할 때는 접속된 Lightsail Ubuntu 터미널에서 아래 명령으로 확인한다(값을 채팅·문서·Git에 붙여 넣지 않는다):
+  ```bash
+  sudo grep '^PROJECT333_DB_CONNECTION=' /etc/after333/server.production.env
+  ```
+
+#### 2단계: PowerShell 창 2 (Windows PC) — 세션 준비 및 DB 연결 문자열 설정
+
+새 Windows PowerShell 창을 열고 아래 준비 명령을 실행한다. `PROJECT333_DB_CONNECTION`에는 `/etc/after333/server.production.env`의 값에서 **`Host=127.0.0.1;Port=15432`**로 포트만 바꾼 문자열을 현재 PowerShell 프로세스에만 설정한다.
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+Set-Location C:\Project_333
+$giftTool = 'C:\Project_333\Server\Project333.PvpServer\Tools\ManageGifts.ps1'
+
+# 현재 PowerShell 창에만 SSH 터널 포트(15432)로 운영 DB 연결 설정
+$env:PROJECT333_DB_CONNECTION = 'Host=127.0.0.1;Port=15432;Database=project333_live;Username=after333;Password=<운영DB비밀번호>'
+```
+
+> **팁 (비밀번호 수동 입력 없이 SSH에서 바로 읽어 터널 포트 `15432`로 자동 설정하는 방법):**
+> `/etc/after333/server.production.env`는 systemd `EnvironmentFile` 형식(`\"` 이스케이프 포함)이므로, 단순 `grep` 대신 `systemd-run ... printenv`로 읽어야 따옴표 이스케이프가 정상 해제된다. 창 1에서 SSH 터널(`15432`)을 열어둔 상태라면, 창 2에서 아래 한 줄을 실행해 비밀번호를 화면에 출력하지 않고 `$env:PROJECT333_DB_CONNECTION`을 자동 설정할 수 있다.
+> ```powershell
+> $env:PROJECT333_DB_CONNECTION = (ssh -i "$env:USERPROFILE\Downloads\LightsailDefaultKey-ap-northeast-2.pem" ubuntu@api.after333.com 'sudo systemd-run --quiet --wait --pipe --collect --property=EnvironmentFile=/etc/after333/server.production.env /usr/bin/printenv PROJECT333_DB_CONNECTION' | Select-Object -Last 1).Trim() -replace 'Port=5432', 'Port=15432'
+> ```
+
+#### 3단계: 계정 검색 (`-Mode Accounts -UseEnvironmentDatabase`)
+
+반드시 **`-UseEnvironmentDatabase`**를 붙여서 실행한다.
+
+```powershell
+# 최근 계정 목록 조회 (최대 100개)
+& $giftTool -UseEnvironmentDatabase -Mode Accounts
+
+# 표시 이름 또는 계정 ID 일부로 검색
+& $giftTool -UseEnvironmentDatabase -Mode Accounts -Search '표시 이름'
+```
+
+출력 결과에서 지급 대상의 `AccountId`(UUID)와 `DisplayName`을 확인한다.
+
+#### 4단계: 선물 준비 (`-Mode Prepare -UseEnvironmentDatabase`)
+
+**Prepare는 미리보기와 요청 JSON 파일 생성만 하며 아직 발송하지 않는다.**
+`-Tickets`(서버 티켓)와 `-ResourceGold`(서버 골드)를 함께 넣거나, 하나만 지급할 때는 다른 하나를 생략한다.
+
+- **특정 계정에 서버 골드·티켓 지급 준비 (`-AccountIds`)**
+  ```powershell
+  & $giftTool -UseEnvironmentDatabase -Mode Prepare `
+    -AccountIds '계정 UUID' `
+    -Title '운영자 선물' `
+    -Message '선물이 도착했습니다.' `
+    -Tickets 3 `
+    -ResourceGold 100 `
+    -Reason '운영자 수동 지급'
+  ```
+
+- **전체 계정에 서버 골드·티켓 일괄 지급 준비 (`-AllUsers`)**
+  ```powershell
+  & $giftTool -UseEnvironmentDatabase -Mode Prepare `
+    -AllUsers `
+    -Title '점검 보상' `
+    -Message '기다려주셔서 감사합니다.' `
+    -Tickets 1 `
+    -ResourceGold 30 `
+    -Reason '서버 점검 보상'
+  ```
+
+- *(선택)* 만료 기한을 지정하려면 `-ExpiresAt '2026-11-30T23:59:00+09:00'`를 추가한다(생략 시 무기한).
+- 실행 결과의 **`RequestFile`** 경로(`%LOCALAPPDATA%\After333\Admin\GiftRequests\gift-<UUID>.json`)를 복사해 둔다.
+
+#### 5단계: 내용 확인 및 실제 발송 (`-Mode Preview` / `-Mode Send`)
+
+앞서 출력된 `RequestFile` 경로를 넣어 미리보기(`Preview`) 후 실제 발송(`Send`)한다. 이때도 **`-UseEnvironmentDatabase`**를 반드시 포함한다.
+
+```powershell
+$requestFile = '출력된 RequestFile 전체 경로'
+
+# 발송 전 내용·대상 수 재확인
+& $giftTool -UseEnvironmentDatabase -Mode Preview -RequestFile $requestFile
+
+# 실제 Lightsail 운영 DB(project333_live) 선물함 발송
+& $giftTool -UseEnvironmentDatabase -Mode Send -RequestFile $requestFile
+```
+
+- **`Send`가 완료되면** `GiftId`, `RecipientCount`, `AlreadySent`가 출력되며, 유저는 게임 시작 화면 우상단 **선물함**에서 즉시 확인·수령할 수 있다.
+- 작업이 끝나면 창 2의 PowerShell을 닫고(메모리의 `PROJECT333_DB_CONNECTION` 자동 소멸), 창 1의 SSH 터널을 `exit`로 종료한다.
+
+---
+
+## 관리자 도구 (이전 로컬 Windows DB 기준 기록)
 
 서버 PC에서 PowerShell을 열어 실행한다. 공개 관리자 API는 없고, 도구가 해당 Windows 사용자의 암호화된 서버 DB 설정으로 로컬 PostgreSQL에 접근한다. 비밀 키나 DB 비밀번호를 앱에 넣지 않는다. 서버를 중지할 필요는 없다.
 

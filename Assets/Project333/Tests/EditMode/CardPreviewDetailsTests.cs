@@ -128,7 +128,7 @@ namespace Project333.Tests.EditMode
                         .Where(panel => panel.gameObject.activeSelf && panel.name.StartsWith("AbilityTooltip")).ToArray();
                     Assert.That(panels.Length, Is.EqualTo(1));
                     var description = panels.Single().Find("Description").GetComponent<Text>().text;
-                    Assert.That(description, Does.Contain("양쪽 턴 시작마다 중첩당 10").And.Contain("영구").And.Contain("중첩"));
+                    Assert.That(description, Is.EqualTo("양쪽 턴 시작마다 10의 고정 피해를 받는다."));
                     Assert.That(description, Does.Not.Contain("고정 데미지 " + (100 + level)));
                     Assert.That(Overlay().transform.Find("CardArtwork/Hp").gameObject.activeSelf, Is.False);
                 }
@@ -158,7 +158,7 @@ namespace Project333.Tests.EditMode
                 Assert.That(VisibleTitles(), Is.EquivalentTo(new[] { "낙진" }));
                 var tutorialDescription = Overlay().GetComponentsInChildren<Text>()
                     .Single(t => t.name == "Description").text;
-                Assert.That(tutorialDescription, Does.Contain("중첩당 10").And.Not.Contain("고정 데미지 100"));
+                Assert.That(tutorialDescription, Is.EqualTo("양쪽 턴 시작마다 10의 고정 피해를 받는다.").And.Not.Contain("고정 데미지 100"));
                 Assert.That(levels[NuclearRules.CardId], Is.EqualTo(13));
 
                 // A subsequent ordinary preview must not inherit the tutorial's local level.

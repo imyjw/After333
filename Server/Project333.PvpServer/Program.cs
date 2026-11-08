@@ -90,7 +90,6 @@ var battleCardUpgradeLevelService = app.Services.GetRequiredService<BattleCardUp
 var pvpMatchmakingService = app.Services.GetRequiredService<PvpMatchmakingService>();
 var pvpBattlePersistenceService = app.Services.GetRequiredService<PvpBattlePersistenceService>();
 var sessionManager = new BattleSessionManager(app.Services.GetRequiredService<BattleResultOutbox>());
-var aiFallbackTimers = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
 var jsonOptions = new JsonSerializerOptions
 {
     PropertyNameCaseInsensitive = true,
@@ -98,6 +97,8 @@ var jsonOptions = new JsonSerializerOptions
     WriteIndented = false
 };
 jsonOptions.Converters.Add(new JsonStringEnumConverter());
+var aiFallbackScheduler = new PvpAiFallbackScheduler(matchmakingAiWait,
+    TryStartAndPublishNormalAiFallbackAsync, app.Lifetime.ApplicationStopping);
 var battleLoginSessions = new BattleLoginSessionRegistry(guestAuthService);
 guestAuthService.LoginSessionsChanged += battleLoginSessions.NotifyLoginChanged;
 
@@ -3039,57 +3040,26 @@ static async Task RecordPvpBattleCommandAsync(
     }
 }
 
-void ScheduleNormalAiFallback(BattleSession waitingSession)
-{
-    if (waitingSession.IsBattleStarted || waitingSession.UseServerAiOpponent ||
-        waitingSession.AiChallengeAttemptId != null ||
-        !aiFallbackTimers.TryAdd(waitingSession.MatchId, 0)) return;
-    _ = RunNormalAiFallbackAsync(waitingSession);
-}
+void ScheduleNormalAiFallback(BattleSession waitingSession) => aiFallbackScheduler.Schedule(waitingSession);
 
-async Task RunNormalAiFallbackAsync(BattleSession waitingSession)
+async Task TryStartAndPublishNormalAiFallbackAsync(BattleSession waitingSession, CancellationToken cancellationToken)
 {
-    var stopping = app.Lifetime.ApplicationStopping;
-    var retry = false;
-    try
-    {
-        await Task.Delay(matchmakingAiWait, stopping);
-        while (!stopping.IsCancellationRequested && !waitingSession.IsBattleStarted &&
-               !waitingSession.UseServerAiOpponent && waitingSession.ConnectionCount > 0)
-        {
-            var outcome = await pvpMatchmakingService.TryStartServerAiFallbackAsync(
-                waitingSession, matchmakingAiWait, stopping);
-            if (outcome.Started)
-            {
-                var audit = app.Services.GetRequiredService<AuditLogService>();
-                Console.WriteLine($"[match:{waitingSession.MatchId}] {outcome.Message}");
-                foreach (var participant in waitingSession.SnapshotConnections())
-                    await participant.SendEnvelopeAsync(() => waitingSession.CreateConnectedEnvelope(participant), jsonOptions, stopping);
-                await RecordPvpBattleSnapshotAsync(waitingSession, pvpBattlePersistenceService,
-                    "ai_matchmaking_started", jsonOptions, stopping);
-                await BroadcastEnvelopeAsync(waitingSession,
-                    waitingSession.CreateBattleStartedEnvelope(outcome.Message), jsonOptions, stopping);
-                await BroadcastStateViewsAsync(waitingSession, jsonOptions, stopping);
-                await BroadcastServerAiTurnIfNeededAsync(waitingSession, runStartService, pvpMatchmakingService,
-                    pvpBattlePersistenceService, audit, jsonOptions, stopping);
-                ScheduleTurnTimeoutIfNeeded(waitingSession, sessionManager, runStartService,
-                    pvpMatchmakingService, pvpBattlePersistenceService, audit, jsonOptions);
-                return;
-            }
-            // A second human may hold a short join reservation. Give that connection priority.
-            await Task.Delay(TimeSpan.FromSeconds(1), stopping);
-        }
-    }
-    catch (OperationCanceledException) when (stopping.IsCancellationRequested) { }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[match:{waitingSession.MatchId}] AI fallback failed: {ex.GetType().Name}");
-        // A transient failure must not strand the sole queued human forever.
-        retry = !stopping.IsCancellationRequested && !waitingSession.IsBattleStarted &&
-            waitingSession.ConnectionCount > 0;
-    }
-    finally { aiFallbackTimers.TryRemove(waitingSession.MatchId, out _); }
-    if (retry) ScheduleNormalAiFallback(waitingSession);
+    var outcome = await pvpMatchmakingService.TryStartServerAiFallbackAsync(
+        waitingSession, matchmakingAiWait, cancellationToken);
+    if (!outcome.Started) return;
+    var audit = app.Services.GetRequiredService<AuditLogService>();
+    Console.WriteLine($"[match:{waitingSession.MatchId}] {outcome.Message}");
+    foreach (var participant in waitingSession.SnapshotConnections())
+        await participant.SendEnvelopeAsync(() => waitingSession.CreateConnectedEnvelope(participant), jsonOptions, cancellationToken);
+    await RecordPvpBattleSnapshotAsync(waitingSession, pvpBattlePersistenceService,
+        "ai_matchmaking_started", jsonOptions, cancellationToken);
+    await BroadcastEnvelopeAsync(waitingSession,
+        waitingSession.CreateBattleStartedEnvelope(outcome.Message), jsonOptions, cancellationToken);
+    await BroadcastStateViewsAsync(waitingSession, jsonOptions, cancellationToken);
+    await BroadcastServerAiTurnIfNeededAsync(waitingSession, runStartService, pvpMatchmakingService,
+        pvpBattlePersistenceService, audit, jsonOptions, cancellationToken);
+    ScheduleTurnTimeoutIfNeeded(waitingSession, sessionManager, runStartService,
+        pvpMatchmakingService, pvpBattlePersistenceService, audit, jsonOptions);
 }
 
 static async Task RecordPvpMatchmakingJoinAsync(

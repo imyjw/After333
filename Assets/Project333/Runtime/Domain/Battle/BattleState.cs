@@ -242,12 +242,12 @@ namespace Project333.Runtime.Domain.Battle
 
         public void RecordCardDraw(PlayerId ownerId)
         {
-            RecordCardDraw(ownerId, string.Empty);
+            RecordCardDraw(ownerId, string.Empty, string.Empty);
         }
 
-        public void RecordCardDraw(PlayerId ownerId, string sourceCardId)
+        public void RecordCardDraw(PlayerId ownerId, string sourceCardId, string drawnCardId = "")
         {
-            CardDrawEvents.Add(new BattleCardDrawEvent(ownerId, sourceCardId));
+            CardDrawEvents.Add(new BattleCardDrawEvent(ownerId, sourceCardId, drawnCardId));
         }
 
         public void RecordCardGeneration(BattleCardGenerationEvent generationEvent)

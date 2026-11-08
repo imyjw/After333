@@ -61,6 +61,8 @@ namespace Project333.Runtime.Application.Services
             // Round-robin placements/targets prevents one hand card from consuming the entire search budget.
             var handGroups = new List<List<AiAction>>();
             var seenCards = new HashSet<string>();
+            // User policy (2026-10-26): never summon into a tile hazard while a safe empty tile exists.
+            var avoidHazardTiles = AiMovementPolicy.HasSafeEmptyTile(state);
             for (var handIndex = 0; handIndex < state.AI.Hand.Count; handIndex++)
             {
                 var hand = state.AI.Hand.Cards[handIndex];
@@ -71,6 +73,8 @@ namespace Project333.Runtime.Application.Services
                 foreach (var coord in Coordinates)
                 {
                     if (state.AIBoard.GetOccupant(coord) != null) continue;
+                    if (avoidHazardTiles && (definition is UnitCardDefinition || definition is BuildingCardDefinition) &&
+                        AiMovementPolicy.IsAiTileHazard(state, coord)) continue;
                     if (definition is UnitCardDefinition)
                         group.Add(new AiAction(70, new PlayUnitCardCommand(hand.CardId, coord, hand.RuntimeId)));
                     else if (definition is BuildingCardDefinition)
